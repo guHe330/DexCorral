@@ -39,3 +39,8 @@
 
 # debug information files
 *.dwo
+
+# Documentation
+*.md
+!README.md
+!MANUAL.md
