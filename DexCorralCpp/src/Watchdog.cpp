@@ -1,4 +1,4 @@
-// DexCorralCpp Watchdog
+// DexCorral Watchdog
 // Monitors the main application and restarts it if it crashes.
 // Does NOT restart if main app signals graceful exit (user Exit or Windows shutdown).
 
@@ -6,8 +6,8 @@
 #include <shellapi.h>
 #include <string>
 
-static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralCppGracefulExit";
-static const wchar_t* WATCHDOG_MUTEX = L"DexCorralCppWatchdogMutex";
+static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralGracefulExit";
+static const wchar_t* WATCHDOG_MUTEX = L"DexCorralWatchdogMutex";
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
     // Prevent multiple watchdog instances
@@ -66,16 +66,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     wchar_t watchdogPath[MAX_PATH];
     GetModuleFileNameW(nullptr, watchdogPath, MAX_PATH);
 
-    // Replace "Watchdog.exe" with ".exe" in path
+    // Replace ".Watchdog.exe" with ".exe" in path
     std::wstring mainPath(watchdogPath);
-    size_t pos = mainPath.rfind(L"Watchdog.exe");
+    size_t pos = mainPath.rfind(L".Watchdog.exe");
     if (pos != std::wstring::npos) {
-        mainPath.replace(pos, 12, L".exe");
+        mainPath.replace(pos, 13, L".exe");
     } else {
-        // Fallback: just look for DexCorralCpp.exe in same directory
+        // Fallback: just look for DexCorral.exe in same directory
         pos = mainPath.rfind(L'\\');
         if (pos != std::wstring::npos) {
-            mainPath = mainPath.substr(0, pos + 1) + L"DexCorralCpp.exe";
+            mainPath = mainPath.substr(0, pos + 1) + L"DexCorral.exe";
         }
     }
 

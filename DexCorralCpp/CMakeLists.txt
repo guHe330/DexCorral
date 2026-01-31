@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(DexCorralCpp VERSION 1.0.0 LANGUAGES CXX)
+project(DexCorral VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # Add executable
-add_executable(DexCorralCpp WIN32
+add_executable(DexCorral WIN32
     src/main.cpp
     src/App.cpp
     src/DesktopIcons.cpp
@@ -19,6 +19,7 @@ add_executable(DexCorralCpp WIN32
     src/TrayIcon.cpp
     src/DesktopMonitor.cpp
     src/MonitorManager.cpp
+    src/FolderWatcher.cpp
     include/App.h
     include/DesktopIcons.h
     include/WallpaperManager.h
@@ -28,16 +29,17 @@ add_executable(DexCorralCpp WIN32
     include/TrayIcon.h
     include/DesktopMonitor.h
     include/MonitorManager.h
+    include/FolderWatcher.h
 )
 
 # Include directories
-target_include_directories(DexCorralCpp PRIVATE include)
+target_include_directories(DexCorral PRIVATE include)
 
 # Unicode and macro definitions
-target_compile_definitions(DexCorralCpp PRIVATE UNICODE _UNICODE NOMINMAX)
+target_compile_definitions(DexCorral PRIVATE UNICODE _UNICODE NOMINMAX)
 
 # Link Windows libraries
-target_link_libraries(DexCorralCpp PRIVATE
+target_link_libraries(DexCorral PRIVATE
     comctl32
     comdlg32
     gdi32
@@ -49,7 +51,23 @@ target_link_libraries(DexCorralCpp PRIVATE
 )
 
 # Set subsystem to Windows
-set_target_properties(DexCorralCpp PROPERTIES
+set_target_properties(DexCorral PROPERTIES
+    WIN32_EXECUTABLE TRUE
+)
+
+# Watchdog executable
+add_executable(DexCorral.Watchdog WIN32
+    src/Watchdog.cpp
+)
+
+target_compile_definitions(DexCorral.Watchdog PRIVATE UNICODE _UNICODE)
+
+target_link_libraries(DexCorral.Watchdog PRIVATE
+    shell32
+    user32
+)
+
+set_target_properties(DexCorral.Watchdog PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 

@@ -8,7 +8,7 @@ std::string Config::GetConfigPath() {
     wchar_t path[MAX_PATH];
     if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, path))) {
         std::wstring wpath(path);
-        wpath += L"\\DexCorralCpp";
+        wpath += L"\\DexCorral";
 
         // Create directory if it doesn't exist
         CreateDirectoryW(wpath.c_str(), NULL);

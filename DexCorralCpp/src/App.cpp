@@ -11,7 +11,7 @@
 App* App::instance = nullptr;
 
 static const wchar_t* MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
-static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralCppGracefulExit";
+static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralGracefulExit";
 
 App::App() : messageWindow(nullptr) {
     instance = this;
@@ -756,7 +756,7 @@ void App::StartWatchdog() {
     std::wstring watchdogPath(exePath);
     size_t pos = watchdogPath.rfind(L'\\');
     if (pos != std::wstring::npos) {
-        watchdogPath = watchdogPath.substr(0, pos + 1) + L"DexCorralCppWatchdog.exe";
+        watchdogPath = watchdogPath.substr(0, pos + 1) + L"DexCorral.Watchdog.exe";
     } else {
         return;  // Can't determine path
     }
