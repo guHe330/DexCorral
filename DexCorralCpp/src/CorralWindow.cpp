@@ -537,6 +537,17 @@ void CorralWindow::LoadIconImages() {
         if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi),
             SHGFI_ICON | iconFlag)) {
             ci.hIcon = sfi.hIcon;
+        } else {
+            // Fallback: Try to get icon by file extension instead of actual file
+            // This helps with corrupted icon cache or permission issues
+            DWORD fileAttribs = GetFileAttributesW(ci.fullPath.c_str());
+            if (fileAttribs == INVALID_FILE_ATTRIBUTES) {
+                fileAttribs = FILE_ATTRIBUTE_NORMAL;
+            }
+            if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfi, sizeof(sfi),
+                SHGFI_ICON | iconFlag | SHGFI_USEFILEATTRIBUTES)) {
+                ci.hIcon = sfi.hIcon;
+            }
         }
 
         // Always load small icon for details view
@@ -545,6 +556,16 @@ void CorralWindow::LoadIconImages() {
             if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfiSmall, sizeof(sfiSmall),
                 SHGFI_ICON | SHGFI_SMALLICON)) {
                 ci.hIconSmall = sfiSmall.hIcon;
+            } else {
+                // Fallback for small icon as well
+                DWORD fileAttribs = GetFileAttributesW(ci.fullPath.c_str());
+                if (fileAttribs == INVALID_FILE_ATTRIBUTES) {
+                    fileAttribs = FILE_ATTRIBUTE_NORMAL;
+                }
+                if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfiSmall, sizeof(sfiSmall),
+                    SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES)) {
+                    ci.hIconSmall = sfiSmall.hIcon;
+                }
             }
         }
 
@@ -605,6 +626,14 @@ void CorralWindow::LoadVirtualFolderIcons() {
         SHFILEINFOW sfi = {};
         if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_ICON | iconFlag)) {
             ci.hIcon = sfi.hIcon;
+        } else {
+            // Fallback: Try to get icon by file extension instead of actual file
+            // This helps with corrupted icon cache or permission issues
+            DWORD fileAttribs = findData.dwFileAttributes;
+            if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfi, sizeof(sfi),
+                SHGFI_ICON | iconFlag | SHGFI_USEFILEATTRIBUTES)) {
+                ci.hIcon = sfi.hIcon;
+            }
         }
 
         // Load small icon for details view
@@ -613,6 +642,13 @@ void CorralWindow::LoadVirtualFolderIcons() {
             if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfiSmall, sizeof(sfiSmall),
                               SHGFI_ICON | SHGFI_SMALLICON)) {
                 ci.hIconSmall = sfiSmall.hIcon;
+            } else {
+                // Fallback for small icon as well
+                DWORD fileAttribs = findData.dwFileAttributes;
+                if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfiSmall, sizeof(sfiSmall),
+                    SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES)) {
+                    ci.hIconSmall = sfiSmall.hIcon;
+                }
             }
         }
 
