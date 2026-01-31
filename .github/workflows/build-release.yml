@@ -1,0 +1,189 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type (patch/minor/major)'
+        required: false
+        default: 'patch'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for tags
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Get latest version tag
+      id: get_version
+      shell: pwsh
+      run: |
+        # Get the latest version tag
+        $tags = git tag -l "v*" | Sort-Object -Descending { [version]($_ -replace '^v', '') }
+        
+        if ($tags) {
+          $latestTag = $tags | Select-Object -First 1
+          $version = $latestTag -replace '^v', ''
+        } else {
+          $version = "1.0.0"
+        }
+        
+        # Parse version components
+        $parts = $version -split '\.'
+        $major = [int]$parts[0]
+        $minor = [int]$parts[1]
+        $patch = [int]$parts[2]
+        
+        # Increment based on input or default to patch
+        $bump = "${{ github.event.inputs.version_bump }}"
+        if (-not $bump) { $bump = "patch" }
+        
+        switch ($bump) {
+          "major" { $major++; $minor = 0; $patch = 0 }
+          "minor" { $minor++; $patch = 0 }
+          "patch" { $patch++ }
+        }
+        
+        $newVersion = "$major.$minor.$patch"
+        
+        Write-Host "Previous version: $version"
+        Write-Host "New version: $newVersion"
+        
+        echo "version=$newVersion" >> $env:GITHUB_OUTPUT
+        echo "tag=v$newVersion" >> $env:GITHUB_OUTPUT
+
+    - name: Update CMakeLists.txt version
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $cmakePath = "DexCorralCpp/CMakeLists.txt"
+        $content = Get-Content $cmakePath -Raw
+        $content = $content -replace 'project\(DexCorral VERSION \d+\.\d+\.\d+', "project(DexCorral VERSION $version"
+        Set-Content $cmakePath -Value $content
+        Write-Host "Updated CMakeLists.txt to version $version"
+
+    - name: Configure CMake
+      run: cmake -S DexCorralCpp -B DexCorralCpp/build -G "Visual Studio 17 2022" -A x64
+
+    - name: Build Release
+      run: cmake --build DexCorralCpp/build --config Release
+
+    - name: Create portable readme.txt
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $content = @"
+DexCorral v$version - Portable Edition
+========================================
+
+DexCorral is a high-performance, native C++ desktop organization tool for Windows.
+It helps you keep your desktop clean by grouping icons into shaded, customizable 
+areas called "Corrals".
+
+CONTENTS
+--------
+- DexCorral.exe         : Main application
+- DexCorral.Watchdog.exe: Auto-restart service (keeps DexCorral running)
+- LICENSE               : MIT License
+- readme.txt            : This file
+
+INSTALLATION
+------------
+1. Extract all files to a folder of your choice
+2. Run DexCorral.exe
+3. The watchdog will start automatically to ensure reliability
+
+USAGE
+-----
+- Right-click the tray icon to create new Corrals or access settings
+- Drag icons into Corrals to organize them
+- Double-click a Corral's title bar to roll it up/down
+- Corrals and icon positions are saved automatically
+
+REQUIREMENTS
+------------
+- Windows 10 or Windows 11
+- No additional runtime or dependencies required
+
+MORE INFORMATION
+----------------
+GitHub: https://github.com/guHe330/DexCorralCpp
+License: MIT License (see LICENSE file)
+
+"@
+        Set-Content -Path "portable_readme.txt" -Value $content
+        Write-Host "Created portable readme.txt"
+
+    - name: Create Portable Package
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        
+        # Create staging directory
+        New-Item -ItemType Directory -Force -Path "package"
+        
+        # Copy files
+        Copy-Item "DexCorralCpp/build/Release/DexCorral.exe" -Destination "package/"
+        Copy-Item "DexCorralCpp/build/Release/DexCorral.Watchdog.exe" -Destination "package/"
+        Copy-Item "LICENSE" -Destination "package/"
+        Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
+        
+        # Create zip
+        Compress-Archive -Path "package/*" -DestinationPath "Portable_DexCorral.zip" -Force
+        
+        Write-Host "Created Portable_DexCorral.zip with contents:"
+        Get-ChildItem "package"
+
+    - name: Create Git Tag
+      shell: pwsh
+      run: |
+        $tag = "${{ steps.get_version.outputs.tag }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a $tag -m "Release $tag"
+        git push origin $tag
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.tag }}
+        name: DexCorral ${{ steps.get_version.outputs.tag }}
+        body: |
+          ## DexCorral ${{ steps.get_version.outputs.version }}
+          
+          ### What's in this release
+          - `Portable_DexCorral.zip` - Complete portable package
+          
+          ### Package Contents
+          - DexCorral.exe - Main application
+          - DexCorral.Watchdog.exe - Auto-restart watchdog service
+          - LICENSE - MIT License
+          - readme.txt - Quick start guide
+          
+          ### Installation
+          1. Download `Portable_DexCorral.zip`
+          2. Extract to any folder
+          3. Run `DexCorral.exe`
+          
+          No installation required - fully portable!
+        files: |
+          Portable_DexCorral.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
