@@ -2,9 +2,21 @@
 #include <Windows.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include "Config.h"
 
 class WallpaperManager;
+class FolderWatcher;
+
+// Sync status for cloud storage providers
+enum class SyncStatus {
+    None = 0,       // Not a synced file or unknown
+    Synced,         // Fully synced (green checkmark)
+    Syncing,        // Currently syncing (blue arrows)
+    Pending,        // Pending sync (blue clock)
+    Error,          // Sync error (red X)
+    CloudOnly       // Available online only (cloud icon)
+};
 
 struct CorralIcon {
     std::string fileName;       // UTF-8 filename (for config)
@@ -12,8 +24,15 @@ struct CorralIcon {
     std::wstring displayName;   // Display name (without .lnk extension)
     std::wstring fullPath;      // Full path to file on desktop
     HICON hIcon = nullptr;      // Shell icon handle
+    HICON hIconSmall = nullptr; // Small icon for details view (16px)
     RECT rect = {};             // Bounding rect in client coords (icon + label)
     RECT iconRect = {};         // Just the icon image rect
+
+    // Details view info
+    std::wstring fileType;      // File type description
+    ULONGLONG fileSize = 0;     // File size in bytes
+    FILETIME modifiedTime = {}; // Last modified time
+    SyncStatus syncStatus = SyncStatus::None;
 };
 
 class CorralWindow {
@@ -32,7 +51,15 @@ public:
     CorralConfig& GetConfig() { return config; }
     const CorralConfig& GetConfig() const { return config; }
 
+    // Virtual corral support
+    void ChangeFolderPath();  // Open folder browser to change virtual folder path
+
 private:
+    // Virtual corral support
+    void LoadVirtualFolderIcons();  // Load icons from virtual folder path
+    void InitializeFolderWatcher();  // Set up folder change monitoring
+    void OnFolderContentsChanged();  // Called when virtual folder contents change
+
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     void OnPaint();
     void UpdateLayeredContent();  // True per-pixel transparency rendering
@@ -49,6 +76,8 @@ private:
     void DeleteCorral();
     void ToggleRollUp();
     void ToggleCatchAll();
+    void SetViewMode(ViewMode mode);
+    void ShowViewMenu(int screenX, int screenY);
 
     // Hover-expand for rolled-up corrals
     void StartHoverExpand();
@@ -80,9 +109,15 @@ private:
     void LoadIconImages();
     void ClearIcons();
     void CalculateIconLayout();
+    void CalculateIconLayoutGrid();    // Grid layout for icon views
+    void CalculateIconLayoutDetails(); // List layout for details view
     int HitTestIcon(int x, int y);
     void OpenFile(int iconIndex);
     void ShowShellContextMenu(int iconIndex, int screenX, int screenY);
+    void LoadFileDetails(CorralIcon& icon);  // Load file info for details view
+    SyncStatus GetSyncStatus(const std::wstring& path);  // Detect sync provider status
+    int GetIconSizeForViewMode() const;  // Get icon size based on current view mode
+    void UpdateIconSpacingForViewMode();  // Update spacing based on current view mode
 
     // Resize support
     int HitTestResize(int x, int y);  // Returns HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT, or 0
@@ -111,7 +146,7 @@ private:
     std::vector<CorralIcon> icons;
     int selectedIcon = -1;
 
-    // Icon layout - dynamically calculated from desktop settings
+    // Icon layout - dynamically calculated from view mode
     int iconSize = 32;
     int iconSpacingX = 72;
     int iconSpacingY = 68;
@@ -121,6 +156,13 @@ private:
     static const int TITLE_BAR_HEIGHT = 32;
     static const int SNAP_DISTANCE = 15;  // Pixels to trigger snap
     static const int SNAP_GAP = 10;       // Gap between snapped corrals
+
+    // Icon sizes for different view modes
+    static const int ICON_SIZE_SMALL = 32;
+    static const int ICON_SIZE_MEDIUM = 48;
+    static const int ICON_SIZE_LARGE = 64;
+    static const int ICON_SIZE_DETAILS = 16;  // Small icon for details/list view
+    static const int DETAILS_ROW_HEIGHT = 20; // Height of each row in details view
 
     // Roll-up state
     double savedHeight = 200;  // Height before roll-up
@@ -145,6 +187,7 @@ private:
     POINT iconDragStart = {};
     int dropTargetIndex = -1;
     bool iconDragOutside = false;  // True when icon is dragged outside corral bounds
+    static const int DRAG_THRESHOLD = 5;  // Pixels to move before starting drag
 
     // Scrollbar state
     int scrollPosition = 0;        // Current scroll offset in pixels
@@ -155,4 +198,9 @@ private:
     static const int SCROLLBAR_WIDTH = 10;
     static const int SCROLLBAR_MARGIN = 2;
     static const int SCROLLBAR_MIN_THUMB = 30;
+
+    // Virtual corral support
+    std::unique_ptr<FolderWatcher> folderWatcher;
+    static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
+    static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
 };

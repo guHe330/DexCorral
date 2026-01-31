@@ -7,6 +7,7 @@
 #include "WallpaperManager.h"
 #include "TrayIcon.h"
 #include "DesktopMonitor.h"
+#include "MonitorManager.h"
 
 class CorralWindow;
 
@@ -27,8 +28,15 @@ public:
     void SetAutostart(bool enable);
     void SetDefaultColorHex(const std::string& colorHex);
     void ApplyColorToAllCorrals(const std::string& colorHex);
+    void CreateCorralAt(POINT pt);  // Create new corral at specified position
+    void CreateVirtualCorralAt(POINT pt);  // Create new virtual corral at specified position
     WallpaperManager* GetWallpaperManager() { return wallpaperManager.get(); }
+    MonitorManager* GetMonitorManager() { return monitorManager.get(); }
     const std::vector<std::unique_ptr<CorralWindow>>& GetCorrals() const { return corrals; }
+
+    // Multi-monitor support
+    void OnDisplayChange();  // Called when monitors are added/removed/resolution changed
+    void UpdateCorralPositions();  // Reposition corrals based on monitor changes
 
     static App* GetInstance() { return instance; }
 
@@ -45,6 +53,8 @@ private:
     void OnLeftButtonDown(POINT pt);
     void OnLeftButtonUp(POINT pt);
     void OnMouseMove(POINT pt);
+    // Removed: Mousewheel events now pass through naturally
+    // void OnMouseWheel(POINT pt, int delta);
 
     // Desktop monitoring callbacks
     void EnsureCatchAllCorral();
@@ -52,6 +62,10 @@ private:
     void OnDesktopFileAdded(const std::wstring& fileName);
     void OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& newName);
     void OnDesktopFileDeleted(const std::wstring& fileName);
+
+    // Watchdog support
+    void StartWatchdog();
+    void SignalGracefulExit();
 
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -64,5 +78,9 @@ private:
     std::unique_ptr<WallpaperManager> wallpaperManager;
     std::unique_ptr<TrayIcon> trayIcon;
     std::unique_ptr<DesktopMonitor> desktopMonitor;
+    std::unique_ptr<MonitorManager> monitorManager;
     std::vector<std::unique_ptr<CorralWindow>> corrals;
+
+    // Watchdog support
+    HANDLE hGracefulExitEvent = nullptr;
 };

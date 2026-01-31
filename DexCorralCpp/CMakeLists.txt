@@ -18,6 +18,7 @@ add_executable(DexCorralCpp WIN32
     src/MouseHook.cpp
     src/TrayIcon.cpp
     src/DesktopMonitor.cpp
+    src/MonitorManager.cpp
     include/App.h
     include/DesktopIcons.h
     include/WallpaperManager.h
@@ -26,6 +27,7 @@ add_executable(DexCorralCpp WIN32
     include/MouseHook.h
     include/TrayIcon.h
     include/DesktopMonitor.h
+    include/MonitorManager.h
 )
 
 # Include directories

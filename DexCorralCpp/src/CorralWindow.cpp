@@ -2,6 +2,7 @@
 #include "App.h"
 #include "WallpaperManager.h"
 #include "DesktopIcons.h"
+#include "FolderWatcher.h"
 #include <windowsx.h>
 #include <commdlg.h>
 #include <shellapi.h>
@@ -11,10 +12,113 @@
 #include <algorithm>
 #include <cstdio>
 #include <cwchar>
+#include <cmath>
 
 #pragma comment(lib, "msimg32.lib")
 
 static const wchar_t* CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
+
+// Cloud file attributes (defined in Windows 10 SDK 1709+, provide fallbacks)
+#ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+#endif
+#ifndef FILE_ATTRIBUTE_RECALL_ON_OPEN
+#define FILE_ATTRIBUTE_RECALL_ON_OPEN 0x00040000
+#endif
+#ifndef FILE_ATTRIBUTE_PINNED
+#define FILE_ATTRIBUTE_PINNED 0x00080000
+#endif
+#ifndef FILE_ATTRIBUTE_UNPINNED
+#define FILE_ATTRIBUTE_UNPINNED 0x00100000
+#endif
+
+// ============================================================================
+// Folder browser utility functions
+// ============================================================================
+
+static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t* title) {
+    std::wstring result;
+
+    IFileDialog* pfd = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS(&pfd));
+    if (SUCCEEDED(hr)) {
+        DWORD dwOptions;
+        hr = pfd->GetOptions(&dwOptions);
+        if (SUCCEEDED(hr)) {
+            hr = pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+        }
+
+        if (SUCCEEDED(hr)) {
+            pfd->SetTitle(title);
+        }
+
+        hr = pfd->Show(hwndOwner);
+        if (SUCCEEDED(hr)) {
+            IShellItem* psi = nullptr;
+            hr = pfd->GetResult(&psi);
+            if (SUCCEEDED(hr)) {
+                PWSTR pszPath = nullptr;
+                hr = psi->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+                if (SUCCEEDED(hr)) {
+                    result = pszPath;
+                    CoTaskMemFree(pszPath);
+                }
+                psi->Release();
+            }
+        }
+        pfd->Release();
+    }
+
+    return result;
+}
+
+static bool ValidateLocalFolder(const std::wstring& path, std::wstring& errorMsg) {
+    DWORD attrs = GetFileAttributesW(path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        errorMsg = L"The specified folder does not exist.";
+        return false;
+    }
+
+    if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        errorMsg = L"The specified path is not a folder.";
+        return false;
+    }
+
+    // Check for network path (starts with \\)
+    if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\') {
+        errorMsg = L"Network paths are not supported. Please select a local folder.";
+        return false;
+    }
+
+    // Check if it's a network drive
+    if (path.length() >= 2 && path[1] == L':') {
+        wchar_t rootPath[4] = { path[0], L':', L'\\', L'\0' };
+        UINT driveType = GetDriveTypeW(rootPath);
+        if (driveType == DRIVE_REMOTE) {
+            errorMsg = L"Network drives are not supported. Please select a local folder.";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static std::string WideToUtf8(const std::wstring& wide) {
+    if (wide.empty()) return std::string();
+    int size = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), nullptr, 0, nullptr, nullptr);
+    std::string result(size, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), &result[0], size, nullptr, nullptr);
+    return result;
+}
+
+static std::wstring Utf8ToWide(const std::string& utf8) {
+    if (utf8.empty()) return std::wstring();
+    int size = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), nullptr, 0);
+    std::wstring result(size, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), &result[0], size);
+    return result;
+}
 
 // ============================================================================
 // Construction / Destruction
@@ -29,9 +133,9 @@ CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperM
     // Save the full height for roll-up restore
     savedHeight = config.Height;
 
-    // Get desktop icon size and spacing from registry
-    iconSize = GetDesktopIconSize();
-    GetDesktopIconSpacing(iconSpacingX, iconSpacingY);
+    // Get icon size and spacing based on view mode
+    iconSize = GetIconSizeForViewMode();
+    UpdateIconSpacingForViewMode();
 
     static bool classRegistered = false;
     if (!classRegistered) {
@@ -64,9 +168,19 @@ CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperM
 
     // Sync config from actual window position/size (in case Windows adjusted it)
     SyncConfigFromWindow();
+
+    // Initialize folder watcher for virtual corrals
+    if (config.IsVirtual) {
+        InitializeFolderWatcher();
+    }
 }
 
 CorralWindow::~CorralWindow() {
+    // Stop folder watcher
+    if (folderWatcher) {
+        folderWatcher->Stop();
+        folderWatcher.reset();
+    }
     ClearIcons();
     if (hwnd) {
         DestroyWindow(hwnd);
@@ -175,7 +289,14 @@ void CorralWindow::Show() {
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         // Set to bottom z-order (above desktop, below other apps)
         SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        LoadFiles();  // This calls UpdateLayeredContent
+
+        if (config.IsVirtual) {
+            // For virtual corrals, show window immediately and load icons asynchronously
+            UpdateLayeredContent();
+            PostMessageW(hwnd, WM_DEFERRED_LOAD, 0, 0);
+        } else {
+            LoadFiles();  // This calls UpdateLayeredContent
+        }
     }
 }
 
@@ -204,16 +325,43 @@ void CorralWindow::SyncConfigFromWindow() {
             savedHeight = config.Height;
         }
         // When rolled up, config.Height keeps the savedHeight value
+
+        // Update monitor position tracking
+        App* app = App::GetInstance();
+        if (app && app->GetMonitorManager()) {
+            MonitorManager* monMgr = app->GetMonitorManager();
+            const MonitorInfo* mon = monMgr->FindMonitorForRect(rect);
+            if (mon) {
+                // Update target monitor ID
+                config.TargetMonitorId = mon->deviceId;
+
+                // Store position for this monitor (relative to monitor origin)
+                MonitorPosition& pos = config.MonitorPositions[mon->deviceId];
+                pos.Left = (int)config.Left - mon->bounds.left;
+                pos.Top = (int)config.Top - mon->bounds.top;
+                pos.Width = (int)config.Width;
+                pos.Height = (int)(config.IsRolledUp ? savedHeight : config.Height);
+                pos.RefWidth = mon->width;
+                pos.RefHeight = mon->height;
+            }
+        }
     }
 }
 
 void CorralWindow::LoadFiles() {
-    LoadIconImages();
+    if (config.IsVirtual) {
+        LoadVirtualFolderIcons();
+    } else {
+        LoadIconImages();
+    }
     CalculateIconLayout();
     UpdateLayeredContent();
 }
 
 void CorralWindow::AddFile(const std::string& fileName) {
+    // Virtual corrals don't accept manual file additions
+    if (config.IsVirtual) return;
+
     // Check if already in this corral
     auto it = std::find(config.Files.begin(), config.Files.end(), fileName);
     if (it == config.Files.end()) {
@@ -232,9 +380,116 @@ void CorralWindow::ClearIcons() {
             DestroyIcon(icon.hIcon);
             icon.hIcon = nullptr;
         }
+        if (icon.hIconSmall) {
+            DestroyIcon(icon.hIconSmall);
+            icon.hIconSmall = nullptr;
+        }
     }
     icons.clear();
     selectedIcon = -1;
+}
+
+void CorralWindow::LoadFileDetails(CorralIcon& icon) {
+    // Get file type description
+    SHFILEINFOW sfi = {};
+    if (SHGetFileInfoW(icon.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_TYPENAME)) {
+        icon.fileType = sfi.szTypeName;
+    }
+
+    // Get file size and modified time
+    WIN32_FILE_ATTRIBUTE_DATA fileData = {};
+    if (GetFileAttributesExW(icon.fullPath.c_str(), GetFileExInfoStandard, &fileData)) {
+        icon.fileSize = ((ULONGLONG)fileData.nFileSizeHigh << 32) | fileData.nFileSizeLow;
+        icon.modifiedTime = fileData.ftLastWriteTime;
+    }
+
+    // Get sync status
+    icon.syncStatus = GetSyncStatus(icon.fullPath);
+}
+
+SyncStatus CorralWindow::GetSyncStatus(const std::wstring& path) {
+    // Try to get icon overlay info which indicates sync status
+    // Shell icon overlays are registered by sync providers like OneDrive, Dropbox, etc.
+
+    SHFILEINFOW sfi = {};
+    if (!SHGetFileInfoW(path.c_str(), 0, &sfi, sizeof(sfi), SHGFI_OVERLAYINDEX | SHGFI_ICON | SHGFI_SMALLICON)) {
+        return SyncStatus::None;
+    }
+
+    // Clean up the icon we got
+    if (sfi.hIcon) {
+        DestroyIcon(sfi.hIcon);
+    }
+
+    // Extract overlay index (stored in high byte of iIcon)
+    int overlayIndex = (sfi.iIcon >> 24) & 0xFF;
+
+    // Common overlay indices used by sync providers:
+    // OneDrive and many others use standard overlay handlers:
+    // 1 = Share overlay (hand icon)
+    // 2 = Shortcut arrow
+    // 3 = Slow file (offline)
+    // The sync-specific overlays are typically in range 10+
+    //
+    // OneDrive overlays (registered with specific GUIDs):
+    // - Synced: green checkmark (various overlay indices depending on registration order)
+    // - Syncing: blue circular arrows
+    // - Pending: blue clock
+    // - Error: red X
+    // - Cloud only: cloud icon
+    //
+    // Since overlay indices depend on registration order, we try to detect by
+    // reading the overlay handler registry keys. For now, use a heuristic based on
+    // known common patterns.
+
+    if (overlayIndex == 0) {
+        return SyncStatus::None;
+    }
+
+    // Try to identify by checking if this is a OneDrive/Dropbox path
+    std::wstring lowerPath = path;
+    std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::towlower);
+
+    bool isCloudPath = (lowerPath.find(L"onedrive") != std::wstring::npos ||
+                        lowerPath.find(L"dropbox") != std::wstring::npos ||
+                        lowerPath.find(L"google drive") != std::wstring::npos ||
+                        lowerPath.find(L"icloud") != std::wstring::npos);
+
+    if (!isCloudPath) {
+        return SyncStatus::None;
+    }
+
+    // For cloud paths with overlays, we can try to determine status
+    // This is a heuristic - actual detection would require COM interfaces
+    // like IStorageProviderHandler in Windows 10+
+
+    // Try using cloud files API if available (Windows 10 1709+)
+    // Check file attributes for cloud files
+    DWORD attrs = GetFileAttributesW(path.c_str());
+    if (attrs != INVALID_FILE_ATTRIBUTES) {
+        // Check cloud file attributes
+        // FILE_ATTRIBUTE_PINNED = always available locally
+        // FILE_ATTRIBUTE_UNPINNED = cloud only (free up space)
+        // FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS/OPEN = cloud only, will download on access
+
+        if (attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS ||
+            attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN ||
+            attrs & FILE_ATTRIBUTE_UNPINNED) {
+            return SyncStatus::CloudOnly;
+        }
+
+        if (attrs & FILE_ATTRIBUTE_PINNED) {
+            return SyncStatus::Synced;
+        }
+    }
+
+    // If we have an overlay on a cloud path, assume it's synced
+    // (green checkmark is the most common overlay)
+    if (overlayIndex > 0) {
+        return SyncStatus::Synced;
+    }
+
+    return SyncStatus::None;
 }
 
 void CorralWindow::LoadIconImages() {
@@ -243,8 +498,10 @@ void CorralWindow::LoadIconImages() {
     std::wstring desktopPath = GetDesktopPath();
     std::wstring publicDesktopPath = GetPublicDesktopPath();
 
-    // Determine which icon flag to use based on size
+    // Determine which icon flag to use based on view mode
+    iconSize = GetIconSizeForViewMode();
     UINT iconFlag = (iconSize <= 16) ? SHGFI_SMALLICON : SHGFI_LARGEICON;
+    bool isDetailsView = (config.GetViewMode() == ViewMode::Details);
 
     for (const auto& fileName : config.Files) {
         CorralIcon ci;
@@ -282,11 +539,163 @@ void CorralWindow::LoadIconImages() {
             ci.hIcon = sfi.hIcon;
         }
 
+        // Always load small icon for details view
+        if (isDetailsView || iconSize > 16) {
+            SHFILEINFOW sfiSmall = {};
+            if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfiSmall, sizeof(sfiSmall),
+                SHGFI_ICON | SHGFI_SMALLICON)) {
+                ci.hIconSmall = sfiSmall.hIcon;
+            }
+        }
+
+        // Load file details for details view
+        if (isDetailsView) {
+            LoadFileDetails(ci);
+        }
+
         icons.push_back(std::move(ci));
     }
 }
 
+void CorralWindow::LoadVirtualFolderIcons() {
+    ClearIcons();
+
+    if (config.VirtualFolderPath.empty()) return;
+
+    std::wstring folderPath = Utf8ToWide(config.VirtualFolderPath);
+
+    // Enumerate folder contents
+    WIN32_FIND_DATAW findData;
+    std::wstring searchPath = folderPath + L"\\*";
+    HANDLE hFind = FindFirstFileW(searchPath.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE) return;
+
+    iconSize = GetIconSizeForViewMode();
+    UINT iconFlag = (iconSize <= 16) ? SHGFI_SMALLICON : SHGFI_LARGEICON;
+    bool isDetailsView = (config.GetViewMode() == ViewMode::Details);
+
+    do {
+        // Skip . and ..
+        if (wcscmp(findData.cFileName, L".") == 0 || wcscmp(findData.cFileName, L"..") == 0) {
+            continue;
+        }
+
+        // Skip hidden files
+        if (findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) {
+            continue;
+        }
+
+        CorralIcon ci;
+        ci.wFileName = findData.cFileName;
+        ci.fileName = WideToUtf8(ci.wFileName);
+        ci.displayName = ci.wFileName;
+        ci.fullPath = folderPath + L"\\" + ci.wFileName;
+
+        // Hide .lnk extension like Windows does
+        if (ci.displayName.length() > 4) {
+            std::wstring ext = ci.displayName.substr(ci.displayName.length() - 4);
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
+            if (ext == L".lnk") {
+                ci.displayName = ci.displayName.substr(0, ci.displayName.length() - 4);
+            }
+        }
+
+        // Load shell icon
+        SHFILEINFOW sfi = {};
+        if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_ICON | iconFlag)) {
+            ci.hIcon = sfi.hIcon;
+        }
+
+        // Load small icon for details view
+        if (isDetailsView || iconSize > 16) {
+            SHFILEINFOW sfiSmall = {};
+            if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfiSmall, sizeof(sfiSmall),
+                              SHGFI_ICON | SHGFI_SMALLICON)) {
+                ci.hIconSmall = sfiSmall.hIcon;
+            }
+        }
+
+        if (isDetailsView) {
+            LoadFileDetails(ci);
+        }
+
+        icons.push_back(std::move(ci));
+    } while (FindNextFileW(hFind, &findData));
+
+    FindClose(hFind);
+}
+
+void CorralWindow::InitializeFolderWatcher() {
+    if (!config.IsVirtual || config.VirtualFolderPath.empty()) return;
+
+    folderWatcher = std::make_unique<FolderWatcher>();
+    std::wstring folderPath = Utf8ToWide(config.VirtualFolderPath);
+    folderWatcher->SetPath(folderPath);
+    folderWatcher->SetChangeCallback([this]() {
+        // Post message to window to handle on main thread
+        if (hwnd) {
+            PostMessageW(hwnd, WM_FOLDER_CHANGED, 0, 0);
+        }
+    });
+    folderWatcher->Start();
+}
+
+void CorralWindow::OnFolderContentsChanged() {
+    LoadFiles();
+}
+
+void CorralWindow::ChangeFolderPath() {
+    if (!config.IsVirtual) return;
+
+    std::wstring newPath = BrowseForLocalFolder(hwnd, L"Select Folder for Virtual Corral");
+    if (newPath.empty()) return;
+
+    std::wstring errorMsg;
+    if (!ValidateLocalFolder(newPath, errorMsg)) {
+        MessageBoxW(hwnd, errorMsg.c_str(), L"Invalid Folder", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    // Stop existing watcher
+    if (folderWatcher) {
+        folderWatcher->Stop();
+        folderWatcher.reset();
+    }
+
+    // Update config
+    config.VirtualFolderPath = WideToUtf8(newPath);
+
+    // Update title to folder name
+    size_t lastSlash = newPath.find_last_of(L"\\/");
+    std::wstring folderName = (lastSlash != std::wstring::npos) ?
+                              newPath.substr(lastSlash + 1) : newPath;
+    config.Title = WideToUtf8(folderName);
+    SetWindowTextW(hwnd, folderName.c_str());
+
+    // Restart watcher with new path
+    InitializeFolderWatcher();
+
+    // Reload icons
+    LoadFiles();
+
+    // Save config
+    if (App::GetInstance()) {
+        App::GetInstance()->SaveConfig();
+    }
+}
+
 void CorralWindow::CalculateIconLayout() {
+    if (config.GetViewMode() == ViewMode::Details) {
+        CalculateIconLayoutDetails();
+    } else {
+        CalculateIconLayoutGrid();
+    }
+    // Clamp scroll position after layout change
+    ClampScrollPosition();
+}
+
+void CorralWindow::CalculateIconLayoutGrid() {
     int x = ICON_PADDING_LEFT;
     int y = ICON_AREA_TOP;
     int clientWidth = (int)config.Width;
@@ -347,9 +756,42 @@ void CorralWindow::CalculateIconLayout() {
             contentHeight = lastIconBottom + ICON_PADDING_LEFT;
         }
     }
+}
 
-    // Clamp scroll position after layout change
-    ClampScrollPosition();
+void CorralWindow::CalculateIconLayoutDetails() {
+    // Details view: list layout with rows
+    // Each row has: [icon 16px] [name] [type] [size] [date] [sync status]
+    int y = ICON_AREA_TOP;
+    int clientWidth = (int)config.Width;
+    int rightPadding = ICON_PADDING_LEFT;
+
+    // Check if we'll need scrollbar
+    int estimatedHeight = ICON_AREA_TOP + (int)icons.size() * DETAILS_ROW_HEIGHT + ICON_PADDING_LEFT;
+    int visibleHeight = (int)config.Height - ICON_AREA_TOP;
+    if (estimatedHeight > visibleHeight) {
+        rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
+    }
+
+    for (size_t i = 0; i < icons.size(); i++) {
+        auto& icon = icons[i];
+
+        // Icon is at the left of each row
+        int iconImgX = ICON_PADDING_LEFT + 2;
+        int iconImgY = y + (DETAILS_ROW_HEIGHT - ICON_SIZE_DETAILS) / 2;
+
+        icon.iconRect = { iconImgX, iconImgY, iconImgX + ICON_SIZE_DETAILS, iconImgY + ICON_SIZE_DETAILS };
+        // Full row rect for selection and hit testing
+        icon.rect = { ICON_PADDING_LEFT, y, clientWidth - rightPadding, y + DETAILS_ROW_HEIGHT };
+
+        y += DETAILS_ROW_HEIGHT;
+    }
+
+    // Calculate total content height
+    if (!icons.empty()) {
+        contentHeight = y + ICON_PADDING_LEFT;
+    } else {
+        contentHeight = ICON_AREA_TOP;
+    }
 }
 
 int CorralWindow::HitTestIcon(int x, int y) {
@@ -710,6 +1152,20 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 // Icon reordering drag
                 window->OnIconDrag(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             }
+            else if (window->draggedIconIndex >= 0) {
+                // Potential drag - check if mouse moved beyond threshold
+                int x = GET_X_LPARAM(lParam);
+                int y = GET_Y_LPARAM(lParam);
+                int dx = x - window->iconDragStart.x;
+                int dy = y - window->iconDragStart.y;
+                int distance = (int)sqrt(dx * dx + dy * dy);
+
+                if (distance > window->DRAG_THRESHOLD) {
+                    // Start actual drag
+                    window->isDraggingIcon = true;
+                    window->UpdateLayeredContent();
+                }
+            }
             else if (window->isDragging) {
                 POINT pt;
                 GetCursorPos(&pt);
@@ -741,6 +1197,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             else if (window->isDraggingIcon) {
                 window->OnIconDragEnd();
+                ReleaseCapture();
+            }
+            else if (window->draggedIconIndex >= 0) {
+                // Mouse up without dragging - just a selection click
+                window->draggedIconIndex = -1;
                 ReleaseCapture();
             }
             else if (window->isDragging) {
@@ -784,6 +1245,14 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 return 0;
             }
             break;
+        case WM_FOLDER_CHANGED:
+            // Virtual folder contents changed - reload icons
+            window->OnFolderContentsChanged();
+            return 0;
+        case WM_DEFERRED_LOAD:
+            // Deferred icon loading for virtual corrals (keeps UI responsive)
+            window->LoadFiles();
+            return 0;
         case WM_MOUSELEAVE:
             window->mouseInsideWindow = false;
             // Start collapse if hover-expanded
@@ -906,8 +1375,12 @@ void CorralWindow::UpdateLayeredContent() {
 
     std::wstring wtitle(config.Title.begin(), config.Title.end());
 
+    // Add folder symbol for virtual corrals
+    if (config.IsVirtual) {
+        wtitle = L"\U0001F4C1 " + wtitle;  // Folder emoji (📁)
+    }
     // Add catch-all symbol if this is the catch-all corral
-    if (config.IsCatchAll) {
+    else if (config.IsCatchAll) {
         wtitle = L"\u2B07 " + wtitle;  // Down arrow (⬇) symbol
     }
 
@@ -945,6 +1418,12 @@ void CorralWindow::UpdateLayeredContent() {
         int visibleTop = ICON_AREA_TOP;
         int visibleBottom = h;
 
+        // Set GDI clipping region to prevent icons from drawing into header
+        HRGN clipRegion = CreateRectRgn(0, visibleTop, w, h);
+        SelectClipRgn(memDC, clipRegion);
+
+        bool isDetailsView = (config.GetViewMode() == ViewMode::Details);
+
         for (int i = 0; i < (int)icons.size(); i++) {
             const auto& icon = icons[i];
 
@@ -956,8 +1435,8 @@ void CorralWindow::UpdateLayeredContent() {
             // Skip if completely outside visible area
             if (drawBottom < visibleTop || drawTop >= visibleBottom) continue;
 
-            // Selection highlight
-            if (i == selectedIcon && !isDraggingIcon) {
+            // Selection highlight (only for grid views, details view handled separately)
+            if (i == selectedIcon && !isDraggingIcon && !isDetailsView) {
                 BYTE selAlpha = 180;
                 BYTE selR = 60, selG = 120, selB = 200;
                 BYTE selPmR = (BYTE)((selR * selAlpha) / 255);
@@ -994,66 +1473,242 @@ void CorralWindow::UpdateLayeredContent() {
                 }
             }
 
-            // Icon image
-            if (icon.hIcon) {
-                DrawIconEx(memDC,
-                    icon.iconRect.left, iconDrawTop,
-                    icon.hIcon,
-                    iconSize, iconSize,
-                    0, nullptr, DI_NORMAL);
+            if (isDetailsView) {
+                // Details view: icon + name + type + size + date + sync status
 
-                // Fix alpha for icon area (with clipping)
-                for (int y = iconDrawTop; y < iconDrawTop + iconSize && y < h; y++) {
-                    if (y < visibleTop) continue;
-                    for (int x = icon.iconRect.left; x < icon.iconRect.left + iconSize && x < w; x++) {
-                        if (x >= 0 && y >= 0) {
-                            DWORD pixel = pixels[y * w + x];
+                // Draw selection highlight for this row (before drawing content)
+                if (i == selectedIcon && !isDraggingIcon) {
+                    BYTE selAlpha = 200;
+                    BYTE selR = 60, selG = 120, selB = 200;
+                    BYTE selPmR = (BYTE)((selR * selAlpha) / 255);
+                    BYTE selPmG = (BYTE)((selG * selAlpha) / 255);
+                    BYTE selPmB = (BYTE)((selB * selAlpha) / 255);
+                    DWORD selPixel = (selAlpha << 24) | (selPmR << 16) | (selPmG << 8) | selPmB;
+
+                    for (int y = drawTop; y < drawBottom && y < h; y++) {
+                        if (y < visibleTop) continue;
+                        for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
+                            if (x >= 0 && y >= 0) {
+                                pixels[y * w + x] = selPixel;
+                            }
+                        }
+                    }
+                }
+
+                int currentIconSize = ICON_SIZE_DETAILS;
+                HICON hIconToDraw = icon.hIconSmall ? icon.hIconSmall : icon.hIcon;
+
+                // Draw small icon
+                if (hIconToDraw) {
+                    DrawIconEx(memDC,
+                        icon.iconRect.left, iconDrawTop,
+                        hIconToDraw,
+                        currentIconSize, currentIconSize,
+                        0, nullptr, DI_NORMAL);
+
+                    // Fix alpha for icon area
+                    for (int py = iconDrawTop; py < iconDrawTop + currentIconSize && py < h; py++) {
+                        if (py < visibleTop) continue;
+                        for (int px = icon.iconRect.left; px < icon.iconRect.left + currentIconSize && px < w; px++) {
+                            if (px >= 0 && py >= 0) {
+                                DWORD pixel = pixels[py * w + px];
+                                BYTE a = (pixel >> 24) & 0xFF;
+                                if (a == 0) {
+                                    BYTE r = (pixel >> 16) & 0xFF;
+                                    BYTE g = (pixel >> 8) & 0xFF;
+                                    BYTE b = pixel & 0xFF;
+                                    if (r > 0 || g > 0 || b > 0) {
+                                        pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Column layout for details view
+                // Columns: Name (40%) | Type (20%) | Size (15%) | Date (15%) | Sync (10%)
+                int contentWidth = icon.rect.right - icon.rect.left - ICON_SIZE_DETAILS - 8;
+                int nameCol = icon.iconRect.left + ICON_SIZE_DETAILS + 4;
+                int typeCol = nameCol + (int)(contentWidth * 0.40);
+                int sizeCol = typeCol + (int)(contentWidth * 0.20);
+                int dateCol = sizeCol + (int)(contentWidth * 0.15);
+                int syncCol = dateCol + (int)(contentWidth * 0.15);
+
+                SetTextColor(memDC, RGB(255, 255, 255));
+
+                // Draw name
+                RECT nameRect = { nameCol, drawTop, typeCol - 4, drawBottom };
+                DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
+                    &nameRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+                // Draw type (dimmer color)
+                SetTextColor(memDC, RGB(180, 180, 180));
+                RECT typeRect = { typeCol, drawTop, sizeCol - 4, drawBottom };
+                DrawTextW(memDC, icon.fileType.c_str(), (int)icon.fileType.length(),
+                    &typeRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+                // Draw size
+                std::wstring sizeStr;
+                if (icon.fileSize < 1024) {
+                    sizeStr = std::to_wstring(icon.fileSize) + L" B";
+                } else if (icon.fileSize < 1024 * 1024) {
+                    sizeStr = std::to_wstring(icon.fileSize / 1024) + L" KB";
+                } else if (icon.fileSize < 1024 * 1024 * 1024) {
+                    sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024)) + L" MB";
+                } else {
+                    sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024 * 1024)) + L" GB";
+                }
+                RECT sizeRect = { sizeCol, drawTop, dateCol - 4, drawBottom };
+                DrawTextW(memDC, sizeStr.c_str(), (int)sizeStr.length(),
+                    &sizeRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+                // Draw date
+                FILETIME localTime;
+                SYSTEMTIME sysTime;
+                FileTimeToLocalFileTime(&icon.modifiedTime, &localTime);
+                FileTimeToSystemTime(&localTime, &sysTime);
+                wchar_t dateStr[32];
+                swprintf_s(dateStr, L"%02d/%02d/%04d", sysTime.wMonth, sysTime.wDay, sysTime.wYear);
+                RECT dateRect = { dateCol, drawTop, syncCol - 4, drawBottom };
+                DrawTextW(memDC, dateStr, -1,
+                    &dateRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+                // Draw sync status indicator
+                if (icon.syncStatus != SyncStatus::None) {
+                    const wchar_t* syncSymbol = L"";
+                    COLORREF syncColor = RGB(180, 180, 180);
+                    switch (icon.syncStatus) {
+                        case SyncStatus::Synced:
+                            syncSymbol = L"\u2713";  // Check mark
+                            syncColor = RGB(100, 200, 100);  // Green
+                            break;
+                        case SyncStatus::Syncing:
+                            syncSymbol = L"\u21BB";  // Circular arrows
+                            syncColor = RGB(100, 150, 255);  // Blue
+                            break;
+                        case SyncStatus::Pending:
+                            syncSymbol = L"\u23F1";  // Stopwatch/clock
+                            syncColor = RGB(100, 150, 255);  // Blue
+                            break;
+                        case SyncStatus::Error:
+                            syncSymbol = L"\u2717";  // X mark
+                            syncColor = RGB(255, 100, 100);  // Red
+                            break;
+                        case SyncStatus::CloudOnly:
+                            syncSymbol = L"\u2601";  // Cloud
+                            syncColor = RGB(150, 150, 255);  // Light blue
+                            break;
+                        default:
+                            break;
+                    }
+                    SetTextColor(memDC, syncColor);
+                    RECT syncRect = { syncCol, drawTop, icon.rect.right - 4, drawBottom };
+                    DrawTextW(memDC, syncSymbol, -1,
+                        &syncRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                }
+
+                // Fix alpha for entire row text area
+                for (int py = drawTop; py < drawBottom && py < h; py++) {
+                    if (py < visibleTop) continue;
+                    for (int px = nameCol; px < icon.rect.right && px < w; px++) {
+                        if (px >= 0 && py >= 0) {
+                            DWORD pixel = pixels[py * w + px];
                             BYTE a = (pixel >> 24) & 0xFF;
-                            if (a == 0) {
+                            BYTE r = (pixel >> 16) & 0xFF;
+                            BYTE g = (pixel >> 8) & 0xFF;
+                            BYTE b = pixel & 0xFF;
+                            if (a == 0 && (r > 0 || g > 0 || b > 0)) {
+                                pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
+                            }
+                        }
+                    }
+                }
+
+                // Draw selection border for selected row in details view
+                if (i == selectedIcon && !isDraggingIcon) {
+                    DWORD borderPixel = (255 << 24) | (100 << 16) | (150 << 8) | 255;
+                    // Top border
+                    for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
+                        if (x >= 0 && drawTop >= visibleTop && drawTop < h) {
+                            pixels[drawTop * w + x] = borderPixel;
+                        }
+                    }
+                    // Bottom border
+                    for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
+                        if (x >= 0 && (drawBottom - 1) >= visibleTop && (drawBottom - 1) < h) {
+                            pixels[(drawBottom - 1) * w + x] = borderPixel;
+                        }
+                    }
+                }
+
+            } else {
+                // Grid view (Small/Medium/Large icons)
+                // Icon image
+                if (icon.hIcon) {
+                    DrawIconEx(memDC,
+                        icon.iconRect.left, iconDrawTop,
+                        icon.hIcon,
+                        iconSize, iconSize,
+                        0, nullptr, DI_NORMAL);
+
+                    // Fix alpha for icon area (with clipping)
+                    for (int py = iconDrawTop; py < iconDrawTop + iconSize && py < h; py++) {
+                        if (py < visibleTop) continue;
+                        for (int px = icon.iconRect.left; px < icon.iconRect.left + iconSize && px < w; px++) {
+                            if (px >= 0 && py >= 0) {
+                                DWORD pixel = pixels[py * w + px];
+                                BYTE a = (pixel >> 24) & 0xFF;
+                                if (a == 0) {
+                                    BYTE r = (pixel >> 16) & 0xFF;
+                                    BYTE g = (pixel >> 8) & 0xFF;
+                                    BYTE b = pixel & 0xFF;
+                                    if (r > 0 || g > 0 || b > 0) {
+                                        pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Label
+                SetTextColor(memDC, RGB(255, 255, 255));
+                int labelTop = iconDrawTop + iconSize + 2;
+                RECT labelRect = {
+                    icon.rect.left,
+                    labelTop,
+                    icon.rect.right,
+                    drawBottom
+                };
+                // Only draw if label area is visible
+                if (labelTop < visibleBottom && drawBottom > visibleTop) {
+                    DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
+                        &labelRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+                    // Fix alpha for label area (with clipping)
+                    for (int py = labelTop; py < drawBottom && py < h; py++) {
+                        if (py < visibleTop) continue;
+                        for (int px = icon.rect.left; px < icon.rect.right && px < w; px++) {
+                            if (px >= 0 && py >= 0) {
+                                DWORD pixel = pixels[py * w + px];
+                                BYTE a = (pixel >> 24) & 0xFF;
                                 BYTE r = (pixel >> 16) & 0xFF;
                                 BYTE g = (pixel >> 8) & 0xFF;
                                 BYTE b = pixel & 0xFF;
-                                if (r > 0 || g > 0 || b > 0) {
-                                    pixels[y * w + x] = (255 << 24) | (r << 16) | (g << 8) | b;
+                                if (a == 0 && (r > 0 || g > 0 || b > 0)) {
+                                    pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
                                 }
                             }
                         }
                     }
                 }
             }
-
-            // Label
-            SetTextColor(memDC, RGB(255, 255, 255));
-            int labelTop = iconDrawTop + iconSize + 2;
-            RECT labelRect = {
-                icon.rect.left,
-                labelTop,
-                icon.rect.right,
-                drawBottom
-            };
-            // Only draw if label area is visible
-            if (labelTop < visibleBottom && drawBottom > visibleTop) {
-                DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
-                    &labelRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-                // Fix alpha for label area (with clipping)
-                for (int y = labelTop; y < drawBottom && y < h; y++) {
-                    if (y < visibleTop) continue;
-                    for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
-                        if (x >= 0 && y >= 0) {
-                            DWORD pixel = pixels[y * w + x];
-                            BYTE a = (pixel >> 24) & 0xFF;
-                            BYTE r = (pixel >> 16) & 0xFF;
-                            BYTE g = (pixel >> 8) & 0xFF;
-                            BYTE b = pixel & 0xFF;
-                            if (a == 0 && (r > 0 || g > 0 || b > 0)) {
-                                pixels[y * w + x] = (255 << 24) | (r << 16) | (g << 8) | b;
-                            }
-                        }
-                    }
-                }
-            }
         }
+
+        // Remove clipping region
+        SelectClipRgn(memDC, nullptr);
+        DeleteObject(clipRegion);
 
         SelectObject(memDC, oldIconFont);
         DeleteObject(iconFont);
@@ -1174,16 +1829,15 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
         return;
     }
 
-    // Check if clicked on an icon - start drag for reordering
+    // Check if clicked on an icon - select it (drag starts on mouse move)
     int hit = HitTestIcon(x, y);
     if (hit >= 0) {
         selectedIcon = hit;
-        isDraggingIcon = true;
-        draggedIconIndex = hit;
-        iconDragStart = { x, y };
+        draggedIconIndex = hit;  // Potential drag candidate
+        iconDragStart = { x, y };  // Store starting position
         dropTargetIndex = -1;
         SetCapture(hwnd);
-        UpdateLayeredContent();
+        UpdateLayeredContent();  // Show selection highlight
         return;
     }
 
@@ -1216,6 +1870,12 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y) {
 }
 
 void CorralWindow::OnRightButtonDown(int x, int y) {
+    // Check title bar first - don't let scrolled icons consume clicks here
+    if (y < TITLE_BAR_HEIGHT) {
+        ShowContextMenu(x, y);
+        return;
+    }
+
     int hit = HitTestIcon(x, y);
     if (hit >= 0) {
         selectedIcon = hit;
@@ -1276,14 +1936,37 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, 1, L"Rename");
     AppendMenuW(menu, MF_STRING, 2, L"Appearance...");
+
+    // Change Folder option for virtual corrals
+    if (config.IsVirtual) {
+        AppendMenuW(menu, MF_STRING, 7, L"Change Folder...");
+    }
+
+    // View submenu
+    HMENU viewMenu = CreatePopupMenu();
+    ViewMode currentMode = config.GetViewMode();
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::SmallIcons ? MF_CHECKED : 0), 10, L"Small Icons");
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::MediumIcons ? MF_CHECKED : 0), 11, L"Medium Icons");
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::LargeIcons ? MF_CHECKED : 0), 12, L"Large Icons");
+    AppendMenuW(viewMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::Details ? MF_CHECKED : 0), 13, L"Details");
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)viewMenu, L"View");
+
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    // Catch-all option with checkmark if already set
-    UINT catchAllFlags = MF_STRING | (config.IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
-    AppendMenuW(menu, catchAllFlags, 3, L"Catch-All (receives new files)");
-    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+
+    // Catch-all option - only for non-virtual corrals
+    if (!config.IsVirtual) {
+        UINT catchAllFlags = MF_STRING | (config.IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
+        AppendMenuW(menu, catchAllFlags, 3, L"Catch-All (receives new files)");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    }
+
     // Show Desktop Icons with checkmark
     UINT iconFlags = MF_STRING | (DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(menu, iconFlags, 5, L"Show Desktop Icons");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, 6, L"Create New Corral");
+    AppendMenuW(menu, MF_STRING, 8, L"New Virtual Corral");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 4, L"Delete Corral");
 
@@ -1306,6 +1989,133 @@ void CorralWindow::ShowContextMenu(int x, int y) {
             App::GetInstance()->ToggleDesktopIcons();
         }
         break;
+    case 6:
+        if (App::GetInstance()) {
+            // Find a good position for the new corral
+            RECT currentRect;
+            GetWindowRect(hwnd, &currentRect);
+
+            // Get screen dimensions
+            HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO mi = { sizeof(mi) };
+            GetMonitorInfo(hMon, &mi);
+
+            POINT newPos;
+            int corralWidth = 300;
+            int corralHeight = 200;
+            int gap = 20;
+
+            // Try to place to the right of current corral
+            newPos.x = currentRect.right + gap + corralWidth / 2;
+            newPos.y = currentRect.top + corralHeight / 2;
+
+            // If that would go off screen, try below
+            if (newPos.x + corralWidth / 2 > mi.rcWork.right) {
+                newPos.x = currentRect.left + corralWidth / 2;
+                newPos.y = currentRect.bottom + gap + corralHeight / 2;
+            }
+
+            // If that would also go off screen, offset from current
+            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom) {
+                newPos.x = currentRect.left + 50 + corralWidth / 2;
+                newPos.y = currentRect.top + 50 + corralHeight / 2;
+            }
+
+            App::GetInstance()->CreateCorralAt(newPos);
+        }
+        break;
+    case 7:
+        // Change Folder (virtual corrals only)
+        ChangeFolderPath();
+        break;
+    case 8:
+        // New Virtual Corral
+        if (App::GetInstance()) {
+            RECT currentRect;
+            GetWindowRect(hwnd, &currentRect);
+
+            HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO mi = { sizeof(mi) };
+            GetMonitorInfo(hMon, &mi);
+
+            POINT newPos;
+            int corralWidth = 300;
+            int corralHeight = 200;
+            int gap = 20;
+
+            newPos.x = currentRect.right + gap + corralWidth / 2;
+            newPos.y = currentRect.top + corralHeight / 2;
+
+            if (newPos.x + corralWidth / 2 > mi.rcWork.right) {
+                newPos.x = currentRect.left + corralWidth / 2;
+                newPos.y = currentRect.bottom + gap + corralHeight / 2;
+            }
+
+            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom) {
+                newPos.x = currentRect.left + 50 + corralWidth / 2;
+                newPos.y = currentRect.top + 50 + corralHeight / 2;
+            }
+
+            App::GetInstance()->CreateVirtualCorralAt(newPos);
+        }
+        break;
+    case 10: SetViewMode(ViewMode::SmallIcons); break;
+    case 11: SetViewMode(ViewMode::MediumIcons); break;
+    case 12: SetViewMode(ViewMode::LargeIcons); break;
+    case 13: SetViewMode(ViewMode::Details); break;
+    }
+}
+
+void CorralWindow::SetViewMode(ViewMode mode) {
+    if (config.GetViewMode() == mode) return;
+
+    config.SetViewMode(mode);
+    iconSize = GetIconSizeForViewMode();
+    UpdateIconSpacingForViewMode();
+
+    // Reload icons to get appropriate size (uses LoadFiles which handles both normal and virtual corrals)
+    scrollPosition = 0;  // Reset scroll when changing view
+    LoadFiles();
+
+    if (App::GetInstance()) {
+        App::GetInstance()->SaveConfig();
+    }
+}
+
+int CorralWindow::GetIconSizeForViewMode() const {
+    switch (config.GetViewMode()) {
+    case ViewMode::SmallIcons: return ICON_SIZE_SMALL;
+    case ViewMode::MediumIcons: return ICON_SIZE_MEDIUM;
+    case ViewMode::LargeIcons: return ICON_SIZE_LARGE;
+    case ViewMode::Details: return ICON_SIZE_DETAILS;
+    default: return ICON_SIZE_SMALL;
+    }
+}
+
+void CorralWindow::UpdateIconSpacingForViewMode() {
+    switch (config.GetViewMode()) {
+    case ViewMode::SmallIcons:
+        iconSpacingX = 72;
+        iconSpacingY = 68;
+        break;
+    case ViewMode::MediumIcons:
+        iconSpacingX = 80;
+        iconSpacingY = 80;
+        break;
+    case ViewMode::LargeIcons:
+        // Larger spacing for large icons to fit longer labels
+        iconSpacingX = 100;
+        iconSpacingY = 100;
+        break;
+    case ViewMode::Details:
+        // Not used for details view, but set reasonable defaults
+        iconSpacingX = 72;
+        iconSpacingY = DETAILS_ROW_HEIGHT;
+        break;
+    default:
+        iconSpacingX = 72;
+        iconSpacingY = 68;
+        break;
     }
 }
 
@@ -1325,8 +2135,23 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
             RECT parentRect, dlgRect;
             GetWindowRect(hParent, &parentRect);
             GetWindowRect(hDlg, &dlgRect);
-            int cx = parentRect.left + (parentRect.right - parentRect.left - (dlgRect.right - dlgRect.left)) / 2;
-            int cy = parentRect.top + (parentRect.bottom - parentRect.top - (dlgRect.bottom - dlgRect.top)) / 2;
+            int dlgWidth = dlgRect.right - dlgRect.left;
+            int dlgHeight = dlgRect.bottom - dlgRect.top;
+
+            // Get monitor work area
+            HMONITOR hMon = MonitorFromWindow(hParent, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO mi = { sizeof(mi) };
+            GetMonitorInfo(hMon, &mi);
+
+            int cx = parentRect.left + (parentRect.right - parentRect.left - dlgWidth) / 2;
+            int cy = parentRect.top + (parentRect.bottom - parentRect.top - dlgHeight) / 2;
+
+            // Clamp to monitor bounds
+            if (cx + dlgWidth > mi.rcWork.right) cx = mi.rcWork.right - dlgWidth;
+            if (cx < mi.rcWork.left) cx = mi.rcWork.left;
+            if (cy + dlgHeight > mi.rcWork.bottom) cy = mi.rcWork.bottom - dlgHeight;
+            if (cy < mi.rcWork.top) cy = mi.rcWork.top;
+
             SetWindowPos(hDlg, nullptr, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
 
@@ -1478,10 +2303,36 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             GetWindowRect(hParent, &parentRect);
             GetWindowRect(hDlg, &dlgRect);
             int dlgWidth = dlgRect.right - dlgRect.left;
+            int dlgHeight = dlgRect.bottom - dlgRect.top;
             int parentWidth = parentRect.right - parentRect.left;
+
+            // Get monitor work area
+            HMONITOR hMon = MonitorFromWindow(hParent, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO mi = { sizeof(mi) };
+            GetMonitorInfo(hMon, &mi);
+
             // Center horizontally, position below the corral window
             int cx = parentRect.left + (parentWidth - dlgWidth) / 2;
             int cy = parentRect.bottom + 5;  // 5px below the corral
+
+            // If dialog would go below screen, try above the corral
+            if (cy + dlgHeight > mi.rcWork.bottom) {
+                cy = parentRect.top - dlgHeight - 5;  // 5px above the corral
+            }
+
+            // If still outside (top), clamp to top of work area
+            if (cy < mi.rcWork.top) {
+                cy = mi.rcWork.top;
+            }
+
+            // Clamp horizontal position to stay within monitor bounds
+            if (cx + dlgWidth > mi.rcWork.right) {
+                cx = mi.rcWork.right - dlgWidth;
+            }
+            if (cx < mi.rcWork.left) {
+                cx = mi.rcWork.left;
+            }
+
             SetWindowPos(hDlg, nullptr, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
         return TRUE;

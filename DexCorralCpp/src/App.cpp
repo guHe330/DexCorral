@@ -3,12 +3,15 @@
 #include "DesktopIcons.h"
 #include "DesktopMonitor.h"
 #include <CommCtrl.h>
+#include <ShlObj.h>
+#include <shobjidl.h>
 #include <cstdlib>
 #include <algorithm>
 
 App* App::instance = nullptr;
 
 static const wchar_t* MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
+static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralCppGracefulExit";
 
 App::App() : messageWindow(nullptr) {
     instance = this;
@@ -42,6 +45,9 @@ void App::Initialize() {
     // Load configuration
     LoadConfig();
 
+    // Create monitor manager (before wallpaper and corrals)
+    monitorManager = std::make_unique<MonitorManager>();
+
     // Create wallpaper manager
     wallpaperManager = std::make_unique<WallpaperManager>();
     wallpaperManager->LoadWallpaper();
@@ -51,6 +57,7 @@ void App::Initialize() {
     mouseHook->SetLeftButtonDownCallback([this](POINT pt) { OnLeftButtonDown(pt); });
     mouseHook->SetLeftButtonUpCallback([this](POINT pt) { OnLeftButtonUp(pt); });
     mouseHook->SetMouseMoveCallback([this](POINT pt) { OnMouseMove(pt); });
+    // Note: Mousewheel events are NOT hooked - they pass through naturally to windows
     mouseHook->Start();
 
     // Create tray icon
@@ -77,6 +84,10 @@ void App::Initialize() {
         auto corral = std::make_unique<CorralWindow>(defaultConfig, wallpaperManager.get());
         corral->Show();
         corrals.push_back(std::move(corral));
+
+        // First run: enable autostart by default
+        SetAutostart(true);
+
         SaveConfig();
     }
 
@@ -89,6 +100,12 @@ void App::Initialize() {
     desktopMonitor->SetFileRenamedCallback([this](const std::wstring& oldName, const std::wstring& newName) { OnDesktopFileRenamed(oldName, newName); });
     desktopMonitor->SetFileDeletedCallback([this](const std::wstring& fileName) { OnDesktopFileDeleted(fileName); });
     desktopMonitor->Start();
+
+    // Create graceful exit event (manual reset, initially not signaled)
+    hGracefulExitEvent = CreateEventW(nullptr, TRUE, FALSE, GRACEFUL_EXIT_EVENT);
+
+    // Start watchdog process
+    StartWatchdog();
 }
 
 void App::Shutdown() {
@@ -109,6 +126,12 @@ void App::Shutdown() {
     // Stop mouse hook
     if (mouseHook) {
         mouseHook->Stop();
+    }
+
+    // Close graceful exit event
+    if (hGracefulExitEvent) {
+        CloseHandle(hGracefulExitEvent);
+        hGracefulExitEvent = nullptr;
     }
 }
 
@@ -246,9 +269,25 @@ void App::OnMouseMove(POINT pt) {
     // Handle mouse move if needed
 }
 
+// Removed: Mousewheel events now pass through naturally instead of being hooked
+// void App::OnMouseWheel(POINT pt, int delta) {
+//     // Forward mouse wheel events to the corral window under the cursor
+//     for (auto& corral : corrals) {
+//         HWND hwnd = corral->GetHWND();
+//         RECT rect;
+//         GetWindowRect(hwnd, &rect);
+//         if (PtInRect(&rect, pt)) {
+//             // Forward the wheel message to this corral
+//             SendMessageW(hwnd, WM_MOUSEWHEEL, MAKEWPARAM(0, delta), MAKELPARAM(pt.x, pt.y));
+//             break;
+//         }
+//     }
+// }
+
 void App::ShowTrayMenu() {
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, 1, L"Create New Corral");
+    AppendMenuW(menu, MF_STRING, 5, L"New Virtual Corral");
 
     // Icon visibility toggle
     UINT flags = DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED;
@@ -285,11 +324,22 @@ void App::ShowTrayMenu() {
         ToggleDesktopIcons();
         break;
     case 3:
+        SignalGracefulExit();
         PostQuitMessage(0);
         break;
     case 4:
         SetAutostart(!IsAutostartEnabled());
         break;
+    case 5: {
+        int offsetX = (int)corrals.size() * 30;
+        int offsetY = (int)corrals.size() * 30;
+        POINT centerPt = {
+            GetSystemMetrics(SM_CXSCREEN) / 2 + offsetX,
+            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY
+        };
+        CreateVirtualCorralAt(centerPt);
+        break;
+    }
     }
 }
 
@@ -307,6 +357,99 @@ void App::CreateCorral(POINT pt) {
     newConfig.Height = 200;
     newConfig.Title = "New Corral";
     newConfig.ColorHex = config.DefaultColorHex;  // Use saved default appearance
+
+    auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
+    corral->Show();
+    corrals.push_back(std::move(corral));
+    SaveConfig();
+}
+
+void App::CreateCorralAt(POINT pt) {
+    CreateCorral(pt);
+}
+
+void App::CreateVirtualCorralAt(POINT pt) {
+    // Show folder browser dialog
+    IFileDialog* pfd = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS(&pfd));
+    if (FAILED(hr)) return;
+
+    DWORD dwOptions;
+    hr = pfd->GetOptions(&dwOptions);
+    if (SUCCEEDED(hr)) {
+        hr = pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+    }
+
+    if (SUCCEEDED(hr)) {
+        pfd->SetTitle(L"Select Folder for Virtual Corral");
+    }
+
+    hr = pfd->Show(messageWindow);
+    std::wstring folderPath;
+    if (SUCCEEDED(hr)) {
+        IShellItem* psi = nullptr;
+        hr = pfd->GetResult(&psi);
+        if (SUCCEEDED(hr)) {
+            PWSTR pszPath = nullptr;
+            hr = psi->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+            if (SUCCEEDED(hr)) {
+                folderPath = pszPath;
+                CoTaskMemFree(pszPath);
+            }
+            psi->Release();
+        }
+    }
+    pfd->Release();
+
+    if (folderPath.empty()) return;
+
+    // Validate folder
+    DWORD attrs = GetFileAttributesW(folderPath.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        MessageBoxW(messageWindow, L"Invalid folder selected.", L"Error", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    // Check for network path
+    if (folderPath.length() >= 2 && folderPath[0] == L'\\' && folderPath[1] == L'\\') {
+        MessageBoxW(messageWindow, L"Network paths are not supported.", L"Error", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    if (folderPath.length() >= 2 && folderPath[1] == L':') {
+        wchar_t rootPath[4] = { folderPath[0], L':', L'\\', L'\0' };
+        if (GetDriveTypeW(rootPath) == DRIVE_REMOTE) {
+            MessageBoxW(messageWindow, L"Network drives are not supported.", L"Error", MB_OK | MB_ICONWARNING);
+            return;
+        }
+    }
+
+    // Extract folder name for title
+    size_t lastSlash = folderPath.find_last_of(L"\\/");
+    std::wstring folderName = (lastSlash != std::wstring::npos) ?
+                              folderPath.substr(lastSlash + 1) : folderPath;
+
+    // Convert wide string to UTF-8
+    int size = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), (int)folderPath.size(), nullptr, 0, nullptr, nullptr);
+    std::string utf8Path(size, 0);
+    WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), (int)folderPath.size(), &utf8Path[0], size, nullptr, nullptr);
+
+    size = WideCharToMultiByte(CP_UTF8, 0, folderName.c_str(), (int)folderName.size(), nullptr, 0, nullptr, nullptr);
+    std::string utf8Name(size, 0);
+    WideCharToMultiByte(CP_UTF8, 0, folderName.c_str(), (int)folderName.size(), &utf8Name[0], size, nullptr, nullptr);
+
+    // Create config
+    CorralConfig newConfig;
+    newConfig.Left = (double)pt.x - 150;
+    newConfig.Top = (double)pt.y - 100;
+    newConfig.Width = 300;
+    newConfig.Height = 200;
+    newConfig.Title = utf8Name;
+    newConfig.ColorHex = config.DefaultColorHex;
+    newConfig.IsVirtual = true;
+    newConfig.VirtualFolderPath = utf8Path;
+    newConfig.IsCatchAll = false;  // Virtual corrals cannot be catch-all
 
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();
@@ -388,6 +531,20 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         }
     }
 
+    if (app && uMsg == WM_DISPLAYCHANGE) {
+        app->OnDisplayChange();
+        return 0;
+    }
+
+    // Handle Windows shutdown/logoff - signal graceful exit
+    if (app && (uMsg == WM_ENDSESSION || uMsg == WM_QUERYENDSESSION)) {
+        if (uMsg == WM_ENDSESSION && wParam) {
+            // Session is ending - signal graceful exit so watchdog doesn't restart
+            app->SignalGracefulExit();
+        }
+        return uMsg == WM_QUERYENDSESSION ? TRUE : 0;
+    }
+
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
@@ -407,6 +564,12 @@ void App::EnsureCatchAllCorral() {
     // Find if any corral is marked as catch-all
     bool foundCatchAll = false;
     for (auto& corral : corrals) {
+        // Virtual corrals cannot be catch-all
+        if (corral->GetConfig().IsVirtual) {
+            corral->GetConfig().IsCatchAll = false;
+            continue;
+        }
+
         if (corral->GetConfig().IsCatchAll) {
             if (foundCatchAll) {
                 // Only one catch-all allowed
@@ -416,21 +579,219 @@ void App::EnsureCatchAllCorral() {
         }
     }
 
-    // If no catch-all exists, make the first corral catch-all
-    if (!foundCatchAll && !corrals.empty()) {
-        corrals[0]->GetConfig().IsCatchAll = true;
-        corrals[0]->UpdateWallpaperBackground();  // Refresh display to show catch-all symbol
+    // If no catch-all exists, make the first non-virtual corral catch-all
+    if (!foundCatchAll) {
+        for (auto& corral : corrals) {
+            if (!corral->GetConfig().IsVirtual) {
+                corral->GetConfig().IsCatchAll = true;
+                corral->UpdateWallpaperBackground();
+                break;
+            }
+        }
     }
 }
 
 CorralWindow* App::GetCatchAllCorral() {
     for (auto& corral : corrals) {
-        if (corral->GetConfig().IsCatchAll) {
+        if (corral->GetConfig().IsCatchAll && !corral->GetConfig().IsVirtual) {
             return corral.get();
         }
     }
-    // Fallback to first corral if no catch-all defined
-    return corrals.empty() ? nullptr : corrals[0].get();
+    // Fallback to first non-virtual corral if no catch-all defined
+    for (auto& corral : corrals) {
+        if (!corral->GetConfig().IsVirtual) {
+            return corral.get();
+        }
+    }
+    return nullptr;
+}
+
+void App::OnDisplayChange() {
+    if (!monitorManager) return;
+
+    // Refresh monitor list
+    monitorManager->Refresh();
+
+    // Update wallpaper (resolution may have changed)
+    if (wallpaperManager) {
+        wallpaperManager->LoadWallpaper();
+    }
+
+    // Reposition all corrals
+    UpdateCorralPositions();
+
+    // Refresh all corral backgrounds
+    RefreshAllCorralBackgrounds();
+}
+
+void App::UpdateCorralPositions() {
+    if (!monitorManager) return;
+
+    const MonitorInfo* primaryMon = monitorManager->GetPrimaryMonitor();
+    if (!primaryMon) return;
+
+    bool configChanged = false;
+
+    for (auto& corral : corrals) {
+        CorralConfig& cfg = corral->GetConfig();
+        const std::string& targetId = cfg.TargetMonitorId;
+
+        // Check if target monitor is active
+        const MonitorInfo* targetMon = monitorManager->FindMonitor(targetId);
+
+        if (targetMon) {
+            // Target monitor is active - restore/scale position
+            auto it = cfg.MonitorPositions.find(targetId);
+            if (it != cfg.MonitorPositions.end()) {
+                MonitorPosition& stored = it->second;
+
+                // Check if resolution changed
+                if (stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height) {
+                    // Scale position and size based on percentage (stored positions are relative to monitor)
+                    double xPercent = (double)stored.Left / stored.RefWidth;
+                    double yPercent = (double)stored.Top / stored.RefHeight;
+                    double wPercent = (double)stored.Width / stored.RefWidth;
+                    double hPercent = (double)stored.Height / stored.RefHeight;
+
+                    // Calculate new relative position on monitor
+                    int newRelLeft = (int)(xPercent * targetMon->width);
+                    int newRelTop = (int)(yPercent * targetMon->height);
+                    int newWidth = (int)(wPercent * targetMon->width);
+                    int newHeight = (int)(hPercent * targetMon->height);
+
+                    // Clamp relative position to monitor bounds
+                    if (newRelLeft + newWidth > targetMon->width) {
+                        newRelLeft = targetMon->width - newWidth;
+                    }
+                    if (newRelTop + newHeight > targetMon->height) {
+                        newRelTop = targetMon->height - newHeight;
+                    }
+                    if (newRelLeft < 0) newRelLeft = 0;
+                    if (newRelTop < 0) newRelTop = 0;
+
+                    // Convert to screen coordinates
+                    int screenLeft = targetMon->bounds.left + newRelLeft;
+                    int screenTop = targetMon->bounds.top + newRelTop;
+
+                    // Update stored position with new relative values
+                    stored.Left = newRelLeft;
+                    stored.Top = newRelTop;
+                    stored.Width = newWidth;
+                    stored.Height = newHeight;
+                    stored.RefWidth = targetMon->width;
+                    stored.RefHeight = targetMon->height;
+
+                    // Apply to corral (using screen coordinates)
+                    cfg.Left = screenLeft;
+                    cfg.Top = screenTop;
+                    cfg.Width = newWidth;
+                    cfg.Height = newHeight;
+
+                    SetWindowPos(corral->GetHWND(), nullptr,
+                        screenLeft, screenTop, newWidth, newHeight,
+                        SWP_NOZORDER | SWP_NOACTIVATE);
+
+                    configChanged = true;
+                }
+            }
+        } else if (!targetId.empty()) {
+            // Target monitor is offline - move to primary monitor
+            // Calculate position based on percentage from stored position
+            auto it = cfg.MonitorPositions.find(targetId);
+            if (it != cfg.MonitorPositions.end()) {
+                MonitorPosition& stored = it->second;
+
+                // Calculate percentages from original relative position
+                double xPercent = (double)stored.Left / stored.RefWidth;
+                double yPercent = (double)stored.Top / stored.RefHeight;
+                double wPercent = (double)stored.Width / stored.RefWidth;
+                double hPercent = (double)stored.Height / stored.RefHeight;
+
+                // Apply to primary monitor (calculate relative position first)
+                int newRelLeft = (int)(xPercent * primaryMon->width);
+                int newRelTop = (int)(yPercent * primaryMon->height);
+                int newWidth = (int)(wPercent * primaryMon->width);
+                int newHeight = (int)(hPercent * primaryMon->height);
+
+                // Clamp relative position to primary monitor bounds
+                if (newRelLeft + newWidth > primaryMon->width) {
+                    newRelLeft = primaryMon->width - newWidth;
+                }
+                if (newRelTop + newHeight > primaryMon->height) {
+                    newRelTop = primaryMon->height - newHeight;
+                }
+                if (newRelLeft < 0) newRelLeft = 0;
+                if (newRelTop < 0) newRelTop = 0;
+
+                // Convert to screen coordinates
+                int screenLeft = primaryMon->bounds.left + newRelLeft;
+                int screenTop = primaryMon->bounds.top + newRelTop;
+
+                // Update current position (but keep TargetMonitorId unchanged so it returns when monitor reconnects)
+                cfg.Left = screenLeft;
+                cfg.Top = screenTop;
+                cfg.Width = newWidth;
+                cfg.Height = newHeight;
+
+                SetWindowPos(corral->GetHWND(), nullptr,
+                    screenLeft, screenTop, newWidth, newHeight,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+
+                configChanged = true;
+            }
+        }
+    }
+
+    if (configChanged) {
+        SaveConfig();
+    }
+}
+
+void App::StartWatchdog() {
+    // Get path to watchdog executable (in same directory as main exe)
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+
+    std::wstring watchdogPath(exePath);
+    size_t pos = watchdogPath.rfind(L'\\');
+    if (pos != std::wstring::npos) {
+        watchdogPath = watchdogPath.substr(0, pos + 1) + L"DexCorralCppWatchdog.exe";
+    } else {
+        return;  // Can't determine path
+    }
+
+    // Check if watchdog exists
+    if (GetFileAttributesW(watchdogPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return;  // Watchdog not found - running in dev mode or standalone
+    }
+
+    // Build command line with our PID
+    wchar_t cmdLine[MAX_PATH + 32];
+    swprintf_s(cmdLine, L"\"%s\" %lu", watchdogPath.c_str(), GetCurrentProcessId());
+
+    // Start watchdog process
+    STARTUPINFOW si = { sizeof(si) };
+    PROCESS_INFORMATION pi = {};
+
+    if (CreateProcessW(
+        watchdogPath.c_str(),
+        cmdLine,
+        nullptr, nullptr,
+        FALSE,
+        0,
+        nullptr, nullptr,
+        &si, &pi
+    )) {
+        // Close handles - we don't need to track the watchdog
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+}
+
+void App::SignalGracefulExit() {
+    if (hGracefulExitEvent) {
+        SetEvent(hGracefulExitEvent);
+    }
 }
 
 void App::OnDesktopFileAdded(const std::wstring& fileName) {
