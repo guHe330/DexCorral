@@ -83,51 +83,12 @@ jobs:
     - name: Build Release
       run: cmake --build DexCorralCpp/build --config Release
 
-    - name: Create portable readme.txt
+    - name: Prepare portable readme
       shell: pwsh
       run: |
-        $version = "${{ steps.get_version.outputs.version }}"
-        $content = @"
-DexCorral v$version - Portable Edition
-========================================
-
-DexCorral is a high-performance, native C++ desktop organization tool for Windows.
-It helps you keep your desktop clean by grouping icons into shaded, customizable 
-areas called "Corrals".
-
-CONTENTS
---------
-- DexCorral.exe         : Main application
-- DexCorral.Watchdog.exe: Auto-restart service (keeps DexCorral running)
-- LICENSE               : MIT License
-- readme.txt            : This file
-
-INSTALLATION
-------------
-1. Extract all files to a folder of your choice
-2. Run DexCorral.exe
-3. The watchdog will start automatically to ensure reliability
-
-USAGE
------
-- Right-click the tray icon to create new Corrals or access settings
-- Drag icons into Corrals to organize them
-- Double-click a Corral's title bar to roll it up/down
-- Corrals and icon positions are saved automatically
-
-REQUIREMENTS
-------------
-- Windows 10 or Windows 11
-- No additional runtime or dependencies required
-
-MORE INFORMATION
-----------------
-GitHub: https://github.com/guHe330/DexCorralCpp
-License: MIT License (see LICENSE file)
-
-"@
-        Set-Content -Path "portable_readme.txt" -Value $content
-        Write-Host "Created portable readme.txt"
+        # Copy the PortableReadme.txt from Distribute folder
+        Copy-Item "Distribute/PortableReadme.txt" -Destination "portable_readme.txt"
+        Write-Host "Copied PortableReadme.txt for portable package"
 
     - name: Create Portable Package
       shell: pwsh
