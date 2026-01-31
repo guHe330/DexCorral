@@ -906,9 +906,14 @@ bool CorralWindow::HitTestScrollbar(int x, int y) const {
     return PtInRect(&track, pt) != FALSE;
 }
 
-void CorralWindow::OnMouseWheel(int delta) {
-    if (!NeedsScrollbar()) return;
+bool CorralWindow::HitTestScrollbarThumb(int x, int y) const {
+    if (!NeedsScrollbar()) return false;
+    RECT thumb = GetScrollbarThumbRect();
+    POINT pt = { x, y };
+    return PtInRect(&thumb, pt) != FALSE;
+}
 
+void CorralWindow::OnMouseWheel(int delta) {
     // Scroll 3 lines per notch (WHEEL_DELTA = 120)
     int scrollAmount = (delta / WHEEL_DELTA) * iconSpacingY;
     scrollPosition -= scrollAmount;
@@ -1861,7 +1866,29 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
 
     // Check if clicked on scrollbar
     if (HitTestScrollbar(x, y)) {
-        StartScrollbarDrag(y);
+        if (HitTestScrollbarThumb(x, y)) {
+            // Clicked on thumb - start dragging
+            StartScrollbarDrag(y);
+        } else {
+            // Clicked in track - jump to position
+            RECT track = GetScrollbarTrackRect();
+            RECT thumb = GetScrollbarThumbRect();
+            int thumbHeight = thumb.bottom - thumb.top;
+            int trackHeight = track.bottom - track.top;
+            int thumbRange = trackHeight - thumbHeight;
+            int scrollRange = contentHeight - GetVisibleHeight();
+
+            // Calculate new scroll position - center thumb on click point
+            int clickOffset = y - track.top - (thumbHeight / 2);
+            if (clickOffset < 0) clickOffset = 0;
+            if (clickOffset > thumbRange) clickOffset = thumbRange;
+
+            if (thumbRange > 0) {
+                scrollPosition = (int)((float)clickOffset / thumbRange * scrollRange);
+                ClampScrollPosition();
+                UpdateLayeredContent();
+            }
+        }
         return;
     }
 

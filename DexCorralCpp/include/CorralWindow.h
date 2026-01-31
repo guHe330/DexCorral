@@ -100,6 +100,7 @@ private:
     RECT GetScrollbarTrackRect() const;
     RECT GetScrollbarThumbRect() const;
     bool HitTestScrollbar(int x, int y) const;
+    bool HitTestScrollbarThumb(int x, int y) const;
     void OnMouseWheel(int delta);
     void StartScrollbarDrag(int y);
     void DoScrollbarDrag(int y);
