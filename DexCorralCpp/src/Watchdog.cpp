@@ -41,12 +41,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         return 1;
     }
 
+    // Open graceful exit event NOW (before process terminates)
+    // This keeps the event object alive even after main process exits
+    HANDLE hEvent = OpenEventW(SYNCHRONIZE, FALSE, GRACEFUL_EXIT_EVENT);
+
     // Wait for main process to terminate
     WaitForSingleObject(hProcess, INFINITE);
     CloseHandle(hProcess);
 
     // Check if it was a graceful exit
-    HANDLE hEvent = OpenEventW(SYNCHRONIZE, FALSE, GRACEFUL_EXIT_EVENT);
     if (hEvent) {
         DWORD result = WaitForSingleObject(hEvent, 0);
         CloseHandle(hEvent);

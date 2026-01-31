@@ -128,11 +128,12 @@ void App::Shutdown() {
         mouseHook->Stop();
     }
 
-    // Close graceful exit event
-    if (hGracefulExitEvent) {
-        CloseHandle(hGracefulExitEvent);
-        hGracefulExitEvent = nullptr;
-    }
+    // DON'T close graceful exit event - let OS clean it up on process exit
+    // This ensures watchdog can still check the event after process terminates
+    // if (hGracefulExitEvent) {
+    //     CloseHandle(hGracefulExitEvent);
+    //     hGracefulExitEvent = nullptr;
+    // }
 }
 
 void App::LoadConfig() {
