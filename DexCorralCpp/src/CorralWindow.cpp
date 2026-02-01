@@ -409,87 +409,46 @@ void CorralWindow::LoadFileDetails(CorralIcon& icon) {
 }
 
 SyncStatus CorralWindow::GetSyncStatus(const std::wstring& path) {
-    // Try to get icon overlay info which indicates sync status
-    // Shell icon overlays are registered by sync providers like OneDrive, Dropbox, etc.
+    // Detect cloud files by their attributes and reparse tags, not by path names.
+    // This works for OneDrive, Dropbox, Google Drive, iCloud, and other cloud providers.
 
-    SHFILEINFOW sfi = {};
-    if (!SHGetFileInfoW(path.c_str(), 0, &sfi, sizeof(sfi), SHGFI_OVERLAYINDEX | SHGFI_ICON | SHGFI_SMALLICON)) {
-        return SyncStatus::None;
-    }
-
-    // Clean up the icon we got
-    if (sfi.hIcon) {
-        DestroyIcon(sfi.hIcon);
-    }
-
-    // Extract overlay index (stored in high byte of iIcon)
-    int overlayIndex = (sfi.iIcon >> 24) & 0xFF;
-
-    // Common overlay indices used by sync providers:
-    // OneDrive and many others use standard overlay handlers:
-    // 1 = Share overlay (hand icon)
-    // 2 = Shortcut arrow
-    // 3 = Slow file (offline)
-    // The sync-specific overlays are typically in range 10+
-    //
-    // OneDrive overlays (registered with specific GUIDs):
-    // - Synced: green checkmark (various overlay indices depending on registration order)
-    // - Syncing: blue circular arrows
-    // - Pending: blue clock
-    // - Error: red X
-    // - Cloud only: cloud icon
-    //
-    // Since overlay indices depend on registration order, we try to detect by
-    // reading the overlay handler registry keys. For now, use a heuristic based on
-    // known common patterns.
-
-    if (overlayIndex == 0) {
-        return SyncStatus::None;
-    }
-
-    // Try to identify by checking if this is a OneDrive/Dropbox path
-    std::wstring lowerPath = path;
-    std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::towlower);
-
-    bool isCloudPath = (lowerPath.find(L"onedrive") != std::wstring::npos ||
-                        lowerPath.find(L"dropbox") != std::wstring::npos ||
-                        lowerPath.find(L"google drive") != std::wstring::npos ||
-                        lowerPath.find(L"icloud") != std::wstring::npos);
-
-    if (!isCloudPath) {
-        return SyncStatus::None;
-    }
-
-    // For cloud paths with overlays, we can try to determine status
-    // This is a heuristic - actual detection would require COM interfaces
-    // like IStorageProviderHandler in Windows 10+
-
-    // Try using cloud files API if available (Windows 10 1709+)
-    // Check file attributes for cloud files
     DWORD attrs = GetFileAttributesW(path.c_str());
-    if (attrs != INVALID_FILE_ATTRIBUTES) {
-        // Check cloud file attributes
-        // FILE_ATTRIBUTE_PINNED = always available locally
-        // FILE_ATTRIBUTE_UNPINNED = cloud only (free up space)
-        // FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS/OPEN = cloud only, will download on access
-
-        if (attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS ||
-            attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN ||
-            attrs & FILE_ATTRIBUTE_UNPINNED) {
-            return SyncStatus::CloudOnly;
-        }
-
-        if (attrs & FILE_ATTRIBUTE_PINNED) {
-            return SyncStatus::Synced;
-        }
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        return SyncStatus::None;
     }
 
-    // If we have an overlay on a cloud path, assume it's synced
-    // (green checkmark is the most common overlay)
-    if (overlayIndex > 0) {
+    // Check Windows cloud file attributes (most reliable method)
+    // These attributes are set by cloud sync providers like OneDrive
+
+    // Cloud-only files: not locally available, will download on access
+    if (attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS ||
+        attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN ||
+        attrs & FILE_ATTRIBUTE_UNPINNED) {
+        return SyncStatus::CloudOnly;
+    }
+
+    // Pinned files: "Always keep on this device" - fully synced locally
+    if (attrs & FILE_ATTRIBUTE_PINNED) {
         return SyncStatus::Synced;
     }
 
+    // Check for cloud reparse point (OneDrive uses 0x9000xxxx tags)
+    // Files synced by OneDrive have reparse points even when locally available
+    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT) {
+        WIN32_FIND_DATAW findData;
+        HANDLE hFind = FindFirstFileW(path.c_str(), &findData);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            FindClose(hFind);
+            // OneDrive cloud tags: 0x9000001A through 0x9000F01A
+            // Check if high word matches 0x9000 (cloud files filter)
+            DWORD tag = findData.dwReserved0;
+            if ((tag & 0xFFFF0000) == 0x90000000) {
+                return SyncStatus::Synced;
+            }
+        }
+    }
+
+    // Not a cloud-managed file - show nothing
     return SyncStatus::None;
 }
 
