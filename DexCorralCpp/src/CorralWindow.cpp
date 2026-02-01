@@ -152,7 +152,7 @@ CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperM
         classRegistered = true;
     }
 
-    std::wstring wtitle(config.Title.begin(), config.Title.end());
+    std::wstring wtitle = Utf8ToWide(config.Title);
 
     // If rolled up, create with title bar height; otherwise use full height
     int initialHeight = config.IsRolledUp ? TITLE_BAR_HEIGHT : (int)config.Height;
@@ -1588,7 +1588,7 @@ void CorralWindow::OnPaint() {
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
-        std::wstring wtitle(config.Title.begin(), config.Title.end());
+        std::wstring wtitle = Utf8ToWide(config.Title);
         RECT titleRect = { 8, 8, rect.right - 8, 30 };
         DrawTextW(hdc, wtitle.c_str(), -1, &titleRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
         SelectObject(hdc, oldFont);
@@ -1727,7 +1727,7 @@ void CorralWindow::UpdateLayeredContent() {
         CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
     HFONT oldFont = (HFONT)SelectObject(memDC, titleFont);
 
-    std::wstring wtitle(config.Title.begin(), config.Title.end());
+    std::wstring wtitle = Utf8ToWide(config.Title);
 
     // Add folder symbol for virtual corrals
     if (config.IsVirtual) {
@@ -2623,7 +2623,7 @@ void CorralWindow::ShowRenameDialog() {
     p += 7; *p++ = 0;
 
     wchar_t nameBuffer[256] = {};
-    std::wstring currentTitle(config.Title.begin(), config.Title.end());
+    std::wstring currentTitle = Utf8ToWide(config.Title);
     wcsncpy_s(nameBuffer, currentTitle.c_str(), _TRUNCATE);
 
     INT_PTR result = DialogBoxIndirectParamW(
