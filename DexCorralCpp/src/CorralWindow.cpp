@@ -5,6 +5,7 @@
 #include "FolderWatcher.h"
 #include <windowsx.h>
 #include <commdlg.h>
+#include <commctrl.h>
 #include <shellapi.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -844,6 +845,231 @@ int CorralWindow::HitTestIcon(int x, int y) {
 }
 
 // ============================================================================
+// Icon rename support
+// ============================================================================
+
+RECT CorralWindow::GetIconLabelRect(int iconIndex) const {
+    if (iconIndex < 0 || iconIndex >= (int)icons.size()) {
+        return { 0, 0, 0, 0 };
+    }
+
+    const CorralIcon& icon = icons[iconIndex];
+
+    // For details view, label is in the name column
+    if (config.GetViewMode() == ViewMode::Details) {
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int clientWidth = rect.right - rect.left;
+        int rightPadding = ICON_PADDING_LEFT;
+        if (NeedsScrollbar()) {
+            rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
+        }
+        int contentWidth = clientWidth - ICON_PADDING_LEFT - rightPadding;
+
+        int nameCol = icon.iconRect.left + ICON_SIZE_DETAILS + 4;
+        int typeCol = nameCol + (int)(contentWidth * 0.40);
+
+        return { nameCol, icon.rect.top, typeCol - 4, icon.rect.bottom };
+    }
+
+    // For icon views, label is below the icon
+    int labelTop = icon.iconRect.bottom + 2;
+    return { icon.rect.left, labelTop, icon.rect.right, icon.rect.bottom };
+}
+
+bool CorralWindow::HitTestIconLabel(int x, int y, int iconIndex) const {
+    if (iconIndex < 0 || iconIndex >= (int)icons.size()) {
+        return false;
+    }
+
+    // Get label rect in content coordinates and convert to screen coordinates
+    RECT labelRect = GetIconLabelRect(iconIndex);
+    labelRect.top -= scrollPosition;
+    labelRect.bottom -= scrollPosition;
+
+    POINT pt = { x, y };
+    return PtInRect(&labelRect, pt) != FALSE;
+}
+
+void CorralWindow::StartIconRename(int iconIndex) {
+    if (iconIndex < 0 || iconIndex >= (int)icons.size() || isRenamingIcon) {
+        return;
+    }
+
+    isRenamingIcon = true;
+    renamingIconIndex = iconIndex;
+    originalName = icons[iconIndex].displayName;
+
+    // Get the label rect in client coordinates
+    RECT labelRect = GetIconLabelRect(iconIndex);
+
+    // Adjust for scroll position
+    labelRect.top -= scrollPosition;
+    labelRect.bottom -= scrollPosition;
+
+    // Temporarily disable layered window style so child controls render properly
+    LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+    RedrawWindow(hwnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
+
+    // Create edit control as a normal child window
+    hEditControl = CreateWindowExW(
+        0,
+        L"EDIT",
+        icons[iconIndex].displayName.c_str(),
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_CENTER,
+        labelRect.left,
+        labelRect.top,
+        labelRect.right - labelRect.left,
+        labelRect.bottom - labelRect.top,
+        hwnd,
+        nullptr,
+        GetModuleHandleW(nullptr),
+        nullptr
+    );
+
+    if (hEditControl) {
+        // Set font to match the label
+        HFONT hFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        SendMessageW(hEditControl, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+        // Select all text
+        SendMessageW(hEditControl, EM_SETSEL, 0, -1);
+
+        // Set focus
+        SetFocus(hEditControl);
+
+        // Subclass the edit control to handle Enter/Escape
+        SetWindowSubclass(hEditControl, EditSubclassProc, 0, (DWORD_PTR)this);
+    }
+}
+
+void CorralWindow::EndIconRename(bool save) {
+    if (!isRenamingIcon || !hEditControl) {
+        return;
+    }
+
+    if (save && renamingIconIndex >= 0 && renamingIconIndex < (int)icons.size()) {
+        // Get the new name from edit control
+        int len = GetWindowTextLengthW(hEditControl);
+        if (len > 0) {
+            std::wstring newName(len + 1, L'\0');
+            GetWindowTextW(hEditControl, &newName[0], len + 1);
+            newName.resize(len);
+
+            // Trim whitespace
+            size_t start = newName.find_first_not_of(L" \t\r\n");
+            size_t end = newName.find_last_not_of(L" \t\r\n");
+            if (start != std::wstring::npos && end != std::wstring::npos) {
+                newName = newName.substr(start, end - start + 1);
+            }
+
+            // Only rename if name actually changed and is not empty
+            if (!newName.empty() && newName != originalName) {
+                // Get the original file path
+                std::wstring oldPath = icons[renamingIconIndex].fullPath;
+
+                // Build new path
+                size_t lastSlash = oldPath.find_last_of(L"\\");
+                std::wstring newPath;
+                if (lastSlash != std::wstring::npos) {
+                    newPath = oldPath.substr(0, lastSlash + 1) + newName;
+
+                    // Add .lnk extension if it's a shortcut and not already present
+                    bool oldPathIsLnk = oldPath.length() >= 4 && oldPath.substr(oldPath.length() - 4) == L".lnk";
+                    bool newNameIsLnk = newName.length() >= 4 && newName.substr(newName.length() - 4) == L".lnk";
+                    if (oldPathIsLnk && !newNameIsLnk) {
+                        newPath += L".lnk";
+                    }
+                }
+
+                // Attempt to rename the file
+                if (!newPath.empty() && MoveFileW(oldPath.c_str(), newPath.c_str())) {
+                    // Update the icon data
+                    icons[renamingIconIndex].fullPath = newPath;
+                    icons[renamingIconIndex].wFileName = newPath.substr(lastSlash + 1);
+
+                    // Update display name (without .lnk)
+                    std::wstring displayName = icons[renamingIconIndex].wFileName;
+                    bool displayNameIsLnk = displayName.length() >= 4 && displayName.substr(displayName.length() - 4) == L".lnk";
+                    if (displayNameIsLnk) {
+                        displayName = displayName.substr(0, displayName.length() - 4);
+                    }
+                    icons[renamingIconIndex].displayName = displayName;
+
+                    // Update config
+                    if (renamingIconIndex < (int)config.Files.size()) {
+                        config.Files[renamingIconIndex] = std::string(icons[renamingIconIndex].wFileName.begin(),
+                                                                       icons[renamingIconIndex].wFileName.end());
+                    }
+
+                    if (App::GetInstance()) {
+                        App::GetInstance()->SaveConfig();
+                    }
+                } else {
+                    // Rename failed - could show error message
+                    MessageBoxW(hwnd, L"Failed to rename file. The file may be in use or you may not have permission.",
+                               L"Rename Error", MB_OK | MB_ICONERROR);
+                }
+            }
+        }
+    }
+
+    // Clean up edit control
+    // Note: Set state flags BEFORE DestroyWindow to prevent re-entrancy
+    // (DestroyWindow triggers WM_KILLFOCUS which would call EndIconRename again)
+    HWND editToDestroy = hEditControl;
+    hEditControl = nullptr;
+    isRenamingIcon = false;
+    renamingIconIndex = -1;
+    originalName.clear();
+
+    if (editToDestroy) {
+        DestroyWindow(editToDestroy);
+    }
+
+    // Restore layered window style (was disabled for child edit control to work)
+    LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+
+    // Redraw to show the updated label
+    UpdateLayeredContent();
+}
+
+LRESULT CALLBACK CorralWindow::EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
+                                                  UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
+    CorralWindow* window = (CorralWindow*)dwRefData;
+
+    switch (uMsg) {
+    case WM_KEYDOWN:
+        if (wParam == VK_RETURN) {
+            // Enter - save and end rename
+            window->EndIconRename(true);
+            return 0;
+        } else if (wParam == VK_ESCAPE) {
+            // Escape - cancel rename
+            window->EndIconRename(false);
+            return 0;
+        }
+        break;
+
+    case WM_KILLFOCUS:
+        // Lost focus - save rename
+        window->EndIconRename(true);
+        return 0;
+
+    case WM_NCDESTROY:
+        // Remove subclass before destruction
+        RemoveWindowSubclass(hwnd, EditSubclassProc, uIdSubclass);
+        break;
+    }
+
+    return DefSubclassProc(hwnd, uMsg, wParam, lParam);
+}
+
+// ============================================================================
 // Scrollbar support
 // ============================================================================
 
@@ -1136,7 +1362,10 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_ACTIVATE:
             // Push back to bottom z-order when activated (keeps corral below other apps)
-            SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            // Skip this if we're renaming an icon to avoid z-order fighting with the edit popup
+            if (!window->isRenamingIcon) {
+                SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
             return 0;
         case WM_SETCURSOR: {
             if (LOWORD(lParam) == HTCLIENT) {
@@ -1264,7 +1493,13 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             window->OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
             return 0;
         case WM_KEYDOWN:
-            if (wParam == VK_DELETE && window->selectedIcon >= 0 &&
+            if (wParam == VK_F2 && window->selectedIcon >= 0 &&
+                window->selectedIcon < (int)window->icons.size()) {
+                // F2 - Rename selected icon
+                window->StartIconRename(window->selectedIcon);
+                return 0;
+            }
+            else if (wParam == VK_DELETE && window->selectedIcon >= 0 &&
                 window->selectedIcon < (int)window->config.Files.size()) {
                 // Remove selected icon from corral
                 window->config.Files.erase(window->config.Files.begin() + window->selectedIcon);
@@ -1317,11 +1552,89 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 
 void CorralWindow::OnPaint() {
     PAINTSTRUCT ps;
-    BeginPaint(hwnd, &ps);
+    HDC hdc = BeginPaint(hwnd, &ps);
+
+    // Check if we're currently in non-layered mode (during rename)
+    LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    if (!(exStyle & WS_EX_LAYERED)) {
+        // Paint a solid background when not layered
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+
+        // Use the config background color
+        BYTE bgR = 40, bgG = 40, bgB = 40;
+        if (!config.ColorHex.empty() && config.ColorHex[0] == '#' && config.ColorHex.length() >= 7) {
+            unsigned int colorValue;
+            sscanf_s(config.ColorHex.c_str() + 1, "%x", &colorValue);
+            bgR = (colorValue >> 16) & 0xFF;
+            bgG = (colorValue >> 8) & 0xFF;
+            bgB = colorValue & 0xFF;
+        }
+
+        HBRUSH brush = CreateSolidBrush(RGB(bgR, bgG, bgB));
+        FillRect(hdc, &rect, brush);
+        DeleteObject(brush);
+
+        // Draw title bar background (darker)
+        HBRUSH titleBrush = CreateSolidBrush(RGB(bgR / 2, bgG / 2, bgB / 2));
+        RECT titleBarRect = { 0, 0, rect.right, TITLE_BAR_HEIGHT };
+        FillRect(hdc, &titleBarRect, titleBrush);
+        DeleteObject(titleBrush);
+
+        // Draw title text
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        HFONT titleFont = CreateFontW(-14, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
+        std::wstring wtitle(config.Title.begin(), config.Title.end());
+        RECT titleRect = { 8, 8, rect.right - 8, 30 };
+        DrawTextW(hdc, wtitle.c_str(), -1, &titleRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        SelectObject(hdc, oldFont);
+        DeleteObject(titleFont);
+
+        // Draw icons
+        HFONT labelFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        SelectObject(hdc, labelFont);
+
+        for (size_t i = 0; i < icons.size(); i++) {
+            const auto& icon = icons[i];
+            int drawTop = icon.iconRect.top - scrollPosition;
+
+            // Skip if outside visible area
+            if (drawTop + iconSize < ICON_AREA_TOP || drawTop > rect.bottom) continue;
+
+            // Draw icon
+            if (icon.hIcon) {
+                DrawIconEx(hdc, icon.iconRect.left, drawTop, icon.hIcon,
+                    iconSize, iconSize, 0, nullptr, DI_NORMAL);
+            }
+
+            // Draw label (skip the one being edited)
+            if ((int)i != renamingIconIndex) {
+                RECT labelRect = {
+                    icon.rect.left,
+                    icon.iconRect.bottom + 2 - scrollPosition,
+                    icon.rect.right,
+                    icon.rect.bottom - scrollPosition
+                };
+                DrawTextW(hdc, icon.displayName.c_str(), -1, &labelRect,
+                    DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS);
+            }
+        }
+
+        DeleteObject(labelFont);
+    }
+
     EndPaint(hwnd, &ps);
 
     // For layered windows, we use UpdateLayeredWindow instead of regular painting
-    UpdateLayeredContent();
+    if (exStyle & WS_EX_LAYERED) {
+        UpdateLayeredContent();
+    }
 }
 
 void CorralWindow::UpdateLayeredContent() {
@@ -1895,10 +2208,19 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
     // Check if clicked on an icon - select it (drag starts on mouse move)
     int hit = HitTestIcon(x, y);
     if (hit >= 0) {
+        // Check if we clicked on the label of an already-selected icon
+        if (hit == selectedIcon && HitTestIconLabel(x, y, hit)) {
+            // Clicked on label of selected icon - start rename
+            StartIconRename(hit);
+            return;
+        }
+
+        // Otherwise, just select the icon
         selectedIcon = hit;
         draggedIconIndex = hit;  // Potential drag candidate
         iconDragStart = { x, y };  // Store starting position
         dropTargetIndex = -1;
+        SetFocus(hwnd);  // Take keyboard focus so F2 works
         SetCapture(hwnd);
         UpdateLayeredContent();  // Show selection highlight
         return;

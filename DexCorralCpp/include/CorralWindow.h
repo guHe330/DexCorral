@@ -93,6 +93,14 @@ private:
     void OnIconDrag(int x, int y);
     void OnIconDragEnd();
 
+    // Icon rename
+    RECT GetIconLabelRect(int iconIndex) const;
+    bool HitTestIconLabel(int x, int y, int iconIndex) const;
+    void StartIconRename(int iconIndex);
+    void EndIconRename(bool save);
+    void OnEditCommand(HWND hEdit, UINT command);
+    static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+
     // Scrollbar support
     bool NeedsScrollbar() const;
     int GetContentHeight() const;
@@ -199,6 +207,12 @@ private:
     static const int SCROLLBAR_WIDTH = 10;
     static const int SCROLLBAR_MARGIN = 2;
     static const int SCROLLBAR_MIN_THUMB = 30;
+
+    // Icon rename state
+    bool isRenamingIcon = false;
+    int renamingIconIndex = -1;
+    HWND hEditControl = nullptr;
+    std::wstring originalName;
 
     // Virtual corral support
     std::unique_ptr<FolderWatcher> folderWatcher;
