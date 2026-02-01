@@ -33,6 +33,11 @@ static const wchar_t* CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
 #define FILE_ATTRIBUTE_UNPINNED 0x00100000
 #endif
 
+// Pointer input messages (Windows 8+, for precision touchpad support)
+#ifndef WM_POINTERWHEEL
+#define WM_POINTERWHEEL 0x024E
+#endif
+
 // ============================================================================
 // Folder browser utility functions
 // ============================================================================
@@ -694,7 +699,11 @@ void CorralWindow::CalculateIconLayout() {
 void CorralWindow::CalculateIconLayoutGrid() {
     int x = ICON_PADDING_LEFT;
     int y = ICON_AREA_TOP;
-    int clientWidth = (int)config.Width;
+
+    // Use actual window dimensions, not config (which may differ when rolled up/animating)
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+    int clientWidth = clientRect.right;
 
     // Reserve space for scrollbar if needed (will be recalculated)
     int rightPadding = ICON_PADDING_LEFT;
@@ -758,12 +767,16 @@ void CorralWindow::CalculateIconLayoutDetails() {
     // Details view: list layout with rows
     // Each row has: [icon 16px] [name] [type] [size] [date] [sync status]
     int y = ICON_AREA_TOP;
-    int clientWidth = (int)config.Width;
+
+    // Use actual window dimensions, not config (which may differ when rolled up/animating)
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+    int clientWidth = clientRect.right;
+    int visibleHeight = clientRect.bottom - ICON_AREA_TOP;
     int rightPadding = ICON_PADDING_LEFT;
 
     // Check if we'll need scrollbar
     int estimatedHeight = ICON_AREA_TOP + (int)icons.size() * DETAILS_ROW_HEIGHT + ICON_PADDING_LEFT;
-    int visibleHeight = (int)config.Height - ICON_AREA_TOP;
     if (estimatedHeight > visibleHeight) {
         rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
     }
@@ -1099,8 +1112,12 @@ bool CorralWindow::HitTestScrollbarThumb(int x, int y) const {
 }
 
 void CorralWindow::OnMouseWheel(int delta) {
-    // Scroll 3 lines per notch (WHEEL_DELTA = 120)
-    int scrollAmount = (delta / WHEEL_DELTA) * iconSpacingY;
+    // Only scroll if content exceeds visible area
+    if (!NeedsScrollbar()) return;
+
+    // Scroll proportionally - multiply first to avoid integer truncation for small deltas
+    // (precision touchpads send small incremental deltas like 6, 20, etc. instead of 120)
+    int scrollAmount = delta * iconSpacingY / WHEEL_DELTA;
     scrollPosition -= scrollAmount;
     ClampScrollPosition();
     UpdateLayeredContent();
@@ -1449,6 +1466,10 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             window->OnDropFiles((HDROP)wParam);
             return 0;
         case WM_MOUSEWHEEL:
+            window->OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+            return 0;
+        case WM_POINTERWHEEL:
+            // Handle precision touchpad scrolling (Windows 8+ pointer input)
             window->OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
             return 0;
         case WM_KEYDOWN:
