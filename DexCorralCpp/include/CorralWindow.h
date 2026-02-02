@@ -37,7 +37,7 @@ struct CorralIcon {
 
 class CorralWindow {
 public:
-    CorralWindow(const CorralConfig& config, WallpaperManager* wallpaperMgr);
+    CorralWindow(const CorralWindowConfig& config, WallpaperManager* wallpaperMgr);
     ~CorralWindow();
 
     void Show();
@@ -45,11 +45,19 @@ public:
     void UpdateWallpaperBackground();
     void LoadFiles();
     void SyncConfigFromWindow();  // Update config from current window state
-    void AddFile(const std::string& fileName);  // Add a file to this corral
+    void AddFile(const std::string& fileName);  // Add a file to this corral (active tab)
 
     HWND GetHWND() const { return hwnd; }
-    CorralConfig& GetConfig() { return config; }
-    const CorralConfig& GetConfig() const { return config; }
+    CorralWindowConfig& GetConfig() { return config; }
+    const CorralWindowConfig& GetConfig() const { return config; }
+
+    // Tab helpers
+    CorralTabConfig& GetActiveTab();
+    const CorralTabConfig& GetActiveTab() const;
+    void SetActiveTab(int index);
+    void AddTab(const CorralTabConfig& tab);
+    void DetachTab(int tabIndex);
+    void MergeWith(CorralWindow* other);
 
     // Virtual corral support
     void ChangeFolderPath();  // Open folder browser to change virtual folder path
@@ -66,6 +74,7 @@ private:
     void OnSize();
     void OnMove();
     void OnLeftButtonDown(int x, int y);
+    void OnLeftButtonUp(int x, int y);  // Added for drag-end detection
     void OnLeftButtonDblClick(int x, int y);
     void OnRightButtonDown(int x, int y);
     void OnDropFiles(HDROP hDrop);
@@ -121,6 +130,8 @@ private:
     void CalculateIconLayoutGrid();    // Grid layout for icon views
     void CalculateIconLayoutDetails(); // List layout for details view
     int HitTestIcon(int x, int y);
+    int HitTestTab(int x, int y);      // Returns tab index or -1
+    RECT GetTabRect(int index) const;  // Get rect for a specific tab
     void OpenFile(int iconIndex);
     void ShowShellContextMenu(int iconIndex, int screenX, int screenY);
     void LoadFileDetails(CorralIcon& icon);  // Load file info for details view
@@ -140,7 +151,7 @@ private:
     void GetDesktopIconSpacing(int& spacingX, int& spacingY);  // Read from registry
 
     HWND hwnd;
-    CorralConfig config;
+    CorralWindowConfig config;
     WallpaperManager* wallpaperManager;
     bool isDragging;
     POINT dragStart;

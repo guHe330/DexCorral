@@ -18,8 +18,8 @@ public:
 
     int Run();
     void SaveConfig();
-    void RemoveCorral(CorralConfig* config);
-    void RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralConfig* exceptCorral);
+    void RemoveCorral(CorralWindowConfig* config);
+    void RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralTabConfig* exceptTab);
     void RefreshAllCorrals();
     void RefreshAllCorralBackgrounds();
     void ToggleDesktopIcons();  // Toggle desktop icons visibility

@@ -130,8 +130,19 @@ static std::wstring Utf8ToWide(const std::string& utf8) {
 // Construction / Destruction
 // ============================================================================
 
-CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperMgr)
+CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wallpaperMgr)
     : config(cfg), wallpaperManager(wallpaperMgr), isDragging(false), hwnd(nullptr) {
+
+    // Ensure at least one tab exists
+    if (config.Tabs.empty()) {
+        CorralTabConfig tab;
+        tab.Title = "New Tab";
+        config.Tabs.push_back(tab);
+    }
+    // Clamp active tab index
+    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size()) {
+        config.ActiveTabIndex = 0;
+    }
 
     dragStart = { 0, 0 };
     dragStartRect = { 0, 0, 0, 0 };
@@ -139,7 +150,7 @@ CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperM
     // Save the full height for roll-up restore
     savedHeight = config.Height;
 
-    // Get icon size and spacing based on view mode
+    // Get icon size and spacing based on view mode (of active tab)
     iconSize = GetIconSizeForViewMode();
     UpdateIconSpacingForViewMode();
 
@@ -157,7 +168,7 @@ CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperM
         classRegistered = true;
     }
 
-    std::wstring wtitle = Utf8ToWide(config.Title);
+    std::wstring wtitle = Utf8ToWide(GetActiveTab().Title);
 
     // If rolled up, create with title bar height; otherwise use full height
     int initialHeight = config.IsRolledUp ? TITLE_BAR_HEIGHT : (int)config.Height;
@@ -175,8 +186,8 @@ CorralWindow::CorralWindow(const CorralConfig& cfg, WallpaperManager* wallpaperM
     // Sync config from actual window position/size (in case Windows adjusted it)
     SyncConfigFromWindow();
 
-    // Initialize folder watcher for virtual corrals
-    if (config.IsVirtual) {
+    // Initialize folder watcher for virtual corrals (if active tab is virtual)
+    if (GetActiveTab().IsVirtual) {
         InitializeFolderWatcher();
     }
 }
@@ -296,8 +307,8 @@ void CorralWindow::Show() {
         // Set to bottom z-order (above desktop, below other apps)
         SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
-        if (config.IsVirtual) {
-            // For virtual corrals, show window immediately and load icons asynchronously
+        if (GetActiveTab().IsVirtual) {
+            // For virtual tabs, show window immediately and load icons asynchronously
             UpdateLayeredContent();
             PostMessageW(hwnd, WM_DEFERRED_LOAD, 0, 0);
         } else {
@@ -355,7 +366,7 @@ void CorralWindow::SyncConfigFromWindow() {
 }
 
 void CorralWindow::LoadFiles() {
-    if (config.IsVirtual) {
+    if (GetActiveTab().IsVirtual) {
         LoadVirtualFolderIcons();
     } else {
         LoadIconImages();
@@ -365,15 +376,178 @@ void CorralWindow::LoadFiles() {
 }
 
 void CorralWindow::AddFile(const std::string& fileName) {
-    // Virtual corrals don't accept manual file additions
-    if (config.IsVirtual) return;
+    // Virtual tabs don't accept manual file additions
+    if (GetActiveTab().IsVirtual) return;
 
-    // Check if already in this corral
-    auto it = std::find(config.Files.begin(), config.Files.end(), fileName);
-    if (it == config.Files.end()) {
-        config.Files.push_back(fileName);
+    // Check if already in this corral (active tab)
+    auto& files = GetActiveTab().Files;
+    auto it = std::find(files.begin(), files.end(), fileName);
+    if (it == files.end()) {
+        files.push_back(fileName);
         LoadFiles();
     }
+}
+
+// ============================================================================
+// Tab Management
+// ============================================================================
+
+CorralTabConfig& CorralWindow::GetActiveTab() {
+    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size()) {
+        config.ActiveTabIndex = 0;
+        if (config.Tabs.empty()) {
+            config.Tabs.push_back(CorralTabConfig());
+        }
+    }
+    return config.Tabs[config.ActiveTabIndex];
+}
+
+const CorralTabConfig& CorralWindow::GetActiveTab() const {
+    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size()) {
+        if (config.Tabs.empty()) {
+            static CorralTabConfig empty;
+            return empty;
+        }
+        return config.Tabs[0];
+    }
+    return config.Tabs[config.ActiveTabIndex];
+}
+
+void CorralWindow::SetActiveTab(int index) {
+    if (index >= 0 && index < (int)config.Tabs.size() && index != config.ActiveTabIndex) {
+        config.ActiveTabIndex = index;
+
+        // Handle switching between virtual/regular
+        if (folderWatcher) {
+            folderWatcher->Stop();
+            folderWatcher.reset();
+        }
+
+        if (GetActiveTab().IsVirtual) {
+            InitializeFolderWatcher();
+        }
+
+        // Update view mode specific settings
+        iconSize = GetIconSizeForViewMode();
+        UpdateIconSpacingForViewMode();
+
+        scrollPosition = 0;
+        LoadFiles();
+
+        if (App::GetInstance()) {
+            App::GetInstance()->SaveConfig();
+        }
+    }
+}
+
+void CorralWindow::AddTab(const CorralTabConfig& tab) {
+    config.Tabs.push_back(tab);
+    SetActiveTab((int)config.Tabs.size() - 1);
+}
+
+void CorralWindow::DetachTab(int tabIndex) {
+    if (tabIndex < 0 || tabIndex >= (int)config.Tabs.size()) return;
+    if (config.Tabs.size() <= 1) return; // Can't detach the only tab
+
+    // Copy the tab to detach
+    CorralTabConfig tabToDetach = config.Tabs[tabIndex];
+
+    // Remove from this window first
+    config.Tabs.erase(config.Tabs.begin() + tabIndex);
+
+    // Adjust active index if needed
+    if (config.ActiveTabIndex >= (int)config.Tabs.size()) {
+        config.ActiveTabIndex = (int)config.Tabs.size() - 1;
+    } else if (config.ActiveTabIndex > tabIndex) {
+        config.ActiveTabIndex--;
+    }
+
+    // Reload this window with remaining tabs
+    if (GetActiveTab().IsVirtual) {
+        if (folderWatcher) {
+            folderWatcher->Stop();
+            folderWatcher.reset();
+        }
+        InitializeFolderWatcher();
+    }
+    iconSize = GetIconSizeForViewMode();
+    UpdateIconSpacingForViewMode();
+    scrollPosition = 0;
+    LoadFiles();
+
+    // Create new window for the detached tab
+    RECT rect;
+    GetWindowRect(hwnd, &rect);
+    POINT pt = { rect.left + 30, rect.top + 30 };
+
+    if (App::GetInstance()) {
+        App::GetInstance()->CreateCorralAt(pt);
+
+        // Get the new corral and replace its default tab with our detached tab
+        const auto& corrals = App::GetInstance()->GetCorrals();
+        if (!corrals.empty()) {
+            CorralWindow* newWindow = corrals.back().get();
+            newWindow->GetConfig().Tabs.clear();
+            newWindow->GetConfig().Tabs.push_back(tabToDetach);
+            newWindow->GetConfig().ActiveTabIndex = 0;
+            newWindow->LoadFiles();
+            newWindow->UpdateLayeredContent();
+        }
+
+        App::GetInstance()->SaveConfig();
+    }
+}
+
+void CorralWindow::MergeWith(CorralWindow* other) {
+    if (!other || other == this) return;
+
+    // Move all tabs from this to other
+    for (const auto& tab : config.Tabs) {
+        other->GetConfig().Tabs.push_back(tab);
+    }
+
+    other->UpdateLayeredContent();
+
+    // Destroy this window
+    if (App::GetInstance()) {
+        App::GetInstance()->RemoveCorral(&config);
+        App::GetInstance()->SaveConfig();
+    }
+}
+
+RECT CorralWindow::GetTabRect(int index) const {
+    if (index < 0 || index >= (int)config.Tabs.size()) return { 0, 0, 0, 0 };
+
+    RECT rect;
+    GetClientRect(hwnd, &rect);
+    int clientWidth = rect.right - rect.left;
+    int tabWidth = clientWidth / (int)config.Tabs.size();
+
+    RECT tabRect;
+    tabRect.left = index * tabWidth;
+    tabRect.right = (index + 1) * tabWidth;
+    tabRect.top = 0;
+    tabRect.bottom = TITLE_BAR_HEIGHT;
+
+    // Last tab fills remainder
+    if (index == (int)config.Tabs.size() - 1) {
+        tabRect.right = clientWidth;
+    }
+
+    return tabRect;
+}
+
+int CorralWindow::HitTestTab(int x, int y) {
+    if (y >= TITLE_BAR_HEIGHT) return -1;
+
+    for (int i = 0; i < (int)config.Tabs.size(); i++) {
+        RECT rect = GetTabRect(i);
+        POINT pt = { x, y };
+        if (PtInRect(&rect, pt)) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 // ============================================================================
@@ -466,9 +640,9 @@ void CorralWindow::LoadIconImages() {
     // Determine which icon flag to use based on view mode
     iconSize = GetIconSizeForViewMode();
     UINT iconFlag = (iconSize <= 16) ? SHGFI_SMALLICON : SHGFI_LARGEICON;
-    bool isDetailsView = (config.GetViewMode() == ViewMode::Details);
+    bool isDetailsView = (GetActiveTab().GetViewMode() == ViewMode::Details);
 
-    for (const auto& fileName : config.Files) {
+    for (const auto& fileName : GetActiveTab().Files) {
         CorralIcon ci;
         ci.fileName = fileName;
         ci.wFileName = std::wstring(fileName.begin(), fileName.end());
@@ -546,9 +720,9 @@ void CorralWindow::LoadIconImages() {
 void CorralWindow::LoadVirtualFolderIcons() {
     ClearIcons();
 
-    if (config.VirtualFolderPath.empty()) return;
+    if (GetActiveTab().VirtualFolderPath.empty()) return;
 
-    std::wstring folderPath = Utf8ToWide(config.VirtualFolderPath);
+    std::wstring folderPath = Utf8ToWide(GetActiveTab().VirtualFolderPath);
 
     // Enumerate folder contents
     WIN32_FIND_DATAW findData;
@@ -559,7 +733,7 @@ void CorralWindow::LoadVirtualFolderIcons() {
 
     iconSize = GetIconSizeForViewMode();
     UINT iconFlag = (iconSize <= 16) ? SHGFI_SMALLICON : SHGFI_LARGEICON;
-    bool isDetailsView = (config.GetViewMode() == ViewMode::Details);
+    bool isDetailsView = (GetActiveTab().GetViewMode() == ViewMode::Details);
 
     do {
         // Skip . and ..
@@ -628,10 +802,10 @@ void CorralWindow::LoadVirtualFolderIcons() {
 }
 
 void CorralWindow::InitializeFolderWatcher() {
-    if (!config.IsVirtual || config.VirtualFolderPath.empty()) return;
+    if (!GetActiveTab().IsVirtual || GetActiveTab().VirtualFolderPath.empty()) return;
 
     folderWatcher = std::make_unique<FolderWatcher>();
-    std::wstring folderPath = Utf8ToWide(config.VirtualFolderPath);
+    std::wstring folderPath = Utf8ToWide(GetActiveTab().VirtualFolderPath);
     folderWatcher->SetPath(folderPath);
     folderWatcher->SetChangeCallback([this]() {
         // Post message to window to handle on main thread
@@ -647,7 +821,7 @@ void CorralWindow::OnFolderContentsChanged() {
 }
 
 void CorralWindow::ChangeFolderPath() {
-    if (!config.IsVirtual) return;
+    if (!GetActiveTab().IsVirtual) return;
 
     std::wstring newPath = BrowseForLocalFolder(hwnd, L"Select Folder for Virtual Corral");
     if (newPath.empty()) return;
@@ -664,14 +838,14 @@ void CorralWindow::ChangeFolderPath() {
         folderWatcher.reset();
     }
 
-    // Update config
-    config.VirtualFolderPath = WideToUtf8(newPath);
+    // Update active tab config
+    GetActiveTab().VirtualFolderPath = WideToUtf8(newPath);
 
     // Update title to folder name
     size_t lastSlash = newPath.find_last_of(L"\\/");
     std::wstring folderName = (lastSlash != std::wstring::npos) ?
                               newPath.substr(lastSlash + 1) : newPath;
-    config.Title = WideToUtf8(folderName);
+    GetActiveTab().Title = WideToUtf8(folderName);
     SetWindowTextW(hwnd, folderName.c_str());
 
     // Restart watcher with new path
@@ -687,7 +861,7 @@ void CorralWindow::ChangeFolderPath() {
 }
 
 void CorralWindow::CalculateIconLayout() {
-    if (config.GetViewMode() == ViewMode::Details) {
+    if (GetActiveTab().GetViewMode() == ViewMode::Details) {
         CalculateIconLayoutDetails();
     } else {
         CalculateIconLayoutGrid();
@@ -828,7 +1002,7 @@ RECT CorralWindow::GetIconLabelRect(int iconIndex) const {
     const CorralIcon& icon = icons[iconIndex];
 
     // For details view, label is in the name column
-    if (config.GetViewMode() == ViewMode::Details) {
+    if (GetActiveTab().GetViewMode() == ViewMode::Details) {
         RECT rect;
         GetClientRect(hwnd, &rect);
         int clientWidth = rect.right - rect.left;
@@ -972,8 +1146,8 @@ void CorralWindow::EndIconRename(bool save) {
                     icons[renamingIconIndex].displayName = displayName;
 
                     // Update config
-                    if (renamingIconIndex < (int)config.Files.size()) {
-                        config.Files[renamingIconIndex] = std::string(icons[renamingIconIndex].wFileName.begin(),
+                    if (renamingIconIndex < (int)GetActiveTab().Files.size()) {
+                        GetActiveTab().Files[renamingIconIndex] = std::string(icons[renamingIconIndex].wFileName.begin(),
                                                                        icons[renamingIconIndex].wFileName.end());
                     }
 
@@ -1281,9 +1455,9 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
             PostMessageW(hwnd, WM_NULL, 0, 0);
 
             if (cmd == 0x7FFF + 1) {
-                auto it = std::find(config.Files.begin(), config.Files.end(), icon.fileName);
-                if (it != config.Files.end()) {
-                    config.Files.erase(it);
+                auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
+                if (it != GetActiveTab().Files.end()) {
+                    GetActiveTab().Files.erase(it);
                     LoadFiles();
                     if (App::GetInstance()) {
                         App::GetInstance()->SaveConfig();
@@ -1435,29 +1609,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         }
         case WM_LBUTTONUP:
-            if (window->isResizing) {
-                window->EndResize();
-            }
-            else if (window->isDraggingScrollbar) {
-                window->EndScrollbarDrag();
-            }
-            else if (window->isDraggingIcon) {
-                window->OnIconDragEnd();
-                ReleaseCapture();
-            }
-            else if (window->draggedIconIndex >= 0) {
-                // Mouse up without dragging - just a selection click
-                window->draggedIconIndex = -1;
-                ReleaseCapture();
-            }
-            else if (window->isDragging) {
-                window->isDragging = false;
-                ReleaseCapture();
-                window->SyncConfigFromWindow();
-                if (App::GetInstance()) {
-                    App::GetInstance()->SaveConfig();
-                }
-            }
+            window->OnLeftButtonUp(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
         case WM_RBUTTONDOWN:
             window->OnRightButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
@@ -1480,9 +1632,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 return 0;
             }
             else if (wParam == VK_DELETE && window->selectedIcon >= 0 &&
-                window->selectedIcon < (int)window->config.Files.size()) {
+                window->selectedIcon < (int)window->GetActiveTab().Files.size()) {
                 // Remove selected icon from corral
-                window->config.Files.erase(window->config.Files.begin() + window->selectedIcon);
+                window->GetActiveTab().Files.erase(window->GetActiveTab().Files.begin() + window->selectedIcon);
                 window->selectedIcon = -1;
                 window->LoadFiles();
                 if (App::GetInstance()) {
@@ -1541,11 +1693,12 @@ void CorralWindow::OnPaint() {
         RECT rect;
         GetClientRect(hwnd, &rect);
 
-        // Use the config background color
+        // Use the active tab's background color
         BYTE bgR = 40, bgG = 40, bgB = 40;
-        if (!config.ColorHex.empty() && config.ColorHex[0] == '#' && config.ColorHex.length() >= 7) {
+        const std::string& colorHex = GetActiveTab().ColorHex;
+        if (!colorHex.empty() && colorHex[0] == '#' && colorHex.length() >= 7) {
             unsigned int colorValue;
-            sscanf_s(config.ColorHex.c_str() + 1, "%x", &colorValue);
+            sscanf_s(colorHex.c_str() + 1, "%x", &colorValue);
             bgR = (colorValue >> 16) & 0xFF;
             bgG = (colorValue >> 8) & 0xFF;
             bgB = colorValue & 0xFF;
@@ -1568,7 +1721,7 @@ void CorralWindow::OnPaint() {
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
-        std::wstring wtitle = Utf8ToWide(config.Title);
+        std::wstring wtitle = Utf8ToWide(GetActiveTab().Title);
         RECT titleRect = { 8, 8, rect.right - 8, 30 };
         DrawTextW(hdc, wtitle.c_str(), -1, &titleRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
         SelectObject(hdc, oldFont);
@@ -1647,13 +1800,14 @@ void CorralWindow::UpdateLayeredContent() {
     HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
     DWORD* pixels = (DWORD*)bits;
 
-    // Get overlay color and alpha from config
+    // Get overlay color and alpha from active tab
     BYTE bgAlpha = 153;  // Default ~60% opacity
     BYTE bgR = 0, bgG = 0, bgB = 0;
 
-    if (!config.ColorHex.empty() && config.ColorHex[0] == '#' && config.ColorHex.length() >= 9) {
+    const std::string& colorHex = GetActiveTab().ColorHex;
+    if (!colorHex.empty() && colorHex[0] == '#' && colorHex.length() >= 9) {
         unsigned int colorValue;
-        sscanf_s(config.ColorHex.c_str() + 1, "%x", &colorValue);
+        sscanf_s(colorHex.c_str() + 1, "%x", &colorValue);
         bgAlpha = (colorValue >> 24) & 0xFF;
         bgR = (colorValue >> 16) & 0xFF;
         bgG = (colorValue >> 8) & 0xFF;
@@ -1678,9 +1832,34 @@ void CorralWindow::UpdateLayeredContent() {
     BYTE titlePmB = (BYTE)((bgB * titleAlpha) / 255 / 2);
     DWORD titlePixel = (titleAlpha << 24) | (titlePmR << 16) | (titlePmG << 8) | titlePmB;
 
-    for (int y = 0; y < TITLE_BAR_HEIGHT && y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            pixels[y * w + x] = titlePixel;
+    // Active tab background (lighter than inactive tabs)
+    BYTE activeAlpha = 240;
+    BYTE activePmR = (BYTE)((bgR * activeAlpha) / 255);
+    BYTE activePmG = (BYTE)((bgG * activeAlpha) / 255);
+    BYTE activePmB = (BYTE)((bgB * activeAlpha) / 255);
+    DWORD activeTabPixel = (activeAlpha << 24) | (activePmR << 16) | (activePmG << 8) | activePmB;
+
+    // Draw tab backgrounds
+    for (int i = 0; i < (int)config.Tabs.size(); i++) {
+        RECT tabRect = GetTabRect(i);
+        DWORD pixel = (i == config.ActiveTabIndex) ? activeTabPixel : titlePixel;
+
+        for (int y = tabRect.top; y < tabRect.bottom && y < h; y++) {
+            for (int x = tabRect.left; x < tabRect.right && x < w; x++) {
+                if (x >= 0 && y >= 0) {
+                    pixels[y * w + x] = pixel;
+                }
+            }
+        }
+
+        // Draw tab separator (vertical line between tabs)
+        if (i > 0) {
+            DWORD sepPixel = (200 << 24) | (80 << 16) | (80 << 8) | 80;
+            for (int y = 2; y < TITLE_BAR_HEIGHT - 2 && y < h; y++) {
+                if (tabRect.left >= 0 && tabRect.left < w) {
+                    pixels[y * w + tabRect.left] = sepPixel;
+                }
+            }
         }
     }
 
@@ -1701,42 +1880,57 @@ void CorralWindow::UpdateLayeredContent() {
     SetBkMode(memDC, TRANSPARENT);
     SetTextColor(memDC, RGB(255, 255, 255));
 
-    // Draw title (with catch-all symbol if applicable)
-    HFONT titleFont = CreateFontW(-14, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+    // Draw tab titles
+    HFONT titleFont = CreateFontW(-13, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
     HFONT oldFont = (HFONT)SelectObject(memDC, titleFont);
 
-    std::wstring wtitle = Utf8ToWide(config.Title);
+    for (int i = 0; i < (int)config.Tabs.size(); i++) {
+        const CorralTabConfig& tab = config.Tabs[i];
+        std::wstring wtitle = Utf8ToWide(tab.Title);
 
-    // Add folder symbol for virtual corrals
-    if (config.IsVirtual) {
-        wtitle = L"\U0001F4C1 " + wtitle;  // Folder emoji (📁)
-    }
-    // Add catch-all symbol if this is the catch-all corral
-    else if (config.IsCatchAll) {
-        wtitle = L"\u2B07 " + wtitle;  // Down arrow (⬇) symbol
-    }
+        // Add symbol prefix
+        if (tab.IsVirtual) {
+            wtitle = L"\U0001F4C1 " + wtitle;  // Folder emoji
+        } else if (tab.IsCatchAll) {
+            wtitle = L"\u2B07 " + wtitle;  // Down arrow
+        }
 
-    RECT titleRect = { 10, 6, w - 10, 28 };
-    DrawTextW(memDC, wtitle.c_str(), (int)wtitle.length(), &titleRect,
-        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        RECT tabRect = GetTabRect(i);
+        tabRect.left += 6;
+        tabRect.right -= 6;
+        tabRect.top += 2;
+
+        DrawTextW(memDC, wtitle.c_str(), (int)wtitle.length(), &tabRect,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    }
 
     SelectObject(memDC, oldFont);
     DeleteObject(titleFont);
 
-    // Fix alpha for title area (GDI sets alpha to 0)
+    // Fix alpha for title/tab area (GDI sets alpha to 0)
     for (int y = 0; y < TITLE_BAR_HEIGHT && y < h; y++) {
         for (int x = 0; x < w; x++) {
             DWORD pixel = pixels[y * w + x];
+            BYTE a = (pixel >> 24) & 0xFF;
             BYTE r = (pixel >> 16) & 0xFF;
             BYTE g = (pixel >> 8) & 0xFF;
             BYTE b = pixel & 0xFF;
-            // If GDI drew here (non-background color), make it fully opaque
-            if (r > titlePmR || g > titlePmG || b > titlePmB) {
+            // If GDI drew here (alpha is 0 but has color), make it fully opaque
+            if (a == 0 && (r > 0 || g > 0 || b > 0)) {
                 pixels[y * w + x] = (255 << 24) | (r << 16) | (g << 8) | b;
-            } else {
-                pixels[y * w + x] = titlePixel;
+            } else if (a == 0) {
+                // Restore tab background for pixels GDI cleared
+                int tabIndex = -1;
+                for (int ti = 0; ti < (int)config.Tabs.size(); ti++) {
+                    RECT tr = GetTabRect(ti);
+                    if (x >= tr.left && x < tr.right) {
+                        tabIndex = ti;
+                        break;
+                    }
+                }
+                pixels[y * w + x] = (tabIndex == config.ActiveTabIndex) ? activeTabPixel : titlePixel;
             }
         }
     }
@@ -1756,7 +1950,7 @@ void CorralWindow::UpdateLayeredContent() {
         HRGN clipRegion = CreateRectRgn(0, visibleTop, w, h);
         SelectClipRgn(memDC, clipRegion);
 
-        bool isDetailsView = (config.GetViewMode() == ViewMode::Details);
+        bool isDetailsView = (GetActiveTab().GetViewMode() == ViewMode::Details);
 
         for (int i = 0; i < (int)icons.size(); i++) {
             const auto& icon = icons[i];
@@ -2185,6 +2379,20 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
         return;
     }
 
+    // Check if clicked on a tab in title bar
+    int tabHit = HitTestTab(x, y);
+    if (tabHit >= 0) {
+        if (tabHit != config.ActiveTabIndex) {
+            SetActiveTab(tabHit);
+        }
+        // Allow dragging window from tab
+        isDragging = true;
+        GetCursorPos(&dragStart);
+        GetWindowRect(hwnd, &dragStartRect);
+        SetCapture(hwnd);
+        return;
+    }
+
     // Check if clicked on an icon - select it (drag starts on mouse move)
     int hit = HitTestIcon(x, y);
     if (hit >= 0) {
@@ -2212,7 +2420,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
         UpdateLayeredContent();
     }
 
-    // Title bar - start dragging window
+    // Title bar - start dragging window (empty area)
     if (y < TITLE_BAR_HEIGHT) {
         isDragging = true;
         GetCursorPos(&dragStart);
@@ -2231,6 +2439,52 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y) {
     int hit = HitTestIcon(x, y);
     if (hit >= 0) {
         OpenFile(hit);
+    }
+}
+
+void CorralWindow::OnLeftButtonUp(int x, int y) {
+    if (isResizing) {
+        EndResize();
+    }
+    else if (isDraggingScrollbar) {
+        EndScrollbarDrag();
+    }
+    else if (isDraggingIcon) {
+        OnIconDragEnd();
+        ReleaseCapture();
+    }
+    else if (draggedIconIndex >= 0) {
+        // Mouse up without dragging - just a selection click
+        draggedIconIndex = -1;
+        ReleaseCapture();
+    }
+    else if (isDragging) {
+        isDragging = false;
+        ReleaseCapture();
+
+        // Check for merge with another corral
+        POINT pt;
+        GetCursorPos(&pt);
+        App* app = App::GetInstance();
+        if (app) {
+            for (const auto& other : app->GetCorrals()) {
+                if (other.get() == this) continue;
+
+                RECT otherRect;
+                GetWindowRect(other->GetHWND(), &otherRect);
+
+                // If dropped on another window's title bar, merge
+                if (PtInRect(&otherRect, pt) && (pt.y - otherRect.top < TITLE_BAR_HEIGHT)) {
+                    MergeWith(other.get());
+                    return; // This window is destroyed now
+                }
+            }
+        }
+
+        SyncConfigFromWindow();
+        if (App::GetInstance()) {
+            App::GetInstance()->SaveConfig();
+        }
     }
 }
 
@@ -2272,13 +2526,13 @@ void CorralWindow::OnDropFiles(HDROP hDrop) {
         std::string fileNameUtf8(size - 1, 0);
         WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameUtf8[0], size, nullptr, nullptr);
 
-        auto it = std::find(config.Files.begin(), config.Files.end(), fileNameUtf8);
-        if (it == config.Files.end()) {
-            config.Files.push_back(fileNameUtf8);
+        auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), fileNameUtf8);
+        if (it == GetActiveTab().Files.end()) {
+            GetActiveTab().Files.push_back(fileNameUtf8);
             changed = true;
 
             if (App::GetInstance()) {
-                App::GetInstance()->RemoveFileFromOtherCorrals(fileName, &config);
+                App::GetInstance()->RemoveFileFromOtherCorrals(fileName, &GetActiveTab());
             }
         }
     }
@@ -2299,17 +2553,25 @@ void CorralWindow::OnDropFiles(HDROP hDrop) {
 
 void CorralWindow::ShowContextMenu(int x, int y) {
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING, 1, L"Rename");
+
+    // Tab operations
+    AppendMenuW(menu, MF_STRING, 15, L"Add Tab");
+    if (config.Tabs.size() > 1) {
+        AppendMenuW(menu, MF_STRING, 14, L"Detach Tab");
+    }
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+
+    AppendMenuW(menu, MF_STRING, 1, L"Rename Tab");
     AppendMenuW(menu, MF_STRING, 2, L"Appearance...");
 
-    // Change Folder option for virtual corrals
-    if (config.IsVirtual) {
+    // Change Folder option for virtual tabs
+    if (GetActiveTab().IsVirtual) {
         AppendMenuW(menu, MF_STRING, 7, L"Change Folder...");
     }
 
     // View submenu
     HMENU viewMenu = CreatePopupMenu();
-    ViewMode currentMode = config.GetViewMode();
+    ViewMode currentMode = GetActiveTab().GetViewMode();
     AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::SmallIcons ? MF_CHECKED : 0), 10, L"Small Icons");
     AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::MediumIcons ? MF_CHECKED : 0), 11, L"Medium Icons");
     AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::LargeIcons ? MF_CHECKED : 0), 12, L"Large Icons");
@@ -2319,9 +2581,9 @@ void CorralWindow::ShowContextMenu(int x, int y) {
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
-    // Catch-all option - only for non-virtual corrals
-    if (!config.IsVirtual) {
-        UINT catchAllFlags = MF_STRING | (config.IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
+    // Catch-all option - only for non-virtual tabs
+    if (!GetActiveTab().IsVirtual) {
+        UINT catchAllFlags = MF_STRING | (GetActiveTab().IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
         AppendMenuW(menu, catchAllFlags, 3, L"Catch-All (receives new files)");
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     }
@@ -2333,7 +2595,13 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     AppendMenuW(menu, MF_STRING, 6, L"Create New Corral");
     AppendMenuW(menu, MF_STRING, 8, L"New Virtual Corral");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, 4, L"Delete Corral");
+
+    // Delete Corral or Close Tab depending on tab count
+    if (config.Tabs.size() > 1) {
+        AppendMenuW(menu, MF_STRING, 4, L"Close Tab");
+    } else {
+        AppendMenuW(menu, MF_STRING, 4, L"Delete Corral");
+    }
 
     POINT pt = { x, y };
     ClientToScreen(hwnd, &pt);
@@ -2428,13 +2696,25 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     case 11: SetViewMode(ViewMode::MediumIcons); break;
     case 12: SetViewMode(ViewMode::LargeIcons); break;
     case 13: SetViewMode(ViewMode::Details); break;
+    case 14: DetachTab(config.ActiveTabIndex); break;
+    case 15: {
+        // Add new empty tab
+        CorralTabConfig newTab;
+        newTab.Title = "New Tab";
+        newTab.ColorHex = GetActiveTab().ColorHex;  // Inherit color from current tab
+        AddTab(newTab);
+        if (App::GetInstance()) {
+            App::GetInstance()->SaveConfig();
+        }
+        break;
+    }
     }
 }
 
 void CorralWindow::SetViewMode(ViewMode mode) {
-    if (config.GetViewMode() == mode) return;
+    if (GetActiveTab().GetViewMode() == mode) return;
 
-    config.SetViewMode(mode);
+    GetActiveTab().SetViewMode(mode);
     iconSize = GetIconSizeForViewMode();
     UpdateIconSpacingForViewMode();
 
@@ -2448,7 +2728,7 @@ void CorralWindow::SetViewMode(ViewMode mode) {
 }
 
 int CorralWindow::GetIconSizeForViewMode() const {
-    switch (config.GetViewMode()) {
+    switch (GetActiveTab().GetViewMode()) {
     case ViewMode::SmallIcons: return ICON_SIZE_SMALL;
     case ViewMode::MediumIcons: return ICON_SIZE_MEDIUM;
     case ViewMode::LargeIcons: return ICON_SIZE_LARGE;
@@ -2458,7 +2738,7 @@ int CorralWindow::GetIconSizeForViewMode() const {
 }
 
 void CorralWindow::UpdateIconSpacingForViewMode() {
-    switch (config.GetViewMode()) {
+    switch (GetActiveTab().GetViewMode()) {
     case ViewMode::SmallIcons:
         iconSpacingX = 72;
         iconSpacingY = 68;
@@ -2603,7 +2883,7 @@ void CorralWindow::ShowRenameDialog() {
     p += 7; *p++ = 0;
 
     wchar_t nameBuffer[256] = {};
-    std::wstring currentTitle = Utf8ToWide(config.Title);
+    std::wstring currentTitle = Utf8ToWide(GetActiveTab().Title);
     wcsncpy_s(nameBuffer, currentTitle.c_str(), _TRUNCATE);
 
     INT_PTR result = DialogBoxIndirectParamW(
@@ -2619,7 +2899,7 @@ void CorralWindow::ShowRenameDialog() {
         std::string newTitle(sz - 1, 0);
         WideCharToMultiByte(CP_UTF8, 0, nameBuffer, -1, &newTitle[0], sz, nullptr, nullptr);
 
-        config.Title = newTitle;
+        GetActiveTab().Title = newTitle;
         SetWindowTextW(hwnd, nameBuffer);
         UpdateLayeredContent();
 
@@ -2786,8 +3066,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 void CorralWindow::ShowAppearanceDialog() {
     auto Align = [](WORD* p) { return (ULONG_PTR)p % 4 ? p + 1 : p; };
 
-    // Build dynamic title with corral name
-    std::wstring wTitle(config.Title.begin(), config.Title.end());
+    // Build dynamic title with tab name
+    std::wstring wTitle = Utf8ToWide(GetActiveTab().Title);
     std::wstring dlgTitleStr = L"Appearance: " + wTitle;
     const wchar_t* strDlgTitle = dlgTitleStr.c_str();
     const wchar_t* strFontName = L"Segoe UI";
@@ -2927,14 +3207,15 @@ void CorralWindow::ShowAppearanceDialog() {
     dlgData.alpha = 153;
     dlgData.color = RGB(0,0,0);
     dlgData.previewWindow = hwnd;
-    dlgData.colorHex = &config.ColorHex;
+    dlgData.colorHex = &GetActiveTab().ColorHex;
     dlgData.hBrush = nullptr;
     dlgData.useAsDefault = false;
     dlgData.applyToAll = false;
 
-    if (!config.ColorHex.empty() && config.ColorHex[0] == '#' && config.ColorHex.length() >= 9) {
+    const std::string& colorHexRef = GetActiveTab().ColorHex;
+    if (!colorHexRef.empty() && colorHexRef[0] == '#' && colorHexRef.length() >= 9) {
         unsigned int colorValue;
-        sscanf_s(config.ColorHex.c_str() + 1, "%x", &colorValue);
+        sscanf_s(colorHexRef.c_str() + 1, "%x", &colorValue);
         dlgData.alpha = (colorValue >> 24) & 0xFF;
         BYTE r = (colorValue >> 16) & 0xFF;
         BYTE g = (colorValue >> 8) & 0xFF;
@@ -2942,7 +3223,7 @@ void CorralWindow::ShowAppearanceDialog() {
         dlgData.color = RGB(r, g, b);
     }
 
-    std::string originalColor = config.ColorHex;
+    std::string originalColor = GetActiveTab().ColorHex;
 
     INT_PTR result = DialogBoxIndirectParamW(
         GetModuleHandleW(nullptr),
@@ -2953,19 +3234,19 @@ void CorralWindow::ShowAppearanceDialog() {
     );
 
     if (result != IDOK) {
-        config.ColorHex = originalColor;
+        GetActiveTab().ColorHex = originalColor;
         UpdateLayeredContent();
     } else {
         App* app = App::GetInstance();
         if (app) {
             // Handle "Use as default for new corrals"
             if (dlgData.useAsDefault) {
-                app->SetDefaultColorHex(config.ColorHex);
+                app->SetDefaultColorHex(GetActiveTab().ColorHex);
             }
 
             // Handle "Apply to all corrals"
             if (dlgData.applyToAll) {
-                app->ApplyColorToAllCorrals(config.ColorHex);
+                app->ApplyColorToAllCorrals(GetActiveTab().ColorHex);
             }
 
             app->SaveConfig();
@@ -2974,9 +3255,24 @@ void CorralWindow::ShowAppearanceDialog() {
 }
 
 void CorralWindow::DeleteCorral() {
-    if (MessageBoxW(hwnd, L"Delete this corral?", L"Confirm Delete", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-        if (App::GetInstance()) {
-            App::GetInstance()->RemoveCorral(&config);
+    // If there are multiple tabs, just close the active tab
+    if (config.Tabs.size() > 1) {
+        if (MessageBoxW(hwnd, L"Close this tab?", L"Confirm Close", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+            config.Tabs.erase(config.Tabs.begin() + config.ActiveTabIndex);
+            if (config.ActiveTabIndex >= (int)config.Tabs.size()) {
+                config.ActiveTabIndex = (int)config.Tabs.size() - 1;
+            }
+            SetActiveTab(config.ActiveTabIndex);
+            if (App::GetInstance()) {
+                App::GetInstance()->SaveConfig();
+            }
+        }
+    } else {
+        // Only one tab - delete the entire window
+        if (MessageBoxW(hwnd, L"Delete this corral?", L"Confirm Delete", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+            if (App::GetInstance()) {
+                App::GetInstance()->RemoveCorral(&config);
+            }
         }
     }
 }
@@ -3016,21 +3312,25 @@ void CorralWindow::ToggleCatchAll() {
     App* app = App::GetInstance();
     if (!app) return;
 
-    if (config.IsCatchAll) {
+    if (GetActiveTab().IsCatchAll) {
         // Already catch-all - can't unset (must always have one)
         // Just ignore or could show a message
         return;
     }
 
-    // Set this corral as catch-all and remove from all others
+    // Set this tab as catch-all and remove from all others
     for (const auto& corral : app->GetCorrals()) {
-        if (corral.get() != this && corral->GetConfig().IsCatchAll) {
-            corral->GetConfig().IsCatchAll = false;
+        for (auto& tab : corral->GetConfig().Tabs) {
+            if (&tab != &GetActiveTab() && tab.IsCatchAll) {
+                tab.IsCatchAll = false;
+            }
+        }
+        if (corral.get() != this) {
             corral->UpdateWallpaperBackground();  // Remove symbol
         }
     }
 
-    config.IsCatchAll = true;
+    GetActiveTab().IsCatchAll = true;
     UpdateLayeredContent();  // Show symbol
     app->SaveConfig();
 }
@@ -3330,7 +3630,7 @@ void CorralWindow::OnIconDrag(int x, int y) {
 }
 
 void CorralWindow::OnIconDragEnd() {
-    if (!isDraggingIcon || draggedIconIndex < 0 || draggedIconIndex >= (int)config.Files.size()) {
+    if (!isDraggingIcon || draggedIconIndex < 0 || draggedIconIndex >= (int)GetActiveTab().Files.size()) {
         isDraggingIcon = false;
         draggedIconIndex = -1;
         dropTargetIndex = -1;
@@ -3338,7 +3638,7 @@ void CorralWindow::OnIconDragEnd() {
         return;
     }
 
-    std::string draggedFile = config.Files[draggedIconIndex];
+    std::string draggedFile = GetActiveTab().Files[draggedIconIndex];
 
     // Check if dragged outside the corral
     if (iconDragOutside) {
@@ -3364,7 +3664,7 @@ void CorralWindow::OnIconDragEnd() {
 
         if (targetCorral) {
             // Move to another corral
-            config.Files.erase(config.Files.begin() + draggedIconIndex);
+            GetActiveTab().Files.erase(GetActiveTab().Files.begin() + draggedIconIndex);
             targetCorral->AddFile(draggedFile);
             LoadFiles();
             if (app) {
@@ -3373,25 +3673,25 @@ void CorralWindow::OnIconDragEnd() {
         }
         else {
             // Dropped outside all corrals - remove from this corral (back to desktop)
-            config.Files.erase(config.Files.begin() + draggedIconIndex);
+            GetActiveTab().Files.erase(GetActiveTab().Files.begin() + draggedIconIndex);
             LoadFiles();
             if (app) {
                 app->SaveConfig();
             }
         }
     }
-    else if (dropTargetIndex >= 0 && dropTargetIndex != draggedIconIndex && dropTargetIndex < (int)config.Files.size()) {
+    else if (dropTargetIndex >= 0 && dropTargetIndex != draggedIconIndex && dropTargetIndex < (int)GetActiveTab().Files.size()) {
         // Reorder within corral
-        config.Files.erase(config.Files.begin() + draggedIconIndex);
+        GetActiveTab().Files.erase(GetActiveTab().Files.begin() + draggedIconIndex);
 
         int insertAt = dropTargetIndex;
         if (draggedIconIndex < dropTargetIndex) {
             insertAt--;
         }
         if (insertAt < 0) insertAt = 0;
-        if (insertAt > (int)config.Files.size()) insertAt = (int)config.Files.size();
+        if (insertAt > (int)GetActiveTab().Files.size()) insertAt = (int)GetActiveTab().Files.size();
 
-        config.Files.insert(config.Files.begin() + insertAt, draggedFile);
+        GetActiveTab().Files.insert(GetActiveTab().Files.begin() + insertAt, draggedFile);
 
         LoadFiles();
         if (App::GetInstance()) {

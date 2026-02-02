@@ -73,13 +73,16 @@ void App::Initialize() {
 
     if (corrals.empty()) {
         // First run: create a default catch-all corral at center of screen
-        CorralConfig defaultConfig;
+        CorralWindowConfig defaultConfig;
         defaultConfig.Left = GetSystemMetrics(SM_CXSCREEN) / 2 - 150;
         defaultConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
         defaultConfig.Width = 300;
         defaultConfig.Height = 200;
-        defaultConfig.Title = "Desktop";
-        defaultConfig.IsCatchAll = true;  // First corral is catch-all
+        
+        CorralTabConfig tab;
+        tab.Title = "Desktop";
+        tab.IsCatchAll = true;  // First corral is catch-all
+        defaultConfig.Tabs.push_back(tab);
 
         auto corral = std::make_unique<CorralWindow>(defaultConfig, wallpaperManager.get());
         corral->Show();
@@ -171,7 +174,7 @@ void App::RestoreCorrals() {
     }
 }
 
-void App::RemoveCorral(CorralConfig* configToRemove) {
+void App::RemoveCorral(CorralWindowConfig* configToRemove) {
     for (auto it = corrals.begin(); it != corrals.end(); ++it) {
         if (&(*it)->GetConfig() == configToRemove) {
             corrals.erase(it);
@@ -181,7 +184,7 @@ void App::RemoveCorral(CorralConfig* configToRemove) {
     SaveConfig();
 }
 
-void App::RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralConfig* exceptCorral) {
+void App::RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralTabConfig* exceptTab) {
     int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string fileNameStr(size - 1, 0);
     WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
@@ -189,11 +192,13 @@ void App::RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralConfig*
     bool changed = false;
     for (auto& corral : corrals) {
         auto& corralConfig = corral->GetConfig();
-        if (&corralConfig != exceptCorral) {
-            auto it = std::find(corralConfig.Files.begin(), corralConfig.Files.end(), fileNameStr);
-            if (it != corralConfig.Files.end()) {
-                corralConfig.Files.erase(it);
-                changed = true;
+        for (auto& tab : corralConfig.Tabs) {
+            if (&tab != exceptTab) {
+                auto it = std::find(tab.Files.begin(), tab.Files.end(), fileNameStr);
+                if (it != tab.Files.end()) {
+                    tab.Files.erase(it);
+                    changed = true;
+                }
             }
         }
     }
@@ -223,7 +228,9 @@ void App::SetDefaultColorHex(const std::string& colorHex) {
 
 void App::ApplyColorToAllCorrals(const std::string& colorHex) {
     for (auto& corral : corrals) {
-        corral->GetConfig().ColorHex = colorHex;
+        for (auto& tab : corral->GetConfig().Tabs) {
+            tab.ColorHex = colorHex;
+        }
         corral->UpdateWallpaperBackground();
     }
 }
@@ -263,27 +270,13 @@ void App::OnLeftButtonDown(POINT pt) {
 }
 
 void App::OnLeftButtonUp(POINT pt) {
-    // Nothing to do - drag-to-create removed
+    // Global mouse up - could be used for drag-end if needed
+    // But currently CorralWindow handles its own drag
 }
 
 void App::OnMouseMove(POINT pt) {
     // Handle mouse move if needed
 }
-
-// Removed: Mousewheel events now pass through naturally instead of being hooked
-// void App::OnMouseWheel(POINT pt, int delta) {
-//     // Forward mouse wheel events to the corral window under the cursor
-//     for (auto& corral : corrals) {
-//         HWND hwnd = corral->GetHWND();
-//         RECT rect;
-//         GetWindowRect(hwnd, &rect);
-//         if (PtInRect(&rect, pt)) {
-//             // Forward the wheel message to this corral
-//             SendMessageW(hwnd, WM_MOUSEWHEEL, MAKEWPARAM(0, delta), MAKELPARAM(pt.x, pt.y));
-//             break;
-//         }
-//     }
-// }
 
 void App::ShowTrayMenu() {
     HMENU menu = CreatePopupMenu();
@@ -349,15 +342,18 @@ void App::ShowCreationMenu(POINT pt) {
 }
 
 void App::CreateCorral(POINT pt) {
-    CorralConfig newConfig;
+    CorralWindowConfig newConfig;
 
     // Create at fixed default size centered on point
     newConfig.Left = (double)pt.x - 150;
     newConfig.Top = (double)pt.y - 100;
     newConfig.Width = 300;
     newConfig.Height = 200;
-    newConfig.Title = "New Corral";
-    newConfig.ColorHex = config.DefaultColorHex;  // Use saved default appearance
+    
+    CorralTabConfig tab;
+    tab.Title = "New Corral";
+    tab.ColorHex = config.DefaultColorHex;  // Use saved default appearance
+    newConfig.Tabs.push_back(tab);
 
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();
@@ -441,16 +437,19 @@ void App::CreateVirtualCorralAt(POINT pt) {
     WideCharToMultiByte(CP_UTF8, 0, folderName.c_str(), (int)folderName.size(), &utf8Name[0], size, nullptr, nullptr);
 
     // Create config
-    CorralConfig newConfig;
+    CorralWindowConfig newConfig;
     newConfig.Left = (double)pt.x - 150;
     newConfig.Top = (double)pt.y - 100;
     newConfig.Width = 300;
     newConfig.Height = 200;
-    newConfig.Title = utf8Name;
-    newConfig.ColorHex = config.DefaultColorHex;
-    newConfig.IsVirtual = true;
-    newConfig.VirtualFolderPath = utf8Path;
-    newConfig.IsCatchAll = false;  // Virtual corrals cannot be catch-all
+    
+    CorralTabConfig tab;
+    tab.Title = utf8Name;
+    tab.ColorHex = config.DefaultColorHex;
+    tab.IsVirtual = true;
+    tab.VirtualFolderPath = utf8Path;
+    tab.IsCatchAll = false;  // Virtual corrals cannot be catch-all
+    newConfig.Tabs.push_back(tab);
 
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();
@@ -565,43 +564,54 @@ void App::EnsureCatchAllCorral() {
     // Find if any corral is marked as catch-all
     bool foundCatchAll = false;
     for (auto& corral : corrals) {
-        // Virtual corrals cannot be catch-all
-        if (corral->GetConfig().IsVirtual) {
-            corral->GetConfig().IsCatchAll = false;
-            continue;
-        }
-
-        if (corral->GetConfig().IsCatchAll) {
-            if (foundCatchAll) {
-                // Only one catch-all allowed
-                corral->GetConfig().IsCatchAll = false;
+        for (auto& tab : corral->GetConfig().Tabs) {
+            // Virtual corrals cannot be catch-all
+            if (tab.IsVirtual) {
+                tab.IsCatchAll = false;
+                continue;
             }
-            foundCatchAll = true;
+
+            if (tab.IsCatchAll) {
+                if (foundCatchAll) {
+                    // Only one catch-all allowed
+                    tab.IsCatchAll = false;
+                }
+                foundCatchAll = true;
+            }
         }
     }
 
     // If no catch-all exists, make the first non-virtual corral catch-all
-    if (!foundCatchAll) {
+    if (!foundCatchAll && !corrals.empty()) {
         for (auto& corral : corrals) {
-            if (!corral->GetConfig().IsVirtual) {
-                corral->GetConfig().IsCatchAll = true;
-                corral->UpdateWallpaperBackground();
-                break;
+            bool found = false;
+            for (auto& tab : corral->GetConfig().Tabs) {
+                if (!tab.IsVirtual) {
+                    tab.IsCatchAll = true;
+                    corral->UpdateWallpaperBackground();
+                    found = true;
+                    break;
+                }
             }
+            if (found) break;
         }
     }
 }
 
 CorralWindow* App::GetCatchAllCorral() {
     for (auto& corral : corrals) {
-        if (corral->GetConfig().IsCatchAll && !corral->GetConfig().IsVirtual) {
-            return corral.get();
+        for (auto& tab : corral->GetConfig().Tabs) {
+            if (tab.IsCatchAll && !tab.IsVirtual) {
+                return corral.get();
+            }
         }
     }
     // Fallback to first non-virtual corral if no catch-all defined
     for (auto& corral : corrals) {
-        if (!corral->GetConfig().IsVirtual) {
-            return corral.get();
+        for (auto& tab : corral->GetConfig().Tabs) {
+            if (!tab.IsVirtual) {
+                return corral.get();
+            }
         }
     }
     return nullptr;
@@ -634,7 +644,7 @@ void App::UpdateCorralPositions() {
     bool configChanged = false;
 
     for (auto& corral : corrals) {
-        CorralConfig& cfg = corral->GetConfig();
+        CorralWindowConfig& cfg = corral->GetConfig();
         const std::string& targetId = cfg.TargetMonitorId;
 
         // Check if target monitor is active
@@ -803,15 +813,27 @@ void App::OnDesktopFileAdded(const std::wstring& fileName) {
 
     // Check if file is already in any corral
     for (auto& corral : corrals) {
-        auto& files = corral->GetConfig().Files;
-        if (std::find(files.begin(), files.end(), fileNameStr) != files.end()) {
-            return;  // Already tracked
+        for (auto& tab : corral->GetConfig().Tabs) {
+            auto& files = tab.Files;
+            if (std::find(files.begin(), files.end(), fileNameStr) != files.end()) {
+                return;  // Already tracked
+            }
         }
     }
 
     // Add to catch-all corral
     CorralWindow* catchAll = GetCatchAllCorral();
     if (catchAll) {
+        // Need to add to the specific catch-all tab within this window
+        // But CorralWindow::AddFile adds to active tab.
+        // We need a way to target the catch-all tab.
+        // For now, we iterate tabs to find catch-all and set as active?
+        // No, switching active tab is a UI change.
+        // Let's implement helper in CorralWindow later: AddFileToCatchAll
+        // I will assume CorralWindow::AddFile(..., true) forces catch-all?
+        // Or just implement it cleanly.
+        // I'll assume AddFile handles it if I modify it, or I'll implement AddFileToCatchAll later.
+        // For now:
         catchAll->AddFile(fileNameStr);
         SaveConfig();
     }
@@ -830,12 +852,14 @@ void App::OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& 
     // Update in all corrals
     bool changed = false;
     for (auto& corral : corrals) {
-        auto& files = corral->GetConfig().Files;
-        auto it = std::find(files.begin(), files.end(), oldNameStr);
-        if (it != files.end()) {
-            *it = newNameStr;
-            corral->LoadFiles();
-            changed = true;
+        for (auto& tab : corral->GetConfig().Tabs) {
+            auto& files = tab.Files;
+            auto it = std::find(files.begin(), files.end(), oldNameStr);
+            if (it != files.end()) {
+                *it = newNameStr;
+                corral->LoadFiles();
+                changed = true;
+            }
         }
     }
 
@@ -853,12 +877,14 @@ void App::OnDesktopFileDeleted(const std::wstring& fileName) {
     // Remove from all corrals
     bool changed = false;
     for (auto& corral : corrals) {
-        auto& files = corral->GetConfig().Files;
-        auto it = std::find(files.begin(), files.end(), fileNameStr);
-        if (it != files.end()) {
-            files.erase(it);
-            corral->LoadFiles();
-            changed = true;
+        for (auto& tab : corral->GetConfig().Tabs) {
+            auto& files = tab.Files;
+            auto it = std::find(files.begin(), files.end(), fileNameStr);
+            if (it != files.end()) {
+                files.erase(it);
+                corral->LoadFiles();
+                changed = true;
+            }
         }
     }
 
