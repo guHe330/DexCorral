@@ -96,7 +96,7 @@ private:
 
     // Snap support
     void ApplySnap(int& newLeft, int& newTop, int width, int height);
-    void ApplyResizeSnap(int& newWidth, int& newHeight);
+    void ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int& newHeight, int resizeMode);
 
     // Icon reordering
     void OnIconDrag(int x, int y);

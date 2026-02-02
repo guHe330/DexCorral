@@ -27,6 +27,11 @@ public:
     static bool AreShortcutArrowsHidden();
     static void RestartExplorer();
 
+    // Experiment: Hide icons by deleting from ListView (requires refresh to restore)
+    static bool HideRandomIconExperiment();  // Deletes a random icon from ListView, returns success
+    static void RestoreHiddenIconsExperiment();  // Refreshes desktop to restore deleted items
+    static int GetIconCount();  // Returns number of desktop icons
+
 private:
     static HWND GetDesktopListView();
     static std::wstring GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index);

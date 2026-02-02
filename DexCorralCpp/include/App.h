@@ -24,6 +24,8 @@ public:
     void RefreshAllCorralBackgrounds();
     void ToggleDesktopIcons();  // Toggle desktop icons visibility
     void ToggleShortcutArrows(); // Toggle shortcut arrow overlay (requires Explorer restart)
+    void HideRandomDesktopIcon();  // Experiment: hide random icon via ListView manipulation
+    void RestoreHiddenIcons();     // Experiment: restore hidden icons by refreshing desktop
     bool IsAutostartEnabled();
     void SetAutostart(bool enable);
     void SetDefaultColorHex(const std::string& colorHex);

@@ -264,6 +264,28 @@ void App::ToggleShortcutArrows() {
     }
 }
 
+void App::HideRandomDesktopIcon() {
+    int count = DesktopIcons::GetIconCount();
+    if (count <= 0) {
+        MessageBoxW(nullptr, L"No desktop icons found.", L"Experiment", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    if (DesktopIcons::HideRandomIconExperiment()) {
+        MessageBoxW(nullptr, L"A random desktop icon has been hidden.\n\nUse 'Restore Hidden Icons' to bring it back.",
+                    L"Experiment", MB_OK | MB_ICONINFORMATION);
+    } else {
+        MessageBoxW(nullptr, L"Failed to hide icon. The operation may require elevated privileges.",
+                    L"Experiment", MB_OK | MB_ICONWARNING);
+    }
+}
+
+void App::RestoreHiddenIcons() {
+    DesktopIcons::RestoreHiddenIconsExperiment();
+    MessageBoxW(nullptr, L"Desktop has been refreshed. Hidden icons should now be restored.",
+                L"Experiment", MB_OK | MB_ICONINFORMATION);
+}
+
 void App::OnLeftButtonDown(POINT pt) {
     // Reserved for future desktop interactions
     // Currently no action on desktop click
@@ -290,6 +312,12 @@ void App::ShowTrayMenu() {
     // Autostart toggle
     UINT autostartFlags = IsAutostartEnabled() ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
+
+    // Experiment submenu
+    HMENU experimentMenu = CreatePopupMenu();
+    AppendMenuW(experimentMenu, MF_STRING, 100, L"Hide Random Desktop Icon");
+    AppendMenuW(experimentMenu, MF_STRING, 101, L"Restore Hidden Icons");
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)experimentMenu, L"Experiment");
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 3, L"Exit");
@@ -334,6 +362,12 @@ void App::ShowTrayMenu() {
         CreateVirtualCorralAt(centerPt);
         break;
     }
+    case 100:
+        HideRandomDesktopIcon();
+        break;
+    case 101:
+        RestoreHiddenIcons();
+        break;
     }
 }
 

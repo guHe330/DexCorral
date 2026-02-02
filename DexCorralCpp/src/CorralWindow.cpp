@@ -1346,11 +1346,26 @@ int CorralWindow::HitTestResize(int x, int y) {
     RECT rect;
     GetClientRect(hwnd, &rect);
 
+    bool nearLeft = (x <= RESIZE_BORDER);
     bool nearRight = (x >= rect.right - RESIZE_BORDER);
+    bool nearTop = (y <= RESIZE_BORDER && y > 0);  // Don't conflict with title bar at y=0
     bool nearBottom = (y >= rect.bottom - RESIZE_BORDER);
 
+    // When rolled up (minimized), disable resizing completely
+    if (config.IsRolledUp) {
+        return 0;
+    }
+
+    // Corners first (they take priority)
+    if (nearLeft && nearTop) return HTTOPLEFT;
+    if (nearRight && nearTop) return HTTOPRIGHT;
+    if (nearLeft && nearBottom) return HTBOTTOMLEFT;
     if (nearRight && nearBottom) return HTBOTTOMRIGHT;
+
+    // Then edges
+    if (nearLeft) return HTLEFT;
     if (nearRight) return HTRIGHT;
+    if (nearTop) return HTTOP;
     if (nearBottom) return HTBOTTOM;
 
     return 0;
@@ -1370,27 +1385,50 @@ void CorralWindow::DoResize(int screenX, int screenY) {
     int dx = screenX - resizeStart.x;
     int dy = screenY - resizeStart.y;
 
+    int newLeft = resizeStartRect.left;
+    int newTop = resizeStartRect.top;
     int newWidth = resizeStartRect.right - resizeStartRect.left;
     int newHeight = resizeStartRect.bottom - resizeStartRect.top;
 
-    if (resizeMode == HTRIGHT || resizeMode == HTBOTTOMRIGHT) {
+    // Handle horizontal resizing
+    if (resizeMode == HTLEFT || resizeMode == HTTOPLEFT || resizeMode == HTBOTTOMLEFT) {
+        newLeft += dx;
+        newWidth -= dx;
+    }
+    if (resizeMode == HTRIGHT || resizeMode == HTTOPRIGHT || resizeMode == HTBOTTOMRIGHT) {
         newWidth += dx;
     }
-    if (resizeMode == HTBOTTOM || resizeMode == HTBOTTOMRIGHT) {
+
+    // Handle vertical resizing
+    if (resizeMode == HTTOP || resizeMode == HTTOPLEFT || resizeMode == HTTOPRIGHT) {
+        newTop += dy;
+        newHeight -= dy;
+    }
+    if (resizeMode == HTBOTTOM || resizeMode == HTBOTTOMLEFT || resizeMode == HTBOTTOMRIGHT) {
         newHeight += dy;
     }
 
-    // Minimum size
-    if (newWidth < 100) newWidth = 100;
-    if (newHeight < 80) newHeight = 80;
+    // Minimum size constraints
+    if (newWidth < 100) {
+        if (resizeMode == HTLEFT || resizeMode == HTTOPLEFT || resizeMode == HTBOTTOMLEFT) {
+            newLeft = resizeStartRect.right - 100;
+        }
+        newWidth = 100;
+    }
+    if (newHeight < 80) {
+        if (resizeMode == HTTOP || resizeMode == HTTOPLEFT || resizeMode == HTTOPRIGHT) {
+            newTop = resizeStartRect.bottom - 80;
+        }
+        newHeight = 80;
+    }
 
     // Apply snap to resize unless Shift is held
     if (!(GetKeyState(VK_SHIFT) & 0x8000)) {
-        ApplyResizeSnap(newWidth, newHeight);
+        ApplyResizeSnap(newLeft, newTop, newWidth, newHeight, resizeMode);
     }
 
-    SetWindowPos(hwnd, nullptr, 0, 0, newWidth, newHeight,
-        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(hwnd, nullptr, newLeft, newTop, newWidth, newHeight,
+        SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void CorralWindow::EndResize() {
@@ -1523,15 +1561,19 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 GetCursorPos(&pt);
                 ScreenToClient(hwnd, &pt);
                 int hit = window->HitTestResize(pt.x, pt.y);
-                if (hit == HTBOTTOMRIGHT) {
+                if (hit == HTBOTTOMRIGHT || hit == HTTOPLEFT) {
                     SetCursor(LoadCursorW(nullptr, IDC_SIZENWSE));
                     return TRUE;
                 }
-                else if (hit == HTRIGHT) {
+                else if (hit == HTBOTTOMLEFT || hit == HTTOPRIGHT) {
+                    SetCursor(LoadCursorW(nullptr, IDC_SIZENESW));
+                    return TRUE;
+                }
+                else if (hit == HTRIGHT || hit == HTLEFT) {
                     SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
                     return TRUE;
                 }
-                else if (hit == HTBOTTOM) {
+                else if (hit == HTBOTTOM || hit == HTTOP) {
                     SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
                     return TRUE;
                 }
@@ -3535,29 +3577,47 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
     }
 }
 
-void CorralWindow::ApplyResizeSnap(int& newWidth, int& newHeight) {
+void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int& newHeight, int resizeMode) {
     App* app = App::GetInstance();
     if (!app) return;
 
-    RECT myRect;
-    GetWindowRect(hwnd, &myRect);
-    int myLeft = myRect.left;
-    int myTop = myRect.top;
-    int newRight = myLeft + newWidth;
-    int newBottom = myTop + newHeight;
+    // Determine which edges are being resized
+    bool resizingLeft = (resizeMode == HTLEFT || resizeMode == HTTOPLEFT || resizeMode == HTBOTTOMLEFT);
+    bool resizingRight = (resizeMode == HTRIGHT || resizeMode == HTTOPRIGHT || resizeMode == HTBOTTOMRIGHT);
+    bool resizingTop = (resizeMode == HTTOP || resizeMode == HTTOPLEFT || resizeMode == HTTOPRIGHT);
+    bool resizingBottom = (resizeMode == HTBOTTOM || resizeMode == HTBOTTOMLEFT || resizeMode == HTBOTTOMRIGHT);
+
+    int newRight = newLeft + newWidth;
+    int newBottom = newTop + newHeight;
 
     // Snap to screen edges
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
+    // Left edge of screen
+    if (resizingLeft && std::abs(newLeft - SNAP_GAP) < SNAP_DISTANCE) {
+        int oldRight = newRight;
+        newLeft = SNAP_GAP;
+        newWidth = oldRight - newLeft;
+    }
     // Right edge of screen
-    if (std::abs(newRight - screenWidth + SNAP_GAP) < SNAP_DISTANCE) {
-        newWidth = screenWidth - myLeft - SNAP_GAP;
+    if (resizingRight && std::abs(newRight - screenWidth + SNAP_GAP) < SNAP_DISTANCE) {
+        newWidth = screenWidth - newLeft - SNAP_GAP;
+    }
+    // Top edge of screen
+    if (resizingTop && std::abs(newTop - SNAP_GAP) < SNAP_DISTANCE) {
+        int oldBottom = newBottom;
+        newTop = SNAP_GAP;
+        newHeight = oldBottom - newTop;
     }
     // Bottom edge of screen (account for taskbar ~40px)
-    if (std::abs(newBottom - screenHeight + 40 + SNAP_GAP) < SNAP_DISTANCE) {
-        newHeight = screenHeight - myTop - 40 - SNAP_GAP;
+    if (resizingBottom && std::abs(newBottom - screenHeight + 40 + SNAP_GAP) < SNAP_DISTANCE) {
+        newHeight = screenHeight - newTop - 40 - SNAP_GAP;
     }
+
+    // Recalculate edges after screen snap
+    newRight = newLeft + newWidth;
+    newBottom = newTop + newHeight;
 
     // Snap to other corrals
     const auto& corrals = app->GetCorrals();
@@ -3567,37 +3627,83 @@ void CorralWindow::ApplyResizeSnap(int& newWidth, int& newHeight) {
         RECT otherRect;
         GetWindowRect(other->GetHWND(), &otherRect);
 
-        // Check if we're near horizontally (for right edge snap)
-        bool nearVertically = (myTop < otherRect.bottom + SNAP_DISTANCE) && (newBottom > otherRect.top - SNAP_DISTANCE);
-        // Check if we're near vertically (for bottom edge snap)
-        bool nearHorizontally = (myLeft < otherRect.right + SNAP_DISTANCE) && (newRight > otherRect.left - SNAP_DISTANCE);
+        // Check vertical overlap
+        bool verticalOverlap = (newTop < otherRect.bottom + SNAP_DISTANCE) && (newBottom > otherRect.top - SNAP_DISTANCE);
+        // Check horizontal overlap
+        bool horizontalOverlap = (newLeft < otherRect.right + SNAP_DISTANCE) && (newRight > otherRect.left - SNAP_DISTANCE);
 
-        if (nearVertically) {
-            // Snap right edge to their left edge (with gap)
-            if (std::abs(newRight - otherRect.left + SNAP_GAP) < SNAP_DISTANCE) {
-                newWidth = otherRect.left - myLeft - SNAP_GAP;
+        if (verticalOverlap) {
+            if (resizingLeft) {
+                // Snap left edge to their right edge (with gap)
+                if (std::abs(newLeft - otherRect.right - SNAP_GAP) < SNAP_DISTANCE) {
+                    int oldRight = newRight;
+                    newLeft = otherRect.right + SNAP_GAP;
+                    newWidth = oldRight - newLeft;
+                }
+                // Snap left edge to their left edge (align)
+                if (std::abs(newLeft - otherRect.left) < SNAP_DISTANCE) {
+                    int oldRight = newRight;
+                    newLeft = otherRect.left;
+                    newWidth = oldRight - newLeft;
+                }
             }
-            // Snap right edge to their right edge (align)
-            if (std::abs(newRight - otherRect.right) < SNAP_DISTANCE) {
-                newWidth = otherRect.right - myLeft;
+            if (resizingRight) {
+                // Snap right edge to their left edge (with gap)
+                if (std::abs(newRight - otherRect.left + SNAP_GAP) < SNAP_DISTANCE) {
+                    newWidth = otherRect.left - newLeft - SNAP_GAP;
+                }
+                // Snap right edge to their right edge (align)
+                if (std::abs(newRight - otherRect.right) < SNAP_DISTANCE) {
+                    newWidth = otherRect.right - newLeft;
+                }
             }
         }
 
-        if (nearHorizontally) {
-            // Snap bottom edge to their top edge (with gap)
-            if (std::abs(newBottom - otherRect.top + SNAP_GAP) < SNAP_DISTANCE) {
-                newHeight = otherRect.top - myTop - SNAP_GAP;
+        if (horizontalOverlap) {
+            if (resizingTop) {
+                // Snap top edge to their bottom edge (with gap)
+                if (std::abs(newTop - otherRect.bottom - SNAP_GAP) < SNAP_DISTANCE) {
+                    int oldBottom = newBottom;
+                    newTop = otherRect.bottom + SNAP_GAP;
+                    newHeight = oldBottom - newTop;
+                }
+                // Snap top edge to their top edge (align)
+                if (std::abs(newTop - otherRect.top) < SNAP_DISTANCE) {
+                    int oldBottom = newBottom;
+                    newTop = otherRect.top;
+                    newHeight = oldBottom - newTop;
+                }
             }
-            // Snap bottom edge to their bottom edge (align)
-            if (std::abs(newBottom - otherRect.bottom) < SNAP_DISTANCE) {
-                newHeight = otherRect.bottom - myTop;
+            if (resizingBottom) {
+                // Snap bottom edge to their top edge (with gap)
+                if (std::abs(newBottom - otherRect.top + SNAP_GAP) < SNAP_DISTANCE) {
+                    newHeight = otherRect.top - newTop - SNAP_GAP;
+                }
+                // Snap bottom edge to their bottom edge (align)
+                if (std::abs(newBottom - otherRect.bottom) < SNAP_DISTANCE) {
+                    newHeight = otherRect.bottom - newTop;
+                }
             }
         }
+
+        // Recalculate after each corral snap for next iteration
+        newRight = newLeft + newWidth;
+        newBottom = newTop + newHeight;
     }
 
-    // Enforce minimum size
-    if (newWidth < 100) newWidth = 100;
-    if (newHeight < 80) newHeight = 80;
+    // Enforce minimum size (adjusting position for left/top edge resizing)
+    if (newWidth < 100) {
+        if (resizingLeft) {
+            newLeft -= (100 - newWidth);
+        }
+        newWidth = 100;
+    }
+    if (newHeight < 80) {
+        if (resizingTop) {
+            newTop -= (80 - newHeight);
+        }
+        newHeight = 80;
+    }
 }
 
 // ============================================================================

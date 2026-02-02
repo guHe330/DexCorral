@@ -348,3 +348,32 @@ void DesktopIcons::RestartExplorer() {
     // Restart explorer
     ShellExecuteW(nullptr, L"open", L"explorer.exe", nullptr, nullptr, SW_SHOWNORMAL);
 }
+
+int DesktopIcons::GetIconCount() {
+    HWND hListView = GetDesktopListView();
+    if (hListView == nullptr) return 0;
+    return (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
+}
+
+bool DesktopIcons::HideRandomIconExperiment() {
+    HWND hListView = GetDesktopListView();
+    if (hListView == nullptr) return false;
+
+    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
+    if (count <= 0) return false;
+
+    // Pick a random icon
+    srand((unsigned int)GetTickCount());
+    int randomIndex = rand() % count;
+
+    // Delete the item from the ListView (this removes it from view until refresh)
+    BOOL result = (BOOL)SendMessageW(hListView, LVM_DELETEITEM, randomIndex, 0);
+
+    return result != FALSE;
+}
+
+void DesktopIcons::RestoreHiddenIconsExperiment() {
+    // Refreshing the desktop will restore any deleted ListView items
+    // This sends a shell change notification that causes Explorer to rebuild the icon list
+    RefreshDesktop();
+}
