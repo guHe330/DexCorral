@@ -14,13 +14,20 @@ add_executable(DexCorral WIN32
     src/DesktopIcons.cpp
     src/WallpaperManager.cpp
     src/CorralWindow.cpp
+    src/CorralWindowRender.cpp
+    src/CorralWindowIcons.cpp
+    src/CorralWindowInput.cpp
+    src/CorralWindowDialogs.cpp
+    src/CorralWindowCommands.cpp
     src/Config.cpp
     src/MouseHook.cpp
     src/TrayIcon.cpp
     src/DesktopMonitor.cpp
     src/MonitorManager.cpp
     src/FolderWatcher.cpp
+    src/HookBridge.cpp
     include/App.h
+    include/HookBridge.h
     include/DesktopIcons.h
     include/WallpaperManager.h
     include/CorralWindow.h
@@ -48,6 +55,7 @@ target_link_libraries(DexCorral PRIVATE
     user32
     ole32
     uuid
+    psapi
 )
 
 # Set subsystem to Windows
@@ -70,5 +78,22 @@ target_link_libraries(DexCorral.Watchdog PRIVATE
 set_target_properties(DexCorral.Watchdog PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
+
+# CorralHook DLL (clean implementation for Explorer injection)
+add_library(CorralHook SHARED
+    ../CorralHook/src/dllmain.cpp
+    ../CorralHook/src/CorralHook.cpp
+)
+
+target_include_directories(CorralHook PRIVATE ../CorralHook/include)
+
+target_link_libraries(CorralHook PRIVATE
+    comctl32
+    user32
+)
+
+target_compile_definitions(CorralHook PRIVATE UNICODE _UNICODE)
+
+set_property(TARGET CorralHook PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # nlohmann/json is included as a single header in include/nlohmann/json.hpp

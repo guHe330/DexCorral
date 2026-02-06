@@ -2,9 +2,11 @@
 #include "CorralWindow.h"
 #include "DesktopIcons.h"
 #include "DesktopMonitor.h"
+#include "HookBridge.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
+#include <Psapi.h>
 #include <cstdlib>
 #include <algorithm>
 
@@ -12,6 +14,8 @@ App* App::instance = nullptr;
 
 static const wchar_t* MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
 static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralGracefulExit";
+static const UINT_PTR HOOK_REPOSITION_TIMER_ID = 42;
+static const DWORD HOOK_REPOSITION_INTERVAL_MS = 2000;  // Reposition every 2 seconds
 
 App::App() : messageWindow(nullptr) {
     instance = this;
@@ -109,6 +113,9 @@ void App::Initialize() {
 
     // Start watchdog process
     StartWatchdog();
+
+    // Auto-inject hook into Explorer (or reconnect if already loaded from a previous instance)
+    AutoConnectHook();
 }
 
 void App::Shutdown() {
@@ -119,6 +126,11 @@ void App::Shutdown() {
 
     // Save config before exit
     SaveConfig();
+
+    // Stop hook repositioning timer and clear hidden icons
+    KillTimer(messageWindow, HOOK_REPOSITION_TIMER_ID);
+    HookBridge::ClearHiddenIcons();
+    HookBridge::RefreshDesktop();
 
     // IMPORTANT: Show desktop icons before exit so user isn't stuck
     DesktopIcons::SetIconsVisible(true);
@@ -154,6 +166,13 @@ void App::SaveConfig() {
         config.Corrals.push_back(corral->GetConfig());
     }
     Config::Save(config);
+
+    // Update hook hidden icons if hook is injected
+    if (injectedModuleHandle) {
+        UpdateHookHiddenIcons();
+        RepositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
+    }
 }
 
 void App::RestoreCorrals() {
@@ -286,6 +305,310 @@ void App::RestoreHiddenIcons() {
                 L"Experiment", MB_OK | MB_ICONINFORMATION);
 }
 
+static DWORD GetExplorerProcessId() {
+    HWND shellWindow = GetShellWindow();
+    if (!shellWindow) return 0;
+
+    DWORD pid = 0;
+    GetWindowThreadProcessId(shellWindow, &pid);
+    return pid;
+}
+
+// Find module in remote process by name
+static HMODULE FindRemoteModule(HANDLE hProcess, const wchar_t* moduleName) {
+    HMODULE hMods[1024];
+    DWORD cbNeeded;
+
+    if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
+        for (unsigned int i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
+            wchar_t szModName[MAX_PATH];
+            if (GetModuleFileNameExW(hProcess, hMods[i], szModName, MAX_PATH)) {
+                // Check if this is our DLL (compare just the filename)
+                wchar_t* lastSlash = wcsrchr(szModName, L'\\');
+                const wchar_t* fileName = lastSlash ? lastSlash + 1 : szModName;
+                if (_wcsicmp(fileName, moduleName) == 0) {
+                    return hMods[i];
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+void App::AutoConnectHook() {
+    // Check if CorralHook.dll is already loaded in Explorer (from a previous instance)
+    DWORD explorerPid = GetExplorerProcessId();
+    if (!explorerPid) return;
+
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, explorerPid);
+    if (!hProcess) return;
+
+    HMODULE hRemoteModule = FindRemoteModule(hProcess, L"CorralHook.dll");
+    CloseHandle(hProcess);
+
+    if (hRemoteModule) {
+        // Hook is already loaded — just reconnect (no injection needed)
+        injectedModuleHandle = (UINT_PTR)hRemoteModule;
+        UpdateHookHiddenIcons();
+        RepositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
+        SetTimer(messageWindow, HOOK_REPOSITION_TIMER_ID, HOOK_REPOSITION_INTERVAL_MS, nullptr);
+    } else {
+        // Hook not loaded — inject it (silently, no message boxes)
+        InjectExplorerHookSilent();
+    }
+}
+
+void App::InjectExplorerHookSilent() {
+    if (injectedModuleHandle) return;
+
+    wchar_t dllPath[MAX_PATH];
+    GetModuleFileNameW(nullptr, dllPath, MAX_PATH);
+    wchar_t* lastSlash = wcsrchr(dllPath, L'\\');
+    if (lastSlash) {
+        wcscpy_s(lastSlash + 1, MAX_PATH - (lastSlash - dllPath + 1), L"CorralHook.dll");
+    }
+
+    if (GetFileAttributesW(dllPath) == INVALID_FILE_ATTRIBUTES) return;
+
+    DWORD explorerPid = GetExplorerProcessId();
+    if (!explorerPid) return;
+
+    HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
+                                  PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+                                  FALSE, explorerPid);
+    if (!hProcess) return;
+
+    size_t pathSize = (wcslen(dllPath) + 1) * sizeof(wchar_t);
+    LPVOID remotePath = VirtualAllocEx(hProcess, nullptr, pathSize, MEM_COMMIT, PAGE_READWRITE);
+    if (!remotePath) { CloseHandle(hProcess); return; }
+
+    if (!WriteProcessMemory(hProcess, remotePath, dllPath, pathSize, nullptr)) {
+        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+        CloseHandle(hProcess);
+        return;
+    }
+
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    LPTHREAD_START_ROUTINE loadLibraryAddr = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryW");
+
+    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, loadLibraryAddr, remotePath, 0, nullptr);
+    if (!hThread) {
+        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+        CloseHandle(hProcess);
+        return;
+    }
+
+    WaitForSingleObject(hThread, 5000);
+    CloseHandle(hThread);
+    VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+
+    HMODULE hRemoteModule = FindRemoteModule(hProcess, L"CorralHook.dll");
+    CloseHandle(hProcess);
+
+    if (hRemoteModule) {
+        injectedModuleHandle = (UINT_PTR)hRemoteModule;
+        UpdateHookHiddenIcons();
+        RepositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
+        SetTimer(messageWindow, HOOK_REPOSITION_TIMER_ID, HOOK_REPOSITION_INTERVAL_MS, nullptr);
+    }
+}
+
+void App::InjectExplorerHook() {
+    // Check if already injected
+    if (injectedModuleHandle) {
+        MessageBoxW(nullptr, L"Hook is already injected.", L"Experiment", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    // Get path to CorralHook.dll (same directory as exe)
+    wchar_t dllPath[MAX_PATH];
+    GetModuleFileNameW(nullptr, dllPath, MAX_PATH);
+
+    // Replace exe name with dll name
+    wchar_t* lastSlash = wcsrchr(dllPath, L'\\');
+    if (lastSlash) {
+        wcscpy_s(lastSlash + 1, MAX_PATH - (lastSlash - dllPath + 1), L"CorralHook.dll");
+    }
+
+    // Check if DLL exists
+    if (GetFileAttributesW(dllPath) == INVALID_FILE_ATTRIBUTES) {
+        MessageBoxW(nullptr, L"CorralHook.dll not found.\n\nMake sure it's in the same folder as DexCorral.exe.",
+                    L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Get Explorer process ID
+    DWORD explorerPid = GetExplorerProcessId();
+    if (!explorerPid) {
+        MessageBoxW(nullptr, L"Could not find Explorer process.", L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Open Explorer process
+    HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
+                                  PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+                                  FALSE, explorerPid);
+    if (!hProcess) {
+        MessageBoxW(nullptr, L"Could not open Explorer process.\n\nTry running as Administrator.",
+                    L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Allocate memory in Explorer for the DLL path
+    size_t pathSize = (wcslen(dllPath) + 1) * sizeof(wchar_t);
+    LPVOID remotePath = VirtualAllocEx(hProcess, nullptr, pathSize, MEM_COMMIT, PAGE_READWRITE);
+    if (!remotePath) {
+        CloseHandle(hProcess);
+        MessageBoxW(nullptr, L"Could not allocate memory in Explorer.", L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Write DLL path to Explorer's memory
+    if (!WriteProcessMemory(hProcess, remotePath, dllPath, pathSize, nullptr)) {
+        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+        CloseHandle(hProcess);
+        MessageBoxW(nullptr, L"Could not write to Explorer memory.", L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Get address of LoadLibraryW
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    LPTHREAD_START_ROUTINE loadLibraryAddr = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryW");
+
+    // Create remote thread to call LoadLibraryW
+    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, loadLibraryAddr, remotePath, 0, nullptr);
+    if (!hThread) {
+        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+        CloseHandle(hProcess);
+        MessageBoxW(nullptr, L"Could not create remote thread.\n\nTry running as Administrator.",
+                    L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Wait for the thread to complete
+    WaitForSingleObject(hThread, 5000);
+    CloseHandle(hThread);
+    VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+
+    // Find the injected module by name (avoids 64-bit truncation issue)
+    HMODULE hRemoteModule = FindRemoteModule(hProcess, L"CorralHook.dll");
+    CloseHandle(hProcess);
+
+    if (hRemoteModule) {
+        injectedModuleHandle = (UINT_PTR)hRemoteModule;
+
+        // Update shared memory with current hidden icon list
+        UpdateHookHiddenIcons();
+        RepositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
+
+        // Start periodic repositioning timer
+        SetTimer(messageWindow, HOOK_REPOSITION_TIMER_ID, HOOK_REPOSITION_INTERVAL_MS, nullptr);
+
+        MessageBoxW(nullptr, L"Hook injected successfully!\n\nCheck %TEMP%\\CorralHook.log for details.",
+                    L"Experiment", MB_OK | MB_ICONINFORMATION);
+    } else {
+        MessageBoxW(nullptr, L"DLL injection may have failed.\n\nCheck %TEMP%\\CorralHook.log",
+                    L"Experiment", MB_OK | MB_ICONWARNING);
+    }
+}
+
+void App::EjectExplorerHook() {
+    if (!injectedModuleHandle) {
+        MessageBoxW(nullptr, L"No hook is currently injected.", L"Experiment", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    DWORD explorerPid = GetExplorerProcessId();
+    if (!explorerPid) {
+        MessageBoxW(nullptr, L"Could not find Explorer process.", L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
+                                  PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+                                  FALSE, explorerPid);
+    if (!hProcess) {
+        MessageBoxW(nullptr, L"Could not open Explorer process.", L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    // Get address of FreeLibrary
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    LPTHREAD_START_ROUTINE freeLibraryAddr = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "FreeLibrary");
+
+    // Create remote thread to call FreeLibrary
+    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, freeLibraryAddr,
+                                        (LPVOID)(UINT_PTR)injectedModuleHandle, 0, nullptr);
+    if (!hThread) {
+        CloseHandle(hProcess);
+        MessageBoxW(nullptr, L"Could not create remote thread.", L"Experiment", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    WaitForSingleObject(hThread, 5000);
+
+    DWORD exitCode = 0;
+    GetExitCodeThread(hThread, &exitCode);
+
+    CloseHandle(hThread);
+    CloseHandle(hProcess);
+
+    if (exitCode) {
+        KillTimer(messageWindow, HOOK_REPOSITION_TIMER_ID);
+        HookBridge::ClearHiddenIcons();
+        HookBridge::RefreshDesktop();
+        injectedModuleHandle = 0;
+        MessageBoxW(nullptr, L"Hook ejected successfully.", L"Experiment", MB_OK | MB_ICONINFORMATION);
+    } else {
+        MessageBoxW(nullptr, L"Failed to eject hook.", L"Experiment", MB_OK | MB_ICONERROR);
+    }
+}
+
+void App::UpdateHookHiddenIcons() {
+    // Collect display names of all icons across all corrals (active tabs only)
+    std::vector<std::wstring> displayNames;
+    for (const auto& corral : corrals) {
+        const auto& tab = corral->GetConfig().Tabs[corral->GetConfig().ActiveTabIndex];
+        if (tab.IsVirtual) continue;  // Virtual tabs don't hide desktop icons
+
+        for (const auto& fileUtf8 : tab.Files) {
+            // Convert UTF-8 filename to wide
+            int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
+            std::wstring wName(size, 0);
+            MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
+
+            // Strip .lnk extension to get display name (same as CorralWindowIcons.cpp)
+            if (wName.length() > 4) {
+                std::wstring ext = wName.substr(wName.length() - 4);
+                if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
+                    wName = wName.substr(0, wName.length() - 4);
+                }
+            }
+
+            displayNames.push_back(wName);
+        }
+    }
+
+    HookBridge::UpdateHiddenIcons(displayNames);
+}
+
+void App::RepositionHiddenIconsUnderCorrals() {
+    // Position hidden ListView icons under their corral windows
+    std::map<std::wstring, POINT2D> positions;
+
+    for (const auto& corral : corrals) {
+        auto iconPositions = corral->GetIconScreenPositions();
+        positions.insert(iconPositions.begin(), iconPositions.end());
+    }
+
+    if (!positions.empty()) {
+        HookBridge::RepositionHiddenIcons(positions);
+    }
+}
+
 void App::OnLeftButtonDown(POINT pt) {
     // Reserved for future desktop interactions
     // Currently no action on desktop click
@@ -317,6 +640,9 @@ void App::ShowTrayMenu() {
     HMENU experimentMenu = CreatePopupMenu();
     AppendMenuW(experimentMenu, MF_STRING, 100, L"Hide Random Desktop Icon");
     AppendMenuW(experimentMenu, MF_STRING, 101, L"Restore Hidden Icons");
+    AppendMenuW(experimentMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(experimentMenu, MF_STRING, 102, L"Inject Hook into Explorer");
+    AppendMenuW(experimentMenu, MF_STRING, 103, L"Eject Hook from Explorer");
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)experimentMenu, L"Experiment");
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -367,6 +693,12 @@ void App::ShowTrayMenu() {
         break;
     case 101:
         RestoreHiddenIcons();
+        break;
+    case 102:
+        InjectExplorerHook();
+        break;
+    case 103:
+        EjectExplorerHook();
         break;
     }
 }
@@ -567,6 +899,13 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     if (app && uMsg == WM_DISPLAYCHANGE) {
         app->OnDisplayChange();
+        return 0;
+    }
+
+    if (app && uMsg == WM_TIMER && wParam == HOOK_REPOSITION_TIMER_ID) {
+        if (app->injectedModuleHandle) {
+            app->RepositionHiddenIconsUnderCorrals();
+        }
         return 0;
     }
 

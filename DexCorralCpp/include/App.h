@@ -26,6 +26,8 @@ public:
     void ToggleShortcutArrows(); // Toggle shortcut arrow overlay (requires Explorer restart)
     void HideRandomDesktopIcon();  // Experiment: hide random icon via ListView manipulation
     void RestoreHiddenIcons();     // Experiment: restore hidden icons by refreshing desktop
+    void InjectExplorerHook();     // Experiment: inject hook DLL into Explorer
+    void EjectExplorerHook();      // Experiment: eject hook DLL from Explorer
     bool IsAutostartEnabled();
     void SetAutostart(bool enable);
     void SetDefaultColorHex(const std::string& colorHex);
@@ -85,4 +87,11 @@ private:
 
     // Watchdog support
     HANDLE hGracefulExitEvent = nullptr;
+
+    // Explorer hook
+    UINT_PTR injectedModuleHandle = 0;  // HMODULE of injected DLL in Explorer (64-bit)
+    void AutoConnectHook();                    // Auto-inject or reconnect to existing hook
+    void InjectExplorerHookSilent();           // Inject without UI (for auto-start)
+    void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
+    void RepositionHiddenIconsUnderCorrals();  // Move hidden icons under corral windows
 };

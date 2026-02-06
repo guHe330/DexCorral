@@ -2,8 +2,10 @@
 #include <Windows.h>
 #include <string>
 #include <vector>
+#include <map>
 #include <memory>
 #include "Config.h"
+#include "DesktopIcons.h"
 
 class WallpaperManager;
 class FolderWatcher;
@@ -61,6 +63,9 @@ public:
 
     // Virtual corral support
     void ChangeFolderPath();  // Open folder browser to change virtual folder path
+
+    // Hook bridge: get screen positions of icons for repositioning hidden ListView icons
+    std::map<std::wstring, POINT2D> GetIconScreenPositions() const;
 
 private:
     // Virtual corral support
@@ -149,6 +154,10 @@ private:
     static std::wstring GetPublicDesktopPath();
     static int GetDesktopIconSize();  // Read from registry
     void GetDesktopIconSpacing(int& spacingX, int& spacingY);  // Read from registry
+
+    // String conversion utilities (used across split implementation files)
+    static std::string WideToUtf8(const std::wstring& wide);
+    static std::wstring Utf8ToWide(const std::string& utf8);
 
     HWND hwnd;
     CorralWindowConfig config;

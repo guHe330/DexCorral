@@ -32,7 +32,8 @@ public:
     static void RestoreHiddenIconsExperiment();  // Refreshes desktop to restore deleted items
     static int GetIconCount();  // Returns number of desktop icons
 
-private:
     static HWND GetDesktopListView();
+
+private:
     static std::wstring GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index);
 };

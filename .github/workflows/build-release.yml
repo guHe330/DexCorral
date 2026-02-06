@@ -2,13 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      version_bump:
-        description: 'Version bump type (patch/minor/major)'
-        required: false
-        default: 'patch'
+    tags: [ 'v*' ]
 
 permissions:
   contents: write
@@ -29,43 +23,15 @@ jobs:
     - name: Setup CMake
       uses: lukka/get-cmake@latest
 
-    - name: Get latest version tag
+    - name: Get version from tag
       id: get_version
       shell: pwsh
       run: |
-        # Get the latest version tag
-        $tags = git tag -l "v*" | Sort-Object -Descending { [version]($_ -replace '^v', '') }
-        
-        if ($tags) {
-          $latestTag = $tags | Select-Object -First 1
-          $version = $latestTag -replace '^v', ''
-        } else {
-          $version = "1.0.0"
-        }
-        
-        # Parse version components
-        $parts = $version -split '\.'
-        $major = [int]$parts[0]
-        $minor = [int]$parts[1]
-        $patch = [int]$parts[2]
-        
-        # Increment based on input or default to patch
-        $bump = "${{ github.event.inputs.version_bump }}"
-        if (-not $bump) { $bump = "patch" }
-        
-        switch ($bump) {
-          "major" { $major++; $minor = 0; $patch = 0 }
-          "minor" { $minor++; $patch = 0 }
-          "patch" { $patch++ }
-        }
-        
-        $newVersion = "$major.$minor.$patch"
-        
-        Write-Host "Previous version: $version"
-        Write-Host "New version: $newVersion"
-        
-        echo "version=$newVersion" >> $env:GITHUB_OUTPUT
-        echo "tag=v$newVersion" >> $env:GITHUB_OUTPUT
+        $tag = "${{ github.ref_name }}"
+        $version = $tag -replace '^v', ''
+        Write-Host "Version: $version (tag: $tag)"
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "tag=$tag" >> $env:GITHUB_OUTPUT
 
     - name: Update CMakeLists.txt version
       shell: pwsh
@@ -101,6 +67,7 @@ jobs:
         # Copy files
         Copy-Item "DexCorralCpp/build/Release/DexCorral.exe" -Destination "package/"
         Copy-Item "DexCorralCpp/build/Release/DexCorral.Watchdog.exe" -Destination "package/"
+        Copy-Item "DexCorralCpp/build/Release/CorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
         
@@ -110,38 +77,20 @@ jobs:
         Write-Host "Created Portable_DexCorral.zip with contents:"
         Get-ChildItem "package"
 
-    - name: Create Git Tag
+    - name: Prepare release notes
       shell: pwsh
       run: |
-        $tag = "${{ steps.get_version.outputs.tag }}"
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git tag -a $tag -m "Release $tag"
-        git push origin $tag
+        $version = "${{ steps.get_version.outputs.version }}"
+        $body = Get-Content "Distribute/RELEASE_TEMPLATE.md" -Raw
+        $body = $body -replace '\$\{VERSION\}', $version
+        Set-Content "release_notes.md" -Value $body
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.get_version.outputs.tag }}
         name: DexCorral ${{ steps.get_version.outputs.tag }}
-        body: |
-          ## DexCorral ${{ steps.get_version.outputs.version }}
-          
-          ### What's in this release
-          - `Portable_DexCorral.zip` - Complete portable package
-          
-          ### Package Contents
-          - DexCorral.exe - Main application
-          - DexCorral.Watchdog.exe - Auto-restart watchdog service
-          - LICENSE - MIT License
-          - readme.txt - Quick start guide
-          
-          ### Installation
-          1. Download `Portable_DexCorral.zip`
-          2. Extract to any folder
-          3. Run `DexCorral.exe`
-          
-          No installation required - fully portable!
+        body_path: release_notes.md
         files: |
           Portable_DexCorral.zip
         draft: false

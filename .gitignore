@@ -44,3 +44,8 @@
 *.md
 !README.md
 !MANUAL.md
+!CONTRIBUTING.md
+!Distribute/RELEASE_TEMPLATE.md
+
+# Claude Code
+.claude/
