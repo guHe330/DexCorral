@@ -61,6 +61,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wall
 
     dragStart = { 0, 0 };
     dragStartRect = { 0, 0, 0, 0 };
+    currentOpacity = config.IconOpacity;
 
     // Save the full height for roll-up restore
     savedHeight = config.Height;
@@ -312,25 +313,6 @@ void CorralWindow::AddFile(const std::string& fileName) {
     }
 }
 
-std::map<std::wstring, POINT2D> CorralWindow::GetIconScreenPositions() const {
-    std::map<std::wstring, POINT2D> positions;
-    if (!hwnd || icons.empty()) return positions;
-
-    RECT windowRect;
-    GetWindowRect(hwnd, &windowRect);
-
-    for (const auto& icon : icons) {
-        if (icon.displayName.empty()) continue;
-        // icon.rect is in client coords - convert to screen by adding window origin
-        POINT2D pt;
-        pt.x = windowRect.left + icon.rect.left;
-        pt.y = windowRect.top + icon.rect.top;
-        positions[icon.displayName] = pt;
-    }
-
-    return positions;
-}
-
 // ============================================================================
 // Tab Management
 // ============================================================================
@@ -541,6 +523,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 if (window->config.IsRolledUp && !window->isHoverExpanded && !window->isAnimating) {
                     window->StartHoverExpand();
                 }
+
+                // Fade to full opacity on hover
+                if (window->config.IconOpacity < 255) {
+                    window->StartOpacityAnimation(255);
+                }
             }
 
             if (window->isResizing) {
@@ -579,6 +566,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 
                 SetWindowPos(hwnd, nullptr, newLeft, newTop, 0, 0,
                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+                // Push desktop icons out of the way
+                if (App::GetInstance()) {
+                    App::GetInstance()->PushDesktopIconsFromCorrals();
+                }
             }
             return 0;
         }
@@ -626,6 +618,10 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->OnHoverCheckTimer();
                 return 0;
             }
+            if (wParam == OPACITY_TIMER_ID) {
+                window->OnOpacityAnimationTimer();
+                return 0;
+            }
             break;
         case WM_FOLDER_CHANGED:
             window->OnFolderContentsChanged();
@@ -640,10 +636,15 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (window->isHoverExpanded && !window->isAnimating) {
                 window->StartHoverCollapse();
             }
+            // Fade back to configured opacity
+            if (window->config.IconOpacity < 255) {
+                window->StartOpacityAnimation(window->config.IconOpacity);
+            }
             return 0;
         case WM_DESTROY:
             KillTimer(hwnd, ANIMATION_TIMER_ID);
             KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
+            KillTimer(hwnd, OPACITY_TIMER_ID);
             return 0;
         }
     }

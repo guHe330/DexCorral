@@ -2,8 +2,21 @@
 #include <stdio.h>
 #include "CorralHook.h"
 
+static const wchar_t* DEBUG_EVENT_NAME = L"Local\\DexCorralDebug";
+
+static bool IsDebugEnabled() {
+    HANDLE hEvent = OpenEventW(EVENT_ALL_ACCESS, FALSE, DEBUG_EVENT_NAME);
+    if (hEvent) {
+        CloseHandle(hEvent);
+        return true;
+    }
+    return false;
+}
+
 // Log to file for debugging (since we can't use console in Explorer)
 static void Log(const wchar_t* message) {
+    if (!IsDebugEnabled()) return;
+
     wchar_t path[MAX_PATH];
     GetTempPathW(MAX_PATH, path);
     wcscat_s(path, L"CorralHook.log");

@@ -184,7 +184,8 @@ void CorralWindow::UpdateLayeredContent() {
     }
 
     // Draw icons (skip when rolled up, but show when hover-expanded)
-    BYTE iconAlpha = (BYTE)config.IconOpacity;
+    // Icon opacity is handled by SourceConstantAlpha (whole-window), so draw icons at full alpha
+    BYTE iconAlpha = 255;
 
     // Parse tint color and strength
     BYTE tintR = 0, tintG = 0, tintB = 0;
@@ -218,7 +219,7 @@ void CorralWindow::UpdateLayeredContent() {
         HBITMAP iconTempBmp = nullptr;
         HBITMAP iconTempOldBmp = nullptr;
         DWORD* iconTempPixels = nullptr;
-        const int ICON_TEMP_SIZE = ICON_SIZE_LARGE; // 64px max
+        const int ICON_TEMP_SIZE = (iconSize > 64) ? iconSize : 64;
         if (useTempIcon) {
             BITMAPINFO iconBmi = {};
             iconBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -694,7 +695,7 @@ void CorralWindow::UpdateLayeredContent() {
     BLENDFUNCTION blend = {};
     blend.BlendOp = AC_SRC_OVER;
     blend.BlendFlags = 0;
-    blend.SourceConstantAlpha = 255;
+    blend.SourceConstantAlpha = (BYTE)currentOpacity;
     blend.AlphaFormat = AC_SRC_ALPHA;
 
     UpdateLayeredWindow(hwnd, screenDC, &ptDst, &sizeWnd, memDC, &ptSrc, 0, &blend, ULW_ALPHA);

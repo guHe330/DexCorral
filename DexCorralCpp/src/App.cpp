@@ -14,8 +14,6 @@ App* App::instance = nullptr;
 
 static const wchar_t* MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
 static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralGracefulExit";
-static const UINT_PTR HOOK_REPOSITION_TIMER_ID = 42;
-static const DWORD HOOK_REPOSITION_INTERVAL_MS = 2000;  // Reposition every 2 seconds
 
 App::App() : messageWindow(nullptr) {
     instance = this;
@@ -127,8 +125,10 @@ void App::Shutdown() {
     // Save config before exit
     SaveConfig();
 
-    // Stop hook repositioning timer and clear hidden icons
-    KillTimer(messageWindow, HOOK_REPOSITION_TIMER_ID);
+    // Restore hidden icons to visible positions (near their corrals) before clearing hook
+    RestoreHiddenIconPositions();
+
+    // Clear hidden icons so hook stops hiding them
     HookBridge::ClearHiddenIcons();
     HookBridge::RefreshDesktop();
 
@@ -142,13 +142,6 @@ void App::Shutdown() {
     if (mouseHook) {
         mouseHook->Stop();
     }
-
-    // DON'T close graceful exit event - let OS clean it up on process exit
-    // This ensures watchdog can still check the event after process terminates
-    // if (hGracefulExitEvent) {
-    //     CloseHandle(hGracefulExitEvent);
-    //     hGracefulExitEvent = nullptr;
-    // }
 }
 
 void App::LoadConfig() {
@@ -170,7 +163,7 @@ void App::SaveConfig() {
     // Update hook hidden icons if hook is injected
     if (injectedModuleHandle) {
         UpdateHookHiddenIcons();
-        RepositionHiddenIconsUnderCorrals();
+        MoveHiddenIconsOffScreen();
         HookBridge::RefreshDesktop();
     }
 }
@@ -325,27 +318,6 @@ void App::ToggleShortcutArrows() {
     }
 }
 
-void App::HideRandomDesktopIcon() {
-    int count = DesktopIcons::GetIconCount();
-    if (count <= 0) {
-        MessageBoxW(nullptr, L"No desktop icons found.", L"Experiment", MB_OK | MB_ICONINFORMATION);
-        return;
-    }
-
-    if (DesktopIcons::HideRandomIconExperiment()) {
-        MessageBoxW(nullptr, L"A random desktop icon has been hidden.\n\nUse 'Restore Hidden Icons' to bring it back.",
-                    L"Experiment", MB_OK | MB_ICONINFORMATION);
-    } else {
-        MessageBoxW(nullptr, L"Failed to hide icon. The operation may require elevated privileges.",
-                    L"Experiment", MB_OK | MB_ICONWARNING);
-    }
-}
-
-void App::RestoreHiddenIcons() {
-    DesktopIcons::RestoreHiddenIconsExperiment();
-    MessageBoxW(nullptr, L"Desktop has been refreshed. Hidden icons should now be restored.",
-                L"Experiment", MB_OK | MB_ICONINFORMATION);
-}
 
 static DWORD GetExplorerProcessId() {
     HWND shellWindow = GetShellWindow();
@@ -392,9 +364,8 @@ void App::AutoConnectHook() {
         // Hook is already loaded — just reconnect (no injection needed)
         injectedModuleHandle = (UINT_PTR)hRemoteModule;
         UpdateHookHiddenIcons();
-        RepositionHiddenIconsUnderCorrals();
+        MoveHiddenIconsOffScreen();
         HookBridge::RefreshDesktop();
-        SetTimer(messageWindow, HOOK_REPOSITION_TIMER_ID, HOOK_REPOSITION_INTERVAL_MS, nullptr);
     } else {
         // Hook not loaded — inject it (silently, no message boxes)
         InjectExplorerHookSilent();
@@ -451,163 +422,11 @@ void App::InjectExplorerHookSilent() {
     if (hRemoteModule) {
         injectedModuleHandle = (UINT_PTR)hRemoteModule;
         UpdateHookHiddenIcons();
-        RepositionHiddenIconsUnderCorrals();
+        MoveHiddenIconsOffScreen();
         HookBridge::RefreshDesktop();
-        SetTimer(messageWindow, HOOK_REPOSITION_TIMER_ID, HOOK_REPOSITION_INTERVAL_MS, nullptr);
     }
 }
 
-void App::InjectExplorerHook() {
-    // Check if already injected
-    if (injectedModuleHandle) {
-        MessageBoxW(nullptr, L"Hook is already injected.", L"Experiment", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    // Get path to CorralHook.dll (same directory as exe)
-    wchar_t dllPath[MAX_PATH];
-    GetModuleFileNameW(nullptr, dllPath, MAX_PATH);
-
-    // Replace exe name with dll name
-    wchar_t* lastSlash = wcsrchr(dllPath, L'\\');
-    if (lastSlash) {
-        wcscpy_s(lastSlash + 1, MAX_PATH - (lastSlash - dllPath + 1), L"CorralHook.dll");
-    }
-
-    // Check if DLL exists
-    if (GetFileAttributesW(dllPath) == INVALID_FILE_ATTRIBUTES) {
-        MessageBoxW(nullptr, L"CorralHook.dll not found.\n\nMake sure it's in the same folder as DexCorral.exe.",
-                    L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Get Explorer process ID
-    DWORD explorerPid = GetExplorerProcessId();
-    if (!explorerPid) {
-        MessageBoxW(nullptr, L"Could not find Explorer process.", L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Open Explorer process
-    HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
-                                  PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
-                                  FALSE, explorerPid);
-    if (!hProcess) {
-        MessageBoxW(nullptr, L"Could not open Explorer process.\n\nTry running as Administrator.",
-                    L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Allocate memory in Explorer for the DLL path
-    size_t pathSize = (wcslen(dllPath) + 1) * sizeof(wchar_t);
-    LPVOID remotePath = VirtualAllocEx(hProcess, nullptr, pathSize, MEM_COMMIT, PAGE_READWRITE);
-    if (!remotePath) {
-        CloseHandle(hProcess);
-        MessageBoxW(nullptr, L"Could not allocate memory in Explorer.", L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Write DLL path to Explorer's memory
-    if (!WriteProcessMemory(hProcess, remotePath, dllPath, pathSize, nullptr)) {
-        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
-        CloseHandle(hProcess);
-        MessageBoxW(nullptr, L"Could not write to Explorer memory.", L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Get address of LoadLibraryW
-    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
-    LPTHREAD_START_ROUTINE loadLibraryAddr = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryW");
-
-    // Create remote thread to call LoadLibraryW
-    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, loadLibraryAddr, remotePath, 0, nullptr);
-    if (!hThread) {
-        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
-        CloseHandle(hProcess);
-        MessageBoxW(nullptr, L"Could not create remote thread.\n\nTry running as Administrator.",
-                    L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Wait for the thread to complete
-    WaitForSingleObject(hThread, 5000);
-    CloseHandle(hThread);
-    VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
-
-    // Find the injected module by name (avoids 64-bit truncation issue)
-    HMODULE hRemoteModule = FindRemoteModule(hProcess, L"CorralHook.dll");
-    CloseHandle(hProcess);
-
-    if (hRemoteModule) {
-        injectedModuleHandle = (UINT_PTR)hRemoteModule;
-
-        // Update shared memory with current hidden icon list
-        UpdateHookHiddenIcons();
-        RepositionHiddenIconsUnderCorrals();
-        HookBridge::RefreshDesktop();
-
-        // Start periodic repositioning timer
-        SetTimer(messageWindow, HOOK_REPOSITION_TIMER_ID, HOOK_REPOSITION_INTERVAL_MS, nullptr);
-
-        MessageBoxW(nullptr, L"Hook injected successfully!\n\nCheck %TEMP%\\CorralHook.log for details.",
-                    L"Experiment", MB_OK | MB_ICONINFORMATION);
-    } else {
-        MessageBoxW(nullptr, L"DLL injection may have failed.\n\nCheck %TEMP%\\CorralHook.log",
-                    L"Experiment", MB_OK | MB_ICONWARNING);
-    }
-}
-
-void App::EjectExplorerHook() {
-    if (!injectedModuleHandle) {
-        MessageBoxW(nullptr, L"No hook is currently injected.", L"Experiment", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    DWORD explorerPid = GetExplorerProcessId();
-    if (!explorerPid) {
-        MessageBoxW(nullptr, L"Could not find Explorer process.", L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
-                                  PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
-                                  FALSE, explorerPid);
-    if (!hProcess) {
-        MessageBoxW(nullptr, L"Could not open Explorer process.", L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Get address of FreeLibrary
-    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
-    LPTHREAD_START_ROUTINE freeLibraryAddr = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "FreeLibrary");
-
-    // Create remote thread to call FreeLibrary
-    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, freeLibraryAddr,
-                                        (LPVOID)(UINT_PTR)injectedModuleHandle, 0, nullptr);
-    if (!hThread) {
-        CloseHandle(hProcess);
-        MessageBoxW(nullptr, L"Could not create remote thread.", L"Experiment", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    WaitForSingleObject(hThread, 5000);
-
-    DWORD exitCode = 0;
-    GetExitCodeThread(hThread, &exitCode);
-
-    CloseHandle(hThread);
-    CloseHandle(hProcess);
-
-    if (exitCode) {
-        KillTimer(messageWindow, HOOK_REPOSITION_TIMER_ID);
-        HookBridge::ClearHiddenIcons();
-        HookBridge::RefreshDesktop();
-        injectedModuleHandle = 0;
-        MessageBoxW(nullptr, L"Hook ejected successfully.", L"Experiment", MB_OK | MB_ICONINFORMATION);
-    } else {
-        MessageBoxW(nullptr, L"Failed to eject hook.", L"Experiment", MB_OK | MB_ICONERROR);
-    }
-}
 
 void App::UpdateHookHiddenIcons() {
     // Collect display names of all icons across all corrals and ALL tabs
@@ -649,17 +468,299 @@ void App::UpdateHookHiddenIcons() {
     HookBridge::UpdateHiddenIcons(displayNames);
 }
 
-void App::RepositionHiddenIconsUnderCorrals() {
-    // Position hidden ListView icons under their corral windows
-    std::map<std::wstring, POINT2D> positions;
-
+void App::MoveHiddenIconsOffScreen() {
+    // Move all hidden (corral-owned) icons far off-screen so they can't be clicked
+    // The hook makes them invisible, but they're still in the ListView —
+    // moving off-screen prevents hit-test conflicts with visible icons.
+    std::vector<std::wstring> hiddenNames;
     for (const auto& corral : corrals) {
-        auto iconPositions = corral->GetIconScreenPositions();
-        positions.insert(iconPositions.begin(), iconPositions.end());
+        for (const auto& tab : corral->GetConfig().Tabs) {
+            if (tab.IsVirtual) continue;
+            for (const auto& fileUtf8 : tab.Files) {
+                std::wstring name;
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
+                    name = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                } else {
+                    int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
+                    name.resize(size);
+                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
+                    if (name.length() > 4) {
+                        std::wstring ext = name.substr(name.length() - 4);
+                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
+                            name = name.substr(0, name.length() - 4);
+                        }
+                    }
+                }
+                if (!name.empty()) {
+                    hiddenNames.push_back(name);
+                }
+            }
+        }
     }
 
-    if (!positions.empty()) {
-        HookBridge::RepositionHiddenIcons(positions);
+    if (!hiddenNames.empty()) {
+        std::map<std::wstring, POINT2D> offScreenPositions;
+        for (const auto& name : hiddenNames) {
+            offScreenPositions[name] = { 32000, 32000 };
+        }
+        DesktopIcons::PositionIcons(offScreenPositions);
+    }
+}
+
+void App::RestoreHiddenIconPositions() {
+    // On exit: move hidden icons back to visible positions (center of their corral)
+    // so they reappear in a sensible location after hook clears
+    std::map<std::wstring, POINT2D> restorePositions;
+
+    for (const auto& corral : corrals) {
+        RECT r;
+        if (!GetWindowRect(corral->GetHWND(), &r)) continue;
+
+        // Convert corral center to ListView client coords
+        HWND hListView = DesktopIcons::GetDesktopListView();
+        POINT center = { (r.left + r.right) / 2, (r.top + r.bottom) / 2 };
+        if (hListView) {
+            ScreenToClient(hListView, &center);
+        }
+
+        for (const auto& tab : corral->GetConfig().Tabs) {
+            if (tab.IsVirtual) continue;
+            for (const auto& fileUtf8 : tab.Files) {
+                std::wstring name;
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
+                    name = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                } else {
+                    int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
+                    name.resize(size);
+                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
+                    if (name.length() > 4) {
+                        std::wstring ext = name.substr(name.length() - 4);
+                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
+                            name = name.substr(0, name.length() - 4);
+                        }
+                    }
+                }
+                if (!name.empty()) {
+                    restorePositions[name] = { center.x, center.y };
+                }
+            }
+        }
+    }
+
+    if (!restorePositions.empty()) {
+        DesktopIcons::PositionIcons(restorePositions);
+    }
+}
+
+// ============================================================================
+// Desktop icon push-out-of-way support
+// ============================================================================
+
+void App::CacheDesktopIconPositions() {
+    cachedDesktopIconPositions = DesktopIcons::GetAllIconPositions();
+
+    // Remove icons that are hidden by corrals (they're managed, not free)
+    auto it = cachedDesktopIconPositions.begin();
+    while (it != cachedDesktopIconPositions.end()) {
+        if (IsIconHiddenByCorral(it->first)) {
+            it = cachedDesktopIconPositions.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    desktopIconCacheValid = true;
+}
+
+void App::InvalidateDesktopIconCache() {
+    desktopIconCacheValid = false;
+    cachedDesktopIconPositions.clear();
+}
+
+bool App::IsIconHiddenByCorral(const std::wstring& displayName) const {
+    for (const auto& corral : corrals) {
+        for (const auto& tab : corral->GetConfig().Tabs) {
+            if (tab.IsVirtual) continue;
+
+            for (const auto& fileUtf8 : tab.Files) {
+                std::wstring name;
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
+                    name = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                } else {
+                    int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
+                    name.resize(size);
+                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
+                    // Strip .lnk extension
+                    if (name.length() > 4) {
+                        std::wstring ext = name.substr(name.length() - 4);
+                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
+                            name = name.substr(0, name.length() - 4);
+                        }
+                    }
+                }
+                if (!name.empty() && _wcsicmp(name.c_str(), displayName.c_str()) == 0) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+std::vector<RECT> App::GetAllCorralRects() const {
+    // Returns corral rects in desktop ListView client coordinates
+    // (LVM_GETITEMPOSITION returns client coords, so we need to match)
+    HWND hListView = DesktopIcons::GetDesktopListView();
+    std::vector<RECT> rects;
+    for (const auto& corral : corrals) {
+        RECT r;
+        if (GetWindowRect(corral->GetHWND(), &r)) {
+            if (hListView) {
+                // Convert screen coords to ListView client coords
+                POINT topLeft = { r.left, r.top };
+                POINT bottomRight = { r.right, r.bottom };
+                ScreenToClient(hListView, &topLeft);
+                ScreenToClient(hListView, &bottomRight);
+                r.left = topLeft.x;
+                r.top = topLeft.y;
+                r.right = bottomRight.x;
+                r.bottom = bottomRight.y;
+            }
+            rects.push_back(r);
+        }
+    }
+    return rects;
+}
+
+static bool RectsOverlap(const RECT& a, const RECT& b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+void App::PushDesktopIconsFromCorrals() {
+    if (!desktopIconCacheValid) {
+        CacheDesktopIconPositions();
+    }
+
+    auto corralRects = GetAllCorralRects();
+    if (corralRects.empty()) return;
+
+    // Icon bounding box size (approximate desktop icon footprint)
+    const int ICON_W = 75;
+    const int ICON_H = 75;
+    const int STEP = 75;  // Push step size (one grid jump)
+
+    // Get screen bounds in ListView client coordinates
+    HWND hListView = DesktopIcons::GetDesktopListView();
+    int screenLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    int screenTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    int screenRight = screenLeft + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    int screenBottom = screenTop + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    if (hListView) {
+        POINT tl = { screenLeft, screenTop };
+        POINT br = { screenRight, screenBottom };
+        ScreenToClient(hListView, &tl);
+        ScreenToClient(hListView, &br);
+        screenLeft = tl.x;
+        screenTop = tl.y;
+        screenRight = br.x;
+        screenBottom = br.y;
+    }
+
+    // Helper: check if a position is free (no corral overlap, no icon overlap, on screen)
+    auto isPositionFree = [&](int x, int y, const std::wstring& skipName) -> bool {
+        if (x < screenLeft || y < screenTop ||
+            x + ICON_W > screenRight || y + ICON_H > screenBottom) return false;
+        RECT r = { x, y, x + ICON_W, y + ICON_H };
+        for (const auto& cr : corralRects) {
+            if (RectsOverlap(r, cr)) return false;
+        }
+        for (const auto& [otherName, otherPos] : cachedDesktopIconPositions) {
+            if (otherName == skipName) continue;
+            if (otherPos.x < -1000 || otherPos.y < -1000) continue;
+            RECT otherRect = { otherPos.x, otherPos.y, otherPos.x + ICON_W, otherPos.y + ICON_H };
+            if (RectsOverlap(r, otherRect)) return false;
+        }
+        return true;
+    };
+
+    bool anyMoved = false;
+    std::vector<std::pair<std::wstring, POINT2D>> toMove;
+
+    for (auto& [name, pos] : cachedDesktopIconPositions) {
+        // Skip icons far off-screen (already hidden)
+        if (pos.x < -1000 || pos.y < -1000) continue;
+
+        RECT iconRect = { pos.x, pos.y, pos.x + ICON_W, pos.y + ICON_H };
+
+        // Find which corral this icon overlaps (if any)
+        const RECT* overlappingCorral = nullptr;
+        for (const auto& cr : corralRects) {
+            if (RectsOverlap(iconRect, cr)) {
+                overlappingCorral = &cr;
+                break;
+            }
+        }
+        if (!overlappingCorral) continue;
+
+        // Find nearest edge of the overlapping corral and push one step past it
+        // Calculate distance to each edge from icon center
+        int iconCenterX = pos.x + ICON_W / 2;
+        int iconCenterY = pos.y + ICON_H / 2;
+        int distLeft = iconCenterX - overlappingCorral->left;
+        int distRight = overlappingCorral->right - iconCenterX;
+        int distTop = iconCenterY - overlappingCorral->top;
+        int distBottom = overlappingCorral->bottom - iconCenterY;
+
+        // Try each direction, ordered by shortest distance to edge
+        struct PushDir { int dx; int dy; int dist; };
+        PushDir dirs[4] = {
+            { -1,  0, distLeft },
+            {  1,  0, distRight },
+            {  0, -1, distTop },
+            {  0,  1, distBottom }
+        };
+        // Sort by distance (nearest edge first)
+        for (int i = 0; i < 3; i++)
+            for (int j = i + 1; j < 4; j++)
+                if (dirs[j].dist < dirs[i].dist)
+                    std::swap(dirs[i], dirs[j]);
+
+        bool found = false;
+        int newX = pos.x, newY = pos.y;
+
+        for (const auto& dir : dirs) {
+            for (int step = 1; step <= 40; step++) {
+                int candidateX = pos.x + dir.dx * STEP * step;
+                int candidateY = pos.y + dir.dy * STEP * step;
+
+                if (isPositionFree(candidateX, candidateY, name)) {
+                    newX = candidateX;
+                    newY = candidateY;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+
+        if (newX != pos.x || newY != pos.y) {
+            toMove.push_back({ name, { newX, newY } });
+            // Update cache so subsequent icons see the new position
+            pos.x = newX;
+            pos.y = newY;
+            anyMoved = true;
+        }
+    }
+
+    // Apply all moves
+    for (const auto& [name, newPos] : toMove) {
+        DesktopIcons::PositionIcon(name, newPos.x, newPos.y);
+    }
+    if (anyMoved) {
+        HookBridge::RefreshDesktop();
     }
 }
 
@@ -689,15 +790,6 @@ void App::ShowTrayMenu() {
     // Autostart toggle
     UINT autostartFlags = IsAutostartEnabled() ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
-
-    // Experiment submenu
-    HMENU experimentMenu = CreatePopupMenu();
-    AppendMenuW(experimentMenu, MF_STRING, 100, L"Hide Random Desktop Icon");
-    AppendMenuW(experimentMenu, MF_STRING, 101, L"Restore Hidden Icons");
-    AppendMenuW(experimentMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(experimentMenu, MF_STRING, 102, L"Inject Hook into Explorer");
-    AppendMenuW(experimentMenu, MF_STRING, 103, L"Eject Hook from Explorer");
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)experimentMenu, L"Experiment");
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 3, L"Exit");
@@ -742,18 +834,6 @@ void App::ShowTrayMenu() {
         CreateVirtualCorralAt(centerPt);
         break;
     }
-    case 100:
-        HideRandomDesktopIcon();
-        break;
-    case 101:
-        RestoreHiddenIcons();
-        break;
-    case 102:
-        InjectExplorerHook();
-        break;
-    case 103:
-        EjectExplorerHook();
-        break;
     }
 }
 
@@ -971,13 +1051,6 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     if (app && uMsg == WM_DISPLAYCHANGE) {
         app->OnDisplayChange();
-        return 0;
-    }
-
-    if (app && uMsg == WM_TIMER && wParam == HOOK_REPOSITION_TIMER_ID) {
-        if (app->injectedModuleHandle) {
-            app->RepositionHiddenIconsUnderCorrals();
-        }
         return 0;
     }
 
@@ -1269,16 +1342,6 @@ void App::OnDesktopFileAdded(const std::wstring& fileName) {
     // Add to catch-all corral
     CorralWindow* catchAll = GetCatchAllCorral();
     if (catchAll) {
-        // Need to add to the specific catch-all tab within this window
-        // But CorralWindow::AddFile adds to active tab.
-        // We need a way to target the catch-all tab.
-        // For now, we iterate tabs to find catch-all and set as active?
-        // No, switching active tab is a UI change.
-        // Let's implement helper in CorralWindow later: AddFileToCatchAll
-        // I will assume CorralWindow::AddFile(..., true) forces catch-all?
-        // Or just implement it cleanly.
-        // I'll assume AddFile handles it if I modify it, or I'll implement AddFileToCatchAll later.
-        // For now:
         catchAll->AddFile(fileNameStr);
         SaveConfig();
     }

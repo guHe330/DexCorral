@@ -99,9 +99,6 @@ public:
     // Virtual corral support
     void ChangeFolderPath();  // Open folder browser to change virtual folder path
 
-    // Hook bridge: get screen positions of icons for repositioning hidden ListView icons
-    std::map<std::wstring, POINT2D> GetIconScreenPositions() const;
-
 private:
     // Virtual corral support
     void LoadVirtualFolderIcons();  // Load icons from virtual folder path
@@ -135,6 +132,10 @@ private:
     void StartHoverCollapse();
     void OnAnimationTimer();
     void OnHoverCheckTimer();
+
+    // Opacity hover animation
+    void StartOpacityAnimation(int target);
+    void OnOpacityAnimationTimer();
 
     // Snap support
     void ApplySnap(int& newLeft, int& newTop, int width, int height);
@@ -245,6 +246,15 @@ private:
     static const UINT_PTR ANIMATION_TIMER_ID = 1;
     static const UINT_PTR HOVER_CHECK_TIMER_ID = 2;
     bool mouseInsideWindow = false;    // Track mouse presence
+
+    // Opacity hover animation state
+    static const UINT_PTR OPACITY_TIMER_ID = 3;
+    static const int OPACITY_ANIMATION_DURATION = 200;  // ms
+    bool isOpacityAnimating = false;
+    DWORD opacityAnimationStartTime = 0;
+    int opacityStart = 255;
+    int opacityTarget = 255;
+    int currentOpacity = 255;  // Current animated opacity (used by render)
 
     // Icon dragging for reordering
     bool isDraggingIcon = false;

@@ -24,6 +24,7 @@ public:
     static void PositionIcon(const std::wstring& fileName, int x, int y);
     static void PositionIcons(const std::map<std::wstring, POINT2D>& iconPositions);
     static POINT2D* GetIconPosition(const std::wstring& fileName);
+    static std::map<std::wstring, POINT2D> GetAllIconPositions();
 
     // Hide/show all desktop icons (the entire ListView)
     static void SetIconsVisible(bool visible);
@@ -33,11 +34,6 @@ public:
     static bool SetShortcutArrowsHidden(bool hidden);
     static bool AreShortcutArrowsHidden();
     static void RestartExplorer();
-
-    // Experiment: Hide icons by deleting from ListView (requires refresh to restore)
-    static bool HideRandomIconExperiment();  // Deletes a random icon from ListView, returns success
-    static void RestoreHiddenIconsExperiment();  // Refreshes desktop to restore deleted items
-    static int GetIconCount();  // Returns number of desktop icons
 
     static HWND GetDesktopListView();
 

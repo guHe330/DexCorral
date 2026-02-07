@@ -233,6 +233,10 @@ void CorralWindow::EndResize() {
         CalculateIconLayout();
         UpdateLayeredContent();
         if (App::GetInstance()) {
+            // Push desktop icons that may now be under the resized corral
+            App::GetInstance()->CacheDesktopIconPositions();
+            App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
     }
@@ -509,6 +513,10 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
         isDragging = true;
         GetCursorPos(&dragStart);
         GetWindowRect(hwnd, &dragStartRect);
+
+        if (App::GetInstance()) {
+            App::GetInstance()->CacheDesktopIconPositions();
+        }
         SetCapture(hwnd);
         return;
     }
@@ -545,6 +553,10 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
         isDragging = true;
         GetCursorPos(&dragStart);
         GetWindowRect(hwnd, &dragStartRect);
+
+        if (App::GetInstance()) {
+            App::GetInstance()->CacheDesktopIconPositions();
+        }
         SetCapture(hwnd);
     }
 }
@@ -603,6 +615,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y) {
 
         SyncConfigFromWindow();
         if (App::GetInstance()) {
+            App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
     }

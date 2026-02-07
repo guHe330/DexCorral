@@ -2,7 +2,10 @@
 #include <Windows.h>
 #include <memory>
 #include <vector>
+#include <map>
+#include <string>
 #include "Config.h"
+#include "DesktopIcons.h"
 #include "MouseHook.h"
 #include "WallpaperManager.h"
 #include "TrayIcon.h"
@@ -24,10 +27,6 @@ public:
     void RefreshAllCorralBackgrounds();
     void ToggleDesktopIcons();  // Toggle desktop icons visibility
     void ToggleShortcutArrows(); // Toggle shortcut arrow overlay (requires Explorer restart)
-    void HideRandomDesktopIcon();  // Experiment: hide random icon via ListView manipulation
-    void RestoreHiddenIcons();     // Experiment: restore hidden icons by refreshing desktop
-    void InjectExplorerHook();     // Experiment: inject hook DLL into Explorer
-    void EjectExplorerHook();      // Experiment: eject hook DLL from Explorer
     bool IsAutostartEnabled();
     void SetAutostart(bool enable);
     void SetDefaultColorHex(const std::string& colorHex);
@@ -53,6 +52,11 @@ public:
 
     static App* GetInstance() { return instance; }
 
+    // Desktop icon push-out-of-way support (public: called from CorralWindow during drag)
+    void CacheDesktopIconPositions();
+    void InvalidateDesktopIconCache();
+    void PushDesktopIconsFromCorrals();
+
 private:
     void Initialize();
     void Shutdown();
@@ -66,8 +70,6 @@ private:
     void OnLeftButtonDown(POINT pt);
     void OnLeftButtonUp(POINT pt);
     void OnMouseMove(POINT pt);
-    // Removed: Mousewheel events now pass through naturally
-    // void OnMouseWheel(POINT pt, int delta);
 
     // Desktop monitoring callbacks
     void EnsureCatchAllCorral();
@@ -102,5 +104,12 @@ private:
     void AutoConnectHook();                    // Auto-inject or reconnect to existing hook
     void InjectExplorerHookSilent();           // Inject without UI (for auto-start)
     void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
-    void RepositionHiddenIconsUnderCorrals();  // Move hidden icons under corral windows
+    void MoveHiddenIconsOffScreen();           // Move corral-owned icons to (-10000,-10000)
+    void RestoreHiddenIconPositions();         // On exit: move icons back near their corrals
+
+    // Desktop icon push cache
+    std::map<std::wstring, POINT2D> cachedDesktopIconPositions;
+    bool desktopIconCacheValid = false;
+    bool IsIconHiddenByCorral(const std::wstring& displayName) const;
+    std::vector<RECT> GetAllCorralRects() const;
 };

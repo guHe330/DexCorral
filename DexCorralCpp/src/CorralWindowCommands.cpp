@@ -531,3 +531,32 @@ void CorralWindow::OnHoverCheckTimer() {
         }
     }
 }
+
+void CorralWindow::StartOpacityAnimation(int target) {
+    if (currentOpacity == target) return;  // Already at target
+    opacityStart = currentOpacity;
+    opacityTarget = target;
+    opacityAnimationStartTime = GetTickCount();
+    isOpacityAnimating = true;
+    SetTimer(hwnd, OPACITY_TIMER_ID, 16, nullptr);  // ~60fps
+}
+
+void CorralWindow::OnOpacityAnimationTimer() {
+    DWORD elapsed = GetTickCount() - opacityAnimationStartTime;
+    float progress = (float)elapsed / OPACITY_ANIMATION_DURATION;
+
+    if (progress >= 1.0f) {
+        progress = 1.0f;
+        isOpacityAnimating = false;
+        KillTimer(hwnd, OPACITY_TIMER_ID);
+    }
+
+    // Ease-out quadratic
+    float easedProgress = 1.0f - (1.0f - progress) * (1.0f - progress);
+
+    currentOpacity = opacityStart + (int)((opacityTarget - opacityStart) * easedProgress);
+    if (currentOpacity < 0) currentOpacity = 0;
+    if (currentOpacity > 255) currentOpacity = 255;
+
+    UpdateLayeredContent();
+}

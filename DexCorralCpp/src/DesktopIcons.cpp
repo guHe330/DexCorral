@@ -162,10 +162,13 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D>& iconPosi
     for (int i = 0; i < count; i++) {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
 
-        auto it = iconPositions.find(text);
-        if (it != iconPositions.end()) {
-            LPARAM pos = MAKELPARAM(it->second.x & 0xFFFF, it->second.y);
-            SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
+        // Case-insensitive lookup (display names may differ in case from filenames)
+        for (const auto& [name, pos2d] : iconPositions) {
+            if (_wcsicmp(text.c_str(), name.c_str()) == 0) {
+                LPARAM pos = MAKELPARAM(pos2d.x & 0xFFFF, pos2d.y);
+                SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
+                break;
+            }
         }
     }
 
@@ -207,6 +210,43 @@ POINT2D* DesktopIcons::GetIconPosition(const std::wstring& fileName) {
         }
     }
 
+    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
+    CloseHandle(hProcess);
+
+    return result;
+}
+
+std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions() {
+    std::map<std::wstring, POINT2D> result;
+
+    HWND hListView = GetDesktopListView();
+    if (hListView == nullptr) return result;
+
+    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
+    DWORD processId;
+    GetWindowThreadProcessId(hListView, &processId);
+
+    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
+    if (hProcess == nullptr) return result;
+
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
+    LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
+
+    for (int i = 0; i < count; i++) {
+        std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
+        if (text.empty()) continue;
+
+        SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
+
+        POINT pt;
+        SIZE_T bytesRead;
+        ReadProcessMemory(hProcess, pRemotePoint, &pt, 8, &bytesRead);
+
+        result[text] = { pt.x, pt.y };
+    }
+
+    VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
     VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
     CloseHandle(hProcess);
 
@@ -353,34 +393,6 @@ void DesktopIcons::RestartExplorer() {
     ShellExecuteW(nullptr, L"open", L"explorer.exe", nullptr, nullptr, SW_SHOWNORMAL);
 }
 
-int DesktopIcons::GetIconCount() {
-    HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return 0;
-    return (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-}
-
-bool DesktopIcons::HideRandomIconExperiment() {
-    HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return false;
-
-    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-    if (count <= 0) return false;
-
-    // Pick a random icon
-    srand((unsigned int)GetTickCount());
-    int randomIndex = rand() % count;
-
-    // Delete the item from the ListView (this removes it from view until refresh)
-    BOOL result = (BOOL)SendMessageW(hListView, LVM_DELETEITEM, randomIndex, 0);
-
-    return result != FALSE;
-}
-
-void DesktopIcons::RestoreHiddenIconsExperiment() {
-    // Refreshing the desktop will restore any deleted ListView items
-    // This sends a shell change notification that causes Explorer to rebuild the icon list
-    RefreshDesktop();
-}
 
 std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons() {
     std::vector<SpecialDesktopIcon> result;

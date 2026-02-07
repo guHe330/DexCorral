@@ -3,6 +3,7 @@
 #include "FolderWatcher.h"
 #include <shellapi.h>
 #include <ShlObj.h>
+#include <commoncontrols.h>
 #include <algorithm>
 
 // Cloud file attributes (defined in Windows 10 SDK 1709+, provide fallbacks)
@@ -18,6 +19,131 @@
 #ifndef FILE_ATTRIBUTE_UNPINNED
 #define FILE_ATTRIBUTE_UNPINNED 0x00100000
 #endif
+
+// ============================================================================
+// High-resolution icon extraction via system image list
+// ============================================================================
+
+// Get the appropriate SHIL_ constant for a given icon size
+static int GetImageListType(int iconSize) {
+    if (iconSize <= 16) return SHIL_SMALL;       // 16x16
+    if (iconSize <= 32) return SHIL_LARGE;        // 32x32
+    if (iconSize <= 48) return SHIL_EXTRALARGE;   // 48x48
+    return SHIL_JUMBO;                            // 256x256
+}
+
+// Check if an icon has actual content filling its canvas. Some apps only provide
+// 32x32 icons, so SHIL_EXTRALARGE returns a 48x48 canvas with the small icon
+// centered and transparent padding. Returns true if the icon content fills at
+// least 70% of the canvas in both dimensions.
+static bool IconHasFullContent(HICON hIcon, int expectedSize) {
+    if (!hIcon || expectedSize <= 32) return true;  // No need to check small icons
+
+    HDC screenDC = GetDC(nullptr);
+    HDC memDC = CreateCompatibleDC(screenDC);
+
+    BITMAPINFO bmi = {};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = expectedSize;
+    bmi.bmiHeader.biHeight = -expectedSize;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    DWORD* pixels = nullptr;
+    HBITMAP hBmp = CreateDIBSection(memDC, &bmi, DIB_RGB_COLORS, (void**)&pixels, nullptr, 0);
+    if (!hBmp) {
+        DeleteDC(memDC);
+        ReleaseDC(nullptr, screenDC);
+        return true;
+    }
+
+    HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, hBmp);
+    memset(pixels, 0, expectedSize * expectedSize * 4);
+    DrawIconEx(memDC, 0, 0, hIcon, expectedSize, expectedSize, 0, nullptr, DI_NORMAL);
+
+    // Find bounding box of non-transparent pixels
+    int minX = expectedSize, minY = expectedSize, maxX = 0, maxY = 0;
+    for (int y = 0; y < expectedSize; y++) {
+        for (int x = 0; x < expectedSize; x++) {
+            BYTE alpha = (pixels[y * expectedSize + x] >> 24) & 0xFF;
+            if (alpha > 10) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    SelectObject(memDC, oldBmp);
+    DeleteObject(hBmp);
+    DeleteDC(memDC);
+    ReleaseDC(nullptr, screenDC);
+
+    if (maxX <= minX || maxY <= minY) return false;  // Empty icon
+
+    int contentW = maxX - minX + 1;
+    int contentH = maxY - minY + 1;
+    // Content should fill at least 70% of the canvas
+    return (contentW >= expectedSize * 7 / 10 && contentH >= expectedSize * 7 / 10);
+}
+
+// Extract icon from system image list at a given index and size.
+// If the icon has too much padding (app lacks high-res icon), falls back to
+// SHIL_LARGE (32x32) which DrawIconEx will scale up.
+static HICON ExtractFromImageList(int iconIndex, int iconSize) {
+    int imageListType = GetImageListType(iconSize);
+
+    IImageList* pImageList = nullptr;
+    if (FAILED(SHGetImageList(imageListType, IID_PPV_ARGS(&pImageList)))) {
+        return nullptr;
+    }
+
+    HICON hIcon = nullptr;
+    pImageList->GetIcon(iconIndex, ILD_TRANSPARENT, &hIcon);
+    pImageList->Release();
+
+    // Check if the high-res icon actually has content or is just a small icon
+    // centered in a larger canvas with transparent padding
+    if (hIcon && imageListType > SHIL_LARGE && !IconHasFullContent(hIcon, iconSize)) {
+        DestroyIcon(hIcon);
+        // Fall back to 32x32 — DrawIconEx will scale it up
+        pImageList = nullptr;
+        if (SUCCEEDED(SHGetImageList(SHIL_LARGE, IID_PPV_ARGS(&pImageList)))) {
+            hIcon = nullptr;
+            pImageList->GetIcon(iconIndex, ILD_TRANSPARENT, &hIcon);
+            pImageList->Release();
+        } else {
+            hIcon = nullptr;
+        }
+    }
+
+    return hIcon;
+}
+
+// Extract a high-resolution icon from the system image list using a file path.
+// Returns the icon handle, or nullptr on failure.
+static HICON ExtractHighResIcon(const std::wstring& path, int iconSize, DWORD fileAttributes = 0) {
+    SHFILEINFOW sfi = {};
+    UINT flags = SHGFI_SYSICONINDEX;
+    if (fileAttributes != 0) {
+        flags |= SHGFI_USEFILEATTRIBUTES;
+    }
+    if (!SHGetFileInfoW(path.c_str(), fileAttributes, &sfi, sizeof(sfi), flags)) {
+        return nullptr;
+    }
+    return ExtractFromImageList(sfi.iIcon, iconSize);
+}
+
+// Extract a high-resolution icon from the system image list using a PIDL (for special shell items).
+static HICON ExtractHighResIconFromPidl(LPCITEMIDLIST pidl, int iconSize) {
+    SHFILEINFOW sfi = {};
+    if (!SHGetFileInfoW((LPCWSTR)pidl, 0, &sfi, sizeof(sfi), SHGFI_PIDL | SHGFI_SYSICONINDEX)) {
+        return nullptr;
+    }
+    return ExtractFromImageList(sfi.iIcon, iconSize);
+}
 
 // ============================================================================
 // Icon clearing and loading
@@ -128,13 +254,17 @@ bool CorralWindow::LoadSpecialIcon(CorralIcon& ci, const std::string& fileName, 
         return false;
     }
 
-    // Load icon via PIDL
-    SHFILEINFOW sfi = {};
-    if (SHGetFileInfoW((LPCWSTR)pidl, 0, &sfi, sizeof(sfi), SHGFI_PIDL | SHGFI_ICON | iconFlag)) {
-        ci.hIcon = sfi.hIcon;
+    // Load icon via system image list for proper resolution
+    ci.hIcon = ExtractHighResIconFromPidl(pidl, iconSize);
+    if (!ci.hIcon) {
+        // Fallback to SHGetFileInfo
+        SHFILEINFOW sfi = {};
+        if (SHGetFileInfoW((LPCWSTR)pidl, 0, &sfi, sizeof(sfi), SHGFI_PIDL | SHGFI_ICON | iconFlag)) {
+            ci.hIcon = sfi.hIcon;
+        }
     }
 
-    // Load small icon
+    // Load small icon for details view
     if (isDetailsView || iconSize > 16) {
         SHFILEINFOW sfiSmall = {};
         if (SHGetFileInfoW((LPCWSTR)pidl, 0, &sfiSmall, sizeof(sfiSmall),
@@ -204,21 +334,27 @@ void CorralWindow::LoadIconImages() {
             ci.fullPath = userPath;
         }
 
-        // Load the shell icon
-        SHFILEINFOW sfi = {};
-        if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi),
-            SHGFI_ICON | iconFlag)) {
-            ci.hIcon = sfi.hIcon;
-        } else {
-            // Fallback: Try to get icon by file extension instead of actual file
-            // This helps with corrupted icon cache or permission issues
-            DWORD fileAttribs = GetFileAttributesW(ci.fullPath.c_str());
-            if (fileAttribs == INVALID_FILE_ATTRIBUTES) {
-                fileAttribs = FILE_ATTRIBUTE_NORMAL;
-            }
-            if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfi, sizeof(sfi),
-                SHGFI_ICON | iconFlag | SHGFI_USEFILEATTRIBUTES)) {
+        // Load the shell icon at proper resolution
+        ci.hIcon = ExtractHighResIcon(ci.fullPath, iconSize);
+        if (!ci.hIcon) {
+            // Fallback: try SHGetFileInfo
+            SHFILEINFOW sfi = {};
+            if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi),
+                SHGFI_ICON | iconFlag)) {
                 ci.hIcon = sfi.hIcon;
+            } else {
+                // Fallback: try by file extension
+                DWORD fileAttribs = GetFileAttributesW(ci.fullPath.c_str());
+                if (fileAttribs == INVALID_FILE_ATTRIBUTES) {
+                    fileAttribs = FILE_ATTRIBUTE_NORMAL;
+                }
+                ci.hIcon = ExtractHighResIcon(ci.fullPath, iconSize, fileAttribs);
+                if (!ci.hIcon) {
+                    if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfi, sizeof(sfi),
+                        SHGFI_ICON | iconFlag | SHGFI_USEFILEATTRIBUTES)) {
+                        ci.hIcon = sfi.hIcon;
+                    }
+                }
             }
         }
 
@@ -294,17 +430,21 @@ void CorralWindow::LoadVirtualFolderIcons() {
             }
         }
 
-        // Load shell icon
-        SHFILEINFOW sfi = {};
-        if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_ICON | iconFlag)) {
-            ci.hIcon = sfi.hIcon;
-        } else {
-            // Fallback: Try to get icon by file extension instead of actual file
-            // This helps with corrupted icon cache or permission issues
-            DWORD fileAttribs = findData.dwFileAttributes;
-            if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfi, sizeof(sfi),
-                SHGFI_ICON | iconFlag | SHGFI_USEFILEATTRIBUTES)) {
+        // Load shell icon at proper resolution
+        ci.hIcon = ExtractHighResIcon(ci.fullPath, iconSize);
+        if (!ci.hIcon) {
+            SHFILEINFOW sfi = {};
+            if (SHGetFileInfoW(ci.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_ICON | iconFlag)) {
                 ci.hIcon = sfi.hIcon;
+            } else {
+                DWORD fileAttribs = findData.dwFileAttributes;
+                ci.hIcon = ExtractHighResIcon(ci.fullPath, iconSize, fileAttribs);
+                if (!ci.hIcon) {
+                    if (SHGetFileInfoW(ci.fullPath.c_str(), fileAttribs, &sfi, sizeof(sfi),
+                        SHGFI_ICON | iconFlag | SHGFI_USEFILEATTRIBUTES)) {
+                        ci.hIcon = sfi.hIcon;
+                    }
+                }
             }
         }
 
@@ -549,37 +689,33 @@ bool CorralWindow::HitTestIconLabel(int x, int y, int iconIndex) const {
 
 int CorralWindow::GetIconSizeForViewMode() const {
     switch (GetActiveTab().GetViewMode()) {
-    case ViewMode::SmallIcons: return ICON_SIZE_SMALL;
-    case ViewMode::MediumIcons: return ICON_SIZE_MEDIUM;
-    case ViewMode::LargeIcons: return ICON_SIZE_LARGE;
+    case ViewMode::SmallIcons: {
+        // Small = 2/3 of desktop icon size, minimum 32
+        int desktopSize = GetDesktopIconSize();
+        int smallSize = desktopSize * 2 / 3;
+        return (smallSize < 32) ? 32 : smallSize;
+    }
+    case ViewMode::MediumIcons:
+        return GetDesktopIconSize();
+    case ViewMode::LargeIcons: {
+        // Large = 2x desktop icon size, minimum 96
+        int desktopSize = GetDesktopIconSize();
+        int largeSize = desktopSize * 2;
+        return (largeSize < 96) ? 96 : largeSize;
+    }
     case ViewMode::Details: return ICON_SIZE_DETAILS;
-    default: return ICON_SIZE_SMALL;
+    default: return GetDesktopIconSize();
     }
 }
 
 void CorralWindow::UpdateIconSpacingForViewMode() {
-    switch (GetActiveTab().GetViewMode()) {
-    case ViewMode::SmallIcons:
-        iconSpacingX = 72;
-        iconSpacingY = 68;
-        break;
-    case ViewMode::MediumIcons:
-        iconSpacingX = 80;
-        iconSpacingY = 80;
-        break;
-    case ViewMode::LargeIcons:
-        // Larger spacing for large icons to fit longer labels
-        iconSpacingX = 100;
-        iconSpacingY = 100;
-        break;
-    case ViewMode::Details:
-        // Not used for details view, but set reasonable defaults
+    if (GetActiveTab().GetViewMode() == ViewMode::Details) {
         iconSpacingX = 72;
         iconSpacingY = DETAILS_ROW_HEIGHT;
-        break;
-    default:
-        iconSpacingX = 72;
-        iconSpacingY = 68;
-        break;
+        return;
     }
+
+    // Scale spacing based on actual icon size with room for labels
+    iconSpacingX = iconSize + 32;
+    iconSpacingY = iconSize + 32;
 }
