@@ -1,5 +1,6 @@
 #pragma once
 #include <Windows.h>
+#include <oleidl.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -9,6 +10,29 @@
 
 class WallpaperManager;
 class FolderWatcher;
+class CorralWindow;
+
+// OLE drop target for corral windows - accepts both regular files and special shell items
+class CorralDropTarget : public IDropTarget {
+public:
+    CorralDropTarget(CorralWindow* owner);
+
+    // IUnknown
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override;
+    ULONG STDMETHODCALLTYPE AddRef() override;
+    ULONG STDMETHODCALLTYPE Release() override;
+
+    // IDropTarget
+    HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override;
+    HRESULT STDMETHODCALLTYPE DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override;
+    HRESULT STDMETHODCALLTYPE DragLeave() override;
+    HRESULT STDMETHODCALLTYPE Drop(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override;
+
+private:
+    LONG refCount;
+    CorralWindow* owner;
+    bool hasDropData;
+};
 
 // Sync status for cloud storage providers
 enum class SyncStatus {
@@ -90,7 +114,9 @@ private:
     void OnLeftButtonUp(int x, int y);  // Added for drag-end detection
     void OnLeftButtonDblClick(int x, int y);
     void OnRightButtonDown(int x, int y);
-    void OnDropFiles(HDROP hDrop);
+    void OnDrop(IDataObject* pDataObj);  // OLE drop handler (replaces OnDropFiles)
+
+    friend class CorralDropTarget;
 
     void ShowContextMenu(int x, int y);
     void ShowRenameDialog();
@@ -247,4 +273,7 @@ private:
     std::unique_ptr<FolderWatcher> folderWatcher;
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
+
+    // OLE drop target
+    CorralDropTarget* dropTarget = nullptr;
 };

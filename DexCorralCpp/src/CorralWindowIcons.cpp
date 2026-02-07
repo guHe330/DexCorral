@@ -178,7 +178,7 @@ void CorralWindow::LoadIconImages() {
         }
 
         ci.fileName = fileName;
-        ci.wFileName = std::wstring(fileName.begin(), fileName.end());
+        ci.wFileName = Utf8ToWide(fileName);
 
         // Create display name (hide .lnk extension like Windows does)
         ci.displayName = ci.wFileName;

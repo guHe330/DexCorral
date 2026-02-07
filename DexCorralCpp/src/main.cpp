@@ -21,18 +21,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     icc.dwICC = ICC_BAR_CLASSES;
     InitCommonControlsEx(&icc);
 
-    // Initialize COM
-    CoInitialize(nullptr);
+    // Initialize OLE (superset of COM, required for drag-drop)
+    OleInitialize(nullptr);
 
     try {
         App app;
         int result = app.Run();
-        CoUninitialize();
+        OleUninitialize();
         if (hMutex) CloseHandle(hMutex);
         return result;
     }
     catch (...) {
-        CoUninitialize();
+        OleUninitialize();
         if (hMutex) CloseHandle(hMutex);
         MessageBoxW(nullptr, L"Fatal error occurred", L"DexCorral Error", MB_ICONERROR);
         return 1;

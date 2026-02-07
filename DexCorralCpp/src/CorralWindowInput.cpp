@@ -6,6 +6,7 @@
 #include <ShlObj.h>
 #include <shobjidl.h>
 #include <algorithm>
+#include <Shlwapi.h>
 #include <cmath>
 
 // ============================================================================
@@ -726,35 +727,152 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
     CoTaskMemFree(pidlFull);
 }
 
-void CorralWindow::OnDropFiles(HDROP hDrop) {
-    UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+// ============================================================================
+// CorralDropTarget - OLE IDropTarget implementation
+// ============================================================================
+
+CorralDropTarget::CorralDropTarget(CorralWindow* owner)
+    : refCount(1), owner(owner), hasDropData(false) {}
+
+HRESULT STDMETHODCALLTYPE CorralDropTarget::QueryInterface(REFIID riid, void** ppvObject) {
+    if (riid == IID_IUnknown || riid == IID_IDropTarget) {
+        *ppvObject = static_cast<IDropTarget*>(this);
+        AddRef();
+        return S_OK;
+    }
+    *ppvObject = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG STDMETHODCALLTYPE CorralDropTarget::AddRef() { return InterlockedIncrement(&refCount); }
+ULONG STDMETHODCALLTYPE CorralDropTarget::Release() {
+    LONG count = InterlockedDecrement(&refCount);
+    if (count == 0) delete this;
+    return count;
+}
+
+HRESULT STDMETHODCALLTYPE CorralDropTarget::DragEnter(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) {
+    // Accept drops that have either CF_HDROP (files) or CFSTR_SHELLIDLIST (shell items)
+    FORMATETC fmtHdrop = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+    FORMATETC fmtShellIdList = { (CLIPFORMAT)RegisterClipboardFormatW(L"Shell IDList Array"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+
+    hasDropData = (pDataObj->QueryGetData(&fmtHdrop) == S_OK ||
+                   pDataObj->QueryGetData(&fmtShellIdList) == S_OK);
+
+    *pdwEffect = hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CorralDropTarget::DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) {
+    *pdwEffect = hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CorralDropTarget::DragLeave() {
+    hasDropData = false;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) {
+    *pdwEffect = DROPEFFECT_LINK;
+    owner->OnDrop(pDataObj);
+    return S_OK;
+}
+
+// ============================================================================
+// OnDrop - handles both regular files (CF_HDROP) and special shell items
+// ============================================================================
+
+void CorralWindow::OnDrop(IDataObject* pDataObj) {
+    if (GetActiveTab().IsVirtual) return;
 
     bool changed = false;
-    for (UINT i = 0; i < fileCount; i++) {
-        wchar_t filePath[MAX_PATH];
-        DragQueryFileW(hDrop, i, filePath, MAX_PATH);
 
-        std::wstring fullPath(filePath);
-        size_t lastSlash = fullPath.find_last_of(L"\\/");
-        std::wstring fileName = (lastSlash != std::wstring::npos) ?
-            fullPath.substr(lastSlash + 1) : fullPath;
+    // Try CF_HDROP first - this preserves actual file paths including .lnk shortcuts
+    // (CFSTR_SHELLIDLIST resolves .lnk to their targets, losing the shortcut itself)
+    FORMATETC fmtHdrop = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+    STGMEDIUM stgHdrop = {};
 
-        int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        std::string fileNameUtf8(size - 1, 0);
-        WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameUtf8[0], size, nullptr, nullptr);
+    if (SUCCEEDED(pDataObj->GetData(&fmtHdrop, &stgHdrop))) {
+        HDROP hDrop = (HDROP)GlobalLock(stgHdrop.hGlobal);
+        if (hDrop) {
+            UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < fileCount; i++) {
+                wchar_t filePath[MAX_PATH];
+                DragQueryFileW(hDrop, i, filePath, MAX_PATH);
 
-        auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), fileNameUtf8);
-        if (it == GetActiveTab().Files.end()) {
-            GetActiveTab().Files.push_back(fileNameUtf8);
-            changed = true;
+                std::wstring fullPath(filePath);
+                size_t lastSlash = fullPath.find_last_of(L"\\/");
+                std::wstring fileName = (lastSlash != std::wstring::npos) ?
+                    fullPath.substr(lastSlash + 1) : fullPath;
 
-            if (App::GetInstance()) {
-                App::GetInstance()->RemoveFileFromOtherCorrals(fileName, &GetActiveTab());
+                std::string fileNameUtf8 = WideToUtf8(fileName);
+
+                auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), fileNameUtf8);
+                if (it == GetActiveTab().Files.end()) {
+                    GetActiveTab().Files.push_back(fileNameUtf8);
+                    changed = true;
+
+                    if (App::GetInstance()) {
+                        App::GetInstance()->RemoveFileFromOtherCorrals(fileName, &GetActiveTab());
+                    }
+                }
             }
+            GlobalUnlock(stgHdrop.hGlobal);
         }
+        ReleaseStgMedium(&stgHdrop);
     }
 
-    DragFinish(hDrop);
+    // Fallback: try CFSTR_SHELLIDLIST for special shell items (Recycle Bin, This PC, etc.)
+    // These don't have CF_HDROP data since they aren't real files
+    if (!changed) {
+        CLIPFORMAT cfShellIdList = (CLIPFORMAT)RegisterClipboardFormatW(L"Shell IDList Array");
+        FORMATETC fmtShellIdList = { cfShellIdList, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+        STGMEDIUM stgShellIdList = {};
+
+        if (SUCCEEDED(pDataObj->GetData(&fmtShellIdList, &stgShellIdList))) {
+            CIDA* pida = (CIDA*)GlobalLock(stgShellIdList.hGlobal);
+            if (pida && pida->cidl > 0) {
+                LPCITEMIDLIST pidlParent = (LPCITEMIDLIST)((BYTE*)pida + pida->aoffset[0]);
+
+                for (UINT i = 0; i < pida->cidl; i++) {
+                    LPCITEMIDLIST pidlChild = (LPCITEMIDLIST)((BYTE*)pida + pida->aoffset[i + 1]);
+
+                    LPITEMIDLIST pidlAbsolute = ILCombine(pidlParent, pidlChild);
+                    if (!pidlAbsolute) continue;
+
+                    PWSTR pszName = nullptr;
+                    HRESULT hr = SHGetNameFromIDList(pidlAbsolute, SIGDN_DESKTOPABSOLUTEPARSING, &pszName);
+                    if (FAILED(hr) || !pszName) {
+                        CoTaskMemFree(pidlAbsolute);
+                        continue;
+                    }
+
+                    std::string entryUtf8;
+
+                    if (pszName[0] == L':' && pszName[1] == L':') {
+                        // Special shell item - store as "shell:{CLSID}"
+                        std::wstring clsid = pszName + 2;
+                        entryUtf8 = "shell:" + WideToUtf8(clsid);
+                    }
+
+                    CoTaskMemFree(pszName);
+
+                    if (!entryUtf8.empty()) {
+                        auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), entryUtf8);
+                        if (it == GetActiveTab().Files.end()) {
+                            GetActiveTab().Files.push_back(entryUtf8);
+                            changed = true;
+                        }
+                    }
+
+                    CoTaskMemFree(pidlAbsolute);
+                }
+            }
+            GlobalUnlock(stgShellIdList.hGlobal);
+            ReleaseStgMedium(&stgShellIdList);
+        }
+    }
 
     if (changed) {
         LoadFiles();

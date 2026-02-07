@@ -568,37 +568,39 @@ void App::EjectExplorerHook() {
 }
 
 void App::UpdateHookHiddenIcons() {
-    // Collect display names of all icons across all corrals (active tabs only)
+    // Collect display names of all icons across all corrals and ALL tabs
+    // (not just active tab - inactive tab icons should stay hidden too)
     std::vector<std::wstring> displayNames;
     for (const auto& corral : corrals) {
-        const auto& tab = corral->GetConfig().Tabs[corral->GetConfig().ActiveTabIndex];
-        if (tab.IsVirtual) continue;  // Virtual tabs don't hide desktop icons
+        for (const auto& tab : corral->GetConfig().Tabs) {
+            if (tab.IsVirtual) continue;  // Virtual tabs don't hide desktop icons
 
-        for (const auto& fileUtf8 : tab.Files) {
-            // Special icon: resolve CLSID to display name
-            if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
-                std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
-                std::wstring name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                if (!name.empty()) {
-                    displayNames.push_back(name);
+            for (const auto& fileUtf8 : tab.Files) {
+                // Special icon: resolve CLSID to display name
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
+                    std::wstring name = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                    if (!name.empty()) {
+                        displayNames.push_back(name);
+                    }
+                    continue;
                 }
-                continue;
-            }
 
-            // Convert UTF-8 filename to wide
-            int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
-            std::wstring wName(size, 0);
-            MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
+                // Convert UTF-8 filename to wide
+                int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
+                std::wstring wName(size, 0);
+                MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
 
-            // Strip .lnk extension to get display name (same as CorralWindowIcons.cpp)
-            if (wName.length() > 4) {
-                std::wstring ext = wName.substr(wName.length() - 4);
-                if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
-                    wName = wName.substr(0, wName.length() - 4);
+                // Strip .lnk extension to get display name (same as CorralWindowIcons.cpp)
+                if (wName.length() > 4) {
+                    std::wstring ext = wName.substr(wName.length() - 4);
+                    if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
+                        wName = wName.substr(0, wName.length() - 4);
+                    }
                 }
-            }
 
-            displayNames.push_back(wName);
+                displayNames.push_back(wName);
+            }
         }
     }
 

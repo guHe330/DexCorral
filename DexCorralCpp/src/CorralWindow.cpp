@@ -89,7 +89,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wall
     int initialHeight = config.IsRolledUp ? TITLE_BAR_HEIGHT : (int)config.Height;
 
     hwnd = CreateWindowExW(
-        WS_EX_TOOLWINDOW | WS_EX_ACCEPTFILES | WS_EX_LAYERED,
+        WS_EX_TOOLWINDOW | WS_EX_LAYERED,
         CORRAL_WINDOW_CLASS,
         wtitle.c_str(),
         WS_POPUP | WS_VISIBLE,
@@ -97,6 +97,10 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wall
         (int)config.Width, initialHeight,
         nullptr, nullptr, GetModuleHandleW(nullptr), this
     );
+
+    // Register OLE drop target (replaces WS_EX_ACCEPTFILES for richer drop support)
+    dropTarget = new CorralDropTarget(this);
+    RegisterDragDrop(hwnd, dropTarget);
 
     // Sync config from actual window position/size (in case Windows adjusted it)
     SyncConfigFromWindow();
@@ -115,7 +119,12 @@ CorralWindow::~CorralWindow() {
     }
     ClearIcons();
     if (hwnd) {
+        RevokeDragDrop(hwnd);
         DestroyWindow(hwnd);
+    }
+    if (dropTarget) {
+        dropTarget->Release();
+        dropTarget = nullptr;
     }
 }
 
@@ -583,9 +592,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             window->OnMouseWheel(delta);
             return 0;
         }
-        case WM_DROPFILES:
-            window->OnDropFiles((HDROP)wParam);
-            return 0;
+        // WM_DROPFILES removed - now handled by IDropTarget (CorralDropTarget)
         case WM_SETCURSOR:
             // Set resize cursor based on position
             if (LOWORD(lParam) == HTCLIENT && !window->config.IsRolledUp) {
