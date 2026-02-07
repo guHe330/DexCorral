@@ -332,7 +332,7 @@ void CorralWindow::ToggleRollUp() {
     if (config.IsRolledUp) {
         // Save current height before rolling up
         savedHeight = config.Height;
-        SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, TITLE_BAR_HEIGHT,
+        SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, GetTitleBarHeight(),
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
     else {
@@ -462,12 +462,12 @@ void CorralWindow::StartHoverCollapse() {
     GetWindowRect(hwnd, &rect);
 
     animationStartHeight = rect.bottom - rect.top;
-    animationTargetHeight = TITLE_BAR_HEIGHT;
+    animationTargetHeight = GetTitleBarHeight();
     animationStartTop = rect.top;
 
     if (expandUpward) {
         // Move window back down while collapsing
-        animationTargetTop = rect.top + (animationStartHeight - TITLE_BAR_HEIGHT);
+        animationTargetTop = rect.top + (animationStartHeight - GetTitleBarHeight());
     } else {
         animationTargetTop = rect.top;  // Stay in place
     }
@@ -488,7 +488,7 @@ void CorralWindow::OnAnimationTimer() {
         KillTimer(hwnd, ANIMATION_TIMER_ID);
 
         // If we just collapsed, mark as not hover-expanded
-        if (animationTargetHeight == TITLE_BAR_HEIGHT) {
+        if (animationTargetHeight == GetTitleBarHeight()) {
             isHoverExpanded = false;
         }
 

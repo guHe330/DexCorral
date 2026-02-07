@@ -86,7 +86,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wall
     std::wstring wtitle = Utf8ToWide(GetActiveTab().Title);
 
     // If rolled up, create with title bar height; otherwise use full height
-    int initialHeight = config.IsRolledUp ? TITLE_BAR_HEIGHT : (int)config.Height;
+    int initialHeight = config.IsRolledUp ? GetTitleBarHeight() : (int)config.Height;
 
     hwnd = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_LAYERED,
@@ -459,7 +459,7 @@ void CorralWindow::MergeWith(CorralWindow* other) {
 }
 
 int CorralWindow::HitTestTab(int x, int y) {
-    if (y >= TITLE_BAR_HEIGHT) return -1;
+    if (y >= GetTitleBarHeight()) return -1;
 
     for (int i = 0; i < (int)config.Tabs.size(); i++) {
         RECT tabRect = GetTabRect(i);
@@ -487,7 +487,7 @@ RECT CorralWindow::GetTabRect(int index) const {
         index * tabWidth,
         0,
         (index + 1) * tabWidth,
-        TITLE_BAR_HEIGHT
+        GetTitleBarHeight()
     };
 }
 
@@ -683,7 +683,7 @@ void CorralWindow::OnPaint() {
 
         // Draw title bar background (darker)
         HBRUSH titleBrush = CreateSolidBrush(RGB(bgR / 2, bgG / 2, bgB / 2));
-        RECT titleBarRect = { 0, 0, rect.right, TITLE_BAR_HEIGHT };
+        RECT titleBarRect = { 0, 0, rect.right, GetTitleBarHeight() };
         FillRect(hdc, &titleBarRect, titleBrush);
         DeleteObject(titleBrush);
 
@@ -711,7 +711,7 @@ void CorralWindow::OnPaint() {
             int drawTop = icon.iconRect.top - scrollPosition;
 
             // Skip if outside visible area
-            if (drawTop + iconSize < ICON_AREA_TOP || drawTop > rect.bottom) continue;
+            if (drawTop + iconSize < GetIconAreaTop() || drawTop > rect.bottom) continue;
 
             // Draw icon
             if (icon.hIcon) {

@@ -371,9 +371,14 @@ void CorralWindow::CalculateIconLayout() {
     ClampScrollPosition();
 }
 
+void CorralWindow::RecalculateLayout() {
+    CalculateIconLayout();
+    UpdateLayeredContent();
+}
+
 void CorralWindow::CalculateIconLayoutGrid() {
     int x = ICON_PADDING_LEFT;
-    int y = ICON_AREA_TOP;
+    int y = GetIconAreaTop();
 
     // Use actual window dimensions, not config (which may differ when rolled up/animating)
     RECT clientRect;
@@ -404,7 +409,7 @@ void CorralWindow::CalculateIconLayoutGrid() {
         int lastIconBottom = icons.back().rect.bottom;
         contentHeight = lastIconBottom + ICON_PADDING_LEFT;
     } else {
-        contentHeight = ICON_AREA_TOP;
+        contentHeight = GetIconAreaTop();
     }
 
     // If we need a scrollbar, recalculate with scrollbar space
@@ -412,7 +417,7 @@ void CorralWindow::CalculateIconLayoutGrid() {
         rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
 
         x = ICON_PADDING_LEFT;
-        y = ICON_AREA_TOP;
+        y = GetIconAreaTop();
 
         for (size_t i = 0; i < icons.size(); i++) {
             auto& icon = icons[i];
@@ -441,17 +446,17 @@ void CorralWindow::CalculateIconLayoutGrid() {
 void CorralWindow::CalculateIconLayoutDetails() {
     // Details view: list layout with rows
     // Each row has: [icon 16px] [name] [type] [size] [date] [sync status]
-    int y = ICON_AREA_TOP;
+    int y = GetIconAreaTop();
 
     // Use actual window dimensions, not config (which may differ when rolled up/animating)
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     int clientWidth = clientRect.right;
-    int visibleHeight = clientRect.bottom - ICON_AREA_TOP;
+    int visibleHeight = clientRect.bottom - GetIconAreaTop();
     int rightPadding = ICON_PADDING_LEFT;
 
     // Check if we'll need scrollbar
-    int estimatedHeight = ICON_AREA_TOP + (int)icons.size() * DETAILS_ROW_HEIGHT + ICON_PADDING_LEFT;
+    int estimatedHeight = GetIconAreaTop() + (int)icons.size() * DETAILS_ROW_HEIGHT + ICON_PADDING_LEFT;
     if (estimatedHeight > visibleHeight) {
         rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
     }
@@ -474,7 +479,7 @@ void CorralWindow::CalculateIconLayoutDetails() {
     if (!icons.empty()) {
         contentHeight = y + ICON_PADDING_LEFT;
     } else {
-        contentHeight = ICON_AREA_TOP;
+        contentHeight = GetIconAreaTop();
     }
 }
 

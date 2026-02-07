@@ -344,14 +344,48 @@ void CorralWindow::ShowRenameDialog() {
 // ============================================================================
 
 struct AppearanceDlgData {
+    // Background color & opacity
     BYTE alpha;
     COLORREF color;
     HBRUSH hBrush;
     HWND previewWindow;
     std::string* colorHex;
+    bool colorChanged;
+
+    // Header settings
+    int titleBarHeight;
+    bool titleBarHeightChanged;
+    std::wstring fontName;
+    int fontSize;
+    bool fontChanged;
+    COLORREF fontColor;
+    HBRUSH fontColorBrush;
+    bool fontColorChanged;
+
+    // Icon settings
+    int iconOpacity;
+    bool iconOpacityChanged;
+    COLORREF tintColor;
+    HBRUSH tintColorBrush;
+    int tintStrength;
+    bool tintChanged;
+
+    // Checkboxes
     bool useAsDefault;
     bool applyToAll;
+
+    // Back-references for live preview
+    CorralWindowConfig* corralConfig;
+    CorralWindow* corralWindow;  // For triggering layout recalculation
 };
+
+static void AppearanceUpdateLivePreview(AppearanceDlgData* data, bool relayout = false) {
+    if (relayout && data->corralWindow) {
+        data->corralWindow->RecalculateLayout();
+        return;  // RecalculateLayout already calls UpdateLayeredContent
+    }
+    if (data->previewWindow) InvalidateRect(data->previewWindow, nullptr, FALSE);
+}
 
 static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
     AppearanceDlgData* data = (AppearanceDlgData*)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
@@ -361,21 +395,44 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         data = (AppearanceDlgData*)lParam;
         SetWindowLongPtrW(hDlg, GWLP_USERDATA, (LONG_PTR)data);
 
-        // Create brush for initial color
+        // Create brushes
         data->hBrush = CreateSolidBrush(data->color);
+        data->fontColorBrush = CreateSolidBrush(data->fontColor);
+        data->tintColorBrush = CreateSolidBrush(data->tintColor);
 
-        // Setup slider
+        // Setup background opacity slider (ID 102)
         HWND hSlider = GetDlgItem(hDlg, 102);
         SendMessageW(hSlider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 255));
         SendMessageW(hSlider, TBM_SETPOS, TRUE, data->alpha);
-
-        // Update label
         wchar_t label[32];
-        int pct = (data->alpha * 100) / 255;
-        swprintf_s(label, L"%d%%", pct);
+        swprintf_s(label, L"%d%%", (data->alpha * 100) / 255);
         SetDlgItemTextW(hDlg, 103, label);
 
-        // Position below parent corral for live preview visibility
+        // Setup header height slider (ID 110)
+        HWND hHeightSlider = GetDlgItem(hDlg, 110);
+        SendMessageW(hHeightSlider, TBM_SETRANGE, TRUE, MAKELPARAM(20, 64));
+        SendMessageW(hHeightSlider, TBM_SETPOS, TRUE, data->titleBarHeight);
+        swprintf_s(label, L"%dpx", data->titleBarHeight);
+        SetDlgItemTextW(hDlg, 111, label);
+
+        // Set font name display (ID 112)
+        SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
+
+        // Setup icon opacity slider (ID 116)
+        HWND hIconSlider = GetDlgItem(hDlg, 116);
+        SendMessageW(hIconSlider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 255));
+        SendMessageW(hIconSlider, TBM_SETPOS, TRUE, data->iconOpacity);
+        swprintf_s(label, L"%d%%", (data->iconOpacity * 100) / 255);
+        SetDlgItemTextW(hDlg, 117, label);
+
+        // Setup tint strength slider (ID 120)
+        HWND hTintSlider = GetDlgItem(hDlg, 120);
+        SendMessageW(hTintSlider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 255));
+        SendMessageW(hTintSlider, TBM_SETPOS, TRUE, data->tintStrength);
+        swprintf_s(label, L"%d%%", (data->tintStrength * 100) / 255);
+        SetDlgItemTextW(hDlg, 121, label);
+
+        // Position below parent corral
         HWND hParent = GetParent(hDlg);
         if (hParent) {
             RECT parentRect, dlgRect;
@@ -385,46 +442,32 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             int dlgHeight = dlgRect.bottom - dlgRect.top;
             int parentWidth = parentRect.right - parentRect.left;
 
-            // Get monitor work area
             HMONITOR hMon = MonitorFromWindow(hParent, MONITOR_DEFAULTTONEAREST);
             MONITORINFO mi = { sizeof(mi) };
             GetMonitorInfo(hMon, &mi);
 
-            // Center horizontally, position below the corral window
             int cx = parentRect.left + (parentWidth - dlgWidth) / 2;
-            int cy = parentRect.bottom + 5;  // 5px below the corral
-
-            // If dialog would go below screen, try above the corral
-            if (cy + dlgHeight > mi.rcWork.bottom) {
-                cy = parentRect.top - dlgHeight - 5;  // 5px above the corral
-            }
-
-            // If still outside (top), clamp to top of work area
-            if (cy < mi.rcWork.top) {
-                cy = mi.rcWork.top;
-            }
-
-            // Clamp horizontal position to stay within monitor bounds
-            if (cx + dlgWidth > mi.rcWork.right) {
-                cx = mi.rcWork.right - dlgWidth;
-            }
-            if (cx < mi.rcWork.left) {
-                cx = mi.rcWork.left;
-            }
+            int cy = parentRect.bottom + 5;
+            if (cy + dlgHeight > mi.rcWork.bottom) cy = parentRect.top - dlgHeight - 5;
+            if (cy < mi.rcWork.top) cy = mi.rcWork.top;
+            if (cx + dlgWidth > mi.rcWork.right) cx = mi.rcWork.right - dlgWidth;
+            if (cx < mi.rcWork.left) cx = mi.rcWork.left;
 
             SetWindowPos(hDlg, nullptr, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
         return TRUE;
     }
     case WM_CTLCOLORSTATIC: {
-        if (GetDlgCtrlID((HWND)lParam) == 105) { // Color swatch
-            return (INT_PTR)data->hBrush;
-        }
+        int ctrlId = GetDlgCtrlID((HWND)lParam);
+        if (ctrlId == 105 && data) return (INT_PTR)data->hBrush;
+        if (ctrlId == 114 && data) return (INT_PTR)data->fontColorBrush;
+        if (ctrlId == 118 && data) return (INT_PTR)data->tintColorBrush;
         break;
     }
     case WM_COMMAND: {
         int id = LOWORD(wParam);
-        if (id == 106) { // Change Color button
+
+        if (id == 106) { // Change Background Color
             static COLORREF customColors[16] = {};
             CHOOSECOLORW cc = {};
             cc.lStructSize = sizeof(CHOOSECOLORW);
@@ -435,27 +478,107 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
             if (ChooseColorW(&cc)) {
                 data->color = cc.rgbResult;
-
-                // Update brush
+                data->colorChanged = true;
                 if (data->hBrush) DeleteObject(data->hBrush);
                 data->hBrush = CreateSolidBrush(data->color);
-
-                // Force redraw of swatch
                 InvalidateRect(GetDlgItem(hDlg, 105), nullptr, TRUE);
 
-                // Update live preview
                 BYTE r = GetRValue(data->color);
                 BYTE g = GetGValue(data->color);
                 BYTE b = GetBValue(data->color);
                 char hexBuf[16];
                 sprintf_s(hexBuf, "#%02X%02X%02X%02X", data->alpha, r, g, b);
                 *data->colorHex = hexBuf;
-                if (data->previewWindow) InvalidateRect(data->previewWindow, nullptr, FALSE);
+                AppearanceUpdateLivePreview(data);
             }
             return TRUE;
         }
+
+        if (id == 113) { // Choose Font
+            LOGFONTW lf = {};
+            lf.lfHeight = -data->fontSize;
+            lf.lfWeight = FW_SEMIBOLD;
+            lf.lfCharSet = DEFAULT_CHARSET;
+            lf.lfQuality = CLEARTYPE_QUALITY;
+            wcsncpy_s(lf.lfFaceName, data->fontName.c_str(), _TRUNCATE);
+
+            CHOOSEFONTW cf = {};
+            cf.lStructSize = sizeof(CHOOSEFONTW);
+            cf.hwndOwner = hDlg;
+            cf.lpLogFont = &lf;
+            cf.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL;
+
+            if (ChooseFontW(&cf)) {
+                data->fontName = lf.lfFaceName;
+                data->fontSize = (lf.lfHeight < 0) ? -lf.lfHeight : lf.lfHeight;
+                data->fontChanged = true;
+                SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
+
+                // Live preview
+                if (data->corralConfig) {
+                    data->corralConfig->HeaderFontName.resize(WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, nullptr, 0, nullptr, nullptr) - 1);
+                    WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, &data->corralConfig->HeaderFontName[0], (int)data->corralConfig->HeaderFontName.size() + 1, nullptr, nullptr);
+                    data->corralConfig->HeaderFontSize = data->fontSize;
+                    AppearanceUpdateLivePreview(data);
+                }
+            }
+            return TRUE;
+        }
+
+        if (id == 115) { // Change Font Color
+            static COLORREF customFontColors[16] = {};
+            CHOOSECOLORW cc = {};
+            cc.lStructSize = sizeof(CHOOSECOLORW);
+            cc.hwndOwner = hDlg;
+            cc.lpCustColors = customFontColors;
+            cc.rgbResult = data->fontColor;
+            cc.Flags = CC_FULLOPEN | CC_RGBINIT;
+
+            if (ChooseColorW(&cc)) {
+                data->fontColor = cc.rgbResult;
+                data->fontColorChanged = true;
+                if (data->fontColorBrush) DeleteObject(data->fontColorBrush);
+                data->fontColorBrush = CreateSolidBrush(data->fontColor);
+                InvalidateRect(GetDlgItem(hDlg, 114), nullptr, TRUE);
+
+                // Live preview
+                if (data->corralConfig) {
+                    char hexBuf[16];
+                    sprintf_s(hexBuf, "#%02X%02X%02X", GetRValue(data->fontColor), GetGValue(data->fontColor), GetBValue(data->fontColor));
+                    data->corralConfig->HeaderFontColor = hexBuf;
+                    AppearanceUpdateLivePreview(data);
+                }
+            }
+            return TRUE;
+        }
+
+        if (id == 119) { // Change Tint Color
+            static COLORREF customTintColors[16] = {};
+            CHOOSECOLORW cc = {};
+            cc.lStructSize = sizeof(CHOOSECOLORW);
+            cc.hwndOwner = hDlg;
+            cc.lpCustColors = customTintColors;
+            cc.rgbResult = data->tintColor;
+            cc.Flags = CC_FULLOPEN | CC_RGBINIT;
+
+            if (ChooseColorW(&cc)) {
+                data->tintColor = cc.rgbResult;
+                data->tintChanged = true;
+                if (data->tintColorBrush) DeleteObject(data->tintColorBrush);
+                data->tintColorBrush = CreateSolidBrush(data->tintColor);
+                InvalidateRect(GetDlgItem(hDlg, 118), nullptr, TRUE);
+
+                if (data->corralConfig) {
+                    char hexBuf[16];
+                    sprintf_s(hexBuf, "#%02X%02X%02X", GetRValue(data->tintColor), GetGValue(data->tintColor), GetBValue(data->tintColor));
+                    data->corralConfig->IconTintColor = hexBuf;
+                    AppearanceUpdateLivePreview(data);
+                }
+            }
+            return TRUE;
+        }
+
         if (id == IDOK) {
-            // Read checkbox states before closing
             data->useAsDefault = (SendDlgItemMessageW(hDlg, 107, BM_GETCHECK, 0, 0) == BST_CHECKED);
             data->applyToAll = (SendDlgItemMessageW(hDlg, 108, BM_GETCHECK, 0, 0) == BST_CHECKED);
             EndDialog(hDlg, IDOK);
@@ -468,184 +591,230 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         break;
     }
     case WM_HSCROLL: {
-        if ((HWND)lParam == GetDlgItem(hDlg, 102)) {
-            data->alpha = (BYTE)SendMessageW((HWND)lParam, TBM_GETPOS, 0, 0);
+        HWND hCtrl = (HWND)lParam;
+        int pos = (int)SendMessageW(hCtrl, TBM_GETPOS, 0, 0);
+        wchar_t label[32];
 
-            wchar_t label[32];
-            int pct = (data->alpha * 100) / 255;
-            swprintf_s(label, L"%d%%", pct);
+        if (hCtrl == GetDlgItem(hDlg, 102)) { // Background opacity
+            data->alpha = (BYTE)pos;
+            data->colorChanged = true;
+            swprintf_s(label, L"%d%%", (pos * 100) / 255);
             SetDlgItemTextW(hDlg, 103, label);
 
-            // Live preview
             BYTE r = GetRValue(data->color);
             BYTE g = GetGValue(data->color);
             BYTE b = GetBValue(data->color);
             char hexBuf[16];
             sprintf_s(hexBuf, "#%02X%02X%02X%02X", data->alpha, r, g, b);
             *data->colorHex = hexBuf;
-            if (data->previewWindow) InvalidateRect(data->previewWindow, nullptr, FALSE);
+            AppearanceUpdateLivePreview(data);
+        }
+        else if (hCtrl == GetDlgItem(hDlg, 110)) { // Header height
+            data->titleBarHeight = pos;
+            data->titleBarHeightChanged = true;
+            swprintf_s(label, L"%dpx", pos);
+            SetDlgItemTextW(hDlg, 111, label);
+
+            if (data->corralConfig) {
+                data->corralConfig->TitleBarHeight = pos;
+                AppearanceUpdateLivePreview(data, true);  // relayout needed
+            }
+        }
+        else if (hCtrl == GetDlgItem(hDlg, 116)) { // Icon opacity
+            data->iconOpacity = pos;
+            data->iconOpacityChanged = true;
+            swprintf_s(label, L"%d%%", (pos * 100) / 255);
+            SetDlgItemTextW(hDlg, 117, label);
+
+            if (data->corralConfig) {
+                data->corralConfig->IconOpacity = pos;
+                AppearanceUpdateLivePreview(data);
+            }
+        }
+        else if (hCtrl == GetDlgItem(hDlg, 120)) { // Tint strength
+            data->tintStrength = pos;
+            data->tintChanged = true;
+            swprintf_s(label, L"%d%%", (pos * 100) / 255);
+            SetDlgItemTextW(hDlg, 121, label);
+
+            if (data->corralConfig) {
+                data->corralConfig->IconTintStrength = pos;
+                AppearanceUpdateLivePreview(data);
+            }
         }
         return TRUE;
     }
     case WM_DESTROY:
-        if (data && data->hBrush) {
-            DeleteObject(data->hBrush);
-            data->hBrush = nullptr;
+        if (data) {
+            if (data->hBrush) { DeleteObject(data->hBrush); data->hBrush = nullptr; }
+            if (data->fontColorBrush) { DeleteObject(data->fontColorBrush); data->fontColorBrush = nullptr; }
+            if (data->tintColorBrush) { DeleteObject(data->tintColorBrush); data->tintColorBrush = nullptr; }
         }
         return TRUE;
     }
     return FALSE;
 }
 
-void CorralWindow::ShowAppearanceDialog() {
-    auto Align = [](WORD* p) { return (ULONG_PTR)p % 4 ? p + 1 : p; };
+// Helper to add a dialog item to the in-memory template
+static WORD* AddDlgItem(WORD* p, DWORD style, short x, short y, short cx, short cy, WORD id,
+                         WORD classHi, WORD classLo, const wchar_t* text) {
+    // Align to DWORD boundary
+    if ((ULONG_PTR)p % 4) p++;
 
-    // Build dynamic title with tab name
+    DLGITEMTEMPLATE* item = (DLGITEMTEMPLATE*)p;
+    item->style = style;
+    item->x = x; item->y = y; item->cx = cx; item->cy = cy;
+    item->id = id;
+    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
+    *p++ = 0xFFFF; *p++ = classLo;
+    if (text) {
+        size_t len = wcslen(text) + 1;
+        memcpy(p, text, len * sizeof(wchar_t));
+        p += len;
+    } else {
+        *p++ = 0;
+    }
+    *p++ = 0; // no creation data
+    return p;
+}
+
+// Helper to add a trackbar (custom class name)
+static WORD* AddTrackbar(WORD* p, DWORD style, short x, short y, short cx, short cy, WORD id) {
+    if ((ULONG_PTR)p % 4) p++;
+
+    DLGITEMTEMPLATE* item = (DLGITEMTEMPLATE*)p;
+    item->style = style;
+    item->x = x; item->y = y; item->cx = cx; item->cy = cy;
+    item->id = id;
+    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
+    const wchar_t* cls = L"msctls_trackbar32";
+    size_t len = wcslen(cls) + 1;
+    memcpy(p, cls, len * sizeof(wchar_t));
+    p += len;
+    *p++ = 0; // no text
+    *p++ = 0; // no creation data
+    return p;
+}
+
+void CorralWindow::ShowAppearanceDialog() {
+    // Build dynamic title
     std::wstring wTitle = Utf8ToWide(GetActiveTab().Title);
     std::wstring dlgTitleStr = L"Appearance: " + wTitle;
-    const wchar_t* strDlgTitle = dlgTitleStr.c_str();
-    const wchar_t* strFontName = L"Segoe UI";
-    const wchar_t* strGrpColor = L"Background Color";
-    const wchar_t* strBtnChange = L"Change...";
-    const wchar_t* strGrpOpacity = L"Opacity";
-    const wchar_t* strTrackbarClass = L"msctls_trackbar32";
-    const wchar_t* strLabelPercent = L"100%";
-    const wchar_t* strChkDefault = L"Use as default for new corrals";
-    const wchar_t* strChkApplyAll = L"Apply to all corrals";
-    const wchar_t* strBtnOK = L"OK";
-    const wchar_t* strBtnCancel = L"Cancel";
 
-    WORD dlgTemplate[2048] = {};
+    // Layout Y positions (in dialog units)
+    // Background Color group: y=5, h=35
+    // Opacity group: y=45, h=30
+    // Header group: y=80, h=55
+    // Icons group: y=140, h=30
+    // Checkboxes: y=176, y=190
+    // Buttons: y=208
+    // Total height: ~225
+
+    const int DLG_WIDTH = 220;
+    const int DLG_HEIGHT = 252;
+    const int ITEM_COUNT = 20;
+
+    WORD dlgTemplate[4096] = {};
     WORD* p = dlgTemplate;
 
     DLGTEMPLATE* dlg = (DLGTEMPLATE*)p;
     dlg->style = DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT;
-    dlg->cdit = 10;  // 8 original + 2 checkboxes
-    dlg->cx = 200;
-    dlg->cy = 130;   // Increased height for checkboxes
+    dlg->cdit = ITEM_COUNT;
+    dlg->cx = DLG_WIDTH;
+    dlg->cy = DLG_HEIGHT;
     p += sizeof(DLGTEMPLATE) / sizeof(WORD);
 
-    *p++ = 0; *p++ = 0;
+    *p++ = 0; *p++ = 0; // menu, class
 
-    size_t len = wcslen(strDlgTitle) + 1;
-    memcpy(p, strDlgTitle, len * sizeof(wchar_t)); p += len;
+    size_t len = wcslen(dlgTitleStr.c_str()) + 1;
+    memcpy(p, dlgTitleStr.c_str(), len * sizeof(wchar_t)); p += len;
 
-    *p++ = 9;
-    len = wcslen(strFontName) + 1;
-    memcpy(p, strFontName, len * sizeof(wchar_t)); p += len;
+    *p++ = 9; // font size
+    const wchar_t* strFont = L"Segoe UI";
+    len = wcslen(strFont) + 1;
+    memcpy(p, strFont, len * sizeof(wchar_t)); p += len;
 
-    // 1. Group Box "Background Color"
-    p = Align(p);
-    DLGITEMTEMPLATE* item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_GROUPBOX;
-    item->x = 5; item->y = 5; item->cx = 190; item->cy = 35;
-    item->id = (WORD)-1;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strGrpColor) + 1; memcpy(p, strGrpColor, len * sizeof(wchar_t)); p += len; *p++ = 0;
+    // === Background Color group ===
+    // 1. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 5, 210, 35, (WORD)-1, 0xFFFF, 0x0080, L"Background Color");
+    // 2. Color swatch (ID 105)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 15, 18, 30, 14, 105, 0xFFFF, 0x0082, nullptr);
+    // 3. Change button (ID 106)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 55, 18, 60, 14, 106, 0xFFFF, 0x0080, L"Change...");
 
-    // 2. Color Swatch (Static with Border) (ID 105)
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY;
-    item->x = 15; item->y = 18; item->cx = 30; item->cy = 14;
-    item->id = 105;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0082; *p++ = 0; *p++ = 0;
+    // === Opacity group ===
+    // 4. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 30, (WORD)-1, 0xFFFF, 0x0080, L"Opacity");
+    // 5. Slider (ID 102)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 15, 56, 160, 15, 102);
+    // 6. Label (ID 103)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 58, 25, 12, 103, 0xFFFF, 0x0082, L"100%");
 
-    // 3. Change Button (ID 106)
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
-    item->x = 55; item->y = 18; item->cx = 60; item->cy = 14;
-    item->id = 106;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strBtnChange) + 1; memcpy(p, strBtnChange, len * sizeof(wchar_t)); p += len; *p++ = 0;
+    // === Header group ===
+    // 7. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 80, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Header");
+    // 8. "Height" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 93, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Height");
+    // 9. Height slider (ID 110)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 91, 130, 15, 110);
+    // 10. Height label (ID 111)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 93, 25, 10, 111, 0xFFFF, 0x0082, L"32px");
+    // 11. "Font" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 110, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Font");
+    // 12. Font name display (ID 112)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_SUNKEN, 45, 109, 100, 12, 112, 0xFFFF, 0x0082, L"Segoe UI");
+    // 13. Choose Font button (ID 113)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 108, 55, 14, 113, 0xFFFF, 0x0080, L"Choose...");
+    // 14. "Color" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 126, 24, 10, (WORD)-1, 0xFFFF, 0x0082, L"Color");
+    // 15. Font color swatch (ID 114)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 45, 124, 30, 14, 114, 0xFFFF, 0x0082, nullptr);
+    // 16. Font color Change button (ID 115)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 124, 60, 14, 115, 0xFFFF, 0x0080, L"Change...");
 
-    // 4. Group Box "Opacity"
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_GROUPBOX;
-    item->x = 5; item->y = 45; item->cx = 190; item->cy = 30;
-    item->id = (WORD)-1;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strGrpOpacity) + 1; memcpy(p, strGrpOpacity, len * sizeof(wchar_t)); p += len; *p++ = 0;
+    // === Icons group ===
+    // 17. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 140, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Icons");
+    // 18. "Opacity" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 153, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
+    // 19. Icon opacity slider (ID 116)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 151, 130, 15, 116);
+    // 20. Icon opacity label (ID 117)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 153, 25, 12, 117, 0xFFFF, 0x0082, L"100%");
+    // 21. "Tint" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 170, 16, 10, (WORD)-1, 0xFFFF, 0x0082, L"Tint");
+    // 22. Tint color swatch (ID 118)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 35, 168, 20, 14, 118, 0xFFFF, 0x0082, nullptr);
+    // 23. Tint color Change button (ID 119)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 168, 40, 14, 119, 0xFFFF, 0x0080, L"Color...");
+    // 24. Tint strength slider (ID 120)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 105, 168, 70, 15, 120);
+    // 25. Tint strength label (ID 121)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 170, 25, 12, 121, 0xFFFF, 0x0082, L"0%");
 
-    // 5. Slider (ID 102) - use TBS_NOTICKS to remove tick marks
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS;
-    item->x = 15; item->y = 56; item->cx = 140; item->cy = 15;
-    item->id = 102;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    len = wcslen(strTrackbarClass) + 1;
-    memcpy(p, strTrackbarClass, len * sizeof(wchar_t));
-    p += len;
-    *p++ = 0;
-    *p++ = 0;
+    // === Checkboxes ===
+    // Checkbox "Use as default" (ID 107)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 201, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
+    // Checkbox "Apply to all corrals" (ID 108)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 215, 200, 12, 108, 0xFFFF, 0x0080, L"Apply to all corrals");
 
-    // 6. Label % (ID 103)
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | SS_RIGHT;
-    item->x = 160; item->y = 58; item->cx = 25; item->cy = 12;
-    item->id = 103;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0082;
-    len = wcslen(strLabelPercent) + 1; memcpy(p, strLabelPercent, len * sizeof(wchar_t)); p += len; *p++ = 0;
+    // === Buttons ===
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 233, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 233, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
 
-    // 7. Checkbox "Use as default for new corrals" (ID 107)
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
-    item->x = 10; item->y = 82; item->cx = 180; item->cy = 12;
-    item->id = 107;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strChkDefault) + 1; memcpy(p, strChkDefault, len * sizeof(wchar_t)); p += len; *p++ = 0;
-
-    // 8. Checkbox "Apply to all corrals" (ID 108)
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
-    item->x = 10; item->y = 96; item->cx = 180; item->cy = 12;
-    item->id = 108;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strChkApplyAll) + 1; memcpy(p, strChkApplyAll, len * sizeof(wchar_t)); p += len; *p++ = 0;
-
-    // 9. OK Button
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP;
-    item->x = 90; item->y = 112; item->cx = 50; item->cy = 14;
-    item->id = IDOK;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strBtnOK) + 1; memcpy(p, strBtnOK, len * sizeof(wchar_t)); p += len; *p++ = 0;
-
-    // 10. Cancel Button
-    p = Align(p);
-    item = (DLGITEMTEMPLATE*)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
-    item->x = 145; item->y = 112; item->cx = 50; item->cy = 14;
-    item->id = IDCANCEL;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    len = wcslen(strBtnCancel) + 1; memcpy(p, strBtnCancel, len * sizeof(wchar_t)); p += len; *p++ = 0;
+    // Fix item count in the template header (19 original + 6 new tint controls + 4 checkboxes/buttons = 29)
+    ((DLGTEMPLATE*)dlgTemplate)->cdit = 29;
 
     // Data prep
-    AppearanceDlgData dlgData;
+    AppearanceDlgData dlgData = {};
     dlgData.alpha = 153;
-    dlgData.color = RGB(0,0,0);
+    dlgData.color = RGB(0, 0, 0);
     dlgData.previewWindow = hwnd;
     dlgData.colorHex = &GetActiveTab().ColorHex;
-    dlgData.hBrush = nullptr;
-    dlgData.useAsDefault = false;
-    dlgData.applyToAll = false;
+    dlgData.corralConfig = &config;
+    dlgData.corralWindow = this;
 
+    // Parse background color
     const std::string& colorHexRef = GetActiveTab().ColorHex;
     if (!colorHexRef.empty() && colorHexRef[0] == '#' && colorHexRef.length() >= 9) {
         unsigned int colorValue;
@@ -657,7 +826,41 @@ void CorralWindow::ShowAppearanceDialog() {
         dlgData.color = RGB(r, g, b);
     }
 
+    // Header settings from config
+    dlgData.titleBarHeight = config.TitleBarHeight;
+    dlgData.fontName = Utf8ToWide(config.HeaderFontName);
+    dlgData.fontSize = config.HeaderFontSize;
+
+    // Parse font color
+    dlgData.fontColor = RGB(255, 255, 255);
+    const std::string& fcHex = config.HeaderFontColor;
+    if (!fcHex.empty() && fcHex[0] == '#' && fcHex.length() >= 7) {
+        unsigned int fcVal;
+        sscanf_s(fcHex.c_str() + 1, "%x", &fcVal);
+        dlgData.fontColor = RGB((fcVal >> 16) & 0xFF, (fcVal >> 8) & 0xFF, fcVal & 0xFF);
+    }
+
+    dlgData.iconOpacity = config.IconOpacity;
+
+    // Parse tint color
+    dlgData.tintColor = RGB(0, 0, 0);
+    const std::string& tintHex = config.IconTintColor;
+    if (!tintHex.empty() && tintHex[0] == '#' && tintHex.length() >= 7) {
+        unsigned int tintVal;
+        sscanf_s(tintHex.c_str() + 1, "%x", &tintVal);
+        dlgData.tintColor = RGB((tintVal >> 16) & 0xFF, (tintVal >> 8) & 0xFF, tintVal & 0xFF);
+    }
+    dlgData.tintStrength = config.IconTintStrength;
+
+    // Save originals for cancel
     std::string originalColor = GetActiveTab().ColorHex;
+    int originalTitleBarHeight = config.TitleBarHeight;
+    std::string originalFontName = config.HeaderFontName;
+    int originalFontSize = config.HeaderFontSize;
+    std::string originalFontColor = config.HeaderFontColor;
+    int originalIconOpacity = config.IconOpacity;
+    std::string originalTintColor = config.IconTintColor;
+    int originalTintStrength = config.IconTintStrength;
 
     INT_PTR result = DialogBoxIndirectParamW(
         GetModuleHandleW(nullptr),
@@ -668,19 +871,52 @@ void CorralWindow::ShowAppearanceDialog() {
     );
 
     if (result != IDOK) {
+        // Restore all settings on cancel
         GetActiveTab().ColorHex = originalColor;
+        config.TitleBarHeight = originalTitleBarHeight;
+        config.HeaderFontName = originalFontName;
+        config.HeaderFontSize = originalFontSize;
+        config.HeaderFontColor = originalFontColor;
+        config.IconOpacity = originalIconOpacity;
+        config.IconTintColor = originalTintColor;
+        config.IconTintStrength = originalTintStrength;
+        CalculateIconLayout();
         UpdateLayeredContent();
     } else {
+        // Apply final values
+        config.TitleBarHeight = dlgData.titleBarHeight;
+        config.HeaderFontName = WideToUtf8(dlgData.fontName);
+        config.HeaderFontSize = dlgData.fontSize;
+        char fcBuf[16];
+        sprintf_s(fcBuf, "#%02X%02X%02X", GetRValue(dlgData.fontColor), GetGValue(dlgData.fontColor), GetBValue(dlgData.fontColor));
+        config.HeaderFontColor = fcBuf;
+        config.IconOpacity = dlgData.iconOpacity;
+
+        char tintBuf[16];
+        sprintf_s(tintBuf, "#%02X%02X%02X", GetRValue(dlgData.tintColor), GetGValue(dlgData.tintColor), GetBValue(dlgData.tintColor));
+        config.IconTintColor = tintBuf;
+        config.IconTintStrength = dlgData.tintStrength;
+
+        CalculateIconLayout();
+        UpdateLayeredContent();
+
         App* app = App::GetInstance();
         if (app) {
-            // Handle "Use as default for new corrals"
             if (dlgData.useAsDefault) {
                 app->SetDefaultColorHex(GetActiveTab().ColorHex);
+                app->SetDefaultAppearance(config.TitleBarHeight, config.HeaderFontName,
+                    config.HeaderFontSize, config.HeaderFontColor, config.IconOpacity,
+                    config.IconTintColor, config.IconTintStrength);
             }
 
-            // Handle "Apply to all corrals"
             if (dlgData.applyToAll) {
-                app->ApplyColorToAllCorrals(GetActiveTab().ColorHex);
+                app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
+                    dlgData.colorChanged,
+                    config.TitleBarHeight, dlgData.titleBarHeightChanged,
+                    config.HeaderFontName, config.HeaderFontSize, dlgData.fontChanged,
+                    config.HeaderFontColor, dlgData.fontColorChanged,
+                    config.IconOpacity, dlgData.iconOpacityChanged,
+                    config.IconTintColor, config.IconTintStrength, dlgData.tintChanged);
             }
 
             app->SaveConfig();

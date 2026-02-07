@@ -84,6 +84,9 @@ public:
     HWND GetHWND() const { return hwnd; }
     CorralWindowConfig& GetConfig() { return config; }
     const CorralWindowConfig& GetConfig() const { return config; }
+    int GetTitleBarHeight() const { return config.TitleBarHeight; }
+    int GetIconAreaTop() const { return config.TitleBarHeight + 4; }
+    void RecalculateLayout();  // Public wrapper for icon layout recalculation
 
     // Tab helpers
     CorralTabConfig& GetActiveTab();
@@ -214,10 +217,8 @@ private:
     int iconSize = 32;
     int iconSpacingX = 72;
     int iconSpacingY = 68;
-    static const int ICON_AREA_TOP = 36;
     static const int ICON_PADDING_LEFT = 8;
     static const int RESIZE_BORDER = 6;
-    static const int TITLE_BAR_HEIGHT = 32;
     static const int SNAP_DISTANCE = 15;  // Pixels to trigger snap
     static const int SNAP_GAP = 10;       // Gap between snapped corrals
 

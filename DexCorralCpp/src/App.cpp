@@ -245,11 +245,53 @@ void App::SetDefaultColorHex(const std::string& colorHex) {
     config.DefaultColorHex = colorHex;
 }
 
+void App::SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
+    int fontSize, const std::string& fontColor, int iconOpacity,
+    const std::string& tintColor, int tintStrength) {
+    config.DefaultTitleBarHeight = titleBarHeight;
+    config.DefaultHeaderFontName = fontName;
+    config.DefaultHeaderFontSize = fontSize;
+    config.DefaultHeaderFontColor = fontColor;
+    config.DefaultIconOpacity = iconOpacity;
+    config.DefaultIconTintColor = tintColor;
+    config.DefaultIconTintStrength = tintStrength;
+}
+
 void App::ApplyColorToAllCorrals(const std::string& colorHex) {
     for (auto& corral : corrals) {
         for (auto& tab : corral->GetConfig().Tabs) {
             tab.ColorHex = colorHex;
         }
+        corral->UpdateWallpaperBackground();
+    }
+}
+
+void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyColor,
+    int titleBarHeight, bool applyHeight,
+    const std::string& fontName, int fontSize, bool applyFont,
+    const std::string& fontColor, bool applyFontColor,
+    int iconOpacity, bool applyIconOpacity,
+    const std::string& tintColor, int tintStrength, bool applyTint) {
+    for (auto& corral : corrals) {
+        auto& cfg = corral->GetConfig();
+
+        if (applyColor) {
+            for (auto& tab : cfg.Tabs) {
+                tab.ColorHex = colorHex;
+            }
+        }
+        if (applyHeight) cfg.TitleBarHeight = titleBarHeight;
+        if (applyFont) {
+            cfg.HeaderFontName = fontName;
+            cfg.HeaderFontSize = fontSize;
+        }
+        if (applyFontColor) cfg.HeaderFontColor = fontColor;
+        if (applyIconOpacity) cfg.IconOpacity = iconOpacity;
+        if (applyTint) {
+            cfg.IconTintColor = tintColor;
+            cfg.IconTintStrength = tintStrength;
+        }
+
         corral->UpdateWallpaperBackground();
     }
 }
@@ -733,6 +775,15 @@ void App::CreateCorral(POINT pt) {
     tab.ColorHex = config.DefaultColorHex;  // Use saved default appearance
     newConfig.Tabs.push_back(tab);
 
+    // Apply default appearance settings
+    newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+    newConfig.HeaderFontName = config.DefaultHeaderFontName;
+    newConfig.HeaderFontSize = config.DefaultHeaderFontSize;
+    newConfig.HeaderFontColor = config.DefaultHeaderFontColor;
+    newConfig.IconOpacity = config.DefaultIconOpacity;
+    newConfig.IconTintColor = config.DefaultIconTintColor;
+    newConfig.IconTintStrength = config.DefaultIconTintStrength;
+
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();
     corrals.push_back(std::move(corral));
@@ -828,6 +879,15 @@ void App::CreateVirtualCorralAt(POINT pt) {
     tab.VirtualFolderPath = utf8Path;
     tab.IsCatchAll = false;  // Virtual corrals cannot be catch-all
     newConfig.Tabs.push_back(tab);
+
+    // Apply default appearance settings
+    newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+    newConfig.HeaderFontName = config.DefaultHeaderFontName;
+    newConfig.HeaderFontSize = config.DefaultHeaderFontSize;
+    newConfig.HeaderFontColor = config.DefaultHeaderFontColor;
+    newConfig.IconOpacity = config.DefaultIconOpacity;
+    newConfig.IconTintColor = config.DefaultIconTintColor;
+    newConfig.IconTintStrength = config.DefaultIconTintStrength;
 
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();

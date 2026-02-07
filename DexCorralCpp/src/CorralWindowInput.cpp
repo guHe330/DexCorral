@@ -24,7 +24,7 @@ int CorralWindow::GetContentHeight() const {
 int CorralWindow::GetVisibleHeight() const {
     RECT rect;
     GetClientRect(hwnd, &rect);
-    return rect.bottom - ICON_AREA_TOP;
+    return rect.bottom - GetIconAreaTop();
 }
 
 RECT CorralWindow::GetScrollbarTrackRect() const {
@@ -32,7 +32,7 @@ RECT CorralWindow::GetScrollbarTrackRect() const {
     GetClientRect(hwnd, &rect);
     return {
         rect.right - SCROLLBAR_WIDTH - SCROLLBAR_MARGIN,
-        ICON_AREA_TOP + SCROLLBAR_MARGIN,
+        GetIconAreaTop() + SCROLLBAR_MARGIN,
         rect.right - SCROLLBAR_MARGIN,
         rect.bottom - SCROLLBAR_MARGIN
     };
@@ -541,7 +541,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
     }
 
     // Title bar - start dragging window (empty area)
-    if (y < TITLE_BAR_HEIGHT) {
+    if (y < GetTitleBarHeight()) {
         isDragging = true;
         GetCursorPos(&dragStart);
         GetWindowRect(hwnd, &dragStartRect);
@@ -551,7 +551,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
 
 void CorralWindow::OnLeftButtonDblClick(int x, int y) {
     // Double-click on title bar toggles roll-up
-    if (y < TITLE_BAR_HEIGHT) {
+    if (y < GetTitleBarHeight()) {
         ToggleRollUp();
         return;
     }
@@ -594,7 +594,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y) {
                 GetWindowRect(other->GetHWND(), &otherRect);
 
                 // If dropped on another window's title bar, merge
-                if (PtInRect(&otherRect, pt) && (pt.y - otherRect.top < TITLE_BAR_HEIGHT)) {
+                if (PtInRect(&otherRect, pt) && (pt.y - otherRect.top < other->GetTitleBarHeight())) {
                     MergeWith(other.get());
                     return; // This window is destroyed now
                 }
@@ -610,7 +610,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y) {
 
 void CorralWindow::OnRightButtonDown(int x, int y) {
     // Check title bar first - don't let scrolled icons consume clicks here
-    if (y < TITLE_BAR_HEIGHT) {
+    if (y < GetTitleBarHeight()) {
         ShowContextMenu(x, y);
         return;
     }

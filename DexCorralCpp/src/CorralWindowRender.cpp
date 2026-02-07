@@ -91,7 +91,7 @@ void CorralWindow::UpdateLayeredContent() {
         // Draw tab separator (vertical line between tabs)
         if (i > 0) {
             DWORD sepPixel = (200 << 24) | (80 << 16) | (80 << 8) | 80;
-            for (int y = 2; y < TITLE_BAR_HEIGHT - 2 && y < h; y++) {
+            for (int y = 2; y < GetTitleBarHeight() - 2 && y < h; y++) {
                 if (tabRect.left >= 0 && tabRect.left < w) {
                     pixels[y * w + tabRect.left] = sepPixel;
                 }
@@ -114,12 +114,24 @@ void CorralWindow::UpdateLayeredContent() {
     // GDI doesn't handle alpha properly, so we draw and then fix alpha
 
     SetBkMode(memDC, TRANSPARENT);
-    SetTextColor(memDC, RGB(255, 255, 255));
+
+    // Parse header font color from config
+    BYTE fontR = 255, fontG = 255, fontB = 255;
+    const std::string& fontColorHex = config.HeaderFontColor;
+    if (!fontColorHex.empty() && fontColorHex[0] == '#' && fontColorHex.length() >= 7) {
+        unsigned int fontColorVal;
+        sscanf_s(fontColorHex.c_str() + 1, "%x", &fontColorVal);
+        fontR = (fontColorVal >> 16) & 0xFF;
+        fontG = (fontColorVal >> 8) & 0xFF;
+        fontB = fontColorVal & 0xFF;
+    }
+    SetTextColor(memDC, RGB(fontR, fontG, fontB));
 
     // Draw tab titles
-    HFONT titleFont = CreateFontW(-13, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+    std::wstring fontNameW = Utf8ToWide(config.HeaderFontName);
+    HFONT titleFont = CreateFontW(-config.HeaderFontSize, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, fontNameW.c_str());
     HFONT oldFont = (HFONT)SelectObject(memDC, titleFont);
 
     for (int i = 0; i < (int)config.Tabs.size(); i++) {
@@ -146,7 +158,7 @@ void CorralWindow::UpdateLayeredContent() {
     DeleteObject(titleFont);
 
     // Fix alpha for title/tab area (GDI sets alpha to 0)
-    for (int y = 0; y < TITLE_BAR_HEIGHT && y < h; y++) {
+    for (int y = 0; y < GetTitleBarHeight() && y < h; y++) {
         for (int x = 0; x < w; x++) {
             DWORD pixel = pixels[y * w + x];
             BYTE a = (pixel >> 24) & 0xFF;
@@ -172,6 +184,21 @@ void CorralWindow::UpdateLayeredContent() {
     }
 
     // Draw icons (skip when rolled up, but show when hover-expanded)
+    BYTE iconAlpha = (BYTE)config.IconOpacity;
+
+    // Parse tint color and strength
+    BYTE tintR = 0, tintG = 0, tintB = 0;
+    int tintStrength = config.IconTintStrength;
+    const std::string& tintHex = config.IconTintColor;
+    if (!tintHex.empty() && tintHex[0] == '#' && tintHex.length() >= 7) {
+        unsigned int tintVal;
+        sscanf_s(tintHex.c_str() + 1, "%x", &tintVal);
+        tintR = (tintVal >> 16) & 0xFF;
+        tintG = (tintVal >> 8) & 0xFF;
+        tintB = tintVal & 0xFF;
+    }
+    int tintInv = 255 - tintStrength;
+
     if (!icons.empty() && (!config.IsRolledUp || isHoverExpanded)) {
         HFONT iconFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
@@ -179,8 +206,39 @@ void CorralWindow::UpdateLayeredContent() {
         HFONT oldIconFont = (HFONT)SelectObject(memDC, iconFont);
 
         // Visible area for clipping (icon area only)
-        int visibleTop = ICON_AREA_TOP;
+        int visibleTop = GetIconAreaTop();
         int visibleBottom = h;
+
+        // Create temp DIB for icon rendering (allows proper tint/opacity on modern icons)
+        // Modern icons have proper alpha channels - DrawIconEx composites them correctly,
+        // but then we can't post-process them. Drawing to a temp buffer first lets us
+        // apply tint and opacity before compositing onto the main buffer.
+        bool useTempIcon = (iconAlpha < 255 || tintStrength > 0);
+        HDC iconTempDC = nullptr;
+        HBITMAP iconTempBmp = nullptr;
+        HBITMAP iconTempOldBmp = nullptr;
+        DWORD* iconTempPixels = nullptr;
+        const int ICON_TEMP_SIZE = ICON_SIZE_LARGE; // 64px max
+        if (useTempIcon) {
+            BITMAPINFO iconBmi = {};
+            iconBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            iconBmi.bmiHeader.biWidth = ICON_TEMP_SIZE;
+            iconBmi.bmiHeader.biHeight = -ICON_TEMP_SIZE;
+            iconBmi.bmiHeader.biPlanes = 1;
+            iconBmi.bmiHeader.biBitCount = 32;
+            iconBmi.bmiHeader.biCompression = BI_RGB;
+            void* tmpBits = nullptr;
+            iconTempDC = CreateCompatibleDC(screenDC);
+            iconTempBmp = CreateDIBSection(screenDC, &iconBmi, DIB_RGB_COLORS, &tmpBits, nullptr, 0);
+            if (iconTempBmp) {
+                iconTempOldBmp = (HBITMAP)SelectObject(iconTempDC, iconTempBmp);
+                iconTempPixels = (DWORD*)tmpBits;
+            } else {
+                DeleteDC(iconTempDC);
+                iconTempDC = nullptr;
+                useTempIcon = false;
+            }
+        }
 
         // Set GDI clipping region to prevent icons from drawing into header
         HRGN clipRegion = CreateRectRgn(0, visibleTop, w, h);
@@ -264,24 +322,58 @@ void CorralWindow::UpdateLayeredContent() {
 
                 // Draw small icon
                 if (hIconToDraw) {
-                    DrawIconEx(memDC,
-                        icon.iconRect.left, iconDrawTop,
-                        hIconToDraw,
-                        currentIconSize, currentIconSize,
-                        0, nullptr, DI_NORMAL);
-
-                    // Fix alpha for icon area
-                    for (int py = iconDrawTop; py < iconDrawTop + currentIconSize && py < h; py++) {
-                        if (py < visibleTop) continue;
-                        for (int px = icon.iconRect.left; px < icon.iconRect.left + currentIconSize && px < w; px++) {
-                            if (px >= 0 && py >= 0) {
-                                DWORD pixel = pixels[py * w + px];
-                                BYTE a = (pixel >> 24) & 0xFF;
-                                if (a == 0) {
-                                    BYTE r = (pixel >> 16) & 0xFF;
-                                    BYTE g = (pixel >> 8) & 0xFF;
-                                    BYTE b = pixel & 0xFF;
-                                    if (r > 0 || g > 0 || b > 0) {
+                    if (useTempIcon && iconTempPixels) {
+                        // Draw to temp DIB, apply tint+opacity, composite onto main buffer
+                        memset(iconTempPixels, 0, ICON_TEMP_SIZE * ICON_TEMP_SIZE * 4);
+                        DrawIconEx(iconTempDC, 0, 0, hIconToDraw, currentIconSize, currentIconSize, 0, nullptr, DI_NORMAL);
+                        for (int py = 0; py < currentIconSize; py++) {
+                            int destY = iconDrawTop + py;
+                            if (destY < visibleTop || destY >= h) continue;
+                            for (int px = 0; px < currentIconSize; px++) {
+                                int destX = icon.iconRect.left + px;
+                                if (destX < 0 || destX >= w) continue;
+                                DWORD srcPx = iconTempPixels[py * ICON_TEMP_SIZE + px];
+                                BYTE srcA = (srcPx >> 24) & 0xFF;
+                                BYTE srcR = (srcPx >> 16) & 0xFF;
+                                BYTE srcG = (srcPx >> 8) & 0xFF;
+                                BYTE srcB = srcPx & 0xFF;
+                                if (srcA == 0 && srcR == 0 && srcG == 0 && srcB == 0) continue;
+                                if (srcA == 0) srcA = 255; // Old-style icon: GDI zeroed alpha
+                                else if (srcA < 255) { // Un-premultiply modern icon
+                                    int uR = (srcR * 255 + srcA / 2) / srcA; srcR = (BYTE)(uR > 255 ? 255 : uR);
+                                    int uG = (srcG * 255 + srcA / 2) / srcA; srcG = (BYTE)(uG > 255 ? 255 : uG);
+                                    int uB = (srcB * 255 + srcA / 2) / srcA; srcB = (BYTE)(uB > 255 ? 255 : uB);
+                                }
+                                if (tintStrength > 0) {
+                                    srcR = (BYTE)((srcR * tintInv + tintR * tintStrength) / 255);
+                                    srcG = (BYTE)((srcG * tintInv + tintG * tintStrength) / 255);
+                                    srcB = (BYTE)((srcB * tintInv + tintB * tintStrength) / 255);
+                                }
+                                BYTE finalA = (BYTE)((srcA * iconAlpha) / 255);
+                                if (finalA == 0) continue;
+                                BYTE pmR = (BYTE)((srcR * finalA) / 255);
+                                BYTE pmG = (BYTE)((srcG * finalA) / 255);
+                                BYTE pmB = (BYTE)((srcB * finalA) / 255);
+                                DWORD dstPx = pixels[destY * w + destX];
+                                BYTE invFA = 255 - finalA;
+                                pixels[destY * w + destX] =
+                                    ((BYTE)(finalA + (((dstPx >> 24) & 0xFF) * invFA) / 255) << 24) |
+                                    ((BYTE)(pmR + (((dstPx >> 16) & 0xFF) * invFA) / 255) << 16) |
+                                    ((BYTE)(pmG + (((dstPx >> 8) & 0xFF) * invFA) / 255) << 8) |
+                                    (BYTE)(pmB + ((dstPx & 0xFF) * invFA) / 255);
+                            }
+                        }
+                    } else {
+                        DrawIconEx(memDC, icon.iconRect.left, iconDrawTop, hIconToDraw,
+                            currentIconSize, currentIconSize, 0, nullptr, DI_NORMAL);
+                        // Fix alpha for old-style icons (no tint/opacity needed in this path)
+                        for (int py = iconDrawTop; py < iconDrawTop + currentIconSize && py < h; py++) {
+                            if (py < visibleTop) continue;
+                            for (int px = icon.iconRect.left; px < icon.iconRect.left + currentIconSize && px < w; px++) {
+                                if (px >= 0 && py >= 0) {
+                                    DWORD pixel = pixels[py * w + px];
+                                    if ((pixel >> 24) == 0 && (pixel & 0xFFFFFF) != 0) {
+                                        BYTE r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
                                         pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
                                     }
                                 }
@@ -372,7 +464,7 @@ void CorralWindow::UpdateLayeredContent() {
                         &syncRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
                 }
 
-                // Fix alpha for entire row text area
+                // Fix alpha for entire row text area (apply icon opacity + tint)
                 for (int py = drawTop; py < drawBottom && py < h; py++) {
                     if (py < visibleTop) continue;
                     for (int px = nameCol; px < icon.rect.right && px < w; px++) {
@@ -383,7 +475,12 @@ void CorralWindow::UpdateLayeredContent() {
                             BYTE g = (pixel >> 8) & 0xFF;
                             BYTE b = pixel & 0xFF;
                             if (a == 0 && (r > 0 || g > 0 || b > 0)) {
-                                pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
+                                if (tintStrength > 0) {
+                                    r = (BYTE)((r * tintInv + tintR * tintStrength) / 255);
+                                    g = (BYTE)((g * tintInv + tintG * tintStrength) / 255);
+                                    b = (BYTE)((b * tintInv + tintB * tintStrength) / 255);
+                                }
+                                pixels[py * w + px] = (iconAlpha << 24) | (((r * iconAlpha) / 255) << 16) | (((g * iconAlpha) / 255) << 8) | ((b * iconAlpha) / 255);
                             }
                         }
                     }
@@ -410,24 +507,58 @@ void CorralWindow::UpdateLayeredContent() {
                 // Grid view (Small/Medium/Large icons)
                 // Icon image
                 if (icon.hIcon) {
-                    DrawIconEx(memDC,
-                        icon.iconRect.left, iconDrawTop,
-                        icon.hIcon,
-                        iconSize, iconSize,
-                        0, nullptr, DI_NORMAL);
-
-                    // Fix alpha for icon area (with clipping)
-                    for (int py = iconDrawTop; py < iconDrawTop + iconSize && py < h; py++) {
-                        if (py < visibleTop) continue;
-                        for (int px = icon.iconRect.left; px < icon.iconRect.left + iconSize && px < w; px++) {
-                            if (px >= 0 && py >= 0) {
-                                DWORD pixel = pixels[py * w + px];
-                                BYTE a = (pixel >> 24) & 0xFF;
-                                if (a == 0) {
-                                    BYTE r = (pixel >> 16) & 0xFF;
-                                    BYTE g = (pixel >> 8) & 0xFF;
-                                    BYTE b = pixel & 0xFF;
-                                    if (r > 0 || g > 0 || b > 0) {
+                    if (useTempIcon && iconTempPixels) {
+                        // Draw to temp DIB, apply tint+opacity, composite onto main buffer
+                        memset(iconTempPixels, 0, ICON_TEMP_SIZE * ICON_TEMP_SIZE * 4);
+                        DrawIconEx(iconTempDC, 0, 0, icon.hIcon, iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                        for (int py = 0; py < iconSize; py++) {
+                            int destY = iconDrawTop + py;
+                            if (destY < visibleTop || destY >= h) continue;
+                            for (int px = 0; px < iconSize; px++) {
+                                int destX = icon.iconRect.left + px;
+                                if (destX < 0 || destX >= w) continue;
+                                DWORD srcPx = iconTempPixels[py * ICON_TEMP_SIZE + px];
+                                BYTE srcA = (srcPx >> 24) & 0xFF;
+                                BYTE srcR = (srcPx >> 16) & 0xFF;
+                                BYTE srcG = (srcPx >> 8) & 0xFF;
+                                BYTE srcB = srcPx & 0xFF;
+                                if (srcA == 0 && srcR == 0 && srcG == 0 && srcB == 0) continue;
+                                if (srcA == 0) srcA = 255; // Old-style icon: GDI zeroed alpha
+                                else if (srcA < 255) { // Un-premultiply modern icon
+                                    int uR = (srcR * 255 + srcA / 2) / srcA; srcR = (BYTE)(uR > 255 ? 255 : uR);
+                                    int uG = (srcG * 255 + srcA / 2) / srcA; srcG = (BYTE)(uG > 255 ? 255 : uG);
+                                    int uB = (srcB * 255 + srcA / 2) / srcA; srcB = (BYTE)(uB > 255 ? 255 : uB);
+                                }
+                                if (tintStrength > 0) {
+                                    srcR = (BYTE)((srcR * tintInv + tintR * tintStrength) / 255);
+                                    srcG = (BYTE)((srcG * tintInv + tintG * tintStrength) / 255);
+                                    srcB = (BYTE)((srcB * tintInv + tintB * tintStrength) / 255);
+                                }
+                                BYTE finalA = (BYTE)((srcA * iconAlpha) / 255);
+                                if (finalA == 0) continue;
+                                BYTE pmR = (BYTE)((srcR * finalA) / 255);
+                                BYTE pmG = (BYTE)((srcG * finalA) / 255);
+                                BYTE pmB = (BYTE)((srcB * finalA) / 255);
+                                DWORD dstPx = pixels[destY * w + destX];
+                                BYTE invFA = 255 - finalA;
+                                pixels[destY * w + destX] =
+                                    ((BYTE)(finalA + (((dstPx >> 24) & 0xFF) * invFA) / 255) << 24) |
+                                    ((BYTE)(pmR + (((dstPx >> 16) & 0xFF) * invFA) / 255) << 16) |
+                                    ((BYTE)(pmG + (((dstPx >> 8) & 0xFF) * invFA) / 255) << 8) |
+                                    (BYTE)(pmB + ((dstPx & 0xFF) * invFA) / 255);
+                            }
+                        }
+                    } else {
+                        DrawIconEx(memDC, icon.iconRect.left, iconDrawTop, icon.hIcon,
+                            iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                        // Fix alpha for old-style icons (no tint/opacity needed in this path)
+                        for (int py = iconDrawTop; py < iconDrawTop + iconSize && py < h; py++) {
+                            if (py < visibleTop) continue;
+                            for (int px = icon.iconRect.left; px < icon.iconRect.left + iconSize && px < w; px++) {
+                                if (px >= 0 && py >= 0) {
+                                    DWORD pixel = pixels[py * w + px];
+                                    if ((pixel >> 24) == 0 && (pixel & 0xFFFFFF) != 0) {
+                                        BYTE r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
                                         pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
                                     }
                                 }
@@ -450,7 +581,7 @@ void CorralWindow::UpdateLayeredContent() {
                     DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
                         &labelRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
 
-                    // Fix alpha for label area (with clipping)
+                    // Fix alpha for label area (with clipping, apply icon opacity + tint)
                     for (int py = labelTop; py < drawBottom && py < h; py++) {
                         if (py < visibleTop) continue;
                         for (int px = icon.rect.left; px < icon.rect.right && px < w; px++) {
@@ -461,13 +592,25 @@ void CorralWindow::UpdateLayeredContent() {
                                 BYTE g = (pixel >> 8) & 0xFF;
                                 BYTE b = pixel & 0xFF;
                                 if (a == 0 && (r > 0 || g > 0 || b > 0)) {
-                                    pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
+                                    if (tintStrength > 0) {
+                                        r = (BYTE)((r * tintInv + tintR * tintStrength) / 255);
+                                        g = (BYTE)((g * tintInv + tintG * tintStrength) / 255);
+                                        b = (BYTE)((b * tintInv + tintB * tintStrength) / 255);
+                                    }
+                                    pixels[py * w + px] = (iconAlpha << 24) | (((r * iconAlpha) / 255) << 16) | (((g * iconAlpha) / 255) << 8) | ((b * iconAlpha) / 255);
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+
+        // Clean up temp icon DIB
+        if (iconTempDC) {
+            SelectObject(iconTempDC, iconTempOldBmp);
+            DeleteObject(iconTempBmp);
+            DeleteDC(iconTempDC);
         }
 
         // Remove clipping region
