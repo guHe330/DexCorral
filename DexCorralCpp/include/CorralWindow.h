@@ -21,14 +21,18 @@ enum class SyncStatus {
 };
 
 struct CorralIcon {
-    std::string fileName;       // UTF-8 filename (for config)
+    std::string fileName;       // UTF-8 filename (for config), or "shell:{CLSID}" for special icons
     std::wstring wFileName;     // Wide filename (actual name)
     std::wstring displayName;   // Display name (without .lnk extension)
-    std::wstring fullPath;      // Full path to file on desktop
+    std::wstring fullPath;      // Full path to file on desktop (empty for special icons)
     HICON hIcon = nullptr;      // Shell icon handle
     HICON hIconSmall = nullptr; // Small icon for details view (16px)
     RECT rect = {};             // Bounding rect in client coords (icon + label)
     RECT iconRect = {};         // Just the icon image rect
+
+    // Special shell icon support (Recycle Bin, This PC, etc.)
+    bool isSpecialIcon = false;  // True if this is a virtual shell item
+    std::wstring clsid;          // CLSID string for special icons (without :: prefix)
 
     // Details view info
     std::wstring fileType;      // File type description
@@ -48,6 +52,10 @@ public:
     void LoadFiles();
     void SyncConfigFromWindow();  // Update config from current window state
     void AddFile(const std::string& fileName);  // Add a file to this corral (active tab)
+
+    // Special icon helpers (public for use by App)
+    static bool IsSpecialIconEntry(const std::string& fileName);
+    static std::wstring GetSpecialIconClsid(const std::string& fileName);
 
     HWND GetHWND() const { return hwnd; }
     CorralWindowConfig& GetConfig() { return config; }
@@ -131,6 +139,7 @@ private:
 
     void LoadIconImages();
     void ClearIcons();
+    bool LoadSpecialIcon(CorralIcon& ci, const std::string& fileName, UINT iconFlag, bool isDetailsView);
     void CalculateIconLayout();
     void CalculateIconLayoutGrid();    // Grid layout for icon views
     void CalculateIconLayoutDetails(); // List layout for details view

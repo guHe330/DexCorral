@@ -636,6 +636,23 @@ void CorralWindow::OpenFile(int iconIndex) {
     if (iconIndex < 0 || iconIndex >= (int)icons.size()) return;
 
     const auto& icon = icons[iconIndex];
+
+    if (icon.isSpecialIcon) {
+        // Open special shell item via PIDL
+        std::wstring parseName = L"::" + icon.clsid;
+        LPITEMIDLIST pidl = nullptr;
+        if (SUCCEEDED(SHParseDisplayName(parseName.c_str(), nullptr, &pidl, 0, nullptr)) && pidl) {
+            SHELLEXECUTEINFOW sei = { sizeof(sei) };
+            sei.lpIDList = pidl;
+            sei.fMask = SEE_MASK_IDLIST;
+            sei.nShow = SW_SHOWNORMAL;
+            sei.hwnd = hwnd;
+            ShellExecuteExW(&sei);
+            CoTaskMemFree(pidl);
+        }
+        return;
+    }
+
     ShellExecuteW(hwnd, L"open", icon.fullPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
@@ -645,7 +662,13 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
     const auto& icon = icons[iconIndex];
 
     LPITEMIDLIST pidlFull = nullptr;
-    HRESULT hr = SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
+    HRESULT hr;
+    if (icon.isSpecialIcon) {
+        std::wstring parseName = L"::" + icon.clsid;
+        hr = SHParseDisplayName(parseName.c_str(), nullptr, &pidlFull, 0, nullptr);
+    } else {
+        hr = SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
+    }
     if (FAILED(hr) || !pidlFull) return;
 
     IShellFolder* pParentFolder = nullptr;

@@ -1,8 +1,12 @@
 #include "DesktopIcons.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
+#include <ShObjIdl.h>
+#include <Shlwapi.h>
 #include <vector>
 #include <algorithm>
+
+#pragma comment(lib, "Shlwapi.lib")
 
 HWND DesktopIcons::GetDesktopListView() {
     HWND progman = FindWindowW(L"Progman", nullptr);
@@ -376,4 +380,78 @@ void DesktopIcons::RestoreHiddenIconsExperiment() {
     // Refreshing the desktop will restore any deleted ListView items
     // This sends a shell change notification that causes Explorer to rebuild the icon list
     RefreshDesktop();
+}
+
+std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons() {
+    std::vector<SpecialDesktopIcon> result;
+
+    // Get the desktop IShellFolder
+    IShellFolder* pDesktop = nullptr;
+    if (FAILED(SHGetDesktopFolder(&pDesktop))) return result;
+
+    // Enumerate desktop items
+    IEnumIDList* pEnum = nullptr;
+    if (FAILED(pDesktop->EnumObjects(nullptr, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &pEnum))) {
+        pDesktop->Release();
+        return result;
+    }
+
+    LPITEMIDLIST pidlChild = nullptr;
+    while (pEnum->Next(1, &pidlChild, nullptr) == S_OK) {
+        // Get the parsing name - special items return "::{GUID}"
+        STRRET strret;
+        if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidlChild, SHGDN_FORPARSING, &strret))) {
+            wchar_t parseName[MAX_PATH] = {};
+            StrRetToBufW(&strret, pidlChild, parseName, MAX_PATH);
+
+            // Special shell items have parsing names starting with "::"
+            if (parseName[0] == L':' && parseName[1] == L':') {
+                // Get the localized display name
+                STRRET strretDisplay;
+                if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidlChild, SHGDN_NORMAL, &strretDisplay))) {
+                    wchar_t displayName[MAX_PATH] = {};
+                    StrRetToBufW(&strretDisplay, pidlChild, displayName, MAX_PATH);
+
+                    SpecialDesktopIcon sdi;
+                    // Strip leading "::" to store just the CLSID
+                    sdi.clsid = parseName + 2;
+                    sdi.displayName = displayName;
+                    result.push_back(std::move(sdi));
+                }
+            }
+        }
+        CoTaskMemFree(pidlChild);
+    }
+
+    pEnum->Release();
+    pDesktop->Release();
+    return result;
+}
+
+std::wstring DesktopIcons::GetSpecialIconDisplayName(const std::wstring& clsid) {
+    // Build the parsing name "::{CLSID}" and resolve to display name
+    std::wstring parseName = L"::" + clsid;
+
+    LPITEMIDLIST pidl = nullptr;
+    if (FAILED(SHParseDisplayName(parseName.c_str(), nullptr, &pidl, 0, nullptr)) || !pidl) {
+        return L"";
+    }
+
+    IShellFolder* pDesktop = nullptr;
+    if (FAILED(SHGetDesktopFolder(&pDesktop))) {
+        CoTaskMemFree(pidl);
+        return L"";
+    }
+
+    STRRET strret;
+    std::wstring displayName;
+    if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidl, SHGDN_NORMAL, &strret))) {
+        wchar_t buf[MAX_PATH] = {};
+        StrRetToBufW(&strret, pidl, buf, MAX_PATH);
+        displayName = buf;
+    }
+
+    pDesktop->Release();
+    CoTaskMemFree(pidl);
+    return displayName;
 }

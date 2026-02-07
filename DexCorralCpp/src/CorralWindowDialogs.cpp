@@ -15,6 +15,9 @@ void CorralWindow::StartIconRename(int iconIndex) {
         return;
     }
 
+    // Special shell icons cannot be renamed
+    if (icons[iconIndex].isSpecialIcon) return;
+
     isRenamingIcon = true;
     renamingIconIndex = iconIndex;
     originalName = icons[iconIndex].displayName;

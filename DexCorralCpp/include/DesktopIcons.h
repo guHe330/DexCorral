@@ -1,11 +1,18 @@
 #pragma once
 #include <Windows.h>
 #include <string>
+#include <vector>
 #include <map>
 
 struct POINT2D {
     int x;
     int y;
+};
+
+// Represents a special shell icon on the desktop (Recycle Bin, This PC, etc.)
+struct SpecialDesktopIcon {
+    std::wstring clsid;        // CLSID string e.g. "{645FF040-5081-101B-9F08-00AA002F954E}"
+    std::wstring displayName;  // Localized display name e.g. "Recycle Bin"
 };
 
 class DesktopIcons {
@@ -33,6 +40,10 @@ public:
     static int GetIconCount();  // Returns number of desktop icons
 
     static HWND GetDesktopListView();
+
+    // Special icon support - enumerate virtual shell items on desktop by CLSID
+    static std::vector<SpecialDesktopIcon> GetSpecialDesktopIcons();
+    static std::wstring GetSpecialIconDisplayName(const std::wstring& clsid);
 
 private:
     static std::wstring GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index);

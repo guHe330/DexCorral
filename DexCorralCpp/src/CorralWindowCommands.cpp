@@ -4,6 +4,7 @@
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
 #include <shobjidl.h>
+#include <algorithm>
 
 // ============================================================================
 // File-local helper functions for folder browsing
@@ -115,8 +116,26 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     if (!GetActiveTab().IsVirtual) {
         UINT catchAllFlags = MF_STRING | (GetActiveTab().IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
         AppendMenuW(menu, catchAllFlags, 3, L"Catch-All (receives new files)");
-        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     }
+
+    // Add Special Icons submenu - only for non-virtual tabs
+    std::vector<SpecialDesktopIcon> specialIcons;
+    if (!GetActiveTab().IsVirtual) {
+        specialIcons = DesktopIcons::GetSpecialDesktopIcons();
+        if (!specialIcons.empty()) {
+            HMENU specialMenu = CreatePopupMenu();
+            for (int i = 0; i < (int)specialIcons.size() && i < 20; i++) {
+                // Check if already in this corral
+                std::string shellEntry = "shell:" + WideToUtf8(specialIcons[i].clsid);
+                bool alreadyAdded = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), shellEntry) != GetActiveTab().Files.end();
+                UINT flags = MF_STRING | (alreadyAdded ? (MF_CHECKED | MF_GRAYED) : 0);
+                AppendMenuW(specialMenu, flags, 20 + i, specialIcons[i].displayName.c_str());
+            }
+            AppendMenuW(menu, MF_POPUP, (UINT_PTR)specialMenu, L"Add Special Icon");
+        }
+    }
+
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
     // Show Desktop Icons with checkmark
     UINT iconFlags = MF_STRING | (DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED);
@@ -227,6 +246,23 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     case 12: SetViewMode(ViewMode::LargeIcons); break;
     case 13: SetViewMode(ViewMode::Details); break;
     case 14: DetachTab(config.ActiveTabIndex); break;
+    default:
+        // Handle special icon additions (IDs 20-39)
+        if (cmd >= 20 && cmd < 40) {
+            int idx = cmd - 20;
+            if (idx < (int)specialIcons.size()) {
+                std::string shellEntry = "shell:" + WideToUtf8(specialIcons[idx].clsid);
+                auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), shellEntry);
+                if (it == GetActiveTab().Files.end()) {
+                    GetActiveTab().Files.push_back(shellEntry);
+                    LoadFiles();
+                    if (App::GetInstance()) {
+                        App::GetInstance()->SaveConfig();
+                    }
+                }
+            }
+        }
+        break;
     case 15: {
         // Add new empty tab
         CorralTabConfig newTab;

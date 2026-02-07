@@ -100,6 +100,61 @@ SyncStatus CorralWindow::GetSyncStatus(const std::wstring& path) {
     return SyncStatus::None;
 }
 
+bool CorralWindow::IsSpecialIconEntry(const std::string& fileName) {
+    return fileName.size() > 6 && fileName.substr(0, 6) == "shell:";
+}
+
+std::wstring CorralWindow::GetSpecialIconClsid(const std::string& fileName) {
+    // "shell:{CLSID}" -> L"{CLSID}"
+    std::string clsid = fileName.substr(6);
+    return std::wstring(clsid.begin(), clsid.end());
+}
+
+bool CorralWindow::LoadSpecialIcon(CorralIcon& ci, const std::string& fileName, UINT iconFlag, bool isDetailsView) {
+    ci.isSpecialIcon = true;
+    ci.fileName = fileName;
+    ci.clsid = GetSpecialIconClsid(fileName);
+
+    // Resolve CLSID to display name via shell namespace
+    ci.displayName = DesktopIcons::GetSpecialIconDisplayName(ci.clsid);
+    if (ci.displayName.empty()) return false;
+
+    ci.wFileName = ci.displayName;
+
+    // Build parsing name "::{CLSID}" and get PIDL for icon extraction
+    std::wstring parseName = L"::" + ci.clsid;
+    LPITEMIDLIST pidl = nullptr;
+    if (FAILED(SHParseDisplayName(parseName.c_str(), nullptr, &pidl, 0, nullptr)) || !pidl) {
+        return false;
+    }
+
+    // Load icon via PIDL
+    SHFILEINFOW sfi = {};
+    if (SHGetFileInfoW((LPCWSTR)pidl, 0, &sfi, sizeof(sfi), SHGFI_PIDL | SHGFI_ICON | iconFlag)) {
+        ci.hIcon = sfi.hIcon;
+    }
+
+    // Load small icon
+    if (isDetailsView || iconSize > 16) {
+        SHFILEINFOW sfiSmall = {};
+        if (SHGetFileInfoW((LPCWSTR)pidl, 0, &sfiSmall, sizeof(sfiSmall),
+                           SHGFI_PIDL | SHGFI_ICON | SHGFI_SMALLICON)) {
+            ci.hIconSmall = sfiSmall.hIcon;
+        }
+    }
+
+    // Load type name for details view
+    if (isDetailsView) {
+        SHFILEINFOW sfiType = {};
+        if (SHGetFileInfoW((LPCWSTR)pidl, 0, &sfiType, sizeof(sfiType), SHGFI_PIDL | SHGFI_TYPENAME)) {
+            ci.fileType = sfiType.szTypeName;
+        }
+    }
+
+    CoTaskMemFree(pidl);
+    return ci.hIcon != nullptr;
+}
+
 void CorralWindow::LoadIconImages() {
     ClearIcons();
 
@@ -113,6 +168,15 @@ void CorralWindow::LoadIconImages() {
 
     for (const auto& fileName : GetActiveTab().Files) {
         CorralIcon ci;
+
+        // Check if this is a special shell icon (e.g. "shell:{645FF040-...}")
+        if (IsSpecialIconEntry(fileName)) {
+            if (LoadSpecialIcon(ci, fileName, iconFlag, isDetailsView)) {
+                icons.push_back(std::move(ci));
+            }
+            continue;
+        }
+
         ci.fileName = fileName;
         ci.wFileName = std::wstring(fileName.begin(), fileName.end());
 

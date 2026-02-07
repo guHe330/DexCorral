@@ -575,6 +575,16 @@ void App::UpdateHookHiddenIcons() {
         if (tab.IsVirtual) continue;  // Virtual tabs don't hide desktop icons
 
         for (const auto& fileUtf8 : tab.Files) {
+            // Special icon: resolve CLSID to display name
+            if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
+                std::wstring name = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                if (!name.empty()) {
+                    displayNames.push_back(name);
+                }
+                continue;
+            }
+
             // Convert UTF-8 filename to wide
             int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
             std::wstring wName(size, 0);
