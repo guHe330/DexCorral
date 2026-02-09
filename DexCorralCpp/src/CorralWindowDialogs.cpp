@@ -420,7 +420,7 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
         // Setup icon opacity slider (ID 116)
         HWND hIconSlider = GetDlgItem(hDlg, 116);
-        SendMessageW(hIconSlider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 255));
+        SendMessageW(hIconSlider, TBM_SETRANGE, TRUE, MAKELPARAM(5, 255));
         SendMessageW(hIconSlider, TBM_SETPOS, TRUE, data->iconOpacity);
         swprintf_s(label, L"%d%%", (data->iconOpacity * 100) / 255);
         SetDlgItemTextW(hDlg, 117, label);
@@ -628,6 +628,10 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
             if (data->corralConfig) {
                 data->corralConfig->IconOpacity = pos;
+                // Update currentOpacity so SourceConstantAlpha reflects the change
+                if (data->corralWindow) {
+                    data->corralWindow->SetCurrentOpacity(pos);
+                }
                 AppearanceUpdateLivePreview(data);
             }
         }

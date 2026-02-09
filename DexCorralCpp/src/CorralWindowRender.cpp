@@ -2,9 +2,12 @@
 #include "CorralWindow.h"
 #include "App.h"
 #include <windowsx.h>
+#include <uxtheme.h>
+#include <vssym32.h>
 #include <cstdio>
 
 #pragma comment(lib, "msimg32.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 void CorralWindow::UpdateLayeredContent() {
     RECT rect;
@@ -184,8 +187,8 @@ void CorralWindow::UpdateLayeredContent() {
     }
 
     // Draw icons (skip when rolled up, but show when hover-expanded)
-    // Icon opacity is handled by SourceConstantAlpha (whole-window), so draw icons at full alpha
-    BYTE iconAlpha = 255;
+    // Icon opacity applied per-icon only (not whole-window via SourceConstantAlpha)
+    BYTE iconAlpha = (BYTE)currentOpacity;
 
     // Parse tint color and strength
     BYTE tintR = 0, tintG = 0, tintB = 0;
@@ -201,9 +204,17 @@ void CorralWindow::UpdateLayeredContent() {
     int tintInv = 255 - tintStrength;
 
     if (!icons.empty() && (!config.IsRolledUp || isHoverExpanded)) {
-        HFONT iconFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        // Use the system icon title font (DPI-aware, matches desktop icon labels)
+        LOGFONTW iconLogFont = {};
+        HFONT iconFont;
+        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0)) {
+            iconLogFont.lfQuality = CLEARTYPE_QUALITY;
+            iconFont = CreateFontIndirectW(&iconLogFont);
+        } else {
+            iconFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        }
         HFONT oldIconFont = (HFONT)SelectObject(memDC, iconFont);
 
         // Visible area for clipping (icon area only)
@@ -568,8 +579,7 @@ void CorralWindow::UpdateLayeredContent() {
                     }
                 }
 
-                // Label
-                SetTextColor(memDC, RGB(255, 255, 255));
+                // Label with glow shadow (matches Windows desktop style)
                 int labelTop = iconDrawTop + iconSize + 2;
                 RECT labelRect = {
                     icon.rect.left,
@@ -579,26 +589,32 @@ void CorralWindow::UpdateLayeredContent() {
                 };
                 // Only draw if label area is visible
                 if (labelTop < visibleBottom && drawBottom > visibleTop) {
-                    DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
-                        &labelRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-                    // Fix alpha for label area (with clipping, apply icon opacity + tint)
-                    for (int py = labelTop; py < drawBottom && py < h; py++) {
-                        if (py < visibleTop) continue;
-                        for (int px = icon.rect.left; px < icon.rect.right && px < w; px++) {
-                            if (px >= 0 && py >= 0) {
-                                DWORD pixel = pixels[py * w + px];
-                                BYTE a = (pixel >> 24) & 0xFF;
-                                BYTE r = (pixel >> 16) & 0xFF;
-                                BYTE g = (pixel >> 8) & 0xFF;
-                                BYTE b = pixel & 0xFF;
-                                if (a == 0 && (r > 0 || g > 0 || b > 0)) {
-                                    if (tintStrength > 0) {
-                                        r = (BYTE)((r * tintInv + tintR * tintStrength) / 255);
-                                        g = (BYTE)((g * tintInv + tintG * tintStrength) / 255);
-                                        b = (BYTE)((b * tintInv + tintB * tintStrength) / 255);
+                    HTHEME hTheme = OpenThemeData(hwnd, L"TextStyle");
+                    if (hTheme) {
+                        DTTOPTS dtOpts = {};
+                        dtOpts.dwSize = sizeof(dtOpts);
+                        dtOpts.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
+                        dtOpts.crText = RGB(255, 255, 255);
+                        dtOpts.iGlowSize = 4;
+                        DrawThemeTextEx(hTheme, memDC, 0, 0,
+                            icon.displayName.c_str(), (int)icon.displayName.length(),
+                            DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+                            &labelRect, &dtOpts);
+                        CloseThemeData(hTheme);
+                    } else {
+                        // Fallback: plain text with manual alpha fix
+                        SetTextColor(memDC, RGB(255, 255, 255));
+                        DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
+                            &labelRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
+                        for (int py = labelTop; py < drawBottom && py < h; py++) {
+                            if (py < visibleTop) continue;
+                            for (int px = icon.rect.left; px < icon.rect.right && px < w; px++) {
+                                if (px >= 0 && py >= 0) {
+                                    DWORD pixel = pixels[py * w + px];
+                                    if ((pixel >> 24) == 0 && (pixel & 0xFFFFFF) != 0) {
+                                        BYTE r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
+                                        pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
                                     }
-                                    pixels[py * w + px] = (iconAlpha << 24) | (((r * iconAlpha) / 255) << 16) | (((g * iconAlpha) / 255) << 8) | ((b * iconAlpha) / 255);
                                 }
                             }
                         }
@@ -695,7 +711,7 @@ void CorralWindow::UpdateLayeredContent() {
     BLENDFUNCTION blend = {};
     blend.BlendOp = AC_SRC_OVER;
     blend.BlendFlags = 0;
-    blend.SourceConstantAlpha = (BYTE)currentOpacity;
+    blend.SourceConstantAlpha = 255;
     blend.AlphaFormat = AC_SRC_ALPHA;
 
     UpdateLayeredWindow(hwnd, screenDC, &ptDst, &sizeWnd, memDC, &ptSrc, 0, &blend, ULW_ALPHA);

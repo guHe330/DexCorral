@@ -87,6 +87,7 @@ public:
     int GetTitleBarHeight() const { return config.TitleBarHeight; }
     int GetIconAreaTop() const { return config.TitleBarHeight + 4; }
     void RecalculateLayout();  // Public wrapper for icon layout recalculation
+    void SetCurrentOpacity(int opacity) { currentOpacity = (opacity < 5) ? 5 : opacity; }
 
     // Tab helpers
     CorralTabConfig& GetActiveTab();

@@ -18,7 +18,6 @@ static const wchar_t* CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
 
 // Pointer input messages (Windows 8+, for precision touchpad support)
 #ifndef WM_POINTERWHEEL
-#define WM_POINTERWHEEL 0x024E
 #endif
 
 // ============================================================================
@@ -61,7 +60,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wall
 
     dragStart = { 0, 0 };
     dragStartRect = { 0, 0, 0, 0 };
-    currentOpacity = config.IconOpacity;
+    currentOpacity = (config.IconOpacity < 5) ? 5 : config.IconOpacity;
 
     // Save the full height for roll-up restore
     savedHeight = config.Height;

@@ -253,25 +253,29 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
     int newRight = newLeft + width;
     int newBottom = newTop + height;
 
-    // Snap to screen edges
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    // Snap to work area edges of the monitor the corral is on
+    RECT corralRect = { newLeft, newTop, newRight, newBottom };
+    HMONITOR hMon = MonitorFromRect(&corralRect, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi = {};
+    mi.cbSize = sizeof(mi);
+    GetMonitorInfoW(hMon, &mi);
+    RECT wa = mi.rcWork;  // Work area (excludes taskbar)
 
-    // Left edge of screen
-    if (std::abs(newLeft) < SNAP_DISTANCE) {
-        newLeft = SNAP_GAP;
+    // Left edge
+    if (std::abs(newLeft - wa.left) < SNAP_DISTANCE) {
+        newLeft = wa.left + SNAP_GAP;
     }
-    // Right edge of screen
-    if (std::abs(newRight - screenWidth) < SNAP_DISTANCE) {
-        newLeft = screenWidth - width - SNAP_GAP;
+    // Right edge
+    if (std::abs(newRight - wa.right) < SNAP_DISTANCE) {
+        newLeft = wa.right - width - SNAP_GAP;
     }
-    // Top edge of screen
-    if (std::abs(newTop) < SNAP_DISTANCE) {
-        newTop = SNAP_GAP;
+    // Top edge
+    if (std::abs(newTop - wa.top) < SNAP_DISTANCE) {
+        newTop = wa.top + SNAP_GAP;
     }
-    // Bottom edge of screen (account for taskbar ~40px)
-    if (std::abs(newBottom - screenHeight + 40) < SNAP_DISTANCE) {
-        newTop = screenHeight - height - 40 - SNAP_GAP;
+    // Bottom edge
+    if (std::abs(newBottom - wa.bottom) < SNAP_DISTANCE) {
+        newTop = wa.bottom - height - SNAP_GAP;
     }
 
     // Snap to other corrals
@@ -287,9 +291,8 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
         int otherRight = otherRect.right;
         int otherBottom = otherRect.bottom;
 
-        // Check vertical alignment (are we in the same vertical band?)
+        // Adjacent snapping (with gap) - only when corrals are nearby
         bool verticalOverlap = (newTop < otherBottom + SNAP_DISTANCE) && (newBottom > otherTop - SNAP_DISTANCE);
-        // Check horizontal alignment (are we in the same horizontal band?)
         bool horizontalOverlap = (newLeft < otherRight + SNAP_DISTANCE) && (newRight > otherLeft - SNAP_DISTANCE);
 
         if (verticalOverlap) {
@@ -300,14 +303,6 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
             // Snap our left edge to their right edge (with gap)
             if (std::abs(newLeft - otherRight - SNAP_GAP) < SNAP_DISTANCE) {
                 newLeft = otherRight + SNAP_GAP;
-            }
-            // Snap our left edge to their left edge (align)
-            if (std::abs(newLeft - otherLeft) < SNAP_DISTANCE) {
-                newLeft = otherLeft;
-            }
-            // Snap our right edge to their right edge (align)
-            if (std::abs(newRight - otherRight) < SNAP_DISTANCE) {
-                newLeft = otherRight - width;
             }
         }
 
@@ -320,14 +315,40 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
             if (std::abs(newTop - otherBottom - SNAP_GAP) < SNAP_DISTANCE) {
                 newTop = otherBottom + SNAP_GAP;
             }
-            // Snap our top edge to their top edge (align)
-            if (std::abs(newTop - otherTop) < SNAP_DISTANCE) {
-                newTop = otherTop;
-            }
-            // Snap our bottom edge to their bottom edge (align)
-            if (std::abs(newBottom - otherBottom) < SNAP_DISTANCE) {
-                newTop = otherBottom - height;
-            }
+        }
+
+        // Alignment snapping - works across the whole screen
+        // Align top edges
+        if (std::abs(newTop - otherTop) < SNAP_DISTANCE) {
+            newTop = otherTop;
+        }
+        // Align bottom edges
+        if (std::abs(newTop + height - otherBottom) < SNAP_DISTANCE) {
+            newTop = otherBottom - height;
+        }
+        // Align our top to their bottom (with gap)
+        if (std::abs(newTop - otherBottom - SNAP_GAP) < SNAP_DISTANCE) {
+            newTop = otherBottom + SNAP_GAP;
+        }
+        // Align our bottom to their top (with gap)
+        if (std::abs(newTop + height - otherTop + SNAP_GAP) < SNAP_DISTANCE) {
+            newTop = otherTop - height - SNAP_GAP;
+        }
+        // Align left edges
+        if (std::abs(newLeft - otherLeft) < SNAP_DISTANCE) {
+            newLeft = otherLeft;
+        }
+        // Align right edges
+        if (std::abs(newLeft + width - otherRight) < SNAP_DISTANCE) {
+            newLeft = otherRight - width;
+        }
+        // Align our left to their right (with gap)
+        if (std::abs(newLeft - otherRight - SNAP_GAP) < SNAP_DISTANCE) {
+            newLeft = otherRight + SNAP_GAP;
+        }
+        // Align our right to their left (with gap)
+        if (std::abs(newLeft + width - otherLeft + SNAP_GAP) < SNAP_DISTANCE) {
+            newLeft = otherLeft - width - SNAP_GAP;
         }
     }
 }
@@ -345,29 +366,33 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
     int newRight = newLeft + newWidth;
     int newBottom = newTop + newHeight;
 
-    // Snap to screen edges
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    // Snap to work area edges of the monitor the corral is on
+    RECT corralRect = { newLeft, newTop, newRight, newBottom };
+    HMONITOR hMon = MonitorFromRect(&corralRect, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi = {};
+    mi.cbSize = sizeof(mi);
+    GetMonitorInfoW(hMon, &mi);
+    RECT wa = mi.rcWork;
 
-    // Left edge of screen
-    if (resizingLeft && std::abs(newLeft - SNAP_GAP) < SNAP_DISTANCE) {
+    // Left edge
+    if (resizingLeft && std::abs(newLeft - wa.left - SNAP_GAP) < SNAP_DISTANCE) {
         int oldRight = newRight;
-        newLeft = SNAP_GAP;
+        newLeft = wa.left + SNAP_GAP;
         newWidth = oldRight - newLeft;
     }
-    // Right edge of screen
-    if (resizingRight && std::abs(newRight - screenWidth + SNAP_GAP) < SNAP_DISTANCE) {
-        newWidth = screenWidth - newLeft - SNAP_GAP;
+    // Right edge
+    if (resizingRight && std::abs(newRight - wa.right + SNAP_GAP) < SNAP_DISTANCE) {
+        newWidth = wa.right - newLeft - SNAP_GAP;
     }
-    // Top edge of screen
-    if (resizingTop && std::abs(newTop - SNAP_GAP) < SNAP_DISTANCE) {
+    // Top edge
+    if (resizingTop && std::abs(newTop - wa.top - SNAP_GAP) < SNAP_DISTANCE) {
         int oldBottom = newBottom;
-        newTop = SNAP_GAP;
+        newTop = wa.top + SNAP_GAP;
         newHeight = oldBottom - newTop;
     }
-    // Bottom edge of screen (account for taskbar ~40px)
-    if (resizingBottom && std::abs(newBottom - screenHeight + 40 + SNAP_GAP) < SNAP_DISTANCE) {
-        newHeight = screenHeight - newTop - 40 - SNAP_GAP;
+    // Bottom edge
+    if (resizingBottom && std::abs(newBottom - wa.bottom + SNAP_GAP) < SNAP_DISTANCE) {
+        newHeight = wa.bottom - newTop - SNAP_GAP;
     }
 
     // Recalculate edges after screen snap

@@ -67,6 +67,7 @@ private:
     void CreateCorral(POINT pt);
     bool IsDesktopUnderMouse(POINT pt);
 
+    void TakeIconPositionSnapshot();  // Debug: dump all desktop icon positions to JSON
     void OnLeftButtonDown(POINT pt);
     void OnLeftButtonUp(POINT pt);
     void OnMouseMove(POINT pt);

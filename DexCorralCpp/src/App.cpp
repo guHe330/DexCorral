@@ -9,6 +9,11 @@
 #include <Psapi.h>
 #include <cstdlib>
 #include <algorithm>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include "nlohmann/json.hpp"
 
 App* App::instance = nullptr;
 
@@ -792,6 +797,8 @@ void App::ShowTrayMenu() {
     AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, 6, L"Debug: Icon Position Snapshot");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 3, L"Exit");
 
     POINT pt;
@@ -834,6 +841,9 @@ void App::ShowTrayMenu() {
         CreateVirtualCorralAt(centerPt);
         break;
     }
+    case 6:
+        TakeIconPositionSnapshot();
+        break;
     }
 }
 
@@ -1274,6 +1284,110 @@ void App::UpdateCorralPositions() {
     if (configChanged) {
         SaveConfig();
     }
+}
+
+void App::TakeIconPositionSnapshot() {
+    // Get the DexCorral appdata directory
+    wchar_t appDataPath[MAX_PATH];
+    if (FAILED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, appDataPath)))
+        return;
+
+    std::wstring dir = std::wstring(appDataPath) + L"\\DexCorral";
+    CreateDirectoryW(dir.c_str(), NULL);
+
+    // Build timestamp filename
+    auto now = std::chrono::system_clock::now();
+    auto timeT = std::chrono::system_clock::to_time_t(now);
+    struct tm tmBuf;
+    localtime_s(&tmBuf, &timeT);
+    std::ostringstream oss;
+    oss << "icon_snapshot_"
+        << std::put_time(&tmBuf, "%Y%m%d_%H%M%S")
+        << ".json";
+
+    std::wstring filePath = dir + L"\\" + std::wstring(oss.str().begin(), oss.str().end());
+
+    // Read all desktop icons via cross-process ListView
+    HWND hListView = DesktopIcons::GetDesktopListView();
+    if (!hListView) return;
+
+    bool listViewVisible = IsWindowVisible(hListView) != FALSE;
+    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
+
+    DWORD processId;
+    GetWindowThreadProcessId(hListView, &processId);
+    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
+    if (!hProcess) return;
+
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
+    LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
+
+    nlohmann::json snapshot;
+    snapshot["timestamp"] = oss.str().substr(14, 15); // YYYYMMDD_HHMMSS
+    char timeBuf[64];
+    strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tmBuf);
+    snapshot["timestamp"] = timeBuf;
+    snapshot["listViewVisible"] = listViewVisible;
+    snapshot["iconCount"] = count;
+
+    nlohmann::json iconsArray = nlohmann::json::array();
+
+    for (int i = 0; i < count; i++) {
+        // Get item text
+        LVITEMW lvi = {};
+        lvi.mask = LVIF_TEXT;
+        lvi.iItem = i;
+        lvi.pszText = (LPWSTR)pRemoteText;
+        lvi.cchTextMax = 260;
+        WriteProcessMemory(hProcess, pRemoteItem, &lvi, sizeof(lvi), nullptr);
+        SendMessageW(hListView, LVM_GETITEMW, 0, (LPARAM)pRemoteItem);
+
+        wchar_t textBuf[260] = {};
+        ReadProcessMemory(hProcess, pRemoteText, textBuf, sizeof(textBuf), nullptr);
+
+        // Get position
+        SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
+        POINT pt;
+        ReadProcessMemory(hProcess, pRemotePoint, &pt, sizeof(pt), nullptr);
+
+        // Get item state (selected, focused, cut)
+        UINT state = (UINT)SendMessageW(hListView, LVM_GETITEMSTATE, i,
+            LVIS_SELECTED | LVIS_FOCUSED | LVIS_CUT);
+
+        // Convert name to UTF-8
+        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, textBuf, -1, NULL, 0, NULL, NULL);
+        std::string name(utf8Len - 1, 0);
+        WideCharToMultiByte(CP_UTF8, 0, textBuf, -1, &name[0], utf8Len, NULL, NULL);
+
+        nlohmann::json iconObj;
+        iconObj["index"] = i;
+        iconObj["name"] = name;
+        iconObj["x"] = pt.x;
+        iconObj["y"] = pt.y;
+        iconObj["selected"] = (state & LVIS_SELECTED) != 0;
+        iconObj["focused"] = (state & LVIS_FOCUSED) != 0;
+        iconObj["cut"] = (state & LVIS_CUT) != 0;
+
+        iconsArray.push_back(iconObj);
+    }
+
+    VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
+    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
+    CloseHandle(hProcess);
+
+    snapshot["icons"] = iconsArray;
+
+    // Write to file
+    std::ofstream outFile(filePath);
+    if (outFile.is_open()) {
+        outFile << snapshot.dump(2);
+        outFile.close();
+    }
+
+    // Show brief notification
+    std::wstring msg = L"Icon position snapshot saved to:\n" + filePath;
+    MessageBoxW(nullptr, msg.c_str(), L"DexCorral Debug", MB_OK | MB_ICONINFORMATION);
 }
 
 void App::StartWatchdog() {
