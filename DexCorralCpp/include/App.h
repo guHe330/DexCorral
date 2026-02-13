@@ -67,7 +67,6 @@ private:
     void CreateCorral(POINT pt);
     bool IsDesktopUnderMouse(POINT pt);
 
-    void TakeIconPositionSnapshot();  // Debug: dump all desktop icon positions to JSON
     void OnLeftButtonDown(POINT pt);
     void OnLeftButtonUp(POINT pt);
     void OnMouseMove(POINT pt);
@@ -100,13 +99,9 @@ private:
     // Watchdog support
     HANDLE hGracefulExitEvent = nullptr;
 
-    // Explorer hook
-    UINT_PTR injectedModuleHandle = 0;  // HMODULE of injected DLL in Explorer (64-bit)
-    void AutoConnectHook();                    // Auto-inject or reconnect to existing hook
-    void InjectExplorerHookSilent();           // Inject without UI (for auto-start)
+    // Hook integration (in-process shell extension)
     void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
-    void MoveHiddenIconsOffScreen();           // Move corral-owned icons to (-10000,-10000)
-    void RestoreHiddenIconPositions();         // On exit: move icons back near their corrals
+    void PositionHiddenIconsUnderCorrals();    // Move hidden icons under corral windows for drag-drop occlusion
 
     // Desktop icon push cache
     std::map<std::wstring, POINT2D> cachedDesktopIconPositions;

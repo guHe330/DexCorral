@@ -29,8 +29,11 @@ jobs:
       run: |
         $tag = "${{ github.ref_name }}"
         $version = $tag -replace '^v', ''
+        $msixVersion = "$version.0"  # MSIX requires 4-part version
         Write-Host "Version: $version (tag: $tag)"
+        Write-Host "MSIX Version: $msixVersion"
         echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "msix_version=$msixVersion" >> $env:GITHUB_OUTPUT
         echo "tag=$tag" >> $env:GITHUB_OUTPUT
 
     - name: Update CMakeLists.txt version
@@ -67,7 +70,7 @@ jobs:
         # Copy files
         Copy-Item "DexCorralCpp/build/Release/DexCorral.exe" -Destination "package/"
         Copy-Item "DexCorralCpp/build/Release/DexCorral.Watchdog.exe" -Destination "package/"
-        Copy-Item "DexCorralCpp/build/Release/CorralHook.dll" -Destination "package/"
+        Copy-Item "DexCorralCpp/build/Release/DexCorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
         
@@ -76,6 +79,28 @@ jobs:
         
         Write-Host "Created Portable_DexCorral.zip with contents:"
         Get-ChildItem "package"
+
+    - name: Build MSIX Package
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.msix_version }}"
+        Write-Host "Building MSIX package version $version"
+
+        # Run the MSIX build script
+        cd installer/msix
+        .\build-msix.ps1 -Version $version -Sign
+
+        # Rename output with version number for clarity
+        $msixFile = "output/DexCorral_$version.msix"
+        $renamedMsix = "../../DexCorral_$version.msix"
+
+        if (Test-Path $msixFile) {
+          Copy-Item $msixFile $renamedMsix
+          Write-Host "MSIX package created: $renamedMsix"
+        } else {
+          Write-Error "MSIX package not found at $msixFile"
+          exit 1
+        }
 
     - name: Prepare release notes
       shell: pwsh
@@ -93,6 +118,7 @@ jobs:
         body_path: release_notes.md
         files: |
           Portable_DexCorral.zip
+          DexCorral_${{ steps.get_version.outputs.msix_version }}.msix
         draft: false
         prerelease: false
       env:

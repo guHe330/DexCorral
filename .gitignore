@@ -46,6 +46,19 @@
 !MANUAL.md
 !CONTRIBUTING.md
 !Distribute/RELEASE_TEMPLATE.md
+!installer/README.md
+!installer/msix/README.md
+
+# Build directories
+build/
+vs2022/
+
+# Installer build artifacts
+installer/msix/staging/
+installer/msix/output/
+installer/**/*.msix
+installer/**/*.appx
+installer/**/*.pfx
 
 # Claude Code
 .claude/

@@ -1,7 +1,7 @@
 #include "HookBridge.h"
 #include <vector>
 
-// Shared memory name - must match CorralHook.dll
+// Shared memory name - must match DexCorralHook.dll
 static const wchar_t* SHARED_MEMORY_NAME = L"Local\\DexCorralHiddenIcons";
 static const DWORD SHARED_MEMORY_SIZE = 65536;  // 64KB
 
@@ -56,11 +56,6 @@ void HookBridge::ClearHiddenIcons() {
         CloseHandle(s_hMapFile);
         s_hMapFile = nullptr;
     }
-}
-
-void HookBridge::RepositionHiddenIcons(const std::map<std::wstring, POINT2D>& iconPositions) {
-    if (iconPositions.empty()) return;
-    DesktopIcons::PositionIcons(iconPositions);
 }
 
 void HookBridge::RefreshDesktop() {

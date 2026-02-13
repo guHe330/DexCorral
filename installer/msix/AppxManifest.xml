@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap3 rescap desktop">
+
+  <Identity
+    Name="DexCorral"
+    Publisher="CN=DexCorral"
+    Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>DexCorral</DisplayName>
+    <PublisherDisplayName>DexCorral</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Desktop icon organizer for Windows - create corrals to organize your desktop icons</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="DexCorral" Executable="DexCorral.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="DexCorral"
+        Description="Desktop icon organizer for Windows"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <!-- Auto-start on login -->
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="DexCorral.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="DexCorralStartup" Enabled="true" DisplayName="DexCorral" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

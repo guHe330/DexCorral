@@ -8,15 +8,37 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Kill any running instances
+# Kill any running instances (watchdog first to prevent auto-relaunch)
 Write-Host "Stopping any running DexCorral instances..." -ForegroundColor Yellow
+$watchdogs = Get-Process -Name "DexCorral.Watchdog" -ErrorAction SilentlyContinue
+if ($watchdogs) {
+    $watchdogs | Stop-Process -Force
+    Write-Host "  Killed $($watchdogs.Count) watchdog instance(s)" -ForegroundColor Yellow
+    Start-Sleep -Milliseconds 500
+}
 $processes = Get-Process -Name "DexCorral" -ErrorAction SilentlyContinue
 if ($processes) {
     $processes | Stop-Process -Force
     Write-Host "  Killed $($processes.Count) instance(s)" -ForegroundColor Yellow
-    Start-Sleep -Milliseconds 500  # Give time for handles to release
+    Start-Sleep -Milliseconds 500
 } else {
     Write-Host "  No running instances found" -ForegroundColor Gray
+}
+
+# Check if DexCorralHook.dll is locked by Explorer (shell extension mode)
+$buildDir = Join-Path $PSScriptRoot "build"
+$hookDll = Join-Path $buildDir "DexCorralHook.dll"
+if (Test-Path $hookDll) {
+    try {
+        [IO.File]::OpenWrite($hookDll).Close()
+    } catch {
+        Write-Host "  DexCorralHook.dll is locked (loaded by Explorer as shell extension)" -ForegroundColor Yellow
+        Write-Host "  Restarting Explorer to unlock DLL..." -ForegroundColor Yellow
+        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
+        Start-Process explorer.exe
+        Start-Sleep -Seconds 3
+    }
 }
 
 # Find Visual Studio installation
@@ -43,7 +65,6 @@ if (!(Test-Path $vcvarsall)) {
 
 Write-Host "Found Visual Studio: $vcvarsall" -ForegroundColor Green
 
-$buildDir = Join-Path $PSScriptRoot "build"
 $sourceDir = $PSScriptRoot
 
 # Clean if requested
@@ -109,9 +130,28 @@ if ($exitCode -eq 0) {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
     Write-Host "Build completed successfully!" -ForegroundColor Green
-    Write-Host "Executable: $buildDir\DexCorral.exe" -ForegroundColor Green
-    Write-Host "Watchdog:   $buildDir\DexCorral.Watchdog.exe" -ForegroundColor Green
+    Write-Host "Shell Extension: $buildDir\DexCorralHook.dll" -ForegroundColor Green
+    Write-Host "Registration:    $buildDir\DexCorral.exe" -ForegroundColor Green
+    Write-Host "Watchdog:        $buildDir\DexCorral.Watchdog.exe" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "To install:   DexCorral.exe --register  (run as Admin)" -ForegroundColor Cyan
+    Write-Host "To uninstall: DexCorral.exe --unregister" -ForegroundColor Cyan
+
+    # Create release zip
+    $zipPath = Join-Path $buildDir "DexCorral.zip"
+    $filesToZip = @(
+        (Join-Path $buildDir "DexCorralHook.dll"),
+        (Join-Path $buildDir "DexCorral.exe"),
+        (Join-Path $buildDir "DexCorral.Watchdog.exe")
+    ) | Where-Object { Test-Path $_ }
+
+    if ($filesToZip.Count -gt 0) {
+        if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+        Compress-Archive -Path $filesToZip -DestinationPath $zipPath -CompressionLevel Optimal
+        Write-Host ""
+        Write-Host "Release zip: $zipPath" -ForegroundColor Cyan
+    }
 } else {
     Write-Host ""
     Write-Host "Build failed with exit code $exitCode" -ForegroundColor Red

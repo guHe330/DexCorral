@@ -7,58 +7,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Use static runtime linking (no vcredist needed)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-# Add executable
+# Registration tool (minimal EXE)
 add_executable(DexCorral WIN32
     src/main.cpp
-    src/App.cpp
-    src/DesktopIcons.cpp
-    src/WallpaperManager.cpp
-    src/CorralWindow.cpp
-    src/CorralWindowRender.cpp
-    src/CorralWindowIcons.cpp
-    src/CorralWindowInput.cpp
-    src/CorralWindowDialogs.cpp
-    src/CorralWindowCommands.cpp
-    src/Config.cpp
-    src/MouseHook.cpp
-    src/TrayIcon.cpp
-    src/DesktopMonitor.cpp
-    src/MonitorManager.cpp
-    src/FolderWatcher.cpp
-    src/HookBridge.cpp
-    include/App.h
-    include/HookBridge.h
-    include/DesktopIcons.h
-    include/WallpaperManager.h
-    include/CorralWindow.h
-    include/Config.h
-    include/MouseHook.h
-    include/TrayIcon.h
-    include/DesktopMonitor.h
-    include/MonitorManager.h
-    include/FolderWatcher.h
 )
 
-# Include directories
-target_include_directories(DexCorral PRIVATE include)
+target_compile_definitions(DexCorral PRIVATE UNICODE _UNICODE)
 
-# Unicode and macro definitions
-target_compile_definitions(DexCorral PRIVATE UNICODE _UNICODE NOMINMAX)
-
-# Link Windows libraries
 target_link_libraries(DexCorral PRIVATE
-    comctl32
-    comdlg32
-    gdi32
-    gdiplus
     shell32
     user32
-    ole32
-    uuid
-    psapi
 )
 
-# Set subsystem to Windows
 set_target_properties(DexCorral PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
@@ -79,21 +39,60 @@ set_target_properties(DexCorral.Watchdog PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-# CorralHook DLL (clean implementation for Explorer injection)
-add_library(CorralHook SHARED
+# DexCorralHook DLL — monolith shell extension (all app logic + Explorer hook)
+add_library(DexCorralHook SHARED
+    # Hook / shell extension code
     ../CorralHook/src/dllmain.cpp
     ../CorralHook/src/CorralHook.cpp
+    ../CorralHook/src/ClassFactory.cpp
+    ../CorralHook/src/ShellExtension.cpp
+    ../CorralHook/src/Registration.cpp
+    ../CorralHook/src/Guids.cpp
+    # App logic (moved from EXE)
+    src/App.cpp
+    src/DesktopIcons.cpp
+    src/WallpaperManager.cpp
+    src/CorralWindow.cpp
+    src/CorralWindowRender.cpp
+    src/CorralWindowIcons.cpp
+    src/CorralWindowInput.cpp
+    src/CorralWindowDialogs.cpp
+    src/CorralWindowCommands.cpp
+    src/Config.cpp
+    src/MouseHook.cpp
+    src/TrayIcon.cpp
+    src/DesktopMonitor.cpp
+    src/MonitorManager.cpp
+    src/FolderWatcher.cpp
+    src/HookBridge.cpp
 )
 
-target_include_directories(CorralHook PRIVATE ../CorralHook/include)
+target_include_directories(DexCorralHook PRIVATE
+    ../CorralHook/include
+    include
+)
 
-target_link_libraries(CorralHook PRIVATE
+target_link_libraries(DexCorralHook PRIVATE
     comctl32
+    comdlg32
+    gdi32
+    gdiplus
+    shell32
     user32
+    ole32
+    oleaut32
+    uuid
+    psapi
+    shlwapi
 )
 
-target_compile_definitions(CorralHook PRIVATE UNICODE _UNICODE)
+target_compile_definitions(DexCorralHook PRIVATE UNICODE _UNICODE NOMINMAX)
 
-set_property(TARGET CorralHook PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# Use .def file for COM exports
+set_target_properties(DexCorralHook PROPERTIES
+    LINK_FLAGS "/DEF:\"${CMAKE_CURRENT_SOURCE_DIR}/../CorralHook/DexCorralHook.def\""
+)
+
+set_property(TARGET DexCorralHook PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # nlohmann/json is included as a single header in include/nlohmann/json.hpp

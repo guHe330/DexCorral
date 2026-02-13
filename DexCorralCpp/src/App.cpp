@@ -9,11 +9,16 @@
 #include <Psapi.h>
 #include <cstdlib>
 #include <algorithm>
-#include <fstream>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include "nlohmann/json.hpp"
+
+// Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
+static HANDLE g_AppStopEvent = nullptr;
+
+// Entry point called from the DLL worker thread
+extern "C" int RunApp(HANDLE hStopEvent) {
+    g_AppStopEvent = hStopEvent;
+    App app;
+    return app.Run();
+}
 
 App* App::instance = nullptr;
 
@@ -117,8 +122,10 @@ void App::Initialize() {
     // Start watchdog process
     StartWatchdog();
 
-    // Auto-inject hook into Explorer (or reconnect if already loaded from a previous instance)
-    AutoConnectHook();
+    // Hook is in-process (shell extension) — just update hidden icon list
+    UpdateHookHiddenIcons();
+    PositionHiddenIconsUnderCorrals();
+    HookBridge::RefreshDesktop();
 }
 
 void App::Shutdown() {
@@ -129,9 +136,6 @@ void App::Shutdown() {
 
     // Save config before exit
     SaveConfig();
-
-    // Restore hidden icons to visible positions (near their corrals) before clearing hook
-    RestoreHiddenIconPositions();
 
     // Clear hidden icons so hook stops hiding them
     HookBridge::ClearHiddenIcons();
@@ -165,12 +169,10 @@ void App::SaveConfig() {
     }
     Config::Save(config);
 
-    // Update hook hidden icons if hook is injected
-    if (injectedModuleHandle) {
-        UpdateHookHiddenIcons();
-        MoveHiddenIconsOffScreen();
-        HookBridge::RefreshDesktop();
-    }
+    // Update hook hidden icons (hook is always active in shell extension mode)
+    UpdateHookHiddenIcons();
+    PositionHiddenIconsUnderCorrals();
+    HookBridge::RefreshDesktop();
 }
 
 void App::RestoreCorrals() {
@@ -324,114 +326,6 @@ void App::ToggleShortcutArrows() {
 }
 
 
-static DWORD GetExplorerProcessId() {
-    HWND shellWindow = GetShellWindow();
-    if (!shellWindow) return 0;
-
-    DWORD pid = 0;
-    GetWindowThreadProcessId(shellWindow, &pid);
-    return pid;
-}
-
-// Find module in remote process by name
-static HMODULE FindRemoteModule(HANDLE hProcess, const wchar_t* moduleName) {
-    HMODULE hMods[1024];
-    DWORD cbNeeded;
-
-    if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
-        for (unsigned int i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
-            wchar_t szModName[MAX_PATH];
-            if (GetModuleFileNameExW(hProcess, hMods[i], szModName, MAX_PATH)) {
-                // Check if this is our DLL (compare just the filename)
-                wchar_t* lastSlash = wcsrchr(szModName, L'\\');
-                const wchar_t* fileName = lastSlash ? lastSlash + 1 : szModName;
-                if (_wcsicmp(fileName, moduleName) == 0) {
-                    return hMods[i];
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-void App::AutoConnectHook() {
-    // Check if CorralHook.dll is already loaded in Explorer (from a previous instance)
-    DWORD explorerPid = GetExplorerProcessId();
-    if (!explorerPid) return;
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, explorerPid);
-    if (!hProcess) return;
-
-    HMODULE hRemoteModule = FindRemoteModule(hProcess, L"CorralHook.dll");
-    CloseHandle(hProcess);
-
-    if (hRemoteModule) {
-        // Hook is already loaded — just reconnect (no injection needed)
-        injectedModuleHandle = (UINT_PTR)hRemoteModule;
-        UpdateHookHiddenIcons();
-        MoveHiddenIconsOffScreen();
-        HookBridge::RefreshDesktop();
-    } else {
-        // Hook not loaded — inject it (silently, no message boxes)
-        InjectExplorerHookSilent();
-    }
-}
-
-void App::InjectExplorerHookSilent() {
-    if (injectedModuleHandle) return;
-
-    wchar_t dllPath[MAX_PATH];
-    GetModuleFileNameW(nullptr, dllPath, MAX_PATH);
-    wchar_t* lastSlash = wcsrchr(dllPath, L'\\');
-    if (lastSlash) {
-        wcscpy_s(lastSlash + 1, MAX_PATH - (lastSlash - dllPath + 1), L"CorralHook.dll");
-    }
-
-    if (GetFileAttributesW(dllPath) == INVALID_FILE_ATTRIBUTES) return;
-
-    DWORD explorerPid = GetExplorerProcessId();
-    if (!explorerPid) return;
-
-    HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
-                                  PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
-                                  FALSE, explorerPid);
-    if (!hProcess) return;
-
-    size_t pathSize = (wcslen(dllPath) + 1) * sizeof(wchar_t);
-    LPVOID remotePath = VirtualAllocEx(hProcess, nullptr, pathSize, MEM_COMMIT, PAGE_READWRITE);
-    if (!remotePath) { CloseHandle(hProcess); return; }
-
-    if (!WriteProcessMemory(hProcess, remotePath, dllPath, pathSize, nullptr)) {
-        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
-        CloseHandle(hProcess);
-        return;
-    }
-
-    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
-    LPTHREAD_START_ROUTINE loadLibraryAddr = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryW");
-
-    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, loadLibraryAddr, remotePath, 0, nullptr);
-    if (!hThread) {
-        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
-        CloseHandle(hProcess);
-        return;
-    }
-
-    WaitForSingleObject(hThread, 5000);
-    CloseHandle(hThread);
-    VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
-
-    HMODULE hRemoteModule = FindRemoteModule(hProcess, L"CorralHook.dll");
-    CloseHandle(hProcess);
-
-    if (hRemoteModule) {
-        injectedModuleHandle = (UINT_PTR)hRemoteModule;
-        UpdateHookHiddenIcons();
-        MoveHiddenIconsOffScreen();
-        HookBridge::RefreshDesktop();
-    }
-}
-
 
 void App::UpdateHookHiddenIcons() {
     // Collect display names of all icons across all corrals and ALL tabs
@@ -473,50 +367,11 @@ void App::UpdateHookHiddenIcons() {
     HookBridge::UpdateHiddenIcons(displayNames);
 }
 
-void App::MoveHiddenIconsOffScreen() {
-    // Move all hidden (corral-owned) icons far off-screen so they can't be clicked
-    // The hook makes them invisible, but they're still in the ListView —
-    // moving off-screen prevents hit-test conflicts with visible icons.
-    std::vector<std::wstring> hiddenNames;
-    for (const auto& corral : corrals) {
-        for (const auto& tab : corral->GetConfig().Tabs) {
-            if (tab.IsVirtual) continue;
-            for (const auto& fileUtf8 : tab.Files) {
-                std::wstring name;
-                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
-                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
-                    name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                } else {
-                    int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
-                    name.resize(size);
-                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
-                    if (name.length() > 4) {
-                        std::wstring ext = name.substr(name.length() - 4);
-                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
-                            name = name.substr(0, name.length() - 4);
-                        }
-                    }
-                }
-                if (!name.empty()) {
-                    hiddenNames.push_back(name);
-                }
-            }
-        }
-    }
-
-    if (!hiddenNames.empty()) {
-        std::map<std::wstring, POINT2D> offScreenPositions;
-        for (const auto& name : hiddenNames) {
-            offScreenPositions[name] = { 32000, 32000 };
-        }
-        DesktopIcons::PositionIcons(offScreenPositions);
-    }
-}
-
-void App::RestoreHiddenIconPositions() {
-    // On exit: move hidden icons back to visible positions (center of their corral)
-    // so they reappear in a sensible location after hook clears
-    std::map<std::wstring, POINT2D> restorePositions;
+void App::PositionHiddenIconsUnderCorrals() {
+    // Position hidden icons at their corral's center so the corral window
+    // occludes them for drag-drop. Icons stay at valid screen coords —
+    // if DexCorral crashes, they reappear near where the corral was.
+    std::map<std::wstring, POINT2D> positions;
 
     for (const auto& corral : corrals) {
         RECT r;
@@ -548,14 +403,14 @@ void App::RestoreHiddenIconPositions() {
                     }
                 }
                 if (!name.empty()) {
-                    restorePositions[name] = { center.x, center.y };
+                    positions[name] = { center.x, center.y };
                 }
             }
         }
     }
 
-    if (!restorePositions.empty()) {
-        DesktopIcons::PositionIcons(restorePositions);
+    if (!positions.empty()) {
+        DesktopIcons::PositionIcons(positions);
     }
 }
 
@@ -797,8 +652,6 @@ void App::ShowTrayMenu() {
     AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, 6, L"Debug: Icon Position Snapshot");
-    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 3, L"Exit");
 
     POINT pt;
@@ -841,9 +694,6 @@ void App::ShowTrayMenu() {
         CreateVirtualCorralAt(centerPt);
         break;
     }
-    case 6:
-        TakeIconPositionSnapshot();
-        break;
     }
 }
 
@@ -1010,12 +860,16 @@ bool App::IsDesktopUnderMouse(POINT pt) {
 }
 
 bool App::IsAutostartEnabled() {
+    // Shell extension mode: check ShellServiceObjectDelayLoad registry key
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-        wchar_t path[MAX_PATH];
-        DWORD size = sizeof(path);
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad",
+        0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        wchar_t value[256];
+        DWORD size = sizeof(value);
         DWORD type = REG_SZ;
-        LONG result = RegQueryValueExW(hKey, L"DexCorral", nullptr, &type, (LPBYTE)path, &size);
+        LONG result = RegQueryValueExW(hKey, L"DexCorral",
+            nullptr, &type, (LPBYTE)value, &size);
         RegCloseKey(hKey);
         return result == ERROR_SUCCESS;
     }
@@ -1023,17 +877,9 @@ bool App::IsAutostartEnabled() {
 }
 
 void App::SetAutostart(bool enable) {
-    HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
-        if (enable) {
-            wchar_t exePath[MAX_PATH];
-            GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-            RegSetValueExW(hKey, L"DexCorral", 0, REG_SZ, (const BYTE*)exePath, (DWORD)(wcslen(exePath) + 1) * sizeof(wchar_t));
-        } else {
-            RegDeleteValueW(hKey, L"DexCorral");
-        }
-        RegCloseKey(hKey);
-    }
+    // Shell extension mode: register/unregister via DllRegisterServer/DllUnregisterServer
+    // For now, autostart is always on when the shell extension is registered
+    // The user can unregister via "DexCorral.exe --unregister"
 }
 
 LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -1079,6 +925,27 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 int App::Run() {
     Initialize();
 
+    // If we have a stop event (shell extension mode), watch it alongside messages
+    if (g_AppStopEvent) {
+        MSG msg;
+        for (;;) {
+            DWORD result = MsgWaitForMultipleObjects(1, &g_AppStopEvent, FALSE, INFINITE, QS_ALLINPUT);
+            if (result == WAIT_OBJECT_0) {
+                // Stop event signaled — DLL is being unloaded
+                break;
+            }
+            // Process all pending messages
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                if (msg.message == WM_QUIT) goto done;
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+    done:
+        return 0;
+    }
+
+    // Standalone mode (no stop event) — classic message loop
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
@@ -1284,110 +1151,6 @@ void App::UpdateCorralPositions() {
     if (configChanged) {
         SaveConfig();
     }
-}
-
-void App::TakeIconPositionSnapshot() {
-    // Get the DexCorral appdata directory
-    wchar_t appDataPath[MAX_PATH];
-    if (FAILED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, appDataPath)))
-        return;
-
-    std::wstring dir = std::wstring(appDataPath) + L"\\DexCorral";
-    CreateDirectoryW(dir.c_str(), NULL);
-
-    // Build timestamp filename
-    auto now = std::chrono::system_clock::now();
-    auto timeT = std::chrono::system_clock::to_time_t(now);
-    struct tm tmBuf;
-    localtime_s(&tmBuf, &timeT);
-    std::ostringstream oss;
-    oss << "icon_snapshot_"
-        << std::put_time(&tmBuf, "%Y%m%d_%H%M%S")
-        << ".json";
-
-    std::wstring filePath = dir + L"\\" + std::wstring(oss.str().begin(), oss.str().end());
-
-    // Read all desktop icons via cross-process ListView
-    HWND hListView = DesktopIcons::GetDesktopListView();
-    if (!hListView) return;
-
-    bool listViewVisible = IsWindowVisible(hListView) != FALSE;
-    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (!hProcess) return;
-
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
-    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
-    LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
-
-    nlohmann::json snapshot;
-    snapshot["timestamp"] = oss.str().substr(14, 15); // YYYYMMDD_HHMMSS
-    char timeBuf[64];
-    strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tmBuf);
-    snapshot["timestamp"] = timeBuf;
-    snapshot["listViewVisible"] = listViewVisible;
-    snapshot["iconCount"] = count;
-
-    nlohmann::json iconsArray = nlohmann::json::array();
-
-    for (int i = 0; i < count; i++) {
-        // Get item text
-        LVITEMW lvi = {};
-        lvi.mask = LVIF_TEXT;
-        lvi.iItem = i;
-        lvi.pszText = (LPWSTR)pRemoteText;
-        lvi.cchTextMax = 260;
-        WriteProcessMemory(hProcess, pRemoteItem, &lvi, sizeof(lvi), nullptr);
-        SendMessageW(hListView, LVM_GETITEMW, 0, (LPARAM)pRemoteItem);
-
-        wchar_t textBuf[260] = {};
-        ReadProcessMemory(hProcess, pRemoteText, textBuf, sizeof(textBuf), nullptr);
-
-        // Get position
-        SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
-        POINT pt;
-        ReadProcessMemory(hProcess, pRemotePoint, &pt, sizeof(pt), nullptr);
-
-        // Get item state (selected, focused, cut)
-        UINT state = (UINT)SendMessageW(hListView, LVM_GETITEMSTATE, i,
-            LVIS_SELECTED | LVIS_FOCUSED | LVIS_CUT);
-
-        // Convert name to UTF-8
-        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, textBuf, -1, NULL, 0, NULL, NULL);
-        std::string name(utf8Len - 1, 0);
-        WideCharToMultiByte(CP_UTF8, 0, textBuf, -1, &name[0], utf8Len, NULL, NULL);
-
-        nlohmann::json iconObj;
-        iconObj["index"] = i;
-        iconObj["name"] = name;
-        iconObj["x"] = pt.x;
-        iconObj["y"] = pt.y;
-        iconObj["selected"] = (state & LVIS_SELECTED) != 0;
-        iconObj["focused"] = (state & LVIS_FOCUSED) != 0;
-        iconObj["cut"] = (state & LVIS_CUT) != 0;
-
-        iconsArray.push_back(iconObj);
-    }
-
-    VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
-    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
-
-    snapshot["icons"] = iconsArray;
-
-    // Write to file
-    std::ofstream outFile(filePath);
-    if (outFile.is_open()) {
-        outFile << snapshot.dump(2);
-        outFile.close();
-    }
-
-    // Show brief notification
-    std::wstring msg = L"Icon position snapshot saved to:\n" + filePath;
-    MessageBoxW(nullptr, msg.c_str(), L"DexCorral Debug", MB_OK | MB_ICONINFORMATION);
 }
 
 void App::StartWatchdog() {

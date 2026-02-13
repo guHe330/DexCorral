@@ -5,7 +5,7 @@
 #include <map>
 #include "DesktopIcons.h"
 
-// Bridge between DexCorral.exe and CorralHook.dll
+// Bridge between DexCorral.exe and DexCorralHook.dll
 // Writes hidden icon list to shared memory, repositions hidden icons under corrals
 class HookBridge {
 public:
@@ -14,10 +14,6 @@ public:
 
     // Clear the hidden icon list (call on eject)
     static void ClearHiddenIcons();
-
-    // Reposition hidden ListView icons to sit under their corral windows
-    // iconPositions: map of display name -> screen position
-    static void RepositionHiddenIcons(const std::map<std::wstring, POINT2D>& iconPositions);
 
     // Force desktop repaint (so hidden icons disappear/reappear)
     static void RefreshDesktop();

@@ -1,15 +1,20 @@
-// CorralHook.cpp - Minimal Explorer hook for hiding desktop icons
+// CorralHook.cpp - Explorer hook for hiding desktop icons via pure draw suppression
 // Reads a list of icon names to hide from a memory-mapped file written by DexCorral.exe
 // Icons in the list are skipped during NM_CUSTOMDRAW (CDRF_SKIPDEFAULT)
+// Mouse/keyboard input on hidden icons is swallowed so they can't be interacted with
 
 #include "CorralHook.h"
+#include <Windows.h>
+#include <windowsx.h>
 #include <CommCtrl.h>
+#include <oleidl.h>
+#include <ole2.h>
 #include <stdio.h>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "ole32.lib")
 
 // Shared memory name - must match HookBridge in main app
 static const wchar_t* SHARED_MEMORY_NAME = L"Local\\DexCorralHiddenIcons";
@@ -80,9 +85,6 @@ static void Log(const wchar_t* format, ...) {
     }
 }
 
-// Forward declarations
-static void MoveHiddenIconsOffScreenInProc();
-
 // ============================================================================
 // Shared memory reading - zero kernel calls if data hasn't changed
 // ============================================================================
@@ -134,8 +136,10 @@ static void RefreshHiddenIconCache() {
     }
     Log(L"RefreshHiddenIconCache: Total %d hidden icons", (int)g_HiddenIcons.size());
 
-    // Move newly-hidden icons off-screen immediately (in-process, reliable)
-    MoveHiddenIconsOffScreenInProc();
+    // Trigger repaint so newly hidden/unhidden icons update visually
+    if (g_hDesktopListView) {
+        RedrawWindow(g_hDesktopListView, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+    }
 }
 
 static bool ShouldHideIcon(const std::wstring& name) {
@@ -172,11 +176,9 @@ static HWND FindDesktopListView(HWND* outShellDefView) {
 }
 
 // ============================================================================
-// Subclass procedure - the core of the hook
+// Helper: get display name for a ListView item index (in-process, fast)
 // ============================================================================
 
-// Helper: get display name for a ListView item index (in-process, fast)
-// Uses CallWindowProc to bypass our subclass and avoid any recursion
 static bool GetItemDisplayName(int index, wchar_t* buf, int bufSize) {
     if (!g_OriginalListViewProc) return false;
     LVITEMW item = {};
@@ -188,278 +190,116 @@ static bool GetItemDisplayName(int index, wchar_t* buf, int bufSize) {
 }
 
 // ============================================================================
-// Move hidden icons off-screen (in-process, reliable)
+// Helper: check if click point hits a hidden icon
 // ============================================================================
 
-// Off-screen position: large positive values (negative gets clamped by Explorer's ListView)
-static const int OFFSCREEN_X = 32000;
-static const int OFFSCREEN_Y = 32000;
+static bool IsClickOnHiddenIcon(HWND hwnd, LPARAM lParam) {
+    if (g_HiddenIcons.empty()) return false;
 
-// Actual clamped position detected after first move (Explorer clamps 32000 to desktop edge)
-static int g_ClampedX = -1;
-static int g_ClampedY = -1;
-static const int CLAMP_TOLERANCE = 20;  // Pixels of tolerance for position matching
+    LVHITTESTINFO ht = {};
+    ht.pt.x = GET_X_LPARAM(lParam);
+    ht.pt.y = GET_Y_LPARAM(lParam);
+    int hit = (int)CallWindowProcW(g_OriginalListViewProc, hwnd, LVM_HITTEST, 0, (LPARAM)&ht);
+    if (hit < 0) return false;
 
-static bool IsOffScreen(int x, int y) {
-    // Check for raw off-screen values (before Explorer clamps them)
-    if (x >= 30000 && y >= 30000) return true;
-    if (g_ClampedX < 0) {
-        // Clamped position not yet detected
-        return false;
-    }
-    // Check if X matches the clamped edge position. We only check X because
-    // Explorer auto-arranges stacked icons vertically, so Y varies when
-    // multiple hidden icons are at the same off-screen position.
-    return (abs(x - g_ClampedX) <= CLAMP_TOLERANCE);
+    wchar_t buf[MAX_PATH] = {};
+    if (!GetItemDisplayName(hit, buf, MAX_PATH)) return false;
+    return ShouldHideIcon(buf);
 }
 
-static void MoveHiddenIconsOffScreenInProc() {
-    Log(L"MoveHiddenIconsOffScreenInProc: Called, ListView=%p, OrigProc=%p, hidden=%d",
-        g_hDesktopListView, g_OriginalListViewProc, (int)g_HiddenIcons.size());
+// ============================================================================
+// Helper: deselect any hidden icons (after rubber-band selection, etc.)
+// ============================================================================
 
-    if (!g_hDesktopListView || !g_OriginalListViewProc || g_HiddenIcons.empty()) {
-        Log(L"MoveHiddenIconsOffScreenInProc: Early exit (missing prereqs)");
-        return;
-    }
+static void DeselectHiddenIcons(HWND hwnd) {
+    if (g_HiddenIcons.empty()) return;
 
-    int count = (int)CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-        LVM_GETITEMCOUNT, 0, 0);
-    Log(L"MoveHiddenIconsOffScreenInProc: ListView has %d items", count);
-
-    int moved = 0;
+    int count = (int)CallWindowProcW(g_OriginalListViewProc, hwnd, LVM_GETITEMCOUNT, 0, 0);
     for (int i = 0; i < count; i++) {
+        DWORD state = (DWORD)CallWindowProcW(g_OriginalListViewProc, hwnd,
+            LVM_GETITEMSTATE, i, LVIS_SELECTED | LVIS_FOCUSED);
+        if (!(state & (LVIS_SELECTED | LVIS_FOCUSED))) continue;
+
         wchar_t buf[MAX_PATH] = {};
         if (!GetItemDisplayName(i, buf, MAX_PATH)) continue;
-
         if (!ShouldHideIcon(buf)) continue;
 
-        // Check if already off-screen
-        POINT pt;
-        CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-            LVM_GETITEMPOSITION, i, (LPARAM)&pt);
-
-        Log(L"MoveHiddenIconsOffScreenInProc: Item %d '%s' at (%d,%d)", i, buf, pt.x, pt.y);
-
-        if (IsOffScreen(pt.x, pt.y)) {
-            Log(L"MoveHiddenIconsOffScreenInProc: Item %d already off-screen, skipping", i);
-            continue;
-        }
-
-        // Move off-screen using large positive coords (negative gets clamped by Explorer)
-        POINT offScreen = { OFFSCREEN_X, OFFSCREEN_Y };
-        LRESULT result = CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-            LVM_SETITEMPOSITION32, i, (LPARAM)&offScreen);
-        Log(L"MoveHiddenIconsOffScreenInProc: Moved item %d '%s' -> (%d,%d), result=%d",
-            i, buf, OFFSCREEN_X, OFFSCREEN_Y, (int)result);
-
-        // Verify the move and detect actual clamped position
-        POINT verify;
-        CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-            LVM_GETITEMPOSITION, i, (LPARAM)&verify);
-        Log(L"MoveHiddenIconsOffScreenInProc: Verify item %d now at (%d,%d)", i, verify.x, verify.y);
-
-        // Store the clamped position so IsOffScreen can detect it later
-        if (g_ClampedX < 0 || g_ClampedY < 0) {
-            g_ClampedX = verify.x;
-            g_ClampedY = verify.y;
-            Log(L"MoveHiddenIconsOffScreenInProc: Detected clamped position = (%d,%d)", g_ClampedX, g_ClampedY);
-        }
-
-        moved++;
+        // Deselect and unfocus this hidden icon
+        LVITEMW lvi = {};
+        lvi.stateMask = LVIS_SELECTED | LVIS_FOCUSED;
+        lvi.state = 0;
+        CallWindowProcW(g_OriginalListViewProc, hwnd, LVM_SETITEMSTATE, i, (LPARAM)&lvi);
     }
-
-    Log(L"MoveHiddenIconsOffScreenInProc: Done, moved %d icons", moved);
 }
 
 // ============================================================================
-// Post-sort compaction - close gaps left by hidden icons after sort/arrange
+// ListView subclass - input filtering for hidden icons
 // ============================================================================
-
-static const UINT_PTR COMPACT_TIMER_ID = 99;
-
-static void CompactVisibleIcons() {
-    if (!g_hDesktopListView || !g_OriginalListViewProc) return;
-
-    int count = (int)CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-        LVM_GETITEMCOUNT, 0, 0);
-    if (count <= 0) return;
-
-    // Get icon spacing from the ListView (FALSE = icon/large icon view, TRUE = small icon view)
-    DWORD spacing = (DWORD)CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-        LVM_GETITEMSPACING, FALSE, 0);
-    int spacingX = LOWORD(spacing);
-    int spacingY = HIWORD(spacing);
-    if (spacingX <= 0) spacingX = 75;
-    if (spacingY <= 0) spacingY = 75;
-
-    // Get work area (desktop minus taskbar) — this is in screen coords,
-    // which matches ListView client coords for the desktop
-    RECT workArea;
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
-
-    // Collect visible items with their current grid positions
-    struct VisibleIcon {
-        int index;
-        int gridOrder;  // for sorting: col * 10000 + row
-    };
-    std::vector<VisibleIcon> visibleItems;
-
-    RefreshHiddenIconCache();
-
-    for (int i = 0; i < count; i++) {
-        wchar_t buf[MAX_PATH] = {};
-        if (!GetItemDisplayName(i, buf, MAX_PATH)) continue;
-        if (ShouldHideIcon(buf)) continue;
-
-        // Get current position
-        POINT pt;
-        CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-            LVM_GETITEMPOSITION, i, (LPARAM)&pt);
-
-        // Calculate grid order (column-major: top-to-bottom, then left-to-right)
-        int col = (pt.x - workArea.left + spacingX / 2) / spacingX;
-        int row = (pt.y - workArea.top + spacingY / 2) / spacingY;
-        if (col < 0) col = 0;
-        if (row < 0) row = 0;
-        visibleItems.push_back({ i, col * 10000 + row });
-    }
-
-    if (visibleItems.empty()) return;
-
-    // Sort by grid position to preserve the sort order Explorer applied
-    std::sort(visibleItems.begin(), visibleItems.end(),
-        [](const VisibleIcon& a, const VisibleIcon& b) { return a.gridOrder < b.gridOrder; });
-
-    // Calculate compact grid: column-major layout (matches Explorer's default)
-    int maxRows = (workArea.bottom - workArea.top) / spacingY;
-    if (maxRows < 1) maxRows = 1;
-
-    // Small offset from work area edge (Explorer uses a small margin)
-    int startX = workArea.left + spacingX / 2 - 16;
-    int startY = workArea.top + 4;
-
-    for (int i = 0; i < (int)visibleItems.size(); i++) {
-        int col = i / maxRows;
-        int row = i % maxRows;
-        POINT newPos = { startX + col * spacingX, startY + row * spacingY };
-
-        CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
-            LVM_SETITEMPOSITION32, visibleItems[i].index, (LPARAM)&newPos);
-    }
-
-    // Refresh to show new positions
-    RedrawWindow(g_hDesktopListView, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
-
-    Log(L"CompactVisibleIcons: Compacted %d visible icons (grid %dx%d, spacing %dx%d)",
-        (int)visibleItems.size(), maxRows, (int)visibleItems.size() / maxRows + 1, spacingX, spacingY);
-}
-
-// ============================================================================
-// ListView subclass - intercepts LVM_SETITEMPOSITION to protect hidden icons
-// ============================================================================
-
-static const UINT_PTR REHIDE_TIMER_ID = 100;
-
-// Cooldown to prevent WM_PAINT from re-triggering compaction immediately after a rehide
-static DWORD g_LastRehideTime = 0;
-static const DWORD REHIDE_COOLDOWN_MS = 1000;  // 1 second cooldown after rehide+compact
-
-static void RehideAndCompact() {
-    // After a sort/arrange, hidden icons may have been moved back on-screen.
-    // Move them off-screen again, then compact visible icons.
-    Log(L"RehideAndCompact: Re-hiding icons after sort/arrange");
-    MoveHiddenIconsOffScreenInProc();
-    CompactVisibleIcons();
-    g_LastRehideTime = GetTickCount();
-}
 
 static LRESULT CALLBACK ListViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    // Handle compaction timer
-    if (uMsg == WM_TIMER && wParam == COMPACT_TIMER_ID) {
-        KillTimer(hwnd, COMPACT_TIMER_ID);
-        Log(L"ListViewSubclassProc: Compaction timer fired");
-        CompactVisibleIcons();
-        g_LastRehideTime = GetTickCount();
-        return 0;
-    }
-
-    // Handle re-hide timer (after sort/arrange)
-    if (uMsg == WM_TIMER && wParam == REHIDE_TIMER_ID) {
-        KillTimer(hwnd, REHIDE_TIMER_ID);
-        RehideAndCompact();
-        return 0;
-    }
-
-    // Detect hidden icons that moved back on-screen (e.g. after Explorer sorts internally).
-    // Check on every paint — if any hidden icon is no longer off-screen, schedule re-hide.
-    // Skip check during cooldown period after a recent rehide/compact.
-    if (uMsg == WM_PAINT && !g_HiddenIcons.empty() &&
-        (GetTickCount() - g_LastRehideTime) > REHIDE_COOLDOWN_MS) {
-        // Quick check: see if any hidden icon is back on-screen
-        int count = (int)CallWindowProcW(g_OriginalListViewProc, hwnd,
-            LVM_GETITEMCOUNT, 0, 0);
-        bool needRehide = false;
-        for (int i = 0; i < count && !needRehide; i++) {
+    // Intercept LVM_HITTEST - makes hidden icons invisible to ALL hit testing:
+    // clicks, drag-drop targets, context menus, tooltips, etc.
+    if (uMsg == LVM_HITTEST || uMsg == LVM_SUBITEMHITTEST) {
+        RefreshHiddenIconCache();
+        LRESULT hit = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        if (hit >= 0 && !g_HiddenIcons.empty()) {
             wchar_t buf[MAX_PATH] = {};
-            if (!GetItemDisplayName(i, buf, MAX_PATH)) continue;
-            if (!ShouldHideIcon(buf)) continue;
-            POINT pt;
-            CallWindowProcW(g_OriginalListViewProc, hwnd,
-                LVM_GETITEMPOSITION, i, (LPARAM)&pt);
-            bool offScreen = IsOffScreen(pt.x, pt.y);
-            if (!offScreen) {
-                Log(L"WM_PAINT check: '%s' at (%d,%d) NOT off-screen! clamped=(%d,%d) tol=%d",
-                    buf, pt.x, pt.y, g_ClampedX, g_ClampedY, CLAMP_TOLERANCE);
-                needRehide = true;
+            if (GetItemDisplayName((int)hit, buf, MAX_PATH) && ShouldHideIcon(buf)) {
+                // Clear the hit test result so caller thinks nothing was hit
+                LVHITTESTINFO* ht = (LVHITTESTINFO*)lParam;
+                ht->iItem = -1;
+                ht->iSubItem = -1;
+                ht->flags = LVHT_NOWHERE;
+                Log(L"ListViewSubclassProc: Filtered hidden icon '%s' from hit test", buf);
+                return -1;
             }
         }
-        if (needRehide) {
-            Log(L"ListViewSubclassProc: Hidden icon found on-screen during paint, scheduling rehide");
-            SetTimer(hwnd, REHIDE_TIMER_ID, 50, nullptr);
-        }
+        return hit;
     }
 
-    if (uMsg == LVM_SETITEMPOSITION || uMsg == LVM_SETITEMPOSITION32) {
-        // Check if this item is in the hidden list
+    // Refresh cache on relevant messages (cheap - just checks version counter)
+    switch (uMsg) {
+    case WM_LBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_LBUTTONDBLCLK:
+    case WM_MBUTTONDOWN:
         RefreshHiddenIconCache();
-        if (!g_HiddenIcons.empty()) {
-            int itemIndex = (int)wParam;
-            wchar_t buf[MAX_PATH] = {};
-            if (GetItemDisplayName(itemIndex, buf, MAX_PATH) && ShouldHideIcon(buf)) {
-                // Force hidden icons to stay off-screen
-                bool isOurCall = false;  // Is DexCorral setting to off-screen?
+        if (IsClickOnHiddenIcon(hwnd, lParam)) {
+            Log(L"ListViewSubclassProc: Swallowed click on hidden icon (msg=0x%04X)", uMsg);
+            return 0;
+        }
+        break;
 
-                if (uMsg == LVM_SETITEMPOSITION) {
-                    int x = (short)LOWORD(lParam);
-                    int y = (short)HIWORD(lParam);
-                    isOurCall = IsOffScreen(x, y);
-                    Log(L"ListViewSubclassProc: SETPOS item %d '%s' to (%d,%d), isOurCall=%d",
-                        itemIndex, buf, x, y, isOurCall);
-                } else {
-                    POINT* pt = (POINT*)lParam;
-                    isOurCall = (pt && IsOffScreen(pt->x, pt->y));
-                    Log(L"ListViewSubclassProc: SETPOS32 item %d '%s' to (%d,%d), isOurCall=%d",
-                        itemIndex, buf, pt ? pt->x : -1, pt ? pt->y : -1, isOurCall);
-                }
+    case WM_LBUTTONUP:
+        // After mouse up (end of rubber-band selection), deselect any hidden icons
+        {
+            LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+            RefreshHiddenIconCache();
+            DeselectHiddenIcons(hwnd);
+            return result;
+        }
 
-                if (!isOurCall) {
-                    // Someone (Explorer sort/arrange) is trying to move a hidden icon
-                    // to a visible position. Block it and schedule compaction.
-                    Log(L"ListViewSubclassProc: Blocking move, redirecting to off-screen");
-                    SetTimer(hwnd, COMPACT_TIMER_ID, 100, nullptr);
-
-                    if (uMsg == LVM_SETITEMPOSITION) {
-                        return CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam,
-                            MAKELPARAM(OFFSCREEN_X & 0xFFFF, OFFSCREEN_Y & 0xFFFF));
-                    } else {
-                        POINT offScreen = { OFFSCREEN_X, OFFSCREEN_Y };
-                        return CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam,
-                            (LPARAM)&offScreen);
+    case WM_KEYDOWN:
+        // For arrow keys, let default handler run then skip hidden icons
+        if (wParam == VK_UP || wParam == VK_DOWN || wParam == VK_LEFT || wParam == VK_RIGHT) {
+            RefreshHiddenIconCache();
+            if (!g_HiddenIcons.empty()) {
+                LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+                // Check if newly focused item is hidden - if so, send another arrow key to skip it
+                int focused = (int)CallWindowProcW(g_OriginalListViewProc, hwnd,
+                    LVM_GETNEXTITEM, -1, LVNI_FOCUSED);
+                if (focused >= 0) {
+                    wchar_t buf[MAX_PATH] = {};
+                    if (GetItemDisplayName(focused, buf, MAX_PATH) && ShouldHideIcon(buf)) {
+                        // Skip this hidden icon by sending another arrow key in the same direction
+                        Log(L"ListViewSubclassProc: Skipping hidden icon %d '%s' on arrow key", focused, buf);
+                        CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
                     }
                 }
-                // else: our own off-screen call, pass through
+                return result;
             }
         }
+        break;
     }
 
     return CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
@@ -503,6 +343,292 @@ static LRESULT CALLBACK ShellDefViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wP
 }
 
 // ============================================================================
+// IDropTarget wrapper - intercepts OLE drag-drop on hidden icons
+// Explorer's internal IDropTarget does hit-testing via direct function calls
+// (not SendMessage), so our LVM_HITTEST interception doesn't catch it.
+// We wrap the original IDropTarget and reject drops on hidden icons.
+// ============================================================================
+
+static IDropTarget* g_pOriginalDropTarget = nullptr;
+
+// Always-on logging for IDropTarget debugging (writes to separate file)
+static void LogDT(const wchar_t* format, ...) {
+    wchar_t path[MAX_PATH];
+    GetTempPathW(MAX_PATH, path);
+    wcscat_s(path, L"CorralHook_DropTarget.log");
+
+    va_list args;
+    va_start(args, format);
+    wchar_t message[512];
+    vswprintf_s(message, format, args);
+    va_end(args);
+
+    HANDLE hFile = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        wchar_t buffer[600];
+        swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] %s\r\n",
+                   st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
+        DWORD written;
+        WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
+        CloseHandle(hFile);
+    }
+}
+
+// Check if a screen-space point is over a hidden icon
+static bool IsPointOnHiddenIcon(POINT ptScreen) {
+    if (!g_hDesktopListView || g_HiddenIcons.empty()) return false;
+
+    // Convert screen coords to ListView client coords
+    POINT ptClient = ptScreen;
+    ScreenToClient(g_hDesktopListView, &ptClient);
+
+    // Do hit test via the original proc to get the true hit, then check if it's hidden
+    LVHITTESTINFO ht = {};
+    ht.pt = ptClient;
+    int hit = (int)CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
+        LVM_HITTEST, 0, (LPARAM)&ht);
+    if (hit < 0) return false;
+
+    wchar_t buf[MAX_PATH] = {};
+    if (!GetItemDisplayName(hit, buf, MAX_PATH)) return false;
+    bool hidden = ShouldHideIcon(buf);
+    if (hidden) {
+        LogDT(L"IsPointOnHiddenIcon: screen(%d,%d) client(%d,%d) hit=%d name='%s' -> HIDDEN",
+              ptScreen.x, ptScreen.y, ptClient.x, ptClient.y, hit, buf);
+    }
+    return hidden;
+}
+
+class DropTargetWrapper : public IDropTarget {
+public:
+    DropTargetWrapper(IDropTarget* pOriginal) : m_pOriginal(pOriginal) {
+        m_pOriginal->AddRef();
+    }
+
+    ~DropTargetWrapper() {
+        m_pOriginal->Release();
+    }
+
+    // IUnknown
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
+        if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_IDropTarget)) {
+            *ppv = static_cast<IDropTarget*>(this);
+            AddRef();
+            return S_OK;
+        }
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override {
+        return InterlockedIncrement(&m_refCount);
+    }
+
+    ULONG STDMETHODCALLTYPE Release() override {
+        LONG count = InterlockedDecrement(&m_refCount);
+        if (count == 0) delete this;
+        return count;
+    }
+
+    // IDropTarget
+    HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState,
+        POINTL pt, DWORD* pdwEffect) override {
+        LogDT(L"DragEnter: pt=(%d,%d) effect=0x%X", pt.x, pt.y, *pdwEffect);
+        m_pDataObj = pDataObj;
+        RefreshHiddenIconCache();
+        POINT ptScreen = { pt.x, pt.y };
+        if (IsPointOnHiddenIcon(ptScreen)) {
+            m_bOverHidden = true;
+            DWORD tempEffect = *pdwEffect;
+            m_pOriginal->DragEnter(pDataObj, grfKeyState, pt, &tempEffect);
+            *pdwEffect = DROPEFFECT_NONE;
+            LogDT(L"DragEnter: BLOCKED (hidden icon)");
+            return S_OK;
+        }
+        m_bOverHidden = false;
+        HRESULT hr = m_pOriginal->DragEnter(pDataObj, grfKeyState, pt, pdwEffect);
+        LogDT(L"DragEnter: forwarded, effect=0x%X hr=0x%08X", *pdwEffect, hr);
+        return hr;
+    }
+
+    HRESULT STDMETHODCALLTYPE DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override {
+        RefreshHiddenIconCache();
+        POINT ptScreen = { pt.x, pt.y };
+        if (IsPointOnHiddenIcon(ptScreen)) {
+            if (!m_bOverHidden) {
+                LogDT(L"DragOver: entering hidden icon at (%d,%d)", pt.x, pt.y);
+            }
+            m_bOverHidden = true;
+            DWORD tempEffect = *pdwEffect;
+            m_pOriginal->DragOver(grfKeyState, pt, &tempEffect);
+            *pdwEffect = DROPEFFECT_NONE;
+            return S_OK;
+        }
+        if (m_bOverHidden) {
+            LogDT(L"DragOver: leaving hidden icon at (%d,%d)", pt.x, pt.y);
+        }
+        m_bOverHidden = false;
+        return m_pOriginal->DragOver(grfKeyState, pt, pdwEffect);
+    }
+
+    HRESULT STDMETHODCALLTYPE DragLeave() override {
+        LogDT(L"DragLeave");
+        m_bOverHidden = false;
+        m_pDataObj = nullptr;
+        return m_pOriginal->DragLeave();
+    }
+
+    HRESULT STDMETHODCALLTYPE Drop(IDataObject* pDataObj, DWORD grfKeyState,
+        POINTL pt, DWORD* pdwEffect) override {
+        LogDT(L"Drop: pt=(%d,%d) effect=0x%X", pt.x, pt.y, *pdwEffect);
+        RefreshHiddenIconCache();
+        POINT ptScreen = { pt.x, pt.y };
+        if (IsPointOnHiddenIcon(ptScreen)) {
+            LogDT(L"Drop: BLOCKED (hidden icon)");
+            *pdwEffect = DROPEFFECT_NONE;
+            m_pOriginal->DragLeave();
+            return S_OK;
+        }
+        HRESULT hr = m_pOriginal->Drop(pDataObj, grfKeyState, pt, pdwEffect);
+        LogDT(L"Drop: forwarded, effect=0x%X hr=0x%08X", *pdwEffect, hr);
+        return hr;
+    }
+
+private:
+    IDropTarget* m_pOriginal;
+    IDataObject* m_pDataObj = nullptr;
+    LONG m_refCount = 1;
+    bool m_bOverHidden = false;
+};
+
+static DropTargetWrapper* g_pDropTargetWrapper = nullptr;
+static HWND g_hDropTargetWindow = nullptr;  // Which window we hooked (ListView or ShellDefView)
+static UINT_PTR g_DropTargetTimerId = 0;
+static int g_DropTargetRetryCount = 0;
+static const int DROP_TARGET_MAX_RETRIES = 30;  // 30 retries * 500ms = 15 seconds
+static const UINT DROP_TARGET_TIMER_ID = 0xDC01;
+static const UINT DROP_TARGET_TIMER_MS = 500;
+
+static bool TryInstallDropTargetHook() {
+    if (g_pDropTargetWrapper) return true;  // Already installed
+
+    // Try SysListView32 first, then SHELLDLL_DefView
+    HWND candidates[] = { g_hDesktopListView, g_hShellDefView };
+    const wchar_t* names[] = { L"SysListView32", L"SHELLDLL_DefView" };
+
+    for (int i = 0; i < 2; i++) {
+        if (!candidates[i]) {
+            LogDT(L"TryInstall: %s hwnd is NULL, skipping", names[i]);
+            continue;
+        }
+
+        IDropTarget* pDropTarget = (IDropTarget*)GetPropW(candidates[i], L"OleDropTargetInterface");
+        if (!pDropTarget) {
+            LogDT(L"TryInstall: No OleDropTargetInterface on %s (hwnd=%p)", names[i], candidates[i]);
+            continue;
+        }
+
+        LogDT(L"TryInstall: Found IDropTarget on %s (hwnd=%p, pDT=%p)", names[i], candidates[i], pDropTarget);
+
+        g_pOriginalDropTarget = pDropTarget;
+        g_hDropTargetWindow = candidates[i];
+        g_pDropTargetWrapper = new DropTargetWrapper(g_pOriginalDropTarget);
+
+        HRESULT hrRevoke = RevokeDragDrop(g_hDropTargetWindow);
+        LogDT(L"TryInstall: RevokeDragDrop on %s returned 0x%08X", names[i], hrRevoke);
+
+        HRESULT hr = RegisterDragDrop(g_hDropTargetWindow, g_pDropTargetWrapper);
+        if (SUCCEEDED(hr)) {
+            // Verify our wrapper is now set
+            IDropTarget* pVerify = (IDropTarget*)GetPropW(g_hDropTargetWindow, L"OleDropTargetInterface");
+            LogDT(L"TryInstall: SUCCESS on %s. Verify prop=%p (wrapper=%p, match=%s)",
+                  names[i], pVerify, g_pDropTargetWrapper,
+                  (pVerify == g_pDropTargetWrapper) ? L"YES" : L"NO");
+            return true;
+        }
+
+        LogDT(L"TryInstall: RegisterDragDrop FAILED on %s (0x%08X)", names[i], hr);
+        RegisterDragDrop(g_hDropTargetWindow, g_pOriginalDropTarget);
+        g_pDropTargetWrapper->Release();
+        g_pDropTargetWrapper = nullptr;
+        g_pOriginalDropTarget = nullptr;
+        g_hDropTargetWindow = nullptr;
+    }
+
+    return false;
+}
+
+// Timer callback for deferred IDropTarget hook installation
+static void CALLBACK DropTargetRetryTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
+    g_DropTargetRetryCount++;
+    LogDT(L"RetryTimer: attempt %d/%d", g_DropTargetRetryCount, DROP_TARGET_MAX_RETRIES);
+
+    if (TryInstallDropTargetHook()) {
+        KillTimer(hwnd, idEvent);
+        g_DropTargetTimerId = 0;
+        LogDT(L"RetryTimer: SUCCESS after %d retries", g_DropTargetRetryCount);
+        return;
+    }
+
+    if (g_DropTargetRetryCount >= DROP_TARGET_MAX_RETRIES) {
+        KillTimer(hwnd, idEvent);
+        g_DropTargetTimerId = 0;
+        LogDT(L"RetryTimer: GAVE UP after %d retries", g_DropTargetRetryCount);
+    }
+}
+
+static void InstallDropTargetHook() {
+    LogDT(L"InstallDropTargetHook: ListView=%p ShellDefView=%p", g_hDesktopListView, g_hShellDefView);
+
+    if (!g_hDesktopListView) {
+        LogDT(L"InstallDropTargetHook: No ListView, aborting");
+        return;
+    }
+
+    // Try immediately first
+    if (TryInstallDropTargetHook()) {
+        LogDT(L"InstallDropTargetHook: Immediate install succeeded");
+        return;
+    }
+
+    // Not available yet - start a retry timer
+    g_DropTargetRetryCount = 0;
+    g_DropTargetTimerId = SetTimer(g_hDesktopListView, DROP_TARGET_TIMER_ID,
+        DROP_TARGET_TIMER_MS, DropTargetRetryTimerProc);
+    if (g_DropTargetTimerId) {
+        LogDT(L"InstallDropTargetHook: Deferred, timer=%llu, interval=%dms", g_DropTargetTimerId, DROP_TARGET_TIMER_MS);
+    } else {
+        LogDT(L"InstallDropTargetHook: SetTimer FAILED, GetLastError=%d", GetLastError());
+    }
+}
+
+static void UninstallDropTargetHook() {
+    if (g_DropTargetTimerId && g_hDesktopListView) {
+        KillTimer(g_hDesktopListView, g_DropTargetTimerId);
+        g_DropTargetTimerId = 0;
+        LogDT(L"UninstallDropTargetHook: Killed retry timer");
+    }
+
+    if (!g_pDropTargetWrapper || !g_hDropTargetWindow) {
+        LogDT(L"UninstallDropTargetHook: Nothing to restore (wrapper=%p, window=%p)",
+              g_pDropTargetWrapper, g_hDropTargetWindow);
+        return;
+    }
+
+    RevokeDragDrop(g_hDropTargetWindow);
+    RegisterDragDrop(g_hDropTargetWindow, g_pOriginalDropTarget);
+    LogDT(L"UninstallDropTargetHook: Original IDropTarget restored on %p", g_hDropTargetWindow);
+
+    g_pDropTargetWrapper->Release();
+    g_pDropTargetWrapper = nullptr;
+    g_pOriginalDropTarget = nullptr;
+    g_hDropTargetWindow = nullptr;
+}
+
+// ============================================================================
 // Initialization & Cleanup
 // ============================================================================
 
@@ -523,7 +649,7 @@ bool InitializeCorralHook() {
     g_OriginalShellDefViewProc = (WNDPROC)SetWindowLongPtrW(
         g_hShellDefView, GWLP_WNDPROC, (LONG_PTR)ShellDefViewSubclassProc);
 
-    // Subclass SysListView32 for LVM_SETITEMPOSITION (prevent sort/arrange from moving hidden icons)
+    // Subclass SysListView32 for input filtering on hidden icons
     g_OriginalListViewProc = (WNDPROC)SetWindowLongPtrW(
         g_hDesktopListView, GWLP_WNDPROC, (LONG_PTR)ListViewSubclassProc);
 
@@ -534,6 +660,9 @@ bool InitializeCorralHook() {
     g_LastVersion = 0;  // Force re-read
     RefreshHiddenIconCache();
 
+    // Hook IDropTarget to intercept OLE drag-drop on hidden icons
+    InstallDropTargetHook();
+
     // Trigger repaint so hidden icons disappear
     RedrawWindow(g_hDesktopListView, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 
@@ -542,11 +671,8 @@ bool InitializeCorralHook() {
 }
 
 void CleanupCorralHook() {
-    // Kill timers if pending
-    if (g_hDesktopListView) {
-        KillTimer(g_hDesktopListView, COMPACT_TIMER_ID);
-        KillTimer(g_hDesktopListView, REHIDE_TIMER_ID);
-    }
+    // Restore IDropTarget before removing subclass (drop target uses subclass proc)
+    UninstallDropTargetHook();
 
     // Restore ListView subclass first (inner-most subclass)
     if (g_hDesktopListView && g_OriginalListViewProc) {

@@ -1,0 +1,7 @@
+LIBRARY DexCorralHook
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE
+    DllRegisterServer   PRIVATE
+    DllUnregisterServer PRIVATE
+    IsHookInstalled     PRIVATE

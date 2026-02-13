@@ -1,0 +1,11 @@
+# MSIX build artifacts
+staging/
+output/
+*.msix
+*.appx
+*.pfx
+
+# Keep the Assets directory structure but ignore actual images during development
+# (Remove these lines once real assets are added)
+Assets/*.png
+!Assets/README.txt
