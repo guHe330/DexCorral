@@ -286,7 +286,10 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
             cfg.HeaderFontSize = fontSize;
         }
         if (applyFontColor) cfg.HeaderFontColor = fontColor;
-        if (applyIconOpacity) cfg.IconOpacity = iconOpacity;
+        if (applyIconOpacity) {
+            cfg.IconOpacity = iconOpacity;
+            corral->SetCurrentOpacity(iconOpacity);
+        }
         if (applyTint) {
             cfg.IconTintColor = tintColor;
             cfg.IconTintStrength = tintStrength;
