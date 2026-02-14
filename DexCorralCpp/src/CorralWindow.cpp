@@ -129,6 +129,19 @@ CorralWindow::~CorralWindow() {
 }
 
 // ============================================================================
+// DPI scaling
+// ============================================================================
+
+bool CorralWindow::s_enableDpiScaling = true;
+
+int CorralWindow::Dpi(int logicalPixels) const {
+    if (!s_enableDpiScaling || !hwnd) return logicalPixels;
+    int dpi = (int)GetDpiForWindow(hwnd);
+    if (dpi <= 0) dpi = 96;
+    return MulDiv(logicalPixels, dpi, 96);
+}
+
+// ============================================================================
 // Static helpers
 // ============================================================================
 
@@ -156,53 +169,35 @@ int CorralWindow::GetDesktopIconSize() {
 }
 
 void CorralWindow::GetDesktopIconSpacing(int& spacingX, int& spacingY) {
-    // Read icon spacing from registry
-    // HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics
-    // IconSpacing and IconVerticalSpacing are in twips (negative values)
-    HKEY hKey;
+    // Query the desktop ListView's actual icon spacing directly.
+    // LVM_GETITEMSPACING returns physical pixels (desktop is DPI-aware).
+    HWND hListView = DesktopIcons::GetDesktopListView();
+    if (hListView) {
+        DWORD spacing = (DWORD)SendMessageW(hListView, LVM_GETITEMSPACING, FALSE, 0);
+        int desktopSpacingX = LOWORD(spacing);
+        int desktopSpacingY = HIWORD(spacing);
 
-    // Default spacing based on icon size
-    spacingX = iconSize + 40;
-    spacingY = iconSize + 40;
+        if (desktopSpacingX > 0 && desktopSpacingY > 0) {
+            // GetDesktopIconSize() returns logical pixels; Dpi() scales to physical.
+            // Both desktopSpacing and iconSize are now in physical pixels.
+            int desktopIconSizePhysical = Dpi(GetDesktopIconSize());
+            if (desktopIconSizePhysical > 0) {
+                // Scale proportionally: keep the same ratio as the desktop grid
+                spacingX = desktopSpacingX * iconSize / desktopIconSizePhysical;
+                spacingY = desktopSpacingY * iconSize / desktopIconSizePhysical;
 
-    if (RegOpenKeyExW(HKEY_CURRENT_USER,
-        L"Control Panel\\Desktop\\WindowMetrics",
-        0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-
-        wchar_t buffer[32];
-        DWORD bufferSize = sizeof(buffer);
-        DWORD type = REG_SZ;
-
-        // IconSpacing (horizontal)
-        if (RegQueryValueExW(hKey, L"IconSpacing", nullptr, &type, (LPBYTE)buffer, &bufferSize) == ERROR_SUCCESS) {
-            int value = _wtoi(buffer);
-            if (value < 0) value = -value;  // Stored as negative
-            // Convert from twips to pixels (approx: value is already in a usable range for newer Windows)
-            // Actually on modern Windows this is typically stored as -1125 to -1920 range
-            // The actual pixel spacing = abs(value) * DPI / 96 / 15 (approximately)
-            // Simplified: just use a reasonable calculation
-            if (value > 0) {
-                // The value divided by about 15 gives reasonable pixel spacing
-                spacingX = value / 15;
-                if (spacingX < iconSize + 20) spacingX = iconSize + 20;
-                if (spacingX > iconSize + 80) spacingX = iconSize + 80;
+                // Ensure minimum label space for 2 lines of text
+                int minLabel = Dpi(40);
+                if (spacingY < iconSize + minLabel) spacingY = iconSize + minLabel;
+                if (spacingX < iconSize + Dpi(32)) spacingX = iconSize + Dpi(32);
+                return;
             }
         }
-
-        bufferSize = sizeof(buffer);
-        // IconVerticalSpacing (vertical)
-        if (RegQueryValueExW(hKey, L"IconVerticalSpacing", nullptr, &type, (LPBYTE)buffer, &bufferSize) == ERROR_SUCCESS) {
-            int value = _wtoi(buffer);
-            if (value < 0) value = -value;
-            if (value > 0) {
-                spacingY = value / 15;
-                if (spacingY < iconSize + 20) spacingY = iconSize + 20;
-                if (spacingY > iconSize + 80) spacingY = iconSize + 80;
-            }
-        }
-
-        RegCloseKey(hKey);
     }
+
+    // Fallback: reasonable defaults
+    spacingX = iconSize + Dpi(32);
+    spacingY = iconSize + Dpi(40);
 }
 
 std::wstring CorralWindow::GetDesktopPath() {
@@ -225,11 +220,16 @@ std::wstring CorralWindow::GetPublicDesktopPath() {
 // Public methods
 // ============================================================================
 
+void CorralWindow::SendToBottom() {
+    if (hwnd) {
+        SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+
 void CorralWindow::Show() {
     if (hwnd) {
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-        // Set to bottom z-order (above desktop, below other apps)
-        SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        SendToBottom();
 
         if (GetActiveTab().IsVirtual) {
             // For virtual tabs, show window immediately and load icons asynchronously
@@ -543,7 +543,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 // Check if we've moved enough to start a drag
                 int dx = x - window->iconDragStart.x;
                 int dy = y - window->iconDragStart.y;
-                if (!window->isDraggingIcon && (abs(dx) > DRAG_THRESHOLD || abs(dy) > DRAG_THRESHOLD)) {
+                if (!window->isDraggingIcon && (abs(dx) > window->Dpi(DRAG_THRESHOLD) || abs(dy) > window->Dpi(DRAG_THRESHOLD))) {
                     window->isDraggingIcon = true;
                 }
                 if (window->isDraggingIcon) {
@@ -640,6 +640,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->StartOpacityAnimation(window->config.IconOpacity);
             }
             return 0;
+        case WM_MOUSEACTIVATE:
+            // Prevent corral from being brought to front when clicked
+            return MA_NOACTIVATE;
         case WM_DESTROY:
             KillTimer(hwnd, ANIMATION_TIMER_ID);
             KillTimer(hwnd, HOVER_CHECK_TIMER_ID);

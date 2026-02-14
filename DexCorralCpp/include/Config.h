@@ -61,8 +61,10 @@ struct CorralWindowConfig {
     int IconOpacity = 255;                      // Icon transparency (0=invisible, 255=opaque)
     std::string IconTintColor = "#000000";      // Tint color for icons (RGB hex)
     int IconTintStrength = 0;                   // Tint strength (0=none, 255=full overlay)
+    int IconSpacingXPercent = 100;               // Horizontal icon spacing (50-200%)
+    int IconSpacingYPercent = 100;               // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderFontName, HeaderFontSize, HeaderFontColor, IconOpacity, IconTintColor, IconTintStrength)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderFontName, HeaderFontSize, HeaderFontColor, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig {
@@ -79,8 +81,10 @@ struct AppConfig {
     int DefaultIconOpacity = 255;
     std::string DefaultIconTintColor = "#000000";
     int DefaultIconTintStrength = 0;
+    int DefaultIconSpacingXPercent = 100;
+    int DefaultIconSpacingYPercent = 100;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent)
 };
 
 class Config {

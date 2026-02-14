@@ -31,10 +31,10 @@ RECT CorralWindow::GetScrollbarTrackRect() const {
     RECT rect;
     GetClientRect(hwnd, &rect);
     return {
-        rect.right - SCROLLBAR_WIDTH - SCROLLBAR_MARGIN,
-        GetIconAreaTop() + SCROLLBAR_MARGIN,
-        rect.right - SCROLLBAR_MARGIN,
-        rect.bottom - SCROLLBAR_MARGIN
+        rect.right - Dpi(SCROLLBAR_WIDTH) - Dpi(SCROLLBAR_MARGIN),
+        GetIconAreaTop() + Dpi(SCROLLBAR_MARGIN),
+        rect.right - Dpi(SCROLLBAR_MARGIN),
+        rect.bottom - Dpi(SCROLLBAR_MARGIN)
     };
 }
 
@@ -46,7 +46,7 @@ RECT CorralWindow::GetScrollbarThumbRect() const {
     int visibleHeight = GetVisibleHeight();
 
     // Thumb size proportional to visible/content ratio
-    int thumbHeight = (std::max)(SCROLLBAR_MIN_THUMB,
+    int thumbHeight = (std::max)(Dpi(SCROLLBAR_MIN_THUMB),
         (int)((float)visibleHeight / contentHeight * trackHeight));
 
     // Thumb position based on scroll position
@@ -104,7 +104,7 @@ void CorralWindow::DoScrollbarDrag(int y) {
     RECT track = GetScrollbarTrackRect();
     int trackHeight = track.bottom - track.top;
     int visibleHeight = GetVisibleHeight();
-    int thumbHeight = (std::max)(SCROLLBAR_MIN_THUMB,
+    int thumbHeight = (std::max)(Dpi(SCROLLBAR_MIN_THUMB),
         (int)((float)visibleHeight / contentHeight * trackHeight));
     int thumbRange = trackHeight - thumbHeight;
     int scrollRange = contentHeight - visibleHeight;
@@ -140,10 +140,10 @@ int CorralWindow::HitTestResize(int x, int y) {
     RECT rect;
     GetClientRect(hwnd, &rect);
 
-    bool nearLeft = (x <= RESIZE_BORDER);
-    bool nearRight = (x >= rect.right - RESIZE_BORDER);
-    bool nearTop = (y <= RESIZE_BORDER && y > 0);  // Don't conflict with title bar at y=0
-    bool nearBottom = (y >= rect.bottom - RESIZE_BORDER);
+    bool nearLeft = (x <= Dpi(RESIZE_BORDER));
+    bool nearRight = (x >= rect.right - Dpi(RESIZE_BORDER));
+    bool nearTop = (y <= Dpi(RESIZE_BORDER) && y > 0);  // Don't conflict with title bar at y=0
+    bool nearBottom = (y >= rect.bottom - Dpi(RESIZE_BORDER));
 
     // When rolled up (minimized), disable resizing completely
     if (config.IsRolledUp) {
@@ -262,20 +262,20 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
     RECT wa = mi.rcWork;  // Work area (excludes taskbar)
 
     // Left edge
-    if (std::abs(newLeft - wa.left) < SNAP_DISTANCE) {
-        newLeft = wa.left + SNAP_GAP;
+    if (std::abs(newLeft - wa.left) < Dpi(SNAP_DISTANCE)) {
+        newLeft = wa.left + Dpi(SNAP_GAP);
     }
     // Right edge
-    if (std::abs(newRight - wa.right) < SNAP_DISTANCE) {
-        newLeft = wa.right - width - SNAP_GAP;
+    if (std::abs(newRight - wa.right) < Dpi(SNAP_DISTANCE)) {
+        newLeft = wa.right - width - Dpi(SNAP_GAP);
     }
     // Top edge
-    if (std::abs(newTop - wa.top) < SNAP_DISTANCE) {
-        newTop = wa.top + SNAP_GAP;
+    if (std::abs(newTop - wa.top) < Dpi(SNAP_DISTANCE)) {
+        newTop = wa.top + Dpi(SNAP_GAP);
     }
     // Bottom edge
-    if (std::abs(newBottom - wa.bottom) < SNAP_DISTANCE) {
-        newTop = wa.bottom - height - SNAP_GAP;
+    if (std::abs(newBottom - wa.bottom) < Dpi(SNAP_DISTANCE)) {
+        newTop = wa.bottom - height - Dpi(SNAP_GAP);
     }
 
     // Snap to other corrals
@@ -292,63 +292,63 @@ void CorralWindow::ApplySnap(int& newLeft, int& newTop, int width, int height) {
         int otherBottom = otherRect.bottom;
 
         // Adjacent snapping (with gap) - only when corrals are nearby
-        bool verticalOverlap = (newTop < otherBottom + SNAP_DISTANCE) && (newBottom > otherTop - SNAP_DISTANCE);
-        bool horizontalOverlap = (newLeft < otherRight + SNAP_DISTANCE) && (newRight > otherLeft - SNAP_DISTANCE);
+        bool verticalOverlap = (newTop < otherBottom + Dpi(SNAP_DISTANCE)) && (newBottom > otherTop - Dpi(SNAP_DISTANCE));
+        bool horizontalOverlap = (newLeft < otherRight + Dpi(SNAP_DISTANCE)) && (newRight > otherLeft - Dpi(SNAP_DISTANCE));
 
         if (verticalOverlap) {
             // Snap our right edge to their left edge (with gap)
-            if (std::abs(newRight - otherLeft + SNAP_GAP) < SNAP_DISTANCE) {
-                newLeft = otherLeft - width - SNAP_GAP;
+            if (std::abs(newRight - otherLeft + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+                newLeft = otherLeft - width - Dpi(SNAP_GAP);
             }
             // Snap our left edge to their right edge (with gap)
-            if (std::abs(newLeft - otherRight - SNAP_GAP) < SNAP_DISTANCE) {
-                newLeft = otherRight + SNAP_GAP;
+            if (std::abs(newLeft - otherRight - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+                newLeft = otherRight + Dpi(SNAP_GAP);
             }
         }
 
         if (horizontalOverlap) {
             // Snap our bottom edge to their top edge (with gap)
-            if (std::abs(newBottom - otherTop + SNAP_GAP) < SNAP_DISTANCE) {
-                newTop = otherTop - height - SNAP_GAP;
+            if (std::abs(newBottom - otherTop + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+                newTop = otherTop - height - Dpi(SNAP_GAP);
             }
             // Snap our top edge to their bottom edge (with gap)
-            if (std::abs(newTop - otherBottom - SNAP_GAP) < SNAP_DISTANCE) {
-                newTop = otherBottom + SNAP_GAP;
+            if (std::abs(newTop - otherBottom - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+                newTop = otherBottom + Dpi(SNAP_GAP);
             }
         }
 
         // Alignment snapping - works across the whole screen
         // Align top edges
-        if (std::abs(newTop - otherTop) < SNAP_DISTANCE) {
+        if (std::abs(newTop - otherTop) < Dpi(SNAP_DISTANCE)) {
             newTop = otherTop;
         }
         // Align bottom edges
-        if (std::abs(newTop + height - otherBottom) < SNAP_DISTANCE) {
+        if (std::abs(newTop + height - otherBottom) < Dpi(SNAP_DISTANCE)) {
             newTop = otherBottom - height;
         }
         // Align our top to their bottom (with gap)
-        if (std::abs(newTop - otherBottom - SNAP_GAP) < SNAP_DISTANCE) {
-            newTop = otherBottom + SNAP_GAP;
+        if (std::abs(newTop - otherBottom - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+            newTop = otherBottom + Dpi(SNAP_GAP);
         }
         // Align our bottom to their top (with gap)
-        if (std::abs(newTop + height - otherTop + SNAP_GAP) < SNAP_DISTANCE) {
-            newTop = otherTop - height - SNAP_GAP;
+        if (std::abs(newTop + height - otherTop + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+            newTop = otherTop - height - Dpi(SNAP_GAP);
         }
         // Align left edges
-        if (std::abs(newLeft - otherLeft) < SNAP_DISTANCE) {
+        if (std::abs(newLeft - otherLeft) < Dpi(SNAP_DISTANCE)) {
             newLeft = otherLeft;
         }
         // Align right edges
-        if (std::abs(newLeft + width - otherRight) < SNAP_DISTANCE) {
+        if (std::abs(newLeft + width - otherRight) < Dpi(SNAP_DISTANCE)) {
             newLeft = otherRight - width;
         }
         // Align our left to their right (with gap)
-        if (std::abs(newLeft - otherRight - SNAP_GAP) < SNAP_DISTANCE) {
-            newLeft = otherRight + SNAP_GAP;
+        if (std::abs(newLeft - otherRight - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+            newLeft = otherRight + Dpi(SNAP_GAP);
         }
         // Align our right to their left (with gap)
-        if (std::abs(newLeft + width - otherLeft + SNAP_GAP) < SNAP_DISTANCE) {
-            newLeft = otherLeft - width - SNAP_GAP;
+        if (std::abs(newLeft + width - otherLeft + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+            newLeft = otherLeft - width - Dpi(SNAP_GAP);
         }
     }
 }
@@ -375,24 +375,24 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
     RECT wa = mi.rcWork;
 
     // Left edge
-    if (resizingLeft && std::abs(newLeft - wa.left - SNAP_GAP) < SNAP_DISTANCE) {
+    if (resizingLeft && std::abs(newLeft - wa.left - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
         int oldRight = newRight;
-        newLeft = wa.left + SNAP_GAP;
+        newLeft = wa.left + Dpi(SNAP_GAP);
         newWidth = oldRight - newLeft;
     }
     // Right edge
-    if (resizingRight && std::abs(newRight - wa.right + SNAP_GAP) < SNAP_DISTANCE) {
-        newWidth = wa.right - newLeft - SNAP_GAP;
+    if (resizingRight && std::abs(newRight - wa.right + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+        newWidth = wa.right - newLeft - Dpi(SNAP_GAP);
     }
     // Top edge
-    if (resizingTop && std::abs(newTop - wa.top - SNAP_GAP) < SNAP_DISTANCE) {
+    if (resizingTop && std::abs(newTop - wa.top - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
         int oldBottom = newBottom;
-        newTop = wa.top + SNAP_GAP;
+        newTop = wa.top + Dpi(SNAP_GAP);
         newHeight = oldBottom - newTop;
     }
     // Bottom edge
-    if (resizingBottom && std::abs(newBottom - wa.bottom + SNAP_GAP) < SNAP_DISTANCE) {
-        newHeight = wa.bottom - newTop - SNAP_GAP;
+    if (resizingBottom && std::abs(newBottom - wa.bottom + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+        newHeight = wa.bottom - newTop - Dpi(SNAP_GAP);
     }
 
     // Recalculate edges after screen snap
@@ -408,20 +408,20 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
         GetWindowRect(other->GetHWND(), &otherRect);
 
         // Check vertical overlap
-        bool verticalOverlap = (newTop < otherRect.bottom + SNAP_DISTANCE) && (newBottom > otherRect.top - SNAP_DISTANCE);
+        bool verticalOverlap = (newTop < otherRect.bottom + Dpi(SNAP_DISTANCE)) && (newBottom > otherRect.top - Dpi(SNAP_DISTANCE));
         // Check horizontal overlap
-        bool horizontalOverlap = (newLeft < otherRect.right + SNAP_DISTANCE) && (newRight > otherRect.left - SNAP_DISTANCE);
+        bool horizontalOverlap = (newLeft < otherRect.right + Dpi(SNAP_DISTANCE)) && (newRight > otherRect.left - Dpi(SNAP_DISTANCE));
 
         if (verticalOverlap) {
             if (resizingLeft) {
                 // Snap left edge to their right edge (with gap)
-                if (std::abs(newLeft - otherRect.right - SNAP_GAP) < SNAP_DISTANCE) {
+                if (std::abs(newLeft - otherRect.right - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
                     int oldRight = newRight;
-                    newLeft = otherRect.right + SNAP_GAP;
+                    newLeft = otherRect.right + Dpi(SNAP_GAP);
                     newWidth = oldRight - newLeft;
                 }
                 // Snap left edge to their left edge (align)
-                if (std::abs(newLeft - otherRect.left) < SNAP_DISTANCE) {
+                if (std::abs(newLeft - otherRect.left) < Dpi(SNAP_DISTANCE)) {
                     int oldRight = newRight;
                     newLeft = otherRect.left;
                     newWidth = oldRight - newLeft;
@@ -429,11 +429,11 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
             }
             if (resizingRight) {
                 // Snap right edge to their left edge (with gap)
-                if (std::abs(newRight - otherRect.left + SNAP_GAP) < SNAP_DISTANCE) {
-                    newWidth = otherRect.left - newLeft - SNAP_GAP;
+                if (std::abs(newRight - otherRect.left + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+                    newWidth = otherRect.left - newLeft - Dpi(SNAP_GAP);
                 }
                 // Snap right edge to their right edge (align)
-                if (std::abs(newRight - otherRect.right) < SNAP_DISTANCE) {
+                if (std::abs(newRight - otherRect.right) < Dpi(SNAP_DISTANCE)) {
                     newWidth = otherRect.right - newLeft;
                 }
             }
@@ -442,13 +442,13 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
         if (horizontalOverlap) {
             if (resizingTop) {
                 // Snap top edge to their bottom edge (with gap)
-                if (std::abs(newTop - otherRect.bottom - SNAP_GAP) < SNAP_DISTANCE) {
+                if (std::abs(newTop - otherRect.bottom - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
                     int oldBottom = newBottom;
-                    newTop = otherRect.bottom + SNAP_GAP;
+                    newTop = otherRect.bottom + Dpi(SNAP_GAP);
                     newHeight = oldBottom - newTop;
                 }
                 // Snap top edge to their top edge (align)
-                if (std::abs(newTop - otherRect.top) < SNAP_DISTANCE) {
+                if (std::abs(newTop - otherRect.top) < Dpi(SNAP_DISTANCE)) {
                     int oldBottom = newBottom;
                     newTop = otherRect.top;
                     newHeight = oldBottom - newTop;
@@ -456,11 +456,11 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
             }
             if (resizingBottom) {
                 // Snap bottom edge to their top edge (with gap)
-                if (std::abs(newBottom - otherRect.top + SNAP_GAP) < SNAP_DISTANCE) {
-                    newHeight = otherRect.top - newTop - SNAP_GAP;
+                if (std::abs(newBottom - otherRect.top + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
+                    newHeight = otherRect.top - newTop - Dpi(SNAP_GAP);
                 }
                 // Snap bottom edge to their bottom edge (align)
-                if (std::abs(newBottom - otherRect.bottom) < SNAP_DISTANCE) {
+                if (std::abs(newBottom - otherRect.bottom) < Dpi(SNAP_DISTANCE)) {
                     newHeight = otherRect.bottom - newTop;
                 }
             }
@@ -737,6 +737,7 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
             int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                 screenX, screenY, 0, hwnd, nullptr);
             PostMessageW(hwnd, WM_NULL, 0, 0);
+            SendToBottom();
 
             if (cmd == 0x7FFF + 1) {
                 auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
@@ -825,9 +826,13 @@ void CorralWindow::OnDrop(IDataObject* pDataObj) {
     if (GetActiveTab().IsVirtual) return;
 
     bool changed = false;
+    std::wstring desktopPath = GetDesktopPath();
+    std::wstring publicDesktopPath = GetPublicDesktopPath();
 
-    // Try CF_HDROP first - this preserves actual file paths including .lnk shortcuts
-    // (CFSTR_SHELLIDLIST resolves .lnk to their targets, losing the shortcut itself)
+    // Try CF_HDROP first for files dragged from Explorer windows.
+    // Note: the desktop shell resolves .lnk shortcuts in CF_HDROP (gives target path),
+    // so we verify each file exists on the desktop. Resolved shortcuts are handled below
+    // via CFSTR_SHELLIDLIST which preserves the actual .lnk filename.
     FORMATETC fmtHdrop = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
     STGMEDIUM stgHdrop = {};
 
@@ -843,6 +848,16 @@ void CorralWindow::OnDrop(IDataObject* pDataObj) {
                 size_t lastSlash = fullPath.find_last_of(L"\\/");
                 std::wstring fileName = (lastSlash != std::wstring::npos) ?
                     fullPath.substr(lastSlash + 1) : fullPath;
+
+                // Verify the file actually exists on the desktop.
+                // If not, CF_HDROP resolved a .lnk shortcut to its target - skip it
+                // and let CFSTR_SHELLIDLIST handle it with the correct .lnk name.
+                std::wstring userPath = desktopPath + L"\\" + fileName;
+                std::wstring pubPath = publicDesktopPath + L"\\" + fileName;
+                if (GetFileAttributesW(userPath.c_str()) == INVALID_FILE_ATTRIBUTES &&
+                    GetFileAttributesW(pubPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+                    continue;
+                }
 
                 std::string fileNameUtf8 = WideToUtf8(fileName);
 
@@ -861,8 +876,8 @@ void CorralWindow::OnDrop(IDataObject* pDataObj) {
         ReleaseStgMedium(&stgHdrop);
     }
 
-    // Fallback: try CFSTR_SHELLIDLIST for special shell items (Recycle Bin, This PC, etc.)
-    // These don't have CF_HDROP data since they aren't real files
+    // Fallback: try CFSTR_SHELLIDLIST for special shell items (Recycle Bin, etc.)
+    // and for .lnk shortcuts whose names CF_HDROP resolved to the target.
     if (!changed) {
         CLIPFORMAT cfShellIdList = (CLIPFORMAT)RegisterClipboardFormatW(L"Shell IDList Array");
         FORMATETC fmtShellIdList = { cfShellIdList, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
@@ -879,28 +894,43 @@ void CorralWindow::OnDrop(IDataObject* pDataObj) {
                     LPITEMIDLIST pidlAbsolute = ILCombine(pidlParent, pidlChild);
                     if (!pidlAbsolute) continue;
 
-                    PWSTR pszName = nullptr;
-                    HRESULT hr = SHGetNameFromIDList(pidlAbsolute, SIGDN_DESKTOPABSOLUTEPARSING, &pszName);
-                    if (FAILED(hr) || !pszName) {
-                        CoTaskMemFree(pidlAbsolute);
-                        continue;
-                    }
-
                     std::string entryUtf8;
 
-                    if (pszName[0] == L':' && pszName[1] == L':') {
-                        // Special shell item - store as "shell:{CLSID}"
-                        std::wstring clsid = pszName + 2;
-                        entryUtf8 = "shell:" + WideToUtf8(clsid);
+                    // Try SIGDN_FILESYSPATH first - this gives the actual filesystem
+                    // path (e.g. "C:\Users\...\Desktop\DexCorral-Register.lnk")
+                    // without resolving through shortcuts like other SIGDN flags do.
+                    PWSTR pszPath = nullptr;
+                    if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_FILESYSPATH, &pszPath)) && pszPath) {
+                        std::wstring fsPath = pszPath;
+                        size_t lastSlash = fsPath.find_last_of(L"\\/");
+                        std::wstring fileName = (lastSlash != std::wstring::npos) ?
+                            fsPath.substr(lastSlash + 1) : fsPath;
+                        if (!fileName.empty()) {
+                            entryUtf8 = WideToUtf8(fileName);
+                        }
+                        CoTaskMemFree(pszPath);
+                    } else {
+                        // No filesystem path - check for special shell item (::CLSID)
+                        PWSTR pszParsing = nullptr;
+                        if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_DESKTOPABSOLUTEPARSING, &pszParsing)) && pszParsing) {
+                            if (pszParsing[0] == L':' && pszParsing[1] == L':') {
+                                std::wstring clsid = pszParsing + 2;
+                                entryUtf8 = "shell:" + WideToUtf8(clsid);
+                            }
+                            CoTaskMemFree(pszParsing);
+                        }
                     }
-
-                    CoTaskMemFree(pszName);
 
                     if (!entryUtf8.empty()) {
                         auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), entryUtf8);
                         if (it == GetActiveTab().Files.end()) {
                             GetActiveTab().Files.push_back(entryUtf8);
                             changed = true;
+
+                            if (App::GetInstance()) {
+                                std::wstring wName = Utf8ToWide(entryUtf8);
+                                App::GetInstance()->RemoveFileFromOtherCorrals(wName, &GetActiveTab());
+                            }
                         }
                     }
 

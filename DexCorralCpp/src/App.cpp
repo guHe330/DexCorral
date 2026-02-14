@@ -247,7 +247,8 @@ void App::SetDefaultColorHex(const std::string& colorHex) {
 
 void App::SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
     int fontSize, const std::string& fontColor, int iconOpacity,
-    const std::string& tintColor, int tintStrength) {
+    const std::string& tintColor, int tintStrength,
+    int spacingX, int spacingY) {
     config.DefaultTitleBarHeight = titleBarHeight;
     config.DefaultHeaderFontName = fontName;
     config.DefaultHeaderFontSize = fontSize;
@@ -255,6 +256,8 @@ void App::SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
     config.DefaultIconOpacity = iconOpacity;
     config.DefaultIconTintColor = tintColor;
     config.DefaultIconTintStrength = tintStrength;
+    config.DefaultIconSpacingXPercent = spacingX;
+    config.DefaultIconSpacingYPercent = spacingY;
 }
 
 void App::ApplyColorToAllCorrals(const std::string& colorHex) {
@@ -271,7 +274,8 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
     const std::string& fontName, int fontSize, bool applyFont,
     const std::string& fontColor, bool applyFontColor,
     int iconOpacity, bool applyIconOpacity,
-    const std::string& tintColor, int tintStrength, bool applyTint) {
+    const std::string& tintColor, int tintStrength, bool applyTint,
+    int spacingX, int spacingY, bool applySpacing) {
     for (auto& corral : corrals) {
         auto& cfg = corral->GetConfig();
 
@@ -293,6 +297,10 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
         if (applyTint) {
             cfg.IconTintColor = tintColor;
             cfg.IconTintStrength = tintStrength;
+        }
+        if (applySpacing) {
+            cfg.IconSpacingXPercent = spacingX;
+            cfg.IconSpacingYPercent = spacingY;
         }
 
         corral->UpdateWallpaperBackground();
@@ -726,6 +734,8 @@ void App::CreateCorral(POINT pt) {
     newConfig.IconOpacity = config.DefaultIconOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
+    newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
+    newConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
 
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();
@@ -831,6 +841,8 @@ void App::CreateVirtualCorralAt(POINT pt) {
     newConfig.IconOpacity = config.DefaultIconOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
+    newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
+    newConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
 
     auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
     corral->Show();

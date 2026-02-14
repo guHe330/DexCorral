@@ -512,12 +512,13 @@ void CorralWindow::CalculateIconLayout() {
 }
 
 void CorralWindow::RecalculateLayout() {
+    UpdateIconSpacingForViewMode();
     CalculateIconLayout();
     UpdateLayeredContent();
 }
 
 void CorralWindow::CalculateIconLayoutGrid() {
-    int x = ICON_PADDING_LEFT;
+    int x = Dpi(ICON_PADDING_LEFT);
     int y = GetIconAreaTop();
 
     // Use actual window dimensions, not config (which may differ when rolled up/animating)
@@ -526,7 +527,7 @@ void CorralWindow::CalculateIconLayoutGrid() {
     int clientWidth = clientRect.right;
 
     // Reserve space for scrollbar if needed (will be recalculated)
-    int rightPadding = ICON_PADDING_LEFT;
+    int rightPadding = Dpi(ICON_PADDING_LEFT);
 
     for (size_t i = 0; i < icons.size(); i++) {
         auto& icon = icons[i];
@@ -539,7 +540,7 @@ void CorralWindow::CalculateIconLayoutGrid() {
 
         x += iconSpacingX;
         if (x + iconSpacingX > clientWidth - rightPadding) {
-            x = ICON_PADDING_LEFT;
+            x = Dpi(ICON_PADDING_LEFT);
             y += iconSpacingY;
         }
     }
@@ -547,16 +548,16 @@ void CorralWindow::CalculateIconLayoutGrid() {
     // Calculate total content height
     if (!icons.empty()) {
         int lastIconBottom = icons.back().rect.bottom;
-        contentHeight = lastIconBottom + ICON_PADDING_LEFT;
+        contentHeight = lastIconBottom + Dpi(ICON_PADDING_LEFT);
     } else {
         contentHeight = GetIconAreaTop();
     }
 
     // If we need a scrollbar, recalculate with scrollbar space
-    if (NeedsScrollbar() && rightPadding == ICON_PADDING_LEFT) {
-        rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
+    if (NeedsScrollbar() && rightPadding == Dpi(ICON_PADDING_LEFT)) {
+        rightPadding = Dpi(ICON_PADDING_LEFT) + Dpi(SCROLLBAR_WIDTH) + Dpi(SCROLLBAR_MARGIN) * 2;
 
-        x = ICON_PADDING_LEFT;
+        x = Dpi(ICON_PADDING_LEFT);
         y = GetIconAreaTop();
 
         for (size_t i = 0; i < icons.size(); i++) {
@@ -570,7 +571,7 @@ void CorralWindow::CalculateIconLayoutGrid() {
 
             x += iconSpacingX;
             if (x + iconSpacingX > clientWidth - rightPadding) {
-                x = ICON_PADDING_LEFT;
+                x = Dpi(ICON_PADDING_LEFT);
                 y += iconSpacingY;
             }
         }
@@ -578,7 +579,7 @@ void CorralWindow::CalculateIconLayoutGrid() {
         // Recalculate content height
         if (!icons.empty()) {
             int lastIconBottom = icons.back().rect.bottom;
-            contentHeight = lastIconBottom + ICON_PADDING_LEFT;
+            contentHeight = lastIconBottom + Dpi(ICON_PADDING_LEFT);
         }
     }
 }
@@ -593,31 +594,33 @@ void CorralWindow::CalculateIconLayoutDetails() {
     GetClientRect(hwnd, &clientRect);
     int clientWidth = clientRect.right;
     int visibleHeight = clientRect.bottom - GetIconAreaTop();
-    int rightPadding = ICON_PADDING_LEFT;
+    int rightPadding = Dpi(ICON_PADDING_LEFT);
 
     // Check if we'll need scrollbar
-    int estimatedHeight = GetIconAreaTop() + (int)icons.size() * DETAILS_ROW_HEIGHT + ICON_PADDING_LEFT;
+    int detailsRow = Dpi(DETAILS_ROW_HEIGHT);
+    int detailsIcon = Dpi(ICON_SIZE_DETAILS);
+    int estimatedHeight = GetIconAreaTop() + (int)icons.size() * detailsRow + Dpi(ICON_PADDING_LEFT);
     if (estimatedHeight > visibleHeight) {
-        rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
+        rightPadding = Dpi(ICON_PADDING_LEFT) + Dpi(SCROLLBAR_WIDTH) + Dpi(SCROLLBAR_MARGIN) * 2;
     }
 
     for (size_t i = 0; i < icons.size(); i++) {
         auto& icon = icons[i];
 
         // Icon is at the left of each row
-        int iconImgX = ICON_PADDING_LEFT + 2;
-        int iconImgY = y + (DETAILS_ROW_HEIGHT - ICON_SIZE_DETAILS) / 2;
+        int iconImgX = Dpi(ICON_PADDING_LEFT) + Dpi(2);
+        int iconImgY = y + (detailsRow - detailsIcon) / 2;
 
-        icon.iconRect = { iconImgX, iconImgY, iconImgX + ICON_SIZE_DETAILS, iconImgY + ICON_SIZE_DETAILS };
+        icon.iconRect = { iconImgX, iconImgY, iconImgX + detailsIcon, iconImgY + detailsIcon };
         // Full row rect for selection and hit testing
-        icon.rect = { ICON_PADDING_LEFT, y, clientWidth - rightPadding, y + DETAILS_ROW_HEIGHT };
+        icon.rect = { Dpi(ICON_PADDING_LEFT), y, clientWidth - rightPadding, y + detailsRow };
 
-        y += DETAILS_ROW_HEIGHT;
+        y += detailsRow;
     }
 
     // Calculate total content height
     if (!icons.empty()) {
-        contentHeight = y + ICON_PADDING_LEFT;
+        contentHeight = y + Dpi(ICON_PADDING_LEFT);
     } else {
         contentHeight = GetIconAreaTop();
     }
@@ -652,20 +655,20 @@ RECT CorralWindow::GetIconLabelRect(int iconIndex) const {
         RECT rect;
         GetClientRect(hwnd, &rect);
         int clientWidth = rect.right - rect.left;
-        int rightPadding = ICON_PADDING_LEFT;
+        int rightPadding = Dpi(ICON_PADDING_LEFT);
         if (NeedsScrollbar()) {
-            rightPadding = ICON_PADDING_LEFT + SCROLLBAR_WIDTH + SCROLLBAR_MARGIN * 2;
+            rightPadding = Dpi(ICON_PADDING_LEFT) + Dpi(SCROLLBAR_WIDTH) + Dpi(SCROLLBAR_MARGIN) * 2;
         }
-        int contentWidth = clientWidth - ICON_PADDING_LEFT - rightPadding;
+        int contentWidth = clientWidth - Dpi(ICON_PADDING_LEFT) - rightPadding;
 
-        int nameCol = icon.iconRect.left + ICON_SIZE_DETAILS + 4;
+        int nameCol = icon.iconRect.left + Dpi(ICON_SIZE_DETAILS) + Dpi(4);
         int typeCol = nameCol + (int)(contentWidth * 0.40);
 
-        return { nameCol, icon.rect.top, typeCol - 4, icon.rect.bottom };
+        return { nameCol, icon.rect.top, typeCol - Dpi(4), icon.rect.bottom };
     }
 
     // For icon views, label is below the icon
-    int labelTop = icon.iconRect.bottom + 2;
+    int labelTop = icon.iconRect.bottom + Dpi(2);
     return { icon.rect.left, labelTop, icon.rect.right, icon.rect.bottom };
 }
 
@@ -688,34 +691,49 @@ bool CorralWindow::HitTestIconLabel(int x, int y, int iconIndex) const {
 // ============================================================================
 
 int CorralWindow::GetIconSizeForViewMode() const {
+    int desktopSize = GetDesktopIconSize();  // logical pixels from registry
+    int size;
+
     switch (GetActiveTab().GetViewMode()) {
-    case ViewMode::SmallIcons: {
-        // Small = 2/3 of desktop icon size, minimum 32
-        int desktopSize = GetDesktopIconSize();
-        int smallSize = desktopSize * 2 / 3;
-        return (smallSize < 32) ? 32 : smallSize;
-    }
+    case ViewMode::SmallIcons:
+        size = 32;
+        break;
     case ViewMode::MediumIcons:
-        return GetDesktopIconSize();
+        // Medium = desktop icon size, but at least 48 so it differs from small
+        size = (desktopSize <= 32) ? 48 : desktopSize;
+        break;
     case ViewMode::LargeIcons: {
         // Large = 2x desktop icon size, minimum 96
-        int desktopSize = GetDesktopIconSize();
         int largeSize = desktopSize * 2;
-        return (largeSize < 96) ? 96 : largeSize;
+        size = (largeSize < 96) ? 96 : largeSize;
+        break;
     }
-    case ViewMode::Details: return ICON_SIZE_DETAILS;
-    default: return GetDesktopIconSize();
+    case ViewMode::Details:
+        size = ICON_SIZE_DETAILS;
+        break;
+    default:
+        size = desktopSize;
+        break;
     }
+
+    return Dpi(size);
 }
 
 void CorralWindow::UpdateIconSpacingForViewMode() {
     if (GetActiveTab().GetViewMode() == ViewMode::Details) {
-        iconSpacingX = 72;
-        iconSpacingY = DETAILS_ROW_HEIGHT;
+        iconSpacingX = Dpi(72);
+        iconSpacingY = Dpi(DETAILS_ROW_HEIGHT);
         return;
     }
 
-    // Scale spacing based on actual icon size with room for labels
-    iconSpacingX = iconSize + 32;
-    iconSpacingY = iconSize + 32;
+    // Use desktop-like grid spacing (queries desktop ListView)
+    GetDesktopIconSpacing(iconSpacingX, iconSpacingY);
+
+    // Apply user's per-corral spacing multiplier
+    iconSpacingX = iconSpacingX * config.IconSpacingXPercent / 100;
+    iconSpacingY = iconSpacingY * config.IconSpacingYPercent / 100;
+
+    // Ensure icons don't overlap (minimum = icon size + small label space)
+    if (iconSpacingX < iconSize + Dpi(16)) iconSpacingX = iconSize + Dpi(16);
+    if (iconSpacingY < iconSize + Dpi(20)) iconSpacingY = iconSize + Dpi(20);
 }

@@ -158,6 +158,7 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     SetForegroundWindow(hwnd);
     int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
     PostMessageW(hwnd, WM_NULL, 0, 0);
+    SendToBottom();
 
     DestroyMenu(menu);
 
@@ -411,6 +412,8 @@ void CorralWindow::ChangeFolderPath() {
 
     // Reload icons
     LoadFiles();
+
+    SendToBottom();
 
     // Save config
     if (App::GetInstance()) {

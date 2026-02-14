@@ -32,14 +32,16 @@ public:
     void SetDefaultColorHex(const std::string& colorHex);
     void SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
         int fontSize, const std::string& fontColor, int iconOpacity,
-        const std::string& tintColor, int tintStrength);
+        const std::string& tintColor, int tintStrength,
+        int spacingX, int spacingY);
     void ApplyColorToAllCorrals(const std::string& colorHex);
     void ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyColor,
         int titleBarHeight, bool applyHeight,
         const std::string& fontName, int fontSize, bool applyFont,
         const std::string& fontColor, bool applyFontColor,
         int iconOpacity, bool applyIconOpacity,
-        const std::string& tintColor, int tintStrength, bool applyTint);
+        const std::string& tintColor, int tintStrength, bool applyTint,
+        int spacingX, int spacingY, bool applySpacing);
     void CreateCorralAt(POINT pt);  // Create new corral at specified position
     void CreateVirtualCorralAt(POINT pt);  // Create new virtual corral at specified position
     WallpaperManager* GetWallpaperManager() { return wallpaperManager.get(); }

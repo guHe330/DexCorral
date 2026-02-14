@@ -154,6 +154,7 @@ void CorralWindow::EndIconRename(bool save) {
     // Restore layered window style (was disabled for child edit control to work)
     LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+    SendToBottom();
 
     // Redraw to show the updated label
     UpdateLayeredContent();
@@ -323,6 +324,7 @@ void CorralWindow::ShowRenameDialog() {
         RenameDlgProc,
         (LPARAM)nameBuffer
     );
+    SendToBottom();
 
     if (result == IDOK && wcslen(nameBuffer) > 0) {
         int sz = WideCharToMultiByte(CP_UTF8, 0, nameBuffer, -1, nullptr, 0, nullptr, nullptr);
@@ -369,6 +371,10 @@ struct AppearanceDlgData {
     HBRUSH tintColorBrush;
     int tintStrength;
     bool tintChanged;
+    int iconSpacingX;
+    bool iconSpacingXChanged;
+    int iconSpacingY;
+    bool iconSpacingYChanged;
 
     // Checkboxes
     bool useAsDefault;
@@ -431,6 +437,20 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         SendMessageW(hTintSlider, TBM_SETPOS, TRUE, data->tintStrength);
         swprintf_s(label, L"%d%%", (data->tintStrength * 100) / 255);
         SetDlgItemTextW(hDlg, 121, label);
+
+        // Setup horizontal spacing slider (ID 130)
+        HWND hSpacingXSlider = GetDlgItem(hDlg, 130);
+        SendMessageW(hSpacingXSlider, TBM_SETRANGE, TRUE, MAKELPARAM(50, 200));
+        SendMessageW(hSpacingXSlider, TBM_SETPOS, TRUE, data->iconSpacingX);
+        swprintf_s(label, L"%d%%", data->iconSpacingX);
+        SetDlgItemTextW(hDlg, 131, label);
+
+        // Setup vertical spacing slider (ID 132)
+        HWND hSpacingYSlider = GetDlgItem(hDlg, 132);
+        SendMessageW(hSpacingYSlider, TBM_SETRANGE, TRUE, MAKELPARAM(50, 200));
+        SendMessageW(hSpacingYSlider, TBM_SETPOS, TRUE, data->iconSpacingY);
+        swprintf_s(label, L"%d%%", data->iconSpacingY);
+        SetDlgItemTextW(hDlg, 133, label);
 
         // Position below parent corral
         HWND hParent = GetParent(hDlg);
@@ -646,6 +666,28 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
                 AppearanceUpdateLivePreview(data);
             }
         }
+        else if (hCtrl == GetDlgItem(hDlg, 130)) { // Horizontal spacing
+            data->iconSpacingX = pos;
+            data->iconSpacingXChanged = true;
+            swprintf_s(label, L"%d%%", pos);
+            SetDlgItemTextW(hDlg, 131, label);
+
+            if (data->corralConfig) {
+                data->corralConfig->IconSpacingXPercent = pos;
+                AppearanceUpdateLivePreview(data, true);  // relayout needed
+            }
+        }
+        else if (hCtrl == GetDlgItem(hDlg, 132)) { // Vertical spacing
+            data->iconSpacingY = pos;
+            data->iconSpacingYChanged = true;
+            swprintf_s(label, L"%d%%", pos);
+            SetDlgItemTextW(hDlg, 133, label);
+
+            if (data->corralConfig) {
+                data->corralConfig->IconSpacingYPercent = pos;
+                AppearanceUpdateLivePreview(data, true);  // relayout needed
+            }
+        }
         return TRUE;
     }
     case WM_DESTROY:
@@ -715,7 +757,7 @@ void CorralWindow::ShowAppearanceDialog() {
     // Total height: ~225
 
     const int DLG_WIDTH = 220;
-    const int DLG_HEIGHT = 252;
+    const int DLG_HEIGHT = 292;
     const int ITEM_COUNT = 20;
 
     WORD dlgTemplate[4096] = {};
@@ -796,18 +838,34 @@ void CorralWindow::ShowAppearanceDialog() {
     // 25. Tint strength label (ID 121)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 170, 25, 12, 121, 0xFFFF, 0x0082, L"0%");
 
+    // === Icon Spacing group ===
+    // Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 200, 210, 40, (WORD)-1, 0xFFFF, 0x0080, L"Icon Spacing");
+    // "Horiz" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 213, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Horiz");
+    // Horizontal spacing slider (ID 130)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 211, 135, 15, 130);
+    // Horizontal spacing label (ID 131)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 213, 25, 10, 131, 0xFFFF, 0x0082, L"100%");
+    // "Vert" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 227, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Vert");
+    // Vertical spacing slider (ID 132)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 225, 135, 15, 132);
+    // Vertical spacing label (ID 133)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 227, 25, 10, 133, 0xFFFF, 0x0082, L"100%");
+
     // === Checkboxes ===
     // Checkbox "Use as default" (ID 107)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 201, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 246, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
     // Checkbox "Apply to all corrals" (ID 108)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 215, 200, 12, 108, 0xFFFF, 0x0080, L"Apply to all corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 260, 200, 12, 108, 0xFFFF, 0x0080, L"Apply to all corrals");
 
     // === Buttons ===
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 233, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 233, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 275, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 275, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
 
-    // Fix item count in the template header (19 original + 6 new tint controls + 4 checkboxes/buttons = 29)
-    ((DLGTEMPLATE*)dlgTemplate)->cdit = 29;
+    // Fix item count in the template header
+    ((DLGTEMPLATE*)dlgTemplate)->cdit = 36;
 
     // Data prep
     AppearanceDlgData dlgData = {};
@@ -855,6 +913,8 @@ void CorralWindow::ShowAppearanceDialog() {
         dlgData.tintColor = RGB((tintVal >> 16) & 0xFF, (tintVal >> 8) & 0xFF, tintVal & 0xFF);
     }
     dlgData.tintStrength = config.IconTintStrength;
+    dlgData.iconSpacingX = config.IconSpacingXPercent;
+    dlgData.iconSpacingY = config.IconSpacingYPercent;
 
     // Save originals for cancel
     std::string originalColor = GetActiveTab().ColorHex;
@@ -865,6 +925,8 @@ void CorralWindow::ShowAppearanceDialog() {
     int originalIconOpacity = config.IconOpacity;
     std::string originalTintColor = config.IconTintColor;
     int originalTintStrength = config.IconTintStrength;
+    int originalSpacingX = config.IconSpacingXPercent;
+    int originalSpacingY = config.IconSpacingYPercent;
 
     INT_PTR result = DialogBoxIndirectParamW(
         GetModuleHandleW(nullptr),
@@ -873,6 +935,7 @@ void CorralWindow::ShowAppearanceDialog() {
         AppearanceDlgProc,
         (LPARAM)&dlgData
     );
+    SendToBottom();
 
     if (result != IDOK) {
         // Restore all settings on cancel
@@ -884,6 +947,8 @@ void CorralWindow::ShowAppearanceDialog() {
         config.IconOpacity = originalIconOpacity;
         config.IconTintColor = originalTintColor;
         config.IconTintStrength = originalTintStrength;
+        config.IconSpacingXPercent = originalSpacingX;
+        config.IconSpacingYPercent = originalSpacingY;
         CalculateIconLayout();
         UpdateLayeredContent();
     } else {
@@ -900,6 +965,8 @@ void CorralWindow::ShowAppearanceDialog() {
         sprintf_s(tintBuf, "#%02X%02X%02X", GetRValue(dlgData.tintColor), GetGValue(dlgData.tintColor), GetBValue(dlgData.tintColor));
         config.IconTintColor = tintBuf;
         config.IconTintStrength = dlgData.tintStrength;
+        config.IconSpacingXPercent = dlgData.iconSpacingX;
+        config.IconSpacingYPercent = dlgData.iconSpacingY;
 
         CalculateIconLayout();
         UpdateLayeredContent();
@@ -910,7 +977,8 @@ void CorralWindow::ShowAppearanceDialog() {
                 app->SetDefaultColorHex(GetActiveTab().ColorHex);
                 app->SetDefaultAppearance(config.TitleBarHeight, config.HeaderFontName,
                     config.HeaderFontSize, config.HeaderFontColor, config.IconOpacity,
-                    config.IconTintColor, config.IconTintStrength);
+                    config.IconTintColor, config.IconTintStrength,
+                    config.IconSpacingXPercent, config.IconSpacingYPercent);
             }
 
             if (dlgData.applyToAll) {
@@ -920,7 +988,9 @@ void CorralWindow::ShowAppearanceDialog() {
                     config.HeaderFontName, config.HeaderFontSize, dlgData.fontChanged,
                     config.HeaderFontColor, dlgData.fontColorChanged,
                     config.IconOpacity, dlgData.iconOpacityChanged,
-                    config.IconTintColor, config.IconTintStrength, dlgData.tintChanged);
+                    config.IconTintColor, config.IconTintStrength, dlgData.tintChanged,
+                    config.IconSpacingXPercent, config.IconSpacingYPercent,
+                    dlgData.iconSpacingXChanged || dlgData.iconSpacingYChanged);
             }
 
             app->SaveConfig();

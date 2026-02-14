@@ -72,6 +72,7 @@ public:
 
     void Show();
     void Hide();
+    void SendToBottom();
     void UpdateWallpaperBackground();
     void LoadFiles();
     void SyncConfigFromWindow();  // Update config from current window state
@@ -84,8 +85,8 @@ public:
     HWND GetHWND() const { return hwnd; }
     CorralWindowConfig& GetConfig() { return config; }
     const CorralWindowConfig& GetConfig() const { return config; }
-    int GetTitleBarHeight() const { return config.TitleBarHeight; }
-    int GetIconAreaTop() const { return config.TitleBarHeight + 4; }
+    int GetTitleBarHeight() const { return Dpi(config.TitleBarHeight); }
+    int GetIconAreaTop() const { return Dpi(config.TitleBarHeight + 4); }
     void RecalculateLayout();  // Public wrapper for icon layout recalculation
     void SetCurrentOpacity(int opacity) { currentOpacity = (opacity < 5) ? 5 : opacity; }
 
@@ -192,8 +193,13 @@ private:
 
     static std::wstring GetDesktopPath();
     static std::wstring GetPublicDesktopPath();
-    static int GetDesktopIconSize();  // Read from registry
-    void GetDesktopIconSpacing(int& spacingX, int& spacingY);  // Read from registry
+    static int GetDesktopIconSize();  // Read from registry (logical pixels)
+    void GetDesktopIconSpacing(int& spacingX, int& spacingY);  // Query desktop ListView
+
+    // DPI scaling - applies monitor DPI factor to logical pixel values.
+    // Controlled by s_enableDpiScaling flag for easy toggling.
+    int Dpi(int logicalPixels) const;
+    static bool s_enableDpiScaling;
 
     // String conversion utilities (used across split implementation files)
     static std::string WideToUtf8(const std::wstring& wide);

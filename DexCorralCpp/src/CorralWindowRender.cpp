@@ -329,7 +329,7 @@ void CorralWindow::UpdateLayeredContent() {
                     }
                 }
 
-                int currentIconSize = ICON_SIZE_DETAILS;
+                int currentIconSize = Dpi(ICON_SIZE_DETAILS);
                 HICON hIconToDraw = icon.hIconSmall ? icon.hIconSmall : icon.hIcon;
 
                 // Draw small icon
@@ -396,8 +396,8 @@ void CorralWindow::UpdateLayeredContent() {
 
                 // Column layout for details view
                 // Columns: Name (40%) | Type (20%) | Size (15%) | Date (15%) | Sync (10%)
-                int contentWidth = icon.rect.right - icon.rect.left - ICON_SIZE_DETAILS - 8;
-                int nameCol = icon.iconRect.left + ICON_SIZE_DETAILS + 4;
+                int contentWidth = icon.rect.right - icon.rect.left - Dpi(ICON_SIZE_DETAILS) - Dpi(8);
+                int nameCol = icon.iconRect.left + Dpi(ICON_SIZE_DETAILS) + Dpi(4);
                 int typeCol = nameCol + (int)(contentWidth * 0.40);
                 int sizeCol = typeCol + (int)(contentWidth * 0.20);
                 int dateCol = sizeCol + (int)(contentWidth * 0.15);
@@ -580,7 +580,7 @@ void CorralWindow::UpdateLayeredContent() {
                 }
 
                 // Label with glow shadow (matches Windows desktop style)
-                int labelTop = iconDrawTop + iconSize + 2;
+                int labelTop = iconDrawTop + iconSize + Dpi(2);
                 RECT labelRect = {
                     icon.rect.left,
                     labelTop,
@@ -666,7 +666,7 @@ void CorralWindow::UpdateLayeredContent() {
         DWORD thumbPixel = (thumbAlpha << 24) | (thumbPmR << 16) | (thumbPmG << 8) | thumbPmB;
 
         // Draw rounded thumb (simple rounded corners)
-        int radius = (SCROLLBAR_WIDTH - 2) / 2;
+        int radius = (Dpi(SCROLLBAR_WIDTH) - 2) / 2;
         for (int y = thumb.top; y < thumb.bottom && y < h; y++) {
             for (int x = thumb.left; x < thumb.right && x < w; x++) {
                 if (x >= 0 && y >= 0) {
