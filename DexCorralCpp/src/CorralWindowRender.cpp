@@ -1,5 +1,14 @@
-// CorralWindowRender.cpp - Per-pixel alpha rendering for corral windows
+/**
+ * CorralWindowRender.cpp - Per-pixel alpha rendering and wallpaper blending
+ *
+ * Implements layered window rendering using DIB sections with per-pixel alpha blending.
+ * Manages wallpaper sampling, color compositing, icon rendering, and the alpha fix-up
+ * mechanism necessary because GDI draws with alpha=0. Provides seamless visual integration
+ * with the desktop by sampling and blending wallpaper underneath the corral.
+ */
+
 #include "CorralWindow.h"
+#include "Constants.h"
 #include "App.h"
 #include <windowsx.h>
 #include <uxtheme.h>
@@ -65,7 +74,7 @@ void CorralWindow::UpdateLayeredContent() {
     }
 
     // Title bar - darker overlay
-    BYTE titleAlpha = 220;
+    BYTE titleAlpha = TITLE_TEXT_ALPHA;
     BYTE titlePmR = (BYTE)((bgR * titleAlpha) / 255 / 2);  // Darker
     BYTE titlePmG = (BYTE)((bgG * titleAlpha) / 255 / 2);
     BYTE titlePmB = (BYTE)((bgB * titleAlpha) / 255 / 2);
@@ -93,7 +102,7 @@ void CorralWindow::UpdateLayeredContent() {
 
         // Draw tab separator (vertical line between tabs)
         if (i > 0) {
-            DWORD sepPixel = (200 << 24) | (80 << 16) | (80 << 8) | 80;
+            DWORD sepPixel = TAB_SEPARATOR_COLOR;
             for (int y = 2; y < GetTitleBarHeight() - 2 && y < h; y++) {
                 if (tabRect.left >= 0 && tabRect.left < w) {
                     pixels[y * w + tabRect.left] = sepPixel;
@@ -103,7 +112,7 @@ void CorralWindow::UpdateLayeredContent() {
     }
 
     // Draw border (1px solid line at full opacity)
-    DWORD borderPixel = (255 << 24) | (100 << 16) | (100 << 8) | 100;
+    DWORD borderPixel = CORRAL_BORDER_COLOR;
     // Top edge
     for (int x = 0; x < w; x++) pixels[x] = borderPixel;
     // Bottom edge
@@ -160,7 +169,17 @@ void CorralWindow::UpdateLayeredContent() {
     SelectObject(memDC, oldFont);
     DeleteObject(titleFont);
 
-    // Fix alpha for title/tab area (GDI sets alpha to 0)
+    /**
+     * Alpha channel fix-up for GDI-drawn title/tab area.
+     *
+     * Problem: GDI (DrawTextW) renders with alpha=0, which makes the text invisible
+     * in our 32-bit DIB with per-pixel alpha blending. This fix-up loop restores the
+     * alpha channel for all pixels that GDI modified:
+     *   - If GDI drew colored text (alpha=0 but RGB non-zero): set alpha to 255 (opaque)
+     *   - If GDI cleared a pixel (alpha=0 and RGB=0): restore the background tab color
+     * This allows layered window compositing to show the text correctly while maintaining
+     * per-pixel transparency for the rest of the window.
+     */
     for (int y = 0; y < GetTitleBarHeight() && y < h; y++) {
         for (int x = 0; x < w; x++) {
             DWORD pixel = pixels[y * w + x];
@@ -230,7 +249,7 @@ void CorralWindow::UpdateLayeredContent() {
         HBITMAP iconTempBmp = nullptr;
         HBITMAP iconTempOldBmp = nullptr;
         DWORD* iconTempPixels = nullptr;
-        const int ICON_TEMP_SIZE = (iconSize > 64) ? iconSize : 64;
+        const int ICON_TEMP_SIZE = (iconSize > ICON_TEMP_SIZE_THRESHOLD) ? iconSize : ICON_TEMP_SIZE_THRESHOLD;
         if (useTempIcon) {
             BITMAPINFO iconBmi = {};
             iconBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -271,8 +290,8 @@ void CorralWindow::UpdateLayeredContent() {
 
             // Selection highlight (only for grid views, details view handled separately)
             if (i == selectedIcon && !isDraggingIcon && !isDetailsView) {
-                BYTE selAlpha = 180;
-                BYTE selR = 60, selG = 120, selB = 200;
+                BYTE selAlpha = SELECTION_ALPHA;
+                BYTE selR = SELECTION_R, selG = SELECTION_G, selB = SELECTION_B;
                 BYTE selPmR = (BYTE)((selR * selAlpha) / 255);
                 BYTE selPmG = (BYTE)((selG * selAlpha) / 255);
                 BYTE selPmB = (BYTE)((selB * selAlpha) / 255);
@@ -643,11 +662,11 @@ void CorralWindow::UpdateLayeredContent() {
         RECT track = GetScrollbarTrackRect();
         RECT thumb = GetScrollbarThumbRect();
 
-        // Draw track (subtle, semi-transparent)
-        BYTE trackAlpha = 60;
-        BYTE trackPmR = (BYTE)((255 * trackAlpha) / 255);
-        BYTE trackPmG = (BYTE)((255 * trackAlpha) / 255);
-        BYTE trackPmB = (BYTE)((255 * trackAlpha) / 255);
+        // Use background color for scrollbar to match corral appearance
+        BYTE trackAlpha = (BYTE)((bgAlpha * 120) / 255);  // Track is semi-transparent
+        BYTE trackPmR = (BYTE)((bgR * trackAlpha) / 255);
+        BYTE trackPmG = (BYTE)((bgG * trackAlpha) / 255);
+        BYTE trackPmB = (BYTE)((bgB * trackAlpha) / 255);
         DWORD trackPixel = (trackAlpha << 24) | (trackPmR << 16) | (trackPmG << 8) | trackPmB;
 
         for (int y = track.top; y < track.bottom && y < h; y++) {
@@ -658,11 +677,12 @@ void CorralWindow::UpdateLayeredContent() {
             }
         }
 
-        // Draw thumb (more visible, rounded appearance via color blend)
-        BYTE thumbAlpha = 140;
-        BYTE thumbPmR = (BYTE)((200 * thumbAlpha) / 255);
-        BYTE thumbPmG = (BYTE)((200 * thumbAlpha) / 255);
-        BYTE thumbPmB = (BYTE)((200 * thumbAlpha) / 255);
+        // Draw thumb using background color with increased opacity for visibility
+        // Use icon opacity setting to match visual prominence with other UI elements
+        BYTE thumbAlpha = (BYTE)((bgAlpha * config.IconOpacity) / 255);
+        BYTE thumbPmR = (BYTE)((bgR * thumbAlpha) / 255);
+        BYTE thumbPmG = (BYTE)((bgG * thumbAlpha) / 255);
+        BYTE thumbPmB = (BYTE)((bgB * thumbAlpha) / 255);
         DWORD thumbPixel = (thumbAlpha << 24) | (thumbPmR << 16) | (thumbPmG << 8) | thumbPmB;
 
         // Draw rounded thumb (simple rounded corners)

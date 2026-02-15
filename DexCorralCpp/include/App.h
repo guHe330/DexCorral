@@ -1,3 +1,12 @@
+/**
+ * App.h - Main application controller
+ *
+ * Manages application initialization, shutdown, and the main message loop.
+ * Coordinates corral window creation/destruction, appearance synchronization,
+ * wallpaper management, tray icon, desktop monitoring, and icon push-out-of-way
+ * when corrals overlap with desktop icons.
+ */
+
 #pragma once
 #include <Windows.h>
 #include <memory>
@@ -14,27 +23,66 @@
 
 class CorralWindow;
 
+/**
+ * Main application class managing corrals, configuration, and system integration.
+ */
 class App {
 public:
+    /// Constructor initializing the application
     App();
     ~App();
 
+    /// Starts the application and runs the main message loop. Returns exit code.
     int Run();
+
+    /// Saves the current configuration to disk
     void SaveConfig();
+
+    /// Removes a corral and all its tabs
     void RemoveCorral(CorralWindowConfig* config);
+
+    /// Removes a file from all corrals except the specified tab
     void RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralTabConfig* exceptTab);
+
+    /// Refreshes all corrals' content (folder contents, icons, etc.)
     void RefreshAllCorrals();
+
+    /// Refreshes background images for all corrals (wallpaper or custom backgrounds)
     void RefreshAllCorralBackgrounds();
-    void ToggleDesktopIcons();  // Toggle desktop icons visibility
-    void ToggleShortcutArrows(); // Toggle shortcut arrow overlay (requires Explorer restart)
+
+    /// Toggles visibility of desktop icons
+    void ToggleDesktopIcons();
+
+    /// Toggles shortcut arrow overlay on icons (requires Explorer restart)
+    void ToggleShortcutArrows();
+
+    /// Returns true if autostart on Windows login is enabled
     bool IsAutostartEnabled();
+
+    /// Enables or disables autostart on Windows login
     void SetAutostart(bool enable);
+
+    /// Sets the default corral background color (hex format, e.g., "FF0000" for red)
     void SetDefaultColorHex(const std::string& colorHex);
+
+    /**
+     * Sets default appearance for all new corrals.
+     * Parameters: titleBarHeight, fontName, fontSize, fontColor (hex),
+     * iconOpacity (0-100), tintColor (hex), tintStrength (0-100), spacingX, spacingY (pixels)
+     */
     void SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
         int fontSize, const std::string& fontColor, int iconOpacity,
         const std::string& tintColor, int tintStrength,
         int spacingX, int spacingY);
+
+    /// Applies the specified background color to all existing corrals
     void ApplyColorToAllCorrals(const std::string& colorHex);
+
+    /**
+     * Applies appearance settings to all existing corrals with selective updating.
+     * Boolean flags determine which settings are applied (changed flags pattern).
+     * Only settings with corresponding flags set to true are updated.
+     */
     void ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyColor,
         int titleBarHeight, bool applyHeight,
         const std::string& fontName, int fontSize, bool applyFont,
@@ -42,21 +90,38 @@ public:
         int iconOpacity, bool applyIconOpacity,
         const std::string& tintColor, int tintStrength, bool applyTint,
         int spacingX, int spacingY, bool applySpacing);
-    void CreateCorralAt(POINT pt);  // Create new corral at specified position
-    void CreateVirtualCorralAt(POINT pt);  // Create new virtual corral at specified position
+
+    /// Creates a new corral at the specified screen coordinates
+    void CreateCorralAt(POINT pt);
+
+    /// Creates a new virtual (non-file) corral at the specified screen coordinates
+    void CreateVirtualCorralAt(POINT pt);
+
+    /// Returns pointer to wallpaper manager (handles desktop background sampling)
     WallpaperManager* GetWallpaperManager() { return wallpaperManager.get(); }
+
+    /// Returns pointer to monitor manager (tracks display configuration)
     MonitorManager* GetMonitorManager() { return monitorManager.get(); }
+
+    /// Returns const reference to the list of all active corrals
     const std::vector<std::unique_ptr<CorralWindow>>& GetCorrals() const { return corrals; }
 
-    // Multi-monitor support
-    void OnDisplayChange();  // Called when monitors are added/removed/resolution changed
-    void UpdateCorralPositions();  // Reposition corrals based on monitor changes
+    /// Called when display configuration changes (monitors added/removed/resolution changed)
+    void OnDisplayChange();
 
+    /// Repositions all corrals based on current monitor layout
+    void UpdateCorralPositions();
+
+    /// Returns the singleton App instance
     static App* GetInstance() { return instance; }
 
-    // Desktop icon push-out-of-way support (public: called from CorralWindow during drag)
+    /// Caches current desktop icon positions for push-out-of-way algorithm
     void CacheDesktopIconPositions();
+
+    /// Invalidates cached desktop icon positions (forces refresh on next use)
     void InvalidateDesktopIconCache();
+
+    /// Moves desktop icons out of the way if they overlap with corrals
     void PushDesktopIconsFromCorrals();
 
 private:

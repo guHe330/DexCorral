@@ -1,5 +1,17 @@
-// CorralWindow.cpp - Core window class: lifecycle, WindowProc, tabs, config
+/**
+ * CorralWindow.cpp - Core window class implementation
+ *
+ * Implements the main CorralWindow class which manages layered windows with per-pixel
+ * alpha blending, wallpaper sampling, icon grid layout, drag-drop, and tab switching.
+ * Handles window lifecycle, WindowProc message routing, tab management, and
+ * configuration persistence. Window logic is split across multiple files:
+ * CorralWindowRender.cpp (drawing), CorralWindowIcons.cpp (icon loading/drawing),
+ * CorralWindowInput.cpp (input handling), CorralWindowDialogs.cpp (settings dialogs),
+ * and CorralWindowCommands.cpp (context menu actions).
+ */
+
 #include "CorralWindow.h"
+#include "Constants.h"
 #include "App.h"
 #include "WallpaperManager.h"
 #include "DesktopIcons.h"
@@ -16,9 +28,11 @@
 
 static const wchar_t* CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
 
-// Pointer input messages (Windows 8+, for precision touchpad support)
-#ifndef WM_POINTERWHEEL
-#endif
+/// Dead code: Incomplete precision touchpad support block.
+/// WM_POINTERWHEEL message handling was planned but never implemented (Windows 8+).
+/// Pointer input is currently not supported; mouse wheel events are handled instead.
+// #ifndef WM_POINTERWHEEL
+// #endif
 
 // ============================================================================
 // String conversion utilities (used across all implementation files)
@@ -163,7 +177,7 @@ int CorralWindow::GetDesktopIconSize() {
 
     // Clamp to reasonable values
     if (iconSizeValue < 16) iconSizeValue = 16;
-    if (iconSizeValue > 256) iconSizeValue = 256;
+    if (iconSizeValue > MAX_ICON_SIZE) iconSizeValue = MAX_ICON_SIZE;
 
     return (int)iconSizeValue;
 }

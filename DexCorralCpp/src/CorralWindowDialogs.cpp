@@ -1,6 +1,15 @@
-// CorralWindowDialogs.cpp - Dialog boxes and inline icon rename
+/**
+ * CorralWindowDialogs.cpp - Settings dialogs, inline rename, and file dialogs
+ *
+ * Implements all dialog user interfaces using in-memory DLGTEMPLATE construction
+ * (no .rc resource files). Includes appearance settings, tab/corral management,
+ * file properties, folder properties, inline icon renaming, and open/save dialogs
+ * for folder selection. Provides live preview of changes via direct config modification.
+ */
+
 #include "CorralWindow.h"
 #include "App.h"
+#include "Constants.h"
 #include <windowsx.h>
 #include <commdlg.h>
 #include <commctrl.h>
@@ -760,7 +769,7 @@ void CorralWindow::ShowAppearanceDialog() {
     const int DLG_HEIGHT = 292;
     const int ITEM_COUNT = 20;
 
-    WORD dlgTemplate[4096] = {};
+    WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD* p = dlgTemplate;
 
     DLGTEMPLATE* dlg = (DLGTEMPLATE*)p;

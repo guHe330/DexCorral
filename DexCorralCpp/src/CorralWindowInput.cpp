@@ -1,4 +1,11 @@
-// CorralWindowInput.cpp - Mouse handling, scrollbar, resize, snap, file ops
+/**
+ * CorralWindowInput.cpp - Mouse/keyboard handling, resize, drag-drop, and file operations
+ *
+ * Implements mouse event handling (clicks, drag-drop, hover effects), keyboard navigation,
+ * window resizing and snapping, file operations (copy, cut, paste, delete), and scrollbar
+ * management. Integrates with the Explorer hook for proper interaction with hidden desktop icons.
+ */
+
 #include "CorralWindow.h"
 #include "App.h"
 #include <windowsx.h>

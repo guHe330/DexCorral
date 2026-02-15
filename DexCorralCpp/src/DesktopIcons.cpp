@@ -1,4 +1,14 @@
+/**
+ * DesktopIcons.cpp - Cross-process desktop icon manipulation
+ *
+ * Implements cross-process access to the Explorer desktop ListView to read icon positions,
+ * names, and properties, and to modify icon positions (hide/restore). Uses VirtualAllocEx,
+ * ReadProcessMemory, and SendMessage to access and manipulate the ListView in explorer.exe
+ * without direct access to its memory space.
+ */
+
 #include "DesktopIcons.h"
+#include "Constants.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <ShObjIdl.h>
@@ -34,16 +44,16 @@ std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID p
     lvItem.iItem = index;
     lvItem.iSubItem = 0;
     lvItem.pszText = (LPWSTR)pRemoteText;
-    lvItem.cchTextMax = 260;
+    lvItem.cchTextMax = MAX_PATH;
 
     SIZE_T written;
     WriteProcessMemory(hProcess, pRemoteItem, &lvItem, sizeof(LVITEMW), &written);
     SendMessageW(hListView, LVM_GETITEMTEXTW, index, (LPARAM)pRemoteItem);
 
-    wchar_t buffer[260];
+    wchar_t buffer[MAX_PATH];
     SIZE_T bytesRead;
-    ReadProcessMemory(hProcess, pRemoteText, buffer, 520, &bytesRead);
-    buffer[259] = L'\0';
+    ReadProcessMemory(hProcess, pRemoteText, buffer, MAX_PATH * sizeof(wchar_t), &bytesRead);
+    buffer[MAX_PATH - 1] = L'\0';
 
     return std::wstring(buffer);
 }
@@ -59,15 +69,15 @@ void DesktopIcons::HideIcon(const std::wstring& fileName) {
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
     if (hProcess == nullptr) return;
 
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
     for (int i = 0; i < count; i++) {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
 
         if (_wcsicmp(text.c_str(), fileName.c_str()) == 0) {
-            int x = -5000;
-            int y = -5000;
+            int x = ICON_HIDE_POSITION_X;
+            int y = ICON_HIDE_POSITION_Y;
             LPARAM pos = MAKELPARAM(x & 0xFFFF, y);
             SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
             break;
@@ -126,7 +136,7 @@ void DesktopIcons::PositionIcon(const std::wstring& fileName, int x, int y) {
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
     if (hProcess == nullptr) return;
 
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
     for (int i = 0; i < count; i++) {
@@ -156,7 +166,7 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D>& iconPosi
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
     if (hProcess == nullptr) return;
 
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
     for (int i = 0; i < count; i++) {
@@ -187,7 +197,7 @@ POINT2D* DesktopIcons::GetIconPosition(const std::wstring& fileName) {
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
     if (hProcess == nullptr) return nullptr;
 
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
     POINT2D* result = nullptr;
@@ -229,7 +239,7 @@ std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions() {
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
     if (hProcess == nullptr) return result;
 
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, 4096, MEM_COMMIT, PAGE_READWRITE);
+    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
     LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
 

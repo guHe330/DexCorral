@@ -1,4 +1,11 @@
-// CorralWindowCommands.cpp - Context menu, commands, and animation
+/**
+ * CorralWindowCommands.cpp - Context menu handling and animation
+ *
+ * Implements right-click context menu and associated file operations (open, rename,
+ * delete, properties, move to tab/corral). Handles command execution, undo/redo,
+ * and smooth animations for adding/removing items and tab transitions.
+ */
+
 #include "CorralWindow.h"
 #include "App.h"
 #include "DesktopIcons.h"

@@ -1,3 +1,12 @@
+/**
+ * CorralWindow.h - Corral window class declaration
+ *
+ * Defines the CorralWindow class which manages individual corral windows with layered
+ * rendering, icon management, input handling, drag-drop, and configuration. Also defines
+ * supporting classes like CorralDropTarget (OLE drop handler) and CorralIcon (icon data).
+ * Implementation is split across multiple .cpp files for manageability.
+ */
+
 #pragma once
 #include <Windows.h>
 #include <oleidl.h>
@@ -12,20 +21,28 @@ class WallpaperManager;
 class FolderWatcher;
 class CorralWindow;
 
-// OLE drop target for corral windows - accepts both regular files and special shell items
+/**
+ * OLE drop target for corral windows.
+ * Implements IDropTarget to accept files, shortcuts, and shell items
+ * dragged and dropped onto the corral window.
+ */
 class CorralDropTarget : public IDropTarget {
 public:
+    /// Constructor that associates this drop target with a corral window
     CorralDropTarget(CorralWindow* owner);
 
-    // IUnknown
+    /// IUnknown: Query interface support (QueryInterface, AddRef, Release)
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
     ULONG STDMETHODCALLTYPE Release() override;
 
-    // IDropTarget
+    /// IDropTarget: Notification when drag enters corral window
     HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override;
+    /// IDropTarget: Notification while dragging over corral window
     HRESULT STDMETHODCALLTYPE DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override;
+    /// IDropTarget: Notification when drag leaves corral window
     HRESULT STDMETHODCALLTYPE DragLeave() override;
+    /// IDropTarget: Notification when drop occurs on corral window
     HRESULT STDMETHODCALLTYPE Drop(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override;
 
 private:
@@ -34,72 +51,115 @@ private:
     bool hasDropData;
 };
 
-// Sync status for cloud storage providers
+/// Sync status for files in cloud storage providers (OneDrive, Google Drive, etc.)
 enum class SyncStatus {
-    None = 0,       // Not a synced file or unknown
-    Synced,         // Fully synced (green checkmark)
-    Syncing,        // Currently syncing (blue arrows)
-    Pending,        // Pending sync (blue clock)
-    Error,          // Sync error (red X)
-    CloudOnly       // Available online only (cloud icon)
+    None = 0,       /// Not a synced file or sync status unknown
+    Synced,         /// Fully synced (green checkmark overlay)
+    Syncing,        /// Currently syncing (blue arrows overlay)
+    Pending,        /// Pending sync (blue clock overlay)
+    Error,          /// Sync error (red X overlay)
+    CloudOnly       /// Available online only (cloud icon overlay)
 };
 
+/// Icon data structure holding display info, file metadata, and rendering state
 struct CorralIcon {
-    std::string fileName;       // UTF-8 filename (for config), or "shell:{CLSID}" for special icons
-    std::wstring wFileName;     // Wide filename (actual name)
-    std::wstring displayName;   // Display name (without .lnk extension)
-    std::wstring fullPath;      // Full path to file on desktop (empty for special icons)
-    HICON hIcon = nullptr;      // Shell icon handle
-    HICON hIconSmall = nullptr; // Small icon for details view (16px)
-    RECT rect = {};             // Bounding rect in client coords (icon + label)
-    RECT iconRect = {};         // Just the icon image rect
+    std::string fileName;       /// UTF-8 filename (for config), or "shell:{CLSID}" for special icons
+    std::wstring wFileName;     /// Wide filename (actual file name)
+    std::wstring displayName;   /// Display name (without .lnk extension for shortcuts)
+    std::wstring fullPath;      /// Full path to file on desktop (empty for special shell icons)
+    HICON hIcon = nullptr;      /// Large shell icon handle for display
+    HICON hIconSmall = nullptr; /// Small icon handle for details view (16px)
+    RECT rect = {};             /// Bounding rect in client coords (icon image + label)
+    RECT iconRect = {};         /// Just the icon image rect (without label)
 
-    // Special shell icon support (Recycle Bin, This PC, etc.)
-    bool isSpecialIcon = false;  // True if this is a virtual shell item
-    std::wstring clsid;          // CLSID string for special icons (without :: prefix)
+    /// Special shell icon support (Recycle Bin, This PC, Network, etc.)
+    bool isSpecialIcon = false;  /// True if this is a virtual shell item
+    std::wstring clsid;          /// CLSID string for special icons
 
-    // Details view info
-    std::wstring fileType;      // File type description
-    ULONGLONG fileSize = 0;     // File size in bytes
-    FILETIME modifiedTime = {}; // Last modified time
-    SyncStatus syncStatus = SyncStatus::None;
+    /// Details view information
+    std::wstring fileType;      /// File type description (e.g., "Text Document")
+    ULONGLONG fileSize = 0;     /// File size in bytes
+    FILETIME modifiedTime = {}; /// Last modified time
+    SyncStatus syncStatus = SyncStatus::None; /// Cloud storage sync status
 };
 
+/**
+ * Main corral window class.
+ * Manages a single corral window with icon grid layout, tab switching, drag-drop,
+ * rendering, and user interaction. Multiple corral windows can exist simultaneously.
+ */
 class CorralWindow {
 public:
+    /// Constructor initializing corral with config and wallpaper manager
     CorralWindow(const CorralWindowConfig& config, WallpaperManager* wallpaperMgr);
     ~CorralWindow();
 
+    /// Shows the corral window (and syncs visibility to config)
     void Show();
-    void Hide();
-    void SendToBottom();
-    void UpdateWallpaperBackground();
-    void LoadFiles();
-    void SyncConfigFromWindow();  // Update config from current window state
-    void AddFile(const std::string& fileName);  // Add a file to this corral (active tab)
 
-    // Special icon helpers (public for use by App)
+    /// Hides the corral window
+    void Hide();
+
+    /// Sends corral to bottom z-order (behind all other windows)
+    void SendToBottom();
+
+    /// Updates the wallpaper background image (samples wallpaper at corral location)
+    void UpdateWallpaperBackground();
+
+    /// Loads files/folders from the active tab into the icon grid
+    void LoadFiles();
+
+    /// Synchronizes corral window state back to the configuration object
+    void SyncConfigFromWindow();
+
+    /// Adds a single file to the corral (added to active tab)
+    void AddFile(const std::string& fileName);
+
+    /// Helper to detect if entry is a special shell icon (format: "shell:{CLSID}")
     static bool IsSpecialIconEntry(const std::string& fileName);
+
+    /// Helper to extract CLSID from special icon entry
     static std::wstring GetSpecialIconClsid(const std::string& fileName);
 
+    /// Returns window handle for this corral
     HWND GetHWND() const { return hwnd; }
+
+    /// Returns reference to corral configuration
     CorralWindowConfig& GetConfig() { return config; }
+    /// Returns const reference to corral configuration
     const CorralWindowConfig& GetConfig() const { return config; }
+
+    /// Returns title bar height in DPI-scaled pixels
     int GetTitleBarHeight() const { return Dpi(config.TitleBarHeight); }
+
+    /// Returns top Y coordinate of icon area (title bar height + padding)
     int GetIconAreaTop() const { return Dpi(config.TitleBarHeight + 4); }
-    void RecalculateLayout();  // Public wrapper for icon layout recalculation
+
+    /// Recalculates icon layout based on window size and view mode
+    void RecalculateLayout();
+
+    /// Sets current window opacity (0-255, clamped to minimum 5)
     void SetCurrentOpacity(int opacity) { currentOpacity = (opacity < 5) ? 5 : opacity; }
 
-    // Tab helpers
+    /// Returns reference to the currently active tab
     CorralTabConfig& GetActiveTab();
+    /// Returns const reference to the currently active tab
     const CorralTabConfig& GetActiveTab() const;
+
+    /// Switches to the specified tab by index
     void SetActiveTab(int index);
+
+    /// Adds a new tab with the given configuration
     void AddTab(const CorralTabConfig& tab);
+
+    /// Detaches (removes) a tab by index
     void DetachTab(int tabIndex);
+
+    /// Merges all tabs from another corral into this one
     void MergeWith(CorralWindow* other);
 
-    // Virtual corral support
-    void ChangeFolderPath();  // Open folder browser to change virtual folder path
+    /// Opens folder browser to change the virtual corral's folder path
+    void ChangeFolderPath();
 
 private:
     // Virtual corral support

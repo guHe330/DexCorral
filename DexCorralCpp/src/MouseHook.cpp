@@ -1,3 +1,11 @@
+/**
+ * MouseHook.cpp - Global mouse event monitoring
+ *
+ * Implements a global mouse hook to capture mouse wheel events and other input
+ * for the application. Provides singleton mouse hook management with thread-safe
+ * event notification.
+ */
+
 #include "MouseHook.h"
 
 MouseHook* MouseHook::instance = nullptr;
@@ -36,7 +44,9 @@ void MouseHook::SetMouseMoveCallback(MouseEventCallback callback) {
     mouseMoveCallback = callback;
 }
 
-// Mousewheel is now handled directly in the hook proc, not via callback
+/// Dead code: Mousewheel callback mechanism was replaced with direct handling in MouseProc.
+/// The hook proc now directly routes WM_MOUSEWHEEL to the window under the cursor,
+/// making the callback approach unnecessary. Kept for historical reference.
 // void MouseHook::SetMouseWheelCallback(MouseWheelCallback callback) {
 //     mouseWheelCallback = callback;
 // }

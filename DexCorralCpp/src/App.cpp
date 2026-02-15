@@ -1,3 +1,12 @@
+/**
+ * App.cpp - Main application controller and message pump
+ *
+ * Manages application initialization, shutdown, and the main message loop.
+ * Handles corral window creation/destruction, application-wide settings,
+ * appearance synchronization, and desktop icon management (pushing icons
+ * out of the way when they overlap with corrals).
+ */
+
 #include "App.h"
 #include "CorralWindow.h"
 #include "DesktopIcons.h"
@@ -278,13 +287,17 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
     int spacingX, int spacingY, bool applySpacing) {
     for (auto& corral : corrals) {
         auto& cfg = corral->GetConfig();
+        bool needsLayoutRecalc = false;
 
         if (applyColor) {
             for (auto& tab : cfg.Tabs) {
                 tab.ColorHex = colorHex;
             }
         }
-        if (applyHeight) cfg.TitleBarHeight = titleBarHeight;
+        if (applyHeight) {
+            cfg.TitleBarHeight = titleBarHeight;
+            needsLayoutRecalc = true;
+        }
         if (applyFont) {
             cfg.HeaderFontName = fontName;
             cfg.HeaderFontSize = fontSize;
@@ -301,9 +314,14 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
         if (applySpacing) {
             cfg.IconSpacingXPercent = spacingX;
             cfg.IconSpacingYPercent = spacingY;
+            needsLayoutRecalc = true;
         }
 
-        corral->UpdateWallpaperBackground();
+        if (needsLayoutRecalc) {
+            corral->RecalculateLayout();
+        } else {
+            corral->UpdateWallpaperBackground();
+        }
     }
 }
 
@@ -510,6 +528,22 @@ static bool RectsOverlap(const RECT& a, const RECT& b) {
     return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
+/**
+ * Pushes desktop icons out of the way if they overlap with corral windows.
+ *
+ * Algorithm:
+ * 1. Cache current desktop icon positions if not already cached
+ * 2. For each cached icon that overlaps with a corral:
+ *    - Calculate distance from icon center to each edge of the overlapping corral
+ *    - Try pushing the icon out from the nearest edge first (shortest distance)
+ *    - Search for a free position one grid step away (75px increments)
+ *    - Continue stepping outward until a free position is found
+ * 3. Update Explorer with new positions for moved icons
+ *
+ * Uses a 75x75px icon footprint for collision detection (standard desktop icon size).
+ * Icons already off-screen (< -1000) are skipped. Icons are pushed to the nearest
+ * free grid position rather than to arbitrary coordinates, maintaining alignment.
+ */
 void App::PushDesktopIconsFromCorrals() {
     if (!desktopIconCacheValid) {
         CacheDesktopIconPositions();
@@ -518,10 +552,10 @@ void App::PushDesktopIconsFromCorrals() {
     auto corralRects = GetAllCorralRects();
     if (corralRects.empty()) return;
 
-    // Icon bounding box size (approximate desktop icon footprint)
+    /// Icon bounding box size (approximate desktop icon footprint)
     const int ICON_W = 75;
     const int ICON_H = 75;
-    const int STEP = 75;  // Push step size (one grid jump)
+    const int STEP = 75;  /// Push step size (one grid jump)
 
     // Get screen bounds in ListView client coordinates
     HWND hListView = DesktopIcons::GetDesktopListView();

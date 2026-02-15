@@ -1,45 +1,56 @@
+/**
+ * Config.h - Configuration data structures
+ *
+ * Defines the JSON-serializable configuration structs for corrals, tabs, and application settings.
+ * Uses nlohmann/json with NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT macro for automatic
+ * JSON serialization/deserialization with backward compatibility.
+ */
+
 #pragma once
 #include <string>
 #include <vector>
 #include <map>
 #include <nlohmann/json.hpp>
 
-// View mode for corral icons
+/// Icon display mode for corral windows (small to large icons or details list)
 enum class ViewMode : int {
-    SmallIcons = 0,   // 32px icons in grid
-    MediumIcons = 1,  // 48px icons in grid
-    LargeIcons = 2,   // 64px icons in grid
-    Details = 3       // List view with columns (name, type, size, date, sync status)
+    SmallIcons = 0,   /// 32px icons in grid layout
+    MediumIcons = 1,  /// 48px icons in grid layout
+    LargeIcons = 2,   /// 64px icons in grid layout
+    Details = 3       /// List view with columns (name, type, size, modified date, sync status)
 };
 
-// Position snapshot for a specific monitor at a specific resolution
+/// Position snapshot for a specific monitor at a specific resolution
 struct MonitorPosition {
-    int Left = 0;
-    int Top = 0;
-    int Width = 300;
-    int Height = 200;
-    int RefWidth = 1920;   // Resolution when position was stored
-    int RefHeight = 1080;
+    int Left = 0;           /// Window left edge
+    int Top = 0;            /// Window top edge
+    int Width = 300;        /// Window width
+    int Height = 200;       /// Window height
+    int RefWidth = 1920;    /// Reference monitor width when position was saved
+    int RefHeight = 1080;   /// Reference monitor height when position was saved
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(MonitorPosition, Left, Top, Width, Height, RefWidth, RefHeight)
 };
 
+/// Configuration for a single tab within a corral window
 struct CorralTabConfig {
-    std::string Title = "New Tab";
-    std::string ColorHex = "#99000000";
-    std::vector<std::string> Files;
-    int ViewModeInt = 0;  // ViewMode as int for JSON serialization (0=Small, 1=Medium, 2=Large, 3=Details)
-    bool IsCatchAll = false;
-    bool IsVirtual = false;              // True if this corral mirrors a folder
-    std::string VirtualFolderPath;       // UTF-8 path to the local folder (empty if not virtual)
+    std::string Title = "New Tab";              /// User-friendly tab name
+    std::string ColorHex = "#99000000";         /// Background color (ARGB hex format)
+    std::vector<std::string> Files;             /// List of file names or "shell:{CLSID}" for special icons
+    int ViewModeInt = 0;                        /// View mode (0=Small, 1=Medium, 2=Large, 3=Details)
+    bool IsCatchAll = false;                    /// True if this is the automatic catch-all folder tab
+    bool IsVirtual = false;                     /// True if this tab mirrors a local folder
+    std::string VirtualFolderPath;              /// UTF-8 path to folder (empty if not virtual)
 
-    // Helper to get/set ViewMode enum
+    /// Returns the current view mode as enum
     ViewMode GetViewMode() const { return static_cast<ViewMode>(ViewModeInt); }
+    /// Sets the view mode from enum
     void SetViewMode(ViewMode mode) { ViewModeInt = static_cast<int>(mode); }
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath)
 };
 
+/// Configuration for a single corral window
 struct CorralWindowConfig {
     double Left = 0;
     double Top = 0;

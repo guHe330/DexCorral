@@ -1,5 +1,14 @@
-// CorralWindowIcons.cpp - Icon loading, layout calculation, and hit testing
+/**
+ * CorralWindowIcons.cpp - Icon loading, caching, layout, and rendering
+ *
+ * Manages icon extraction from files, caching for performance, grid layout calculation,
+ * hit testing for mouse interactions, and per-icon rendering. Detects icon content
+ * (full vs padded), handles special cases like shortcuts and OneDrive cloud files,
+ * and provides visual selection/hover states.
+ */
+
 #include "CorralWindow.h"
+#include "Constants.h"
 #include "FolderWatcher.h"
 #include <shellapi.h>
 #include <ShlObj.h>
@@ -32,10 +41,17 @@ static int GetImageListType(int iconSize) {
     return SHIL_JUMBO;                            // 256x256
 }
 
-// Check if an icon has actual content filling its canvas. Some apps only provide
-// 32x32 icons, so SHIL_EXTRALARGE returns a 48x48 canvas with the small icon
-// centered and transparent padding. Returns true if the icon content fills at
-// least 70% of the canvas in both dimensions.
+/**
+ * Checks if an icon has actual content filling its canvas.
+ *
+ * Some applications only provide 32x32 icons, so requesting larger sizes (SHIL_EXTRALARGE,
+ * SHIL_JUMBO) returns a canvas with the small icon centered and surrounded by transparent
+ * padding. This function detects padded icons by checking if the non-transparent pixels
+ * fill at least 70% of both dimensions.
+ *
+ * Returns true if the icon content fills at least 70% threshold in both dimensions,
+ * false if padding is detected (meaning we should fall back to a smaller icon).
+ */
 static bool IconHasFullContent(HICON hIcon, int expectedSize) {
     if (!hIcon || expectedSize <= 32) return true;  // No need to check small icons
 
@@ -86,7 +102,7 @@ static bool IconHasFullContent(HICON hIcon, int expectedSize) {
     int contentW = maxX - minX + 1;
     int contentH = maxY - minY + 1;
     // Content should fill at least 70% of the canvas
-    return (contentW >= expectedSize * 7 / 10 && contentH >= expectedSize * 7 / 10);
+    return (contentW >= (int)(expectedSize * ICON_CONTENT_THRESHOLD) && contentH >= (int)(expectedSize * ICON_CONTENT_THRESHOLD));
 }
 
 // Extract icon from system image list at a given index and size.
@@ -213,10 +229,10 @@ SyncStatus CorralWindow::GetSyncStatus(const std::wstring& path) {
         HANDLE hFind = FindFirstFileW(path.c_str(), &findData);
         if (hFind != INVALID_HANDLE_VALUE) {
             FindClose(hFind);
-            // OneDrive cloud tags: 0x9000001A through 0x9000F01A
-            // Check if high word matches 0x9000 (cloud files filter)
+            /// OneDrive cloud tags: 0x9000001A through 0x9000F01A
+            /// Check if high word matches 0x9000 (cloud files filter)
             DWORD tag = findData.dwReserved0;
-            if ((tag & 0xFFFF0000) == 0x90000000) {
+            if ((tag & ONEDRIVE_CLOUD_TAG_MASK) == ONEDRIVE_CLOUD_TAG_MASK) {
                 return SyncStatus::Synced;
             }
         }

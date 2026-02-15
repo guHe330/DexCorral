@@ -1,7 +1,11 @@
-// CorralHook.cpp - Explorer hook for hiding desktop icons via pure draw suppression
-// Reads a list of icon names to hide from a memory-mapped file written by DexCorral.exe
-// Icons in the list are skipped during NM_CUSTOMDRAW (CDRF_SKIPDEFAULT)
-// Mouse/keyboard input on hidden icons is swallowed so they can't be interacted with
+/**
+ * CorralHook.cpp - Explorer.exe hook for hiding desktop icons
+ *
+ * Implements a DLL injected into explorer.exe that subclasses the desktop ListView
+ * to hide icons owned by corrals. Uses pure draw suppression (CDRF_SKIPDEFAULT) for
+ * invisible icons, input filtering to prevent interaction with hidden icons, and
+ * shared memory IPC for receiving the list of hidden icons from DexCorral.exe.
+ */
 
 #include "CorralHook.h"
 #include <Windows.h>
