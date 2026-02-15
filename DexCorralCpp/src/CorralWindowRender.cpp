@@ -14,6 +14,7 @@
 #include <uxtheme.h>
 #include <vssym32.h>
 #include <cstdio>
+#include <algorithm>
 
 #pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "uxtheme.lib")
@@ -657,47 +658,136 @@ void CorralWindow::UpdateLayeredContent() {
         DeleteObject(iconFont);
     }
 
-    // Draw scrollbar (only when needed, blends with appearance)
+    // Draw PowerShell-style scrollbar (only when needed, blends with appearance)
     if (NeedsScrollbar() && (!config.IsRolledUp || isHoverExpanded)) {
-        RECT track = GetScrollbarTrackRect();
         RECT thumb = GetScrollbarThumbRect();
 
-        // Use background color for scrollbar to match corral appearance
-        BYTE trackAlpha = (BYTE)((bgAlpha * 120) / 255);  // Track is semi-transparent
-        BYTE trackPmR = (BYTE)((bgR * trackAlpha) / 255);
-        BYTE trackPmG = (BYTE)((bgG * trackAlpha) / 255);
-        BYTE trackPmB = (BYTE)((bgB * trackAlpha) / 255);
-        DWORD trackPixel = (trackAlpha << 24) | (trackPmR << 16) | (trackPmG << 8) | trackPmB;
+        if (!isScrollbarHovered) {
+            // Draw narrow grey indicator (PowerShell minimal mode)
+            int narrowWidth = Dpi(SCROLLBAR_NARROW_WIDTH);
+            int indicatorLeft = w - narrowWidth - Dpi(SCROLLBAR_MARGIN);
 
-        for (int y = track.top; y < track.bottom && y < h; y++) {
-            for (int x = track.left; x < track.right && x < w; x++) {
-                if (x >= 0 && y >= 0) {
-                    pixels[y * w + x] = trackPixel;
+            // Grey color for indicator (RGB: 128, 128, 128 with some alpha)
+            BYTE indAlpha = 180;
+            BYTE indR = 128, indG = 128, indB = 128;
+            BYTE indPmR = (BYTE)((indR * indAlpha) / 255);
+            BYTE indPmG = (BYTE)((indG * indAlpha) / 255);
+            BYTE indPmB = (BYTE)((indB * indAlpha) / 255);
+            DWORD indicatorPixel = (indAlpha << 24) | (indPmR << 16) | (indPmG << 8) | indPmB;
+
+            // Draw narrow thumb indicator
+            for (int y = thumb.top; y < thumb.bottom && y < h; y++) {
+                for (int x = indicatorLeft; x < indicatorLeft + narrowWidth && x < w; x++) {
+                    if (x >= 0 && y >= 0) {
+                        pixels[y * w + x] = indicatorPixel;
+                    }
                 }
             }
-        }
+        } else {
+            // Full scrollbar on hover (PowerShell expanded mode)
+            RECT track = GetScrollbarTrackRect();
+            int arrowSize = Dpi(SCROLLBAR_ARROW_SIZE);
 
-        // Draw thumb using background color with increased opacity for visibility
-        // Use icon opacity setting to match visual prominence with other UI elements
-        BYTE thumbAlpha = (BYTE)((bgAlpha * config.IconOpacity) / 255);
-        BYTE thumbPmR = (BYTE)((bgR * thumbAlpha) / 255);
-        BYTE thumbPmG = (BYTE)((bgG * thumbAlpha) / 255);
-        BYTE thumbPmB = (BYTE)((bgB * thumbAlpha) / 255);
-        DWORD thumbPixel = (thumbAlpha << 24) | (thumbPmR << 16) | (thumbPmG << 8) | thumbPmB;
+            // Background: corral color but lighter ("heller")
+            // Increase RGB components by ~30% to make it lighter
+            BYTE trackR = (BYTE)(std::min(255, bgR + (255 - bgR) * 30 / 100));
+            BYTE trackG = (BYTE)(std::min(255, bgG + (255 - bgG) * 30 / 100));
+            BYTE trackB = (BYTE)(std::min(255, bgB + (255 - bgB) * 30 / 100));
+            BYTE trackAlpha = bgAlpha;
+            BYTE trackPmR = (BYTE)((trackR * trackAlpha) / 255);
+            BYTE trackPmG = (BYTE)((trackG * trackAlpha) / 255);
+            BYTE trackPmB = (BYTE)((trackB * trackAlpha) / 255);
+            DWORD trackPixel = (trackAlpha << 24) | (trackPmR << 16) | (trackPmG << 8) | trackPmB;
 
-        // Draw rounded thumb (simple rounded corners)
-        int radius = (Dpi(SCROLLBAR_WIDTH) - 2) / 2;
-        for (int y = thumb.top; y < thumb.bottom && y < h; y++) {
-            for (int x = thumb.left; x < thumb.right && x < w; x++) {
-                if (x >= 0 && y >= 0) {
-                    // Simple rounded corners check
-                    int dx = 0, dy = 0;
-                    if (y < thumb.top + radius) dy = thumb.top + radius - y;
-                    if (y > thumb.bottom - radius - 1) dy = y - (thumb.bottom - radius - 1);
-                    if (x < thumb.left + radius) dx = thumb.left + radius - x;
-                    if (x > thumb.right - radius - 1) dx = x - (thumb.right - radius - 1);
+            // Draw track background
+            for (int y = track.top; y < track.bottom && y < h; y++) {
+                for (int x = track.left; x < track.right && x < w; x++) {
+                    if (x >= 0 && y >= 0) {
+                        pixels[y * w + x] = trackPixel;
+                    }
+                }
+            }
 
-                    if (dx * dx + dy * dy <= radius * radius) {
+            // Draw arrow buttons (top and bottom)
+            RECT topArrow = { track.left, track.top, track.right, track.top + arrowSize };
+            RECT bottomArrow = { track.left, track.bottom - arrowSize, track.right, track.bottom };
+
+            // Arrows use slightly darker color
+            BYTE arrowAlpha = 200;
+            BYTE arrowR = 100, arrowG = 100, arrowB = 100;
+            BYTE arrowPmR = (BYTE)((arrowR * arrowAlpha) / 255);
+            BYTE arrowPmG = (BYTE)((arrowG * arrowAlpha) / 255);
+            BYTE arrowPmB = (BYTE)((arrowB * arrowAlpha) / 255);
+            DWORD arrowPixel = (arrowAlpha << 24) | (arrowPmR << 16) | (arrowPmG << 8) | arrowPmB;
+
+            // Draw arrow backgrounds
+            for (int y = topArrow.top; y < topArrow.bottom && y < h; y++) {
+                for (int x = topArrow.left; x < topArrow.right && x < w; x++) {
+                    if (x >= 0 && y >= 0) {
+                        pixels[y * w + x] = arrowPixel;
+                    }
+                }
+            }
+            for (int y = bottomArrow.top; y < bottomArrow.bottom && y < h; y++) {
+                for (int x = bottomArrow.left; x < bottomArrow.right && x < w; x++) {
+                    if (x >= 0 && y >= 0) {
+                        pixels[y * w + x] = arrowPixel;
+                    }
+                }
+            }
+
+            // Draw arrow triangles
+            int arrowCenterX = (topArrow.left + topArrow.right) / 2;
+            int arrowCenterY_top = (topArrow.top + topArrow.bottom) / 2;
+            int arrowCenterY_bottom = (bottomArrow.top + bottomArrow.bottom) / 2;
+
+            BYTE arrowTriAlpha = 255;
+            BYTE arrowTriR = 255, arrowTriG = 255, arrowTriB = 255;
+            BYTE arrowTriPmR = (BYTE)((arrowTriR * arrowTriAlpha) / 255);
+            BYTE arrowTriPmG = (BYTE)((arrowTriG * arrowTriAlpha) / 255);
+            BYTE arrowTriPmB = (BYTE)((arrowTriB * arrowTriAlpha) / 255);
+            DWORD arrowTriPixel = (arrowTriAlpha << 24) | (arrowTriPmR << 16) | (arrowTriPmG << 8) | arrowTriPmB;
+
+            // Simple triangle drawing (up arrow)
+            for (int dy = -2; dy <= 2; dy++) {
+                int width = 2 - abs(dy);
+                for (int dx = -width; dx <= width; dx++) {
+                    int x = arrowCenterX + dx;
+                    int y = arrowCenterY_top - dy;
+                    if (x >= 0 && x < w && y >= 0 && y < h) {
+                        pixels[y * w + x] = arrowTriPixel;
+                    }
+                }
+            }
+
+            // Simple triangle drawing (down arrow)
+            for (int dy = -2; dy <= 2; dy++) {
+                int width = 2 - abs(dy);
+                for (int dx = -width; dx <= width; dx++) {
+                    int x = arrowCenterX + dx;
+                    int y = arrowCenterY_bottom + dy;
+                    if (x >= 0 && x < w && y >= 0 && y < h) {
+                        pixels[y * w + x] = arrowTriPixel;
+                    }
+                }
+            }
+
+            // Draw thumb (grey, matching PowerShell style)
+            BYTE thumbAlpha = 200;
+            BYTE thumbR = 128, thumbG = 128, thumbB = 128;
+            BYTE thumbPmR = (BYTE)((thumbR * thumbAlpha) / 255);
+            BYTE thumbPmG = (BYTE)((thumbG * thumbAlpha) / 255);
+            BYTE thumbPmB = (BYTE)((thumbB * thumbAlpha) / 255);
+            DWORD thumbPixel = (thumbAlpha << 24) | (thumbPmR << 16) | (thumbPmG << 8) | thumbPmB;
+
+            // Adjust thumb to avoid arrow areas
+            RECT adjustedThumb = thumb;
+            adjustedThumb.top = std::max(adjustedThumb.top, track.top + arrowSize);
+            adjustedThumb.bottom = std::min(adjustedThumb.bottom, track.bottom - arrowSize);
+
+            for (int y = adjustedThumb.top; y < adjustedThumb.bottom && y < h; y++) {
+                for (int x = adjustedThumb.left; x < adjustedThumb.right && x < w; x++) {
+                    if (x >= 0 && y >= 0) {
                         pixels[y * w + x] = thumbPixel;
                     }
                 }

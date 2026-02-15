@@ -337,9 +337,12 @@ private:
     bool isDraggingScrollbar = false;
     int scrollbarDragStartY = 0;   // Mouse Y at drag start
     int scrollbarDragStartPos = 0; // Scroll position at drag start
+    bool isScrollbarHovered = false; // Mouse over scrollbar region (PowerShell-style expand)
     static const int SCROLLBAR_WIDTH = 10;
+    static const int SCROLLBAR_NARROW_WIDTH = 3;  // Narrow indicator width
     static const int SCROLLBAR_MARGIN = 2;
     static const int SCROLLBAR_MIN_THUMB = 30;
+    static const int SCROLLBAR_ARROW_SIZE = 12;  // Arrow button height
 
     // Icon rename state
     bool isRenamingIcon = false;

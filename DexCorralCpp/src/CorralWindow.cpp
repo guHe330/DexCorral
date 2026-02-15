@@ -543,6 +543,26 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 }
             }
 
+            // Check scrollbar hover state (PowerShell-style expand on hover)
+            int x = GET_X_LPARAM(lParam);
+            int y = GET_Y_LPARAM(lParam);
+            bool wasHovered = window->isScrollbarHovered;
+
+            // Detect hover over scrollbar region (wider detection for easier hover)
+            RECT clientRect;
+            GetClientRect(hwnd, &clientRect);
+            int scrollbarRegionLeft = clientRect.right - window->Dpi(SCROLLBAR_WIDTH) - window->Dpi(SCROLLBAR_MARGIN) * 2;
+            bool isOverScrollbarRegion = window->NeedsScrollbar() &&
+                                          x >= scrollbarRegionLeft &&
+                                          y >= window->GetIconAreaTop();
+
+            window->isScrollbarHovered = isOverScrollbarRegion;
+
+            // Redraw if hover state changed
+            if (wasHovered != window->isScrollbarHovered) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+
             if (window->isResizing) {
                 POINT pt;
                 GetCursorPos(&pt);
@@ -645,6 +665,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_MOUSELEAVE:
             window->mouseInsideWindow = false;
+            // Reset scrollbar hover state
+            if (window->isScrollbarHovered) {
+                window->isScrollbarHovered = false;
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             // Start collapse if hover-expanded
             if (window->isHoverExpanded && !window->isAnimating) {
                 window->StartHoverCollapse();

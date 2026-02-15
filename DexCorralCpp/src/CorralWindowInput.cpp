@@ -52,16 +52,21 @@ RECT CorralWindow::GetScrollbarThumbRect() const {
     int trackHeight = track.bottom - track.top;
     int visibleHeight = GetVisibleHeight();
 
+    // When hovered, adjust for arrow buttons
+    int arrowSize = isScrollbarHovered ? Dpi(SCROLLBAR_ARROW_SIZE) : 0;
+    int effectiveTrackTop = track.top + arrowSize;
+    int effectiveTrackHeight = trackHeight - 2 * arrowSize;
+
     // Thumb size proportional to visible/content ratio
     int thumbHeight = (std::max)(Dpi(SCROLLBAR_MIN_THUMB),
-        (int)((float)visibleHeight / contentHeight * trackHeight));
+        (int)((float)visibleHeight / contentHeight * effectiveTrackHeight));
 
     // Thumb position based on scroll position
     int scrollRange = contentHeight - visibleHeight;
-    int thumbRange = trackHeight - thumbHeight;
-    int thumbTop = track.top;
+    int thumbRange = effectiveTrackHeight - thumbHeight;
+    int thumbTop = effectiveTrackTop;
     if (scrollRange > 0) {
-        thumbTop = track.top + (int)((float)scrollPosition / scrollRange * thumbRange);
+        thumbTop = effectiveTrackTop + (int)((float)scrollPosition / scrollRange * thumbRange);
     }
 
     return {
@@ -111,9 +116,14 @@ void CorralWindow::DoScrollbarDrag(int y) {
     RECT track = GetScrollbarTrackRect();
     int trackHeight = track.bottom - track.top;
     int visibleHeight = GetVisibleHeight();
+
+    // Adjust for arrow buttons when hovered
+    int arrowSize = isScrollbarHovered ? Dpi(SCROLLBAR_ARROW_SIZE) : 0;
+    int effectiveTrackHeight = trackHeight - 2 * arrowSize;
+
     int thumbHeight = (std::max)(Dpi(SCROLLBAR_MIN_THUMB),
-        (int)((float)visibleHeight / contentHeight * trackHeight));
-    int thumbRange = trackHeight - thumbHeight;
+        (int)((float)visibleHeight / contentHeight * effectiveTrackHeight));
+    int thumbRange = effectiveTrackHeight - thumbHeight;
     int scrollRange = contentHeight - visibleHeight;
 
     if (thumbRange > 0 && scrollRange > 0) {
@@ -509,6 +519,30 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
 
     // Check if clicked on scrollbar
     if (HitTestScrollbar(x, y)) {
+        // Check if clicked on arrow buttons (when hovered)
+        if (isScrollbarHovered) {
+            RECT track = GetScrollbarTrackRect();
+            int arrowSize = Dpi(SCROLLBAR_ARROW_SIZE);
+
+            // Top arrow button
+            if (y >= track.top && y < track.top + arrowSize) {
+                // Scroll up
+                scrollPosition -= iconSpacingY;
+                ClampScrollPosition();
+                UpdateLayeredContent();
+                return;
+            }
+
+            // Bottom arrow button
+            if (y >= track.bottom - arrowSize && y < track.bottom) {
+                // Scroll down
+                scrollPosition += iconSpacingY;
+                ClampScrollPosition();
+                UpdateLayeredContent();
+                return;
+            }
+        }
+
         if (HitTestScrollbarThumb(x, y)) {
             // Clicked on thumb - start dragging
             StartScrollbarDrag(y);
@@ -518,11 +552,15 @@ void CorralWindow::OnLeftButtonDown(int x, int y) {
             RECT thumb = GetScrollbarThumbRect();
             int thumbHeight = thumb.bottom - thumb.top;
             int trackHeight = track.bottom - track.top;
-            int thumbRange = trackHeight - thumbHeight;
+
+            // Adjust for arrows when hovered
+            int arrowSize = isScrollbarHovered ? Dpi(SCROLLBAR_ARROW_SIZE) : 0;
+            int effectiveTrackHeight = trackHeight - 2 * arrowSize;
+            int thumbRange = effectiveTrackHeight - thumbHeight;
             int scrollRange = contentHeight - GetVisibleHeight();
 
             // Calculate new scroll position - center thumb on click point
-            int clickOffset = y - track.top - (thumbHeight / 2);
+            int clickOffset = y - (track.top + arrowSize) - (thumbHeight / 2);
             if (clickOffset < 0) clickOffset = 0;
             if (clickOffset > thumbRange) clickOffset = thumbRange;
 
