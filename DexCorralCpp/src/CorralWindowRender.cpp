@@ -1,10 +1,9 @@
 /**
- * CorralWindowRender.cpp - Per-pixel alpha rendering and wallpaper blending
+ * CorralWindowRender.cpp - Per-pixel alpha rendering
  *
  * Implements layered window rendering using DIB sections with per-pixel alpha blending.
- * Manages wallpaper sampling, color compositing, icon rendering, and the alpha fix-up
- * mechanism necessary because GDI draws with alpha=0. Provides seamless visual integration
- * with the desktop by sampling and blending wallpaper underneath the corral.
+ * Manages color compositing, icon rendering, hover/selection highlights, and the alpha
+ * fix-up mechanism necessary because GDI draws with alpha=0.
  */
 
 #include "CorralWindow.h"
@@ -296,13 +295,49 @@ void CorralWindow::UpdateLayeredContent() {
                 BYTE selPmR = (BYTE)((selR * selAlpha) / 255);
                 BYTE selPmG = (BYTE)((selG * selAlpha) / 255);
                 BYTE selPmB = (BYTE)((selB * selAlpha) / 255);
-                DWORD selPixel = (selAlpha << 24) | (selPmR << 16) | (selPmG << 8) | selPmB;
+                BYTE invSelAlpha = 255 - selAlpha;
 
                 for (int y = drawTop; y < drawBottom && y < h; y++) {
                     if (y < visibleTop) continue;  // Clip to visible area
                     for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
                         if (x >= 0 && y >= 0) {
-                            pixels[y * w + x] = selPixel;
+                            DWORD dst = pixels[y * w + x];
+                            BYTE dstA = (dst >> 24) & 0xFF;
+                            BYTE dstR = (dst >> 16) & 0xFF;
+                            BYTE dstG = (dst >> 8) & 0xFF;
+                            BYTE dstB = dst & 0xFF;
+                            BYTE outA = selAlpha + (BYTE)((dstA * invSelAlpha) / 255);
+                            BYTE outR = selPmR + (BYTE)((dstR * invSelAlpha) / 255);
+                            BYTE outG = selPmG + (BYTE)((dstG * invSelAlpha) / 255);
+                            BYTE outB = selPmB + (BYTE)((dstB * invSelAlpha) / 255);
+                            pixels[y * w + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+                        }
+                    }
+                }
+            }
+
+            // Hover highlight (only for grid views, not selected, not dragging)
+            if (i == hoveredIcon && i != selectedIcon && !isDraggingIcon && !isDetailsView) {
+                BYTE hovAlpha = HOVER_ALPHA;
+                BYTE hovPmR = (BYTE)((HOVER_R * hovAlpha) / 255);
+                BYTE hovPmG = (BYTE)((HOVER_G * hovAlpha) / 255);
+                BYTE hovPmB = (BYTE)((HOVER_B * hovAlpha) / 255);
+                BYTE invHovAlpha = 255 - hovAlpha;
+
+                for (int y = drawTop; y < drawBottom && y < h; y++) {
+                    if (y < visibleTop) continue;
+                    for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
+                        if (x >= 0 && y >= 0) {
+                            DWORD dst = pixels[y * w + x];
+                            BYTE dstA = (dst >> 24) & 0xFF;
+                            BYTE dstR = (dst >> 16) & 0xFF;
+                            BYTE dstG = (dst >> 8) & 0xFF;
+                            BYTE dstB = dst & 0xFF;
+                            BYTE outA = hovAlpha + (BYTE)((dstA * invHovAlpha) / 255);
+                            BYTE outR = hovPmR + (BYTE)((dstR * invHovAlpha) / 255);
+                            BYTE outG = hovPmG + (BYTE)((dstG * invHovAlpha) / 255);
+                            BYTE outB = hovPmB + (BYTE)((dstB * invHovAlpha) / 255);
+                            pixels[y * w + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
                         }
                     }
                 }
@@ -337,13 +372,48 @@ void CorralWindow::UpdateLayeredContent() {
                     BYTE selPmR = (BYTE)((selR * selAlpha) / 255);
                     BYTE selPmG = (BYTE)((selG * selAlpha) / 255);
                     BYTE selPmB = (BYTE)((selB * selAlpha) / 255);
-                    DWORD selPixel = (selAlpha << 24) | (selPmR << 16) | (selPmG << 8) | selPmB;
+                    BYTE invSelAlpha = 255 - selAlpha;
 
                     for (int y = drawTop; y < drawBottom && y < h; y++) {
                         if (y < visibleTop) continue;
                         for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
                             if (x >= 0 && y >= 0) {
-                                pixels[y * w + x] = selPixel;
+                                DWORD dst = pixels[y * w + x];
+                                BYTE dstA = (dst >> 24) & 0xFF;
+                                BYTE dstR = (dst >> 16) & 0xFF;
+                                BYTE dstG = (dst >> 8) & 0xFF;
+                                BYTE dstB = dst & 0xFF;
+                                BYTE outA = selAlpha + (BYTE)((dstA * invSelAlpha) / 255);
+                                BYTE outR = selPmR + (BYTE)((dstR * invSelAlpha) / 255);
+                                BYTE outG = selPmG + (BYTE)((dstG * invSelAlpha) / 255);
+                                BYTE outB = selPmB + (BYTE)((dstB * invSelAlpha) / 255);
+                                pixels[y * w + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+                            }
+                        }
+                    }
+                }
+                // Hover highlight for this row (before drawing content)
+                else if (i == hoveredIcon && !isDraggingIcon) {
+                    BYTE hovAlpha = HOVER_ALPHA;
+                    BYTE hovPmR = (BYTE)((HOVER_R * hovAlpha) / 255);
+                    BYTE hovPmG = (BYTE)((HOVER_G * hovAlpha) / 255);
+                    BYTE hovPmB = (BYTE)((HOVER_B * hovAlpha) / 255);
+                    BYTE invHovAlpha = 255 - hovAlpha;
+
+                    for (int y = drawTop; y < drawBottom && y < h; y++) {
+                        if (y < visibleTop) continue;
+                        for (int x = icon.rect.left; x < icon.rect.right && x < w; x++) {
+                            if (x >= 0 && y >= 0) {
+                                DWORD dst = pixels[y * w + x];
+                                BYTE dstA = (dst >> 24) & 0xFF;
+                                BYTE dstR = (dst >> 16) & 0xFF;
+                                BYTE dstG = (dst >> 8) & 0xFF;
+                                BYTE dstB = dst & 0xFF;
+                                BYTE outA = hovAlpha + (BYTE)((dstA * invHovAlpha) / 255);
+                                BYTE outR = hovPmR + (BYTE)((dstR * invHovAlpha) / 255);
+                                BYTE outG = hovPmG + (BYTE)((dstG * invHovAlpha) / 255);
+                                BYTE outB = hovPmB + (BYTE)((dstB * invHovAlpha) / 255);
+                                pixels[y * w + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
                             }
                         }
                     }

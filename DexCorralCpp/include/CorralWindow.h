@@ -17,7 +17,6 @@
 #include "Config.h"
 #include "DesktopIcons.h"
 
-class WallpaperManager;
 class FolderWatcher;
 class CorralWindow;
 
@@ -90,8 +89,8 @@ struct CorralIcon {
  */
 class CorralWindow {
 public:
-    /// Constructor initializing corral with config and wallpaper manager
-    CorralWindow(const CorralWindowConfig& config, WallpaperManager* wallpaperMgr);
+    /// Constructor initializing corral with config
+    CorralWindow(const CorralWindowConfig& config);
     ~CorralWindow();
 
     /// Shows the corral window (and syncs visibility to config)
@@ -102,9 +101,6 @@ public:
 
     /// Sends corral to bottom z-order (behind all other windows)
     void SendToBottom();
-
-    /// Updates the wallpaper background image (samples wallpaper at corral location)
-    void UpdateWallpaperBackground();
 
     /// Loads files/folders from the active tab into the icon grid
     void LoadFiles();
@@ -177,6 +173,7 @@ private:
     void OnLeftButtonDblClick(int x, int y);
     void OnRightButtonDown(int x, int y);
     void OnDrop(IDataObject* pDataObj);  // OLE drop handler (replaces OnDropFiles)
+    void OnDropOnIcon(IDataObject* pDataObj, int iconIndex);  // Drop file onto a corral icon (shell-execute)
 
     friend class CorralDropTarget;
 
@@ -267,7 +264,6 @@ private:
 
     HWND hwnd;
     CorralWindowConfig config;
-    WallpaperManager* wallpaperManager;
     bool isDragging;
     POINT dragStart;
     RECT dragStartRect;
@@ -280,6 +276,7 @@ private:
 
     std::vector<CorralIcon> icons;
     int selectedIcon = -1;
+    int hoveredIcon = -1;
 
     // Icon layout - dynamically calculated from view mode
     int iconSize = 32;

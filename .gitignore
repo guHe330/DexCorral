@@ -44,10 +44,14 @@
 *.md
 !README.md
 !MANUAL.md
-!CONTRIBUTING.md
+!docs/CONTRIBUTING.md
 !Distribute/RELEASE_TEMPLATE.md
 !installer/README.md
 !installer/msix/README.md
+!docs/ARCHITECTURE.md
+!docs/CHANGELOG.md
+!docs/USER_MANUAL.md
+!docs/BUILD_GUIDE.md
 
 # Build directories
 build/

@@ -1,15 +1,16 @@
 #include <Windows.h>
 #include <CommCtrl.h>
+#include <ShlObj.h>
 #include <stdio.h>
 #include <new>
 #include "CorralHook.h"
+#include "HookBridge.h"
 #include "ClassFactory.h"
 #include "Registration.h"
 #include "Guids.h"
 
 #pragma comment(lib, "comctl32.lib")
 
-static const wchar_t* DEBUG_EVENT_NAME = L"Local\\DexCorralDebug";
 static HMODULE g_hModule = nullptr;
 static HANDLE g_hWorkerThread = nullptr;
 static HANDLE g_hStopEvent = nullptr;  // Signaled to tell worker thread to quit
@@ -18,24 +19,25 @@ static bool g_bInsideExplorer = false; // Only activate hook+app when loaded by 
 // RunApp is defined in App.cpp — compiled into the same DLL
 extern "C" int RunApp(HANDLE hStopEvent);
 
-static bool IsDebugEnabled() {
-    HANDLE hEvent = OpenEventW(EVENT_ALL_ACCESS, FALSE, DEBUG_EVENT_NAME);
-    if (hEvent) {
-        CloseHandle(hEvent);
-        return true;
-    }
-    return false;
-}
+// Log to file (always on, writes to %APPDATA%/DexCorral/dllmain.log)
+static wchar_t g_DllMainLogPath[MAX_PATH] = {};
 
-// Log to file for debugging (since we can't use console in Explorer)
 static void Log(const wchar_t* message) {
-    if (!IsDebugEnabled()) return;
+    if (!g_DllMainLogPath[0]) {
+        wchar_t* appData = nullptr;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData))) {
+            wchar_t dir[MAX_PATH];
+            swprintf_s(dir, L"%s\\DexCorral", appData);
+            CreateDirectoryW(dir, nullptr);
+            swprintf_s(g_DllMainLogPath, L"%s\\dllmain.log", dir);
+            CoTaskMemFree(appData);
+        } else {
+            GetTempPathW(MAX_PATH, g_DllMainLogPath);
+            wcscat_s(g_DllMainLogPath, L"dllmain.log");
+        }
+    }
 
-    wchar_t path[MAX_PATH];
-    GetTempPathW(MAX_PATH, path);
-    wcscat_s(path, L"CorralHook.log");
-
-    HANDLE hFile = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+    HANDLE hFile = CreateFileW(g_DllMainLogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
                                OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile != INVALID_HANDLE_VALUE) {
         SYSTEMTIME st;
@@ -84,6 +86,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         g_bInsideExplorer = IsRunningInsideExplorer();
         Log(L"CorralHook: DLL_PROCESS_ATTACH");
 
+        // Initialize HookBridge (critical section) regardless of context
+        HookBridge::Initialize();
+
         if (!g_bInsideExplorer) {
             // Loaded by registration tool — only COM exports needed, no hook/app
             Log(L"CorralHook: Not in Explorer, skipping hook and app initialization");
@@ -131,6 +136,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         }
 
         CleanupCorralHook();
+        HookBridge::Cleanup();
         break;
     }
     return TRUE;

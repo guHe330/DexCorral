@@ -2,7 +2,7 @@
  * CorralWindow.cpp - Core window class implementation
  *
  * Implements the main CorralWindow class which manages layered windows with per-pixel
- * alpha blending, wallpaper sampling, icon grid layout, drag-drop, and tab switching.
+ * alpha blending, icon grid layout, drag-drop, and tab switching.
  * Handles window lifecycle, WindowProc message routing, tab management, and
  * configuration persistence. Window logic is split across multiple files:
  * CorralWindowRender.cpp (drawing), CorralWindowIcons.cpp (icon loading/drawing),
@@ -13,7 +13,6 @@
 #include "CorralWindow.h"
 #include "Constants.h"
 #include "App.h"
-#include "WallpaperManager.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
 #include <windowsx.h>
@@ -58,8 +57,8 @@ std::wstring CorralWindow::Utf8ToWide(const std::string& utf8) {
 // Construction / Destruction
 // ============================================================================
 
-CorralWindow::CorralWindow(const CorralWindowConfig& cfg, WallpaperManager* wallpaperMgr)
-    : config(cfg), wallpaperManager(wallpaperMgr), isDragging(false), hwnd(nullptr) {
+CorralWindow::CorralWindow(const CorralWindowConfig& cfg)
+    : config(cfg), isDragging(false), hwnd(nullptr) {
 
     // Ensure at least one tab exists
     if (config.Tabs.empty()) {
@@ -261,11 +260,6 @@ void CorralWindow::Hide() {
     }
 }
 
-void CorralWindow::UpdateWallpaperBackground() {
-    if (hwnd) {
-        UpdateLayeredContent();
-    }
-}
 
 void CorralWindow::SyncConfigFromWindow() {
     if (hwnd) {
@@ -563,6 +557,15 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
 
+            // Track hovered icon
+            if (!window->isDragging && !window->isResizing && !window->isDraggingIcon && !window->isDraggingScrollbar) {
+                int prevHovered = window->hoveredIcon;
+                window->hoveredIcon = window->HitTestIcon(x, y);
+                if (prevHovered != window->hoveredIcon) {
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
+            }
+
             if (window->isResizing) {
                 POINT pt;
                 GetCursorPos(&pt);
@@ -665,6 +668,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_MOUSELEAVE:
             window->mouseInsideWindow = false;
+            // Reset hovered icon
+            if (window->hoveredIcon >= 0) {
+                window->hoveredIcon = -1;
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             // Reset scrollbar hover state
             if (window->isScrollbarHovered) {
                 window->isScrollbarHovered = false;

@@ -16,10 +16,6 @@
 /// Used when reading window titles, paths, and other metadata from Explorer
 constexpr DWORD DESKTOP_ICON_BUFFER_SIZE = 4096;
 
-/// Shared memory size for hidden icon list (64KB)
-/// Stores version counter and list of hidden icon indices for the hook DLL
-constexpr DWORD HOOK_SHARED_MEMORY_SIZE = 65536;
-
 /// Dialog template buffer size (4KB)
 /// Sufficient for in-memory DLGTEMPLATE construction and dialog resources
 constexpr DWORD DIALOG_TEMPLATE_BUFFER_SIZE = 4096;
@@ -50,6 +46,10 @@ constexpr BYTE TITLE_TEXT_ALPHA = 220;
 /// Provides visual feedback for selected icons without blocking them
 constexpr BYTE SELECTION_ALPHA = 180;
 
+/// Icon hover overlay alpha (30% opacity, 77/255)
+/// Subtle highlight on mouse-over
+constexpr BYTE HOVER_ALPHA = 77;
+
 // ============================================================================
 // Rendering: Colors (ARGB format)
 // ============================================================================
@@ -67,6 +67,11 @@ constexpr COLORREF CORRAL_BORDER_COLOR = (255 << 24) | (100 << 16) | (100 << 8) 
 constexpr BYTE SELECTION_R = 60;
 constexpr BYTE SELECTION_G = 120;
 constexpr BYTE SELECTION_B = 200;
+
+/// Icon hover color RGB components (light gray: 180, 180, 200)
+constexpr BYTE HOVER_R = 180;
+constexpr BYTE HOVER_G = 180;
+constexpr BYTE HOVER_B = 200;
 
 // ============================================================================
 // Icon Rendering

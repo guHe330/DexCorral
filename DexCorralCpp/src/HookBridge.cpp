@@ -1,70 +1,59 @@
 /**
- * HookBridge.cpp - IPC communication with Explorer hook DLL
+ * HookBridge.cpp - In-process communication between app and Explorer hook
  *
- * Implements inter-process communication with the CorralHook.dll that is injected
- * into explorer.exe. Uses shared memory with version counter for zero-cost cache checks,
- * allowing the hook to efficiently determine when the list of hidden icons has changed
- * without polling or event notifications.
+ * Both the app (worker thread) and the Explorer hook (UI thread) run inside
+ * DexCorralHook.dll in the same process. Communication uses a global vector
+ * protected by a CRITICAL_SECTION, with a version counter for zero-cost
+ * cache checks on the hook side.
  */
 
 #include "HookBridge.h"
 #include "Constants.h"
 #include <vector>
 
-/// Shared memory name - must match DexCorralHook.dll
-static const wchar_t* SHARED_MEMORY_NAME = L"Local\\DexCorralHiddenIcons";
+static CRITICAL_SECTION s_Lock;
+static std::vector<std::wstring> s_HiddenNames;
+static volatile DWORD s_Version = 0;
+static bool s_Initialized = false;
 
-// Shared memory layout:
-//   [0..3]   DWORD version  - incremented on every update
-//   [4..N]   wchar_t[]      - null-separated display names, double-null terminated
+void HookBridge::Initialize() {
+    if (!s_Initialized) {
+        InitializeCriticalSection(&s_Lock);
+        s_Initialized = true;
+    }
+}
 
-HANDLE HookBridge::s_hMapFile = nullptr;
-static DWORD s_Version = 0;
+void HookBridge::Cleanup() {
+    if (s_Initialized) {
+        DeleteCriticalSection(&s_Lock);
+        s_Initialized = false;
+    }
+}
 
 void HookBridge::UpdateHiddenIcons(const std::vector<std::wstring>& displayNames) {
-    // Create mapping if not yet created
-    if (!s_hMapFile) {
-        s_hMapFile = CreateFileMappingW(
-            INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, HOOK_SHARED_MEMORY_SIZE, SHARED_MEMORY_NAME);
-        if (!s_hMapFile) return;
-    }
-
-    BYTE* data = (BYTE*)MapViewOfFile(s_hMapFile, FILE_MAP_WRITE, 0, 0, 0);
-    if (!data) return;
-
-    // Increment version
+    EnterCriticalSection(&s_Lock);
+    s_HiddenNames = displayNames;
     s_Version++;
-    *(DWORD*)data = s_Version;
-
-    // Write names after the version header
-    wchar_t* p = (wchar_t*)(data + sizeof(DWORD));
-    DWORD remaining = (HOOK_SHARED_MEMORY_SIZE - sizeof(DWORD)) / sizeof(wchar_t);
-
-    for (const auto& name : displayNames) {
-        DWORD len = (DWORD)name.length() + 1;
-        if (len + 1 > remaining) break;
-        wcscpy_s(p, remaining, name.c_str());
-        p += len;
-        remaining -= len;
-    }
-    *p = L'\0';  // Double-null terminator
-
-    UnmapViewOfFile(data);
+    LeaveCriticalSection(&s_Lock);
 }
 
 void HookBridge::ClearHiddenIcons() {
-    if (s_hMapFile) {
-        BYTE* data = (BYTE*)MapViewOfFile(s_hMapFile, FILE_MAP_WRITE, 0, 0, 0);
-        if (data) {
-            s_Version++;
-            *(DWORD*)data = s_Version;
-            wchar_t* p = (wchar_t*)(data + sizeof(DWORD));
-            *p = L'\0';
-            UnmapViewOfFile(data);
-        }
-        CloseHandle(s_hMapFile);
-        s_hMapFile = nullptr;
-    }
+    EnterCriticalSection(&s_Lock);
+    s_HiddenNames.clear();
+    s_Version++;
+    LeaveCriticalSection(&s_Lock);
+}
+
+DWORD HookBridge::GetVersion() {
+    return s_Version;
+}
+
+DWORD HookBridge::GetHiddenIconNames(std::vector<std::wstring>& out) {
+    EnterCriticalSection(&s_Lock);
+    out = s_HiddenNames;
+    DWORD ver = s_Version;
+    LeaveCriticalSection(&s_Lock);
+    return ver;
 }
 
 void HookBridge::RefreshDesktop() {

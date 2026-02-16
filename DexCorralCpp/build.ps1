@@ -8,14 +8,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Kill any running instances (watchdog first to prevent auto-relaunch)
+# Kill any running instances
 Write-Host "Stopping any running DexCorral instances..." -ForegroundColor Yellow
-$watchdogs = Get-Process -Name "DexCorral.Watchdog" -ErrorAction SilentlyContinue
-if ($watchdogs) {
-    $watchdogs | Stop-Process -Force
-    Write-Host "  Killed $($watchdogs.Count) watchdog instance(s)" -ForegroundColor Yellow
-    Start-Sleep -Milliseconds 500
-}
 $processes = Get-Process -Name "DexCorral" -ErrorAction SilentlyContinue
 if ($processes) {
     $processes | Stop-Process -Force
@@ -132,7 +126,6 @@ if ($exitCode -eq 0) {
     Write-Host "Build completed successfully!" -ForegroundColor Green
     Write-Host "Shell Extension: $buildDir\DexCorralHook.dll" -ForegroundColor Green
     Write-Host "Registration:    $buildDir\DexCorral.exe" -ForegroundColor Green
-    Write-Host "Watchdog:        $buildDir\DexCorral.Watchdog.exe" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "To install:   DexCorral.exe --register  (run as Admin)" -ForegroundColor Cyan
@@ -142,8 +135,7 @@ if ($exitCode -eq 0) {
     $zipPath = Join-Path $buildDir "DexCorral.zip"
     $filesToZip = @(
         (Join-Path $buildDir "DexCorralHook.dll"),
-        (Join-Path $buildDir "DexCorral.exe"),
-        (Join-Path $buildDir "DexCorral.Watchdog.exe")
+        (Join-Path $buildDir "DexCorral.exe")
     ) | Where-Object { Test-Path $_ }
 
     if ($filesToZip.Count -gt 0) {

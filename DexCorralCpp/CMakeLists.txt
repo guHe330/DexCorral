@@ -23,22 +23,6 @@ set_target_properties(DexCorral PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-# Watchdog executable
-add_executable(DexCorral.Watchdog WIN32
-    src/Watchdog.cpp
-)
-
-target_compile_definitions(DexCorral.Watchdog PRIVATE UNICODE _UNICODE)
-
-target_link_libraries(DexCorral.Watchdog PRIVATE
-    shell32
-    user32
-)
-
-set_target_properties(DexCorral.Watchdog PROPERTIES
-    WIN32_EXECUTABLE TRUE
-)
-
 # DexCorralHook DLL — monolith shell extension (all app logic + Explorer hook)
 add_library(DexCorralHook SHARED
     # Hook / shell extension code
@@ -51,7 +35,6 @@ add_library(DexCorralHook SHARED
     # App logic (moved from EXE)
     src/App.cpp
     src/DesktopIcons.cpp
-    src/WallpaperManager.cpp
     src/CorralWindow.cpp
     src/CorralWindowRender.cpp
     src/CorralWindowIcons.cpp
@@ -76,7 +59,6 @@ target_link_libraries(DexCorralHook PRIVATE
     comctl32
     comdlg32
     gdi32
-    gdiplus
     shell32
     user32
     ole32

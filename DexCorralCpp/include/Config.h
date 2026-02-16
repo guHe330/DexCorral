@@ -3,7 +3,7 @@
  *
  * Defines the JSON-serializable configuration structs for corrals, tabs, and application settings.
  * Uses nlohmann/json with NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT macro for automatic
- * JSON serialization/deserialization with backward compatibility.
+ * JSON serialization/deserialization. Missing fields get default values instead of throwing.
  */
 
 #pragma once

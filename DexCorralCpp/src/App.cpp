@@ -32,8 +32,6 @@ extern "C" int RunApp(HANDLE hStopEvent) {
 App* App::instance = nullptr;
 
 static const wchar_t* MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
-static const wchar_t* GRACEFUL_EXIT_EVENT = L"DexCorralGracefulExit";
-
 App::App() : messageWindow(nullptr) {
     instance = this;
 }
@@ -66,12 +64,8 @@ void App::Initialize() {
     // Load configuration
     LoadConfig();
 
-    // Create monitor manager (before wallpaper and corrals)
+    // Create monitor manager (before corrals)
     monitorManager = std::make_unique<MonitorManager>();
-
-    // Create wallpaper manager
-    wallpaperManager = std::make_unique<WallpaperManager>();
-    wallpaperManager->LoadWallpaper();
 
     // Setup mouse hook
     mouseHook = std::make_unique<MouseHook>();
@@ -105,7 +99,7 @@ void App::Initialize() {
         tab.IsCatchAll = true;  // First corral is catch-all
         defaultConfig.Tabs.push_back(tab);
 
-        auto corral = std::make_unique<CorralWindow>(defaultConfig, wallpaperManager.get());
+        auto corral = std::make_unique<CorralWindow>(defaultConfig);
         corral->Show();
         corrals.push_back(std::move(corral));
 
@@ -124,12 +118,6 @@ void App::Initialize() {
     desktopMonitor->SetFileRenamedCallback([this](const std::wstring& oldName, const std::wstring& newName) { OnDesktopFileRenamed(oldName, newName); });
     desktopMonitor->SetFileDeletedCallback([this](const std::wstring& fileName) { OnDesktopFileDeleted(fileName); });
     desktopMonitor->Start();
-
-    // Create graceful exit event (manual reset, initially not signaled)
-    hGracefulExitEvent = CreateEventW(nullptr, TRUE, FALSE, GRACEFUL_EXIT_EVENT);
-
-    // Start watchdog process
-    StartWatchdog();
 
     // Hook is in-process (shell extension) — just update hidden icon list
     UpdateHookHiddenIcons();
@@ -196,7 +184,7 @@ void App::RestoreCorrals() {
             corralConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
         }
 
-        auto corral = std::make_unique<CorralWindow>(corralConfig, wallpaperManager.get());
+        auto corral = std::make_unique<CorralWindow>(corralConfig);
         corral->Show();
         corrals.push_back(std::move(corral));
     }
@@ -244,9 +232,8 @@ void App::RefreshAllCorrals() {
 }
 
 void App::RefreshAllCorralBackgrounds() {
-    wallpaperManager->LoadWallpaper();
     for (auto& corral : corrals) {
-        corral->UpdateWallpaperBackground();
+        corral->RecalculateLayout();
     }
 }
 
@@ -274,7 +261,7 @@ void App::ApplyColorToAllCorrals(const std::string& colorHex) {
         for (auto& tab : corral->GetConfig().Tabs) {
             tab.ColorHex = colorHex;
         }
-        corral->UpdateWallpaperBackground();
+        corral->RecalculateLayout();
     }
 }
 
@@ -320,7 +307,7 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
         if (needsLayoutRecalc) {
             corral->RecalculateLayout();
         } else {
-            corral->UpdateWallpaperBackground();
+            corral->RecalculateLayout();
         }
     }
 }
@@ -696,9 +683,6 @@ void App::ShowTrayMenu() {
     UINT autostartFlags = IsAutostartEnabled() ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
 
-    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, 3, L"Exit");
-
     POINT pt;
     GetCursorPos(&pt);
 
@@ -721,10 +705,6 @@ void App::ShowTrayMenu() {
     }
     case 2:
         ToggleDesktopIcons();
-        break;
-    case 3:
-        SignalGracefulExit();
-        PostQuitMessage(0);
         break;
     case 4:
         SetAutostart(!IsAutostartEnabled());
@@ -771,7 +751,7 @@ void App::CreateCorral(POINT pt) {
     newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
     newConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
 
-    auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
+    auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
     corrals.push_back(std::move(corral));
     SaveConfig();
@@ -878,7 +858,7 @@ void App::CreateVirtualCorralAt(POINT pt) {
     newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
     newConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
 
-    auto corral = std::make_unique<CorralWindow>(newConfig, wallpaperManager.get());
+    auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
     corrals.push_back(std::move(corral));
     SaveConfig();
@@ -959,13 +939,9 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
-    // Handle Windows shutdown/logoff - signal graceful exit
-    if (app && (uMsg == WM_ENDSESSION || uMsg == WM_QUERYENDSESSION)) {
-        if (uMsg == WM_ENDSESSION && wParam) {
-            // Session is ending - signal graceful exit so watchdog doesn't restart
-            app->SignalGracefulExit();
-        }
-        return uMsg == WM_QUERYENDSESSION ? TRUE : 0;
+    // Handle Windows shutdown/logoff
+    if (uMsg == WM_QUERYENDSESSION) {
+        return TRUE;
     }
 
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
@@ -1032,7 +1008,7 @@ void App::EnsureCatchAllCorral() {
             for (auto& tab : corral->GetConfig().Tabs) {
                 if (!tab.IsVirtual) {
                     tab.IsCatchAll = true;
-                    corral->UpdateWallpaperBackground();
+                    corral->RecalculateLayout();
                     found = true;
                     break;
                 }
@@ -1066,11 +1042,6 @@ void App::OnDisplayChange() {
 
     // Refresh monitor list
     monitorManager->Refresh();
-
-    // Update wallpaper (resolution may have changed)
-    if (wallpaperManager) {
-        wallpaperManager->LoadWallpaper();
-    }
 
     // Reposition all corrals
     UpdateCorralPositions();
@@ -1199,53 +1170,6 @@ void App::UpdateCorralPositions() {
 
     if (configChanged) {
         SaveConfig();
-    }
-}
-
-void App::StartWatchdog() {
-    // Get path to watchdog executable (in same directory as main exe)
-    wchar_t exePath[MAX_PATH];
-    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-
-    std::wstring watchdogPath(exePath);
-    size_t pos = watchdogPath.rfind(L'\\');
-    if (pos != std::wstring::npos) {
-        watchdogPath = watchdogPath.substr(0, pos + 1) + L"DexCorral.Watchdog.exe";
-    } else {
-        return;  // Can't determine path
-    }
-
-    // Check if watchdog exists
-    if (GetFileAttributesW(watchdogPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        return;  // Watchdog not found - running in dev mode or standalone
-    }
-
-    // Build command line with our PID
-    wchar_t cmdLine[MAX_PATH + 32];
-    swprintf_s(cmdLine, L"\"%s\" %lu", watchdogPath.c_str(), GetCurrentProcessId());
-
-    // Start watchdog process
-    STARTUPINFOW si = { sizeof(si) };
-    PROCESS_INFORMATION pi = {};
-
-    if (CreateProcessW(
-        watchdogPath.c_str(),
-        cmdLine,
-        nullptr, nullptr,
-        FALSE,
-        0,
-        nullptr, nullptr,
-        &si, &pi
-    )) {
-        // Close handles - we don't need to track the watchdog
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-    }
-}
-
-void App::SignalGracefulExit() {
-    if (hGracefulExitEvent) {
-        SetEvent(hGracefulExitEvent);
     }
 }
 

@@ -8,6 +8,7 @@
 
 #include "CorralWindow.h"
 #include "App.h"
+#include "DesktopIcons.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <ShlObj.h>
@@ -15,6 +16,49 @@
 #include <algorithm>
 #include <Shlwapi.h>
 #include <cmath>
+#include <stdio.h>
+
+// ============================================================================
+// Drag-drop logging (writes to %APPDATA%/DexCorral/CorralDrop.log)
+// ============================================================================
+
+static wchar_t g_CorralDropLogPath[MAX_PATH] = {};
+
+static void LogCorralDrop(const wchar_t* fmt, ...) {
+    if (!g_CorralDropLogPath[0]) {
+        wchar_t* appData = nullptr;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData))) {
+            wchar_t dir[MAX_PATH];
+            swprintf_s(dir, L"%s\\DexCorral", appData);
+            CreateDirectoryW(dir, nullptr);
+            swprintf_s(g_CorralDropLogPath, L"%s\\CorralDrop.log", dir);
+            CoTaskMemFree(appData);
+        } else {
+            GetTempPathW(MAX_PATH, g_CorralDropLogPath);
+            wcscat_s(g_CorralDropLogPath, L"CorralDrop.log");
+        }
+    }
+
+    HANDLE hFile = CreateFileW(g_CorralDropLogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        wchar_t buffer[1024];
+        int offset = swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] ",
+                                st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+        va_list args;
+        va_start(args, fmt);
+        vswprintf_s(buffer + offset, _countof(buffer) - offset, fmt, args);
+        va_end(args);
+
+        wcscat_s(buffer, L"\r\n");
+        DWORD written;
+        WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
+        CloseHandle(hFile);
+    }
+}
 
 // ============================================================================
 // Scrollbar support
@@ -844,22 +888,49 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::DragEnter(IDataObject* pDataObj, DWO
                    pDataObj->QueryGetData(&fmtShellIdList) == S_OK);
 
     *pdwEffect = hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+    LogCorralDrop(L"DragEnter: hasDropData=%d, effect=0x%X", hasDropData, *pdwEffect);
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CorralDropTarget::DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) {
-    *pdwEffect = hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+    if (!hasDropData) {
+        *pdwEffect = DROPEFFECT_NONE;
+        return S_OK;
+    }
+
+    // Show DROPEFFECT_COPY when hovering over an icon (drop-on-icon = open with)
+    // Show DROPEFFECT_LINK when hovering over empty space (add to corral)
+    POINT clientPt = { pt.x, pt.y };
+    ScreenToClient(owner->hwnd, &clientPt);
+    int hit = owner->HitTestIcon(clientPt.x, clientPt.y);
+    *pdwEffect = (hit >= 0) ? DROPEFFECT_COPY : DROPEFFECT_LINK;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CorralDropTarget::DragLeave() {
+    LogCorralDrop(L"DragLeave");
     hasDropData = false;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) {
-    *pdwEffect = DROPEFFECT_LINK;
-    owner->OnDrop(pDataObj);
+    // Check if dropped on a corral icon -> shell-execute (open with that icon)
+    POINT clientPt = { pt.x, pt.y };
+    ScreenToClient(owner->hwnd, &clientPt);
+    int hit = owner->HitTestIcon(clientPt.x, clientPt.y);
+
+    LogCorralDrop(L"Drop: screen=(%d,%d) client=(%d,%d) hitIcon=%d",
+                  pt.x, pt.y, clientPt.x, clientPt.y, hit);
+
+    if (hit >= 0) {
+        *pdwEffect = DROPEFFECT_COPY;
+        LogCorralDrop(L"Drop: on icon %d -> OnDropOnIcon", hit);
+        owner->OnDropOnIcon(pDataObj, hit);
+    } else {
+        *pdwEffect = DROPEFFECT_LINK;
+        LogCorralDrop(L"Drop: on empty space -> OnDrop (add to corral)");
+        owner->OnDrop(pDataObj);
+    }
     return S_OK;
 }
 
@@ -996,6 +1067,52 @@ void CorralWindow::OnDrop(IDataObject* pDataObj) {
 }
 
 // ============================================================================
+// OnDropOnIcon - drop a file onto a corral icon (shell-execute / open with)
+// ============================================================================
+
+void CorralWindow::OnDropOnIcon(IDataObject* pDataObj, int iconIndex) {
+    if (iconIndex < 0 || iconIndex >= (int)icons.size()) return;
+
+    const auto& targetIcon = icons[iconIndex];
+
+    // Get the target icon's IDropTarget via the shell and forward the drop.
+    // This replicates Explorer's behavior: dropping onto an exe opens the file,
+    // dropping onto a folder moves/copies the file, dropping onto a shortcut
+    // invokes the shortcut's target with the dropped file, etc.
+    std::wstring targetPath;
+    if (targetIcon.isSpecialIcon) {
+        targetPath = L"::" + targetIcon.clsid;
+    } else {
+        targetPath = targetIcon.fullPath;
+    }
+
+    LogCorralDrop(L"OnDropOnIcon: icon=%d target='%s' special=%d",
+                  iconIndex, targetPath.c_str(), targetIcon.isSpecialIcon);
+
+    IShellItem* pItem = nullptr;
+    HRESULT hr = SHCreateItemFromParsingName(targetPath.c_str(), nullptr, IID_PPV_ARGS(&pItem));
+    if (SUCCEEDED(hr) && pItem) {
+        IDropTarget* pDropTarget = nullptr;
+        hr = pItem->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&pDropTarget));
+        if (SUCCEEDED(hr) && pDropTarget) {
+            LogCorralDrop(L"OnDropOnIcon: got IDropTarget, forwarding drop");
+            POINTL ptl = { 0, 0 };
+            DWORD dwEffect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
+            pDropTarget->DragEnter(pDataObj, MK_LBUTTON, ptl, &dwEffect);
+            dwEffect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
+            pDropTarget->Drop(pDataObj, MK_LBUTTON, ptl, &dwEffect);
+            pDropTarget->Release();
+            LogCorralDrop(L"OnDropOnIcon: drop forwarded, effect=0x%X", dwEffect);
+        } else {
+            LogCorralDrop(L"OnDropOnIcon: BindToHandler failed hr=0x%08X", hr);
+        }
+        pItem->Release();
+    } else {
+        LogCorralDrop(L"OnDropOnIcon: SHCreateItemFromParsingName failed hr=0x%08X", hr);
+    }
+}
+
+// ============================================================================
 // Icon reordering
 // ============================================================================
 
@@ -1072,6 +1189,33 @@ void CorralWindow::OnIconDragEnd() {
             LoadFiles();
             if (app) {
                 app->SaveConfig();
+                app->UpdateHookHiddenIcons();
+
+                // Position the icon at the drop location on the desktop
+                std::wstring displayName;
+                if (CorralWindow::IsSpecialIconEntry(draggedFile)) {
+                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(draggedFile);
+                    displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                } else {
+                    displayName = Utf8ToWide(draggedFile);
+                    // Strip .lnk to get display name (matches ListView item text)
+                    if (displayName.length() > 4) {
+                        std::wstring ext = displayName.substr(displayName.length() - 4);
+                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
+                            displayName = displayName.substr(0, displayName.length() - 4);
+                        }
+                    }
+                }
+
+                if (!displayName.empty()) {
+                    // Convert screen coords to desktop ListView client coords
+                    HWND hListView = DesktopIcons::GetDesktopListView();
+                    if (hListView) {
+                        POINT clientPt = screenPt;
+                        ScreenToClient(hListView, &clientPt);
+                        DesktopIcons::PositionIcon(displayName, clientPt.x, clientPt.y);
+                    }
+                }
             }
         }
     }

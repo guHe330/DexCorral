@@ -3,7 +3,7 @@
  *
  * Manages application initialization, shutdown, and the main message loop.
  * Coordinates corral window creation/destruction, appearance synchronization,
- * wallpaper management, tray icon, desktop monitoring, and icon push-out-of-way
+ * tray icon, desktop monitoring, and icon push-out-of-way
  * when corrals overlap with desktop icons.
  */
 
@@ -16,7 +16,6 @@
 #include "Config.h"
 #include "DesktopIcons.h"
 #include "MouseHook.h"
-#include "WallpaperManager.h"
 #include "TrayIcon.h"
 #include "DesktopMonitor.h"
 #include "MonitorManager.h"
@@ -97,9 +96,6 @@ public:
     /// Creates a new virtual (non-file) corral at the specified screen coordinates
     void CreateVirtualCorralAt(POINT pt);
 
-    /// Returns pointer to wallpaper manager (handles desktop background sampling)
-    WallpaperManager* GetWallpaperManager() { return wallpaperManager.get(); }
-
     /// Returns pointer to monitor manager (tracks display configuration)
     MonitorManager* GetMonitorManager() { return monitorManager.get(); }
 
@@ -124,6 +120,8 @@ public:
     /// Moves desktop icons out of the way if they overlap with corrals
     void PushDesktopIconsFromCorrals();
 
+    void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
+
 private:
     void Initialize();
     void Shutdown();
@@ -145,10 +143,6 @@ private:
     void OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& newName);
     void OnDesktopFileDeleted(const std::wstring& fileName);
 
-    // Watchdog support
-    void StartWatchdog();
-    void SignalGracefulExit();
-
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     static App* instance;
@@ -157,17 +151,12 @@ private:
     AppConfig config;
     std::string configPath;
     std::unique_ptr<MouseHook> mouseHook;
-    std::unique_ptr<WallpaperManager> wallpaperManager;
     std::unique_ptr<TrayIcon> trayIcon;
     std::unique_ptr<DesktopMonitor> desktopMonitor;
     std::unique_ptr<MonitorManager> monitorManager;
     std::vector<std::unique_ptr<CorralWindow>> corrals;
 
-    // Watchdog support
-    HANDLE hGracefulExitEvent = nullptr;
-
     // Hook integration (in-process shell extension)
-    void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
     void PositionHiddenIconsUnderCorrals();    // Move hidden icons under corral windows for drag-drop occlusion
 
     // Desktop icon push cache

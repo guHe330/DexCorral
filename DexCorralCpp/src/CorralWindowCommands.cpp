@@ -377,7 +377,7 @@ void CorralWindow::ToggleCatchAll() {
             }
         }
         if (corral.get() != this) {
-            corral->UpdateWallpaperBackground();  // Remove symbol
+            corral->UpdateLayeredContent();  // Remove symbol
         }
     }
 
