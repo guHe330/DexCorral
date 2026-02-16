@@ -29,7 +29,7 @@ installer/msix/
    - Provides `MakeAppx.exe` and `SignTool.exe`
 2. **Build artifacts** - Run the main build first:
    ```powershell
-   cd ..\DexCorralCpp
+   cd ..\DexCorral
    powershell -File build.ps1
    ```
 

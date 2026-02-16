@@ -31,7 +31,7 @@ $ErrorActionPreference = "Stop"
 # Paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
-$BuildDir = Join-Path $ProjectRoot "DexCorralCpp\build"
+$BuildDir = Join-Path $ProjectRoot "DexCorral\build"
 $MsixDir = $ScriptDir
 $StagingDir = Join-Path $MsixDir "staging"
 $OutputDir = Join-Path $MsixDir "output"

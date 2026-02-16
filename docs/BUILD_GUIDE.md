@@ -14,7 +14,7 @@ To build the project, you need the following tools installed:
 
 The project uses the following third-party libraries:
 
-*   **nlohmann/json**: A header-only JSON library for C++. It is included in the source tree under `DexCorralCpp/include/nlohmann/`.
+*   **nlohmann/json**: A header-only JSON library for C++. It is included in the source tree under `DexCorral/include/nlohmann/`.
 
 ## Build Instructions
 

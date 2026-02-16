@@ -12,7 +12,7 @@ The application maintains one "Catch-All" Corral. Any new files or shortcuts add
 
 ## Getting Started
 
-1.  Launch `DexCorralCpp.exe`.
+1.  Launch `DexCorral.exe`.
 2.  Upon first run, a default "Desktop" Corral is created in the center of your screen as the Catch-All.
 3.  Your desktop icons will be managed according to the configuration.
 

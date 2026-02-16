@@ -40,17 +40,17 @@ jobs:
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.version }}"
-        $cmakePath = "DexCorralCpp/CMakeLists.txt"
+        $cmakePath = "DexCorral/CMakeLists.txt"
         $content = Get-Content $cmakePath -Raw
         $content = $content -replace 'project\(DexCorral VERSION \d+\.\d+\.\d+', "project(DexCorral VERSION $version"
         Set-Content $cmakePath -Value $content
         Write-Host "Updated CMakeLists.txt to version $version"
 
     - name: Configure CMake
-      run: cmake -S DexCorralCpp -B DexCorralCpp/build -G "Visual Studio 17 2022" -A x64
+      run: cmake -S DexCorral -B DexCorral/build -G "Visual Studio 17 2022" -A x64
 
     - name: Build Release
-      run: cmake --build DexCorralCpp/build --config Release
+      run: cmake --build DexCorral/build --config Release
 
     - name: Prepare portable readme
       shell: pwsh
@@ -68,9 +68,9 @@ jobs:
         New-Item -ItemType Directory -Force -Path "package"
         
         # Copy files
-        Copy-Item "DexCorralCpp/build/Release/DexCorral.exe" -Destination "package/"
-        Copy-Item "DexCorralCpp/build/Release/DexCorral.Watchdog.exe" -Destination "package/"
-        Copy-Item "DexCorralCpp/build/Release/DexCorralHook.dll" -Destination "package/"
+        Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "package/"
+        Copy-Item "DexCorral/build/Release/DexCorral.Watchdog.exe" -Destination "package/"
+        Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
         
