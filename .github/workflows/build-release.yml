@@ -46,6 +46,23 @@ jobs:
         Set-Content $cmakePath -Value $content
         Write-Host "Updated CMakeLists.txt to version $version"
 
+    - name: Update Version.h
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $parts = $version -split '\.'
+        $major = $parts[0]
+        $minor = $parts[1]
+        $patch = $parts[2]
+        $versionH = "DexCorral/include/Version.h"
+        $content = Get-Content $versionH -Raw
+        $content = $content -replace '#define DEXCORRAL_VERSION L"[^"]*"', "#define DEXCORRAL_VERSION L""$version"""
+        $content = $content -replace '#define DEXCORRAL_VERSION_MAJOR \d+', "#define DEXCORRAL_VERSION_MAJOR $major"
+        $content = $content -replace '#define DEXCORRAL_VERSION_MINOR \d+', "#define DEXCORRAL_VERSION_MINOR $minor"
+        $content = $content -replace '#define DEXCORRAL_VERSION_PATCH \d+', "#define DEXCORRAL_VERSION_PATCH $patch"
+        Set-Content $versionH -Value $content
+        Write-Host "Updated Version.h to $version"
+
     - name: Configure CMake
       run: cmake -S DexCorral -B DexCorral/build -G "Visual Studio 17 2022" -A x64
 
