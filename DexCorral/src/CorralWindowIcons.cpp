@@ -609,14 +609,13 @@ void CorralWindow::CalculateIconLayoutDetails() {
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     int clientWidth = clientRect.right;
-    int visibleHeight = clientRect.bottom - GetIconAreaTop();
     int rightPadding = Dpi(ICON_PADDING_LEFT);
 
     // Check if we'll need scrollbar
     int detailsRow = Dpi(DETAILS_ROW_HEIGHT);
     int detailsIcon = Dpi(ICON_SIZE_DETAILS);
     int estimatedHeight = GetIconAreaTop() + (int)icons.size() * detailsRow + Dpi(ICON_PADDING_LEFT);
-    if (estimatedHeight > visibleHeight) {
+    if (estimatedHeight > clientRect.bottom) {
         rightPadding = Dpi(ICON_PADDING_LEFT) + Dpi(SCROLLBAR_WIDTH) + Dpi(SCROLLBAR_MARGIN) * 2;
     }
 

@@ -75,7 +75,7 @@ int CorralWindow::GetContentHeight() const {
 int CorralWindow::GetVisibleHeight() const {
     RECT rect;
     GetClientRect(hwnd, &rect);
-    return rect.bottom - GetIconAreaTop();
+    return rect.bottom;
 }
 
 RECT CorralWindow::GetScrollbarTrackRect() const {

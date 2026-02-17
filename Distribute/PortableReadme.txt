@@ -17,7 +17,7 @@ Status:         Alpha
 Version:        C++ Native (Win32)
 Binary Size:    ~750KB (exe + dll)
 Platform:       Windows 10 / 11
-License:        MIT
+License:        GPL-3.0
 
 ================================================================================
 FEATURES
@@ -73,7 +73,7 @@ NOTE: The binaries are currently unsigned. Windows SmartScreen may show a
 warning when you first run the application. Click "More info" then "Run
 anyway" to proceed.
 
-An MSIX installer is also available on the Releases page for a more
+An Inno Setup installer is also available on the Releases page for a more
 integrated install experience.
 
 ================================================================================
@@ -82,7 +82,7 @@ PACKAGE CONTENTS
 
 * DexCorral.exe       - Registration tool
 * DexCorralHook.dll   - Explorer shell extension (all app logic)
-* LICENSE             - MIT License
+* LICENSE             - GPL-3.0 License
 * readme.txt          - This file
 
 ================================================================================
@@ -97,7 +97,7 @@ MORE INFORMATION
 LICENSE
 ================================================================================
 
-This project is licensed under the MIT License - see the LICENSE file for
+This project is licensed under the GPL-3.0 License - see the LICENSE file for
 details.
 
 Third-party: nlohmann/json v3.11.3 (MIT License)

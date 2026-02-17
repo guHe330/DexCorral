@@ -42,7 +42,10 @@
 
 ### What's New
 
-_Fill in changelog for this release._
+- Smooth icon hover: mouse-over now fades out both opacity and color tint overlay
+- Fix scrollbar appearing when icons fit fully within the corral
+- Replace MSIX with Inno Setup installer, add `--silent` flag
+- Fix build pipeline path handling
 
 ### Known Issues
 
