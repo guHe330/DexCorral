@@ -179,7 +179,7 @@ Runs on a worker thread inside `DexCorralHook.dll` (within Explorer.exe). Manage
 6. Alpha fix-up: GDI draws with alpha=0, so loop through pixels and restore alpha for non-transparent pixels
 7. Update layered window via `UpdateLayeredWindow` with final DIB
 
-### 3. Explorer Hook DLL (`CorralHook.cpp`)
+### 3. Explorer Shell Extension (`CorralHook.cpp`)
 
 Loaded into `explorer.exe` via COM shell extension registration to hide corral-owned icons and manage desktop layout.
 
