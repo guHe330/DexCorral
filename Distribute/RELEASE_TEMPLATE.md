@@ -20,12 +20,6 @@
 2. Run the installer (requires Administrator)
 3. The installer registers the shell extension and restarts Explorer automatically
 
-**Features:**
-- License agreement shown during install
-- Clean install/uninstall via Windows Settings > Apps
-- Handles upgrades automatically (unregisters old version, restarts Explorer, installs new files)
-- Start Menu shortcuts
-
 #### Option 2: Portable Package
 **For advanced users or non-administrator installs**
 
