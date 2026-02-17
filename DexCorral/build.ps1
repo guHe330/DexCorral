@@ -144,6 +144,34 @@ if ($exitCode -eq 0) {
         Write-Host ""
         Write-Host "Release zip: $zipPath" -ForegroundColor Cyan
     }
+
+    # Build Inno Setup installer if ISCC is available
+    $isccPaths = @(
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+    )
+    $iscc = $isccPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+    if ($iscc) {
+        $issFile = Join-Path $sourceDir "..\installer\innosetup\DexCorral.iss"
+        if (Test-Path $issFile) {
+            Write-Host ""
+            Write-Host "Building installer..." -ForegroundColor Green
+            & $iscc $issFile
+            if ($LASTEXITCODE -eq 0) {
+                $setupExe = Join-Path $sourceDir "..\installer\innosetup\output" | Get-ChildItem -Filter "DexCorral_*_Setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($setupExe) {
+                    Write-Host "Installer:   $($setupExe.FullName)" -ForegroundColor Green
+                }
+            } else {
+                Write-Host "Installer build failed (exit code $LASTEXITCODE)" -ForegroundColor Yellow
+            }
+        }
+    } else {
+        Write-Host ""
+        Write-Host "Inno Setup not found - skipping installer build" -ForegroundColor DarkGray
+        Write-Host "Install from: https://jrsoftware.org/isdl.php" -ForegroundColor DarkGray
+    }
 } else {
     Write-Host ""
     Write-Host "Build failed with exit code $exitCode" -ForegroundColor Red

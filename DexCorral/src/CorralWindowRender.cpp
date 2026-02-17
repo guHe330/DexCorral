@@ -211,7 +211,7 @@ void CorralWindow::UpdateLayeredContent() {
 
     // Parse tint color and strength
     BYTE tintR = 0, tintG = 0, tintB = 0;
-    int tintStrength = config.IconTintStrength;
+    int tintStrength = currentTintStrength;
     const std::string& tintHex = config.IconTintColor;
     if (!tintHex.empty() && tintHex[0] == '#' && tintHex.length() >= 7) {
         unsigned int tintVal;

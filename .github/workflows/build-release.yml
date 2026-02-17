@@ -10,7 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -29,11 +29,8 @@ jobs:
       run: |
         $tag = "${{ github.ref_name }}"
         $version = $tag -replace '^v', ''
-        $msixVersion = "$version.0"  # MSIX requires 4-part version
         Write-Host "Version: $version (tag: $tag)"
-        Write-Host "MSIX Version: $msixVersion"
         echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "msix_version=$msixVersion" >> $env:GITHUB_OUTPUT
         echo "tag=$tag" >> $env:GITHUB_OUTPUT
 
     - name: Update CMakeLists.txt version
@@ -72,7 +69,6 @@ jobs:
     - name: Prepare portable readme
       shell: pwsh
       run: |
-        # Copy the PortableReadme.txt from Distribute folder
         Copy-Item "Distribute/PortableReadme.txt" -Destination "portable_readme.txt"
         Write-Host "Copied PortableReadme.txt for portable package"
 
@@ -80,41 +76,43 @@ jobs:
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.version }}"
-        
+
         # Create staging directory
         New-Item -ItemType Directory -Force -Path "package"
-        
+
         # Copy files
         Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "package/"
         Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
-        
+
         # Create zip
         Compress-Archive -Path "package/*" -DestinationPath "Portable_DexCorral.zip" -Force
-        
+
         Write-Host "Created Portable_DexCorral.zip with contents:"
         Get-ChildItem "package"
 
-    - name: Build MSIX Package
+    - name: Build Inno Setup Installer
       shell: pwsh
       run: |
-        $version = "${{ steps.get_version.outputs.msix_version }}"
-        Write-Host "Building MSIX package version $version"
+        $version = "${{ steps.get_version.outputs.version }}"
+        Write-Host "Building Inno Setup installer version $version"
 
-        # Run the MSIX build script
-        cd installer/msix
-        .\build-msix.ps1 -Version $version -Sign
+        # Copy build output to where the .iss expects it (DexCorral/build/)
+        # VS generator puts output in Release/ subfolder
+        Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "DexCorral/build/" -Force
+        Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "DexCorral/build/" -Force
 
-        # Rename output with version number for clarity
-        $msixFile = "output/DexCorral_$version.msix"
-        $renamedMsix = "../../DexCorral_$version.msix"
+        # Inno Setup 6 is pre-installed on windows-latest runners
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$version "installer\innosetup\DexCorral.iss"
+        if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
 
-        if (Test-Path $msixFile) {
-          Copy-Item $msixFile $renamedMsix
-          Write-Host "MSIX package created: $renamedMsix"
+        $setupFile = "installer\innosetup\output\DexCorral_${version}_Setup.exe"
+        if (Test-Path $setupFile) {
+          Copy-Item $setupFile "DexCorral_${version}_Setup.exe"
+          Write-Host "Installer created: DexCorral_${version}_Setup.exe"
         } else {
-          Write-Error "MSIX package not found at $msixFile"
+          Write-Error "Installer not found at $setupFile"
           exit 1
         }
 
@@ -134,7 +132,7 @@ jobs:
         body_path: release_notes.md
         files: |
           Portable_DexCorral.zip
-          DexCorral_${{ steps.get_version.outputs.msix_version }}.msix
+          DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
         draft: false
         prerelease: false
       env:

@@ -298,6 +298,7 @@ void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyCol
         if (applyTint) {
             cfg.IconTintColor = tintColor;
             cfg.IconTintStrength = tintStrength;
+            corral->SetCurrentTintStrength(tintStrength);
         }
         if (applySpacing) {
             cfg.IconSpacingXPercent = spacingX;

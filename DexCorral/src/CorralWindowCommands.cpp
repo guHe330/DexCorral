@@ -543,9 +543,17 @@ void CorralWindow::OnHoverCheckTimer() {
 }
 
 void CorralWindow::StartOpacityAnimation(int target) {
-    if (currentOpacity == target) return;  // Already at target
+    StartOpacityAnimation(target, (target == 255) ? 0 : config.IconTintStrength);
+}
+
+void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal) {
+    bool opacityChanged = (currentOpacity != target);
+    bool tintChanged = (currentTintStrength != tintTargetVal);
+    if (!opacityChanged && !tintChanged) return;  // Already at target
     opacityStart = currentOpacity;
     opacityTarget = target;
+    tintStart = currentTintStrength;
+    tintTarget = tintTargetVal;
     opacityAnimationStartTime = GetTickCount();
     isOpacityAnimating = true;
     SetTimer(hwnd, OPACITY_TIMER_ID, 16, nullptr);  // ~60fps
@@ -567,6 +575,10 @@ void CorralWindow::OnOpacityAnimationTimer() {
     currentOpacity = opacityStart + (int)((opacityTarget - opacityStart) * easedProgress);
     if (currentOpacity < 0) currentOpacity = 0;
     if (currentOpacity > 255) currentOpacity = 255;
+
+    currentTintStrength = tintStart + (int)((tintTarget - tintStart) * easedProgress);
+    if (currentTintStrength < 0) currentTintStrength = 0;
+    if (currentTintStrength > 255) currentTintStrength = 255;
 
     UpdateLayeredContent();
 }

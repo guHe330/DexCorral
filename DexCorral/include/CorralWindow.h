@@ -136,6 +136,7 @@ public:
 
     /// Sets current window opacity (0-255, clamped to minimum 5)
     void SetCurrentOpacity(int opacity) { currentOpacity = (opacity < 5) ? 5 : opacity; }
+    void SetCurrentTintStrength(int tint) { currentTintStrength = (tint < 0) ? 0 : (tint > 255) ? 255 : tint; }
 
     /// Returns reference to the currently active tab
     CorralTabConfig& GetActiveTab();
@@ -192,8 +193,9 @@ private:
     void OnAnimationTimer();
     void OnHoverCheckTimer();
 
-    // Opacity hover animation
+    // Opacity/tint hover animation
     void StartOpacityAnimation(int target);
+    void StartOpacityAnimation(int target, int tintTargetVal);
     void OnOpacityAnimationTimer();
 
     // Snap support
@@ -311,7 +313,7 @@ private:
     static const UINT_PTR HOVER_CHECK_TIMER_ID = 2;
     bool mouseInsideWindow = false;    // Track mouse presence
 
-    // Opacity hover animation state
+    // Opacity/tint hover animation state
     static const UINT_PTR OPACITY_TIMER_ID = 3;
     static const int OPACITY_ANIMATION_DURATION = 200;  // ms
     bool isOpacityAnimating = false;
@@ -319,6 +321,9 @@ private:
     int opacityStart = 255;
     int opacityTarget = 255;
     int currentOpacity = 255;  // Current animated opacity (used by render)
+    int tintStart = 0;
+    int tintTarget = 0;
+    int currentTintStrength = 0;  // Current animated tint strength (used by render)
 
     // Icon dragging for reordering
     bool isDraggingIcon = false;

@@ -672,6 +672,9 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
             if (data->corralConfig) {
                 data->corralConfig->IconTintStrength = pos;
+                if (data->corralWindow) {
+                    data->corralWindow->SetCurrentTintStrength(pos);
+                }
                 AppearanceUpdateLivePreview(data);
             }
         }
@@ -956,6 +959,7 @@ void CorralWindow::ShowAppearanceDialog() {
         config.IconOpacity = originalIconOpacity;
         config.IconTintColor = originalTintColor;
         config.IconTintStrength = originalTintStrength;
+        currentTintStrength = originalTintStrength;
         config.IconSpacingXPercent = originalSpacingX;
         config.IconSpacingYPercent = originalSpacingY;
         CalculateIconLayout();
@@ -974,6 +978,7 @@ void CorralWindow::ShowAppearanceDialog() {
         sprintf_s(tintBuf, "#%02X%02X%02X", GetRValue(dlgData.tintColor), GetGValue(dlgData.tintColor), GetBValue(dlgData.tintColor));
         config.IconTintColor = tintBuf;
         config.IconTintStrength = dlgData.tintStrength;
+        currentTintStrength = dlgData.tintStrength;
         config.IconSpacingXPercent = dlgData.iconSpacingX;
         config.IconSpacingYPercent = dlgData.iconSpacingY;
 

@@ -74,6 +74,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg)
     dragStart = { 0, 0 };
     dragStartRect = { 0, 0, 0, 0 };
     currentOpacity = (config.IconOpacity < 5) ? 5 : config.IconOpacity;
+    currentTintStrength = config.IconTintStrength;
 
     // Save the full height for roll-up restore
     savedHeight = config.Height;
@@ -531,9 +532,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                     window->StartHoverExpand();
                 }
 
-                // Fade to full opacity on hover
-                if (window->config.IconOpacity < 255) {
-                    window->StartOpacityAnimation(255);
+                // Fade to full opacity and remove tint on hover
+                if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0) {
+                    window->StartOpacityAnimation(255, 0);
                 }
             }
 
@@ -682,9 +683,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (window->isHoverExpanded && !window->isAnimating) {
                 window->StartHoverCollapse();
             }
-            // Fade back to configured opacity
-            if (window->config.IconOpacity < 255) {
-                window->StartOpacityAnimation(window->config.IconOpacity);
+            // Fade back to configured opacity and tint
+            if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0) {
+                window->StartOpacityAnimation(window->config.IconOpacity, window->config.IconTintStrength);
             }
             return 0;
         case WM_MOUSEACTIVATE:

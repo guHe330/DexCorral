@@ -6,24 +6,25 @@
 
 | File | Description | Size |
 |------|-------------|------|
-| `DexCorral_${VERSION}.0.msix` | Windows app package | ~750KB |
+| `DexCorral_${VERSION}_Setup.exe` | Installer (recommended) | ~750KB |
 | `Portable_DexCorral.zip` | Portable package (no installer) | ~750KB |
 
 > **Note:** Both packages are currently unsigned. Windows SmartScreen may show a warning on first run. Click "More info" then "Run anyway" to proceed.
 
 ### Installation Options
 
-#### Option 1: MSIX Package
+#### Option 1: Installer (Recommended)
 **For Windows 10/11 users**
 
-1. Download `DexCorral_${VERSION}.0.msix`
-2. Double-click to install
-3. The app will auto-start and integrate with Windows
+1. Download `DexCorral_${VERSION}_Setup.exe`
+2. Run the installer (requires Administrator)
+3. The installer registers the shell extension and restarts Explorer automatically
 
 **Features:**
-- Clean install/uninstall via Windows Settings
-- Auto-start on login
-- Modern Windows integration
+- License agreement shown during install
+- Clean install/uninstall via Windows Settings > Apps
+- Handles upgrades automatically (unregisters old version, restarts Explorer, installs new files)
+- Start Menu shortcuts
 
 #### Option 2: Portable Package
 **For advanced users or non-administrator installs**
@@ -36,7 +37,7 @@
 **Package Contents:**
 - `DexCorral.exe` - Registration tool
 - `DexCorralHook.dll` - Explorer shell extension
-- `LICENSE` - MIT License
+- `LICENSE` - GPL-3.0 License
 - `readme.txt` - Quick start guide
 
 ### What's New
