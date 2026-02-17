@@ -128,6 +128,7 @@ private:
     void LoadConfig();
     void RestoreCorrals();
     void ShowTrayMenu();
+    void ShowAbout();
     void ShowCreationMenu(POINT pt);
     void CreateCorral(POINT pt);
     bool IsDesktopUnderMouse(POINT pt);

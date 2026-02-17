@@ -12,6 +12,7 @@
 #include "DesktopIcons.h"
 #include "DesktopMonitor.h"
 #include "HookBridge.h"
+#include "Version.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -672,6 +673,8 @@ void App::OnMouseMove(POINT pt) {
 
 void App::ShowTrayMenu() {
     HMENU menu = CreatePopupMenu();
+    AppendMenuW(menu, MF_STRING, 3, L"About");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 1, L"Create New Corral");
     AppendMenuW(menu, MF_STRING, 5, L"New Virtual Corral");
 
@@ -693,6 +696,9 @@ void App::ShowTrayMenu() {
     DestroyMenu(menu);
 
     switch (cmd) {
+    case 3:
+        ShowAbout();
+        break;
     case 1: {
         int offsetX = (int)corrals.size() * 30;
         int offsetY = (int)corrals.size() * 30;
@@ -724,6 +730,29 @@ void App::ShowTrayMenu() {
 
 void App::ShowCreationMenu(POINT pt) {
     CreateCorral(pt);
+}
+
+void App::ShowAbout() {
+    // Build the About message with GPL-3.0 license notice
+    std::wstring aboutText = L"DexCorral - a free and open source Windows desktop icon organizer\n\n";
+    aboutText += L"Version: ";
+    aboutText += DEXCORRAL_VERSION;
+    aboutText += L"\n\n";
+    aboutText += L"Copyright (C) 2026 Gunter Heiss\n\n";
+    aboutText += L"This program is free software: you can redistribute it and/or modify\n";
+    aboutText += L"it under the terms of the GNU General Public License as published by\n";
+    aboutText += L"the Free Software Foundation, either version 3 of the License, or\n";
+    aboutText += L"(at your option) any later version.\n\n";
+    aboutText += L"This program is distributed in the hope that it will be useful,\n";
+    aboutText += L"but WITHOUT ANY WARRANTY; without even the implied warranty of\n";
+    aboutText += L"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n";
+    aboutText += L"GNU General Public License for more details.\n\n";
+    aboutText += L"You should have received a copy of the GNU General Public License\n";
+    aboutText += L"along with this program.  If not, see https://www.gnu.org/licenses/\n\n";
+    aboutText += L"Website: https://dexcorral.app\n";
+    aboutText += L"GitHub: https://github.com/guHe300/DexCorral";
+
+    MessageBoxW(messageWindow, aboutText.c_str(), L"About DexCorral", MB_OK | MB_ICONINFORMATION);
 }
 
 void App::CreateCorral(POINT pt) {
