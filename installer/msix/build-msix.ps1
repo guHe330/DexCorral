@@ -32,6 +32,10 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $BuildDir = Join-Path $ProjectRoot "DexCorral\build"
+# VS generator puts output in Release/ subfolder; Ninja puts it directly in build/
+if (Test-Path (Join-Path $BuildDir "Release\DexCorral.exe")) {
+    $BuildDir = Join-Path $BuildDir "Release"
+}
 $MsixDir = $ScriptDir
 $StagingDir = Join-Path $MsixDir "staging"
 $OutputDir = Join-Path $MsixDir "output"
@@ -59,7 +63,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $StagingDir "Scripts") | Ou
 # Check if build artifacts exist
 if (-not (Test-Path (Join-Path $BuildDir "DexCorral.exe"))) {
     Write-Host "Build artifacts not found. Building project..." -ForegroundColor Yellow
-    Push-Location (Join-Path $ProjectRoot "DexCorralCpp")
+    Push-Location (Join-Path $ProjectRoot "DexCorral")
     try {
         & powershell -File "build.ps1"
         if ($LASTEXITCODE -ne 0) {
@@ -67,6 +71,11 @@ if (-not (Test-Path (Join-Path $BuildDir "DexCorral.exe"))) {
         }
     } finally {
         Pop-Location
+    }
+    # Re-check for Release subfolder after building
+    $BuildDir = Join-Path $ProjectRoot "DexCorral\build"
+    if (Test-Path (Join-Path $BuildDir "Release\DexCorral.exe")) {
+        $BuildDir = Join-Path $BuildDir "Release"
     }
 }
 
