@@ -14,10 +14,10 @@ A Windows desktop icon organizer that creates virtual corral windows to organize
 
 ## System Overview
 
-DexCorral is a sophisticated desktop icon management tool that:
+DexCorral is a desktop icon management tool that:
 
 1. **Creates layered corral windows** with per-pixel alpha transparency on the desktop
-2. **Injects a hook DLL into Explorer.exe** to hide corral-owned icons from the desktop ListView
+2. **Injects a ShellExtension DLL into Explorer.exe** to hide corral-owned icons from the desktop ListView
 3. **Manages desktop icons** across multiple corrals using cross-process memory manipulation
 4. **Provides rich UI** with tabs, drag-drop, context menus, and resizable windows
 5. **Persists configuration** in JSON format with automatic icon snapping and positioning
@@ -48,7 +48,7 @@ Worker thread starts App message loop (corral windows, tray icon, config)
          ↓
 User drags icons → Corral receives drop → Adds to active tab
          ↓
-App updates hidden icon list (in-process) → Hook reads & hides icons
+App updates hidden icon list (in-process) → Hook reads and hides icons
          ↓
 Desktop icons are visually suppressed in Explorer (pure draw suppression)
          ↓
@@ -164,7 +164,7 @@ Runs on a worker thread inside `DexCorralHook.dll` (within Explorer.exe). Manage
 - **Drag-Drop**: Supports files, shortcuts, shell items via `IDropTarget`
 - **Drop-on-Icon**: Dropping a file onto an icon inside a corral forwards the drop to that icon's shell `IDropTarget` (e.g., drop onto an exe to open with it)
 - **Icon Hover Effects**: Visual highlight when mousing over icons (alpha-blended overlay, grid and details views)
-- **Resize & Snap**: Snap to grid, edges, other corrals
+- **Resize and Snap**: Snap to grid, edges, other corrals
 - **Roll-Up/Hover-Expand**: Compact title-bar-only view that expands on hover
 - **Scrollbar**: PowerShell-style scrollbar with custom rendering
 - **Icon Rename**: Double-click label to rename files
@@ -219,7 +219,7 @@ Loaded into `explorer.exe` via COM shell extension registration to hide corral-o
 - Protected by CRITICAL_SECTION; most paint cycles just read a volatile DWORD (no lock)
 
 **Logging:**
-- Always-on logging to `%APPDATA%/DexCorral/CorralHook.log`
+- Always-on logging to `%APPDATA%/DexCorral/CorralHook.log` at this stage of development
 
 ### 4. Desktop Icon Manipulation (`DesktopIcons.cpp`)
 
@@ -353,129 +353,129 @@ Since both the app worker thread and Explorer hook run inside the same process (
 
 ### Window Management
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `CreateWindowExW` | Create layered corral window with `WS_EX_LAYERED` and `WS_EX_TOOLWINDOW` | CorralWindow.cpp:105 |
-| `DestroyWindow` | Destroy corral window on close | CorralWindow.cpp:137 |
-| `RegisterClassExW` | Register custom window class for corrals | CorralWindow.cpp:96 |
-| `FindWindowW` | Find Progman window (desktop parent) | CorralHook.cpp:164, DesktopIcons.cpp:22 |
-| `FindWindowExW` | Find SHELLDLL_DefView and SysListView32 children | CorralHook.cpp:165, DesktopIcons.cpp:23 |
-| `EnumWindows` | Enumerate all windows to find desktop ListView in WorkerW | DesktopIcons.cpp:27 |
-| `ShowWindow` | Show/hide corral windows | CorralWindow.cpp (multiple) |
-| `MoveWindow` | Reposition window on drag/snap | CorralWindow.cpp (input handling) |
-| `GetWindowRect` | Get corral window bounds | CorralWindow.cpp (multiple) |
-| `SetWindowPos` | Set window position with Z-order (e.g., `SendToBottom`) | CorralWindow.cpp |
-| `GetWindowThreadProcessId` | Get process ID of desktop ListView | DesktopIcons.cpp:67 |
-| `WindowFromPoint` | Find window under mouse cursor (for mouse wheel routing) | MouseHook.cpp:78 |
-| `GetModuleHandleW` | Get application instance handle | CorralWindow.cpp:91, etc. |
+| API | Purpose |
+|-----|---------|
+| `CreateWindowExW` | Create layered corral window with `WS_EX_LAYERED` and `WS_EX_TOOLWINDOW` |
+| `DestroyWindow` | Destroy corral window on close |
+| `RegisterClassExW` | Register custom window class for corrals |
+| `FindWindowW` | Find Progman window (desktop parent) |
+| `FindWindowExW` | Find SHELLDLL_DefView and SysListView32 children |
+| `EnumWindows` | Enumerate all windows to find desktop ListView in WorkerW |
+| `ShowWindow` | Show/hide corral windows |
+| `MoveWindow` | Reposition window on drag/snap |
+| `GetWindowRect` | Get corral window bounds |
+| `SetWindowPos` | Set window position with Z-order (e.g., `SendToBottom`) |
+| `GetWindowThreadProcessId` | Get process ID of desktop ListView |
+| `WindowFromPoint` | Find window under mouse cursor (for mouse wheel routing) |
+| `GetModuleHandleW` | Get application instance handle |
 
 ### Message Processing
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `SendMessageW` | Send messages to windows (LVM_* for ListView) | DesktopIcons.cpp (frequent), CorralHook.cpp |
-| `PostMessageW` | Post asynchronous messages | CorralWindow.cpp |
-| `DefWindowProcW` | Default window procedure | CorralWindow.cpp |
-| `CallWindowProcW` | Call original window procedure in subclass | CorralHook.cpp:193 |
-| `DispatchMessageW` | Dispatch message from queue to window proc | App.cpp (main loop) |
-| `GetMessageW` | Retrieve next message from queue | App.cpp (main loop) |
-| `TranslateMessage` | Translate virtual key codes to WM_CHAR | App.cpp (main loop) |
-| `CreateMessageQueueW` | Create per-thread message queue | Not explicitly called (implicit with window creation) |
+| API | Purpose |
+|-----|---------|
+| `SendMessageW` | Send messages to windows (LVM_* for ListView) |
+| `PostMessageW` | Post asynchronous messages | 
+| `DefWindowProcW` | Default window procedure |
+| `CallWindowProcW` | Call original window procedure in subclass |
+| `DispatchMessageW` | Dispatch message from queue to window proc |
+| `GetMessageW` | Retrieve next message from queue |
+| `TranslateMessage` | Translate virtual key codes to WM_CHAR |
+| `CreateMessageQueueW` | Create per-thread message queue |
 
-### Rendering & Graphics
+### Rendering and Graphics
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `GetDC` | Get device context for screen/window | CorralWindowRender.cpp:38 |
-| `ReleaseDC` | Release device context | CorralWindowRender.cpp:45 |
-| `CreateCompatibleDC` | Create memory device context for drawing | CorralWindowRender.cpp:39 |
-| `DeleteDC` | Delete memory device context | CorralWindowRender.cpp |
-| `CreateDIBSection` | Create 32-bit DIB section for per-pixel alpha | CorralWindowRender.cpp:42 |
-| `SelectObject` | Select bitmap/brush/pen into device context | CorralWindowRender.cpp:49 |
-| `UpdateLayeredWindow` | Update layered window with final DIB (alpha blending) | CorralWindowRender.cpp |
-| `CreateSolidBrush` | Create solid color brush | CorralWindowRender.cpp |
-| `GetStockObject` | Get standard system objects (pens, brushes) | CorralWindowRender.cpp |
-| `PatBlt` | Fast fill rectangle with pattern | CorralWindowRender.cpp |
-| `TextOutW` | Draw text (title bar, labels, tab names) | CorralWindowRender.cpp |
-| `SetTextColor` | Set text color for drawing | CorralWindowRender.cpp |
-| `SetBkMode` | Set background mode (TRANSPARENT, OPAQUE) | CorralWindowRender.cpp |
-| `DrawEdge` | Draw beveled edge for 3D effect | CorralWindowRender.cpp |
+| API | Purpose |
+|-----|---------|
+| `GetDC` | Get device context for screen/window |
+| `ReleaseDC` | Release device context |
+| `CreateCompatibleDC` | Create memory device context for drawing |
+| `DeleteDC` | Delete memory device context |
+| `CreateDIBSection` | Create 32-bit DIB section for per-pixel alpha |
+| `SelectObject` | Select bitmap/brush/pen into device context |
+| `UpdateLayeredWindow` | Update layered window with final DIB (alpha blending) |
+| `CreateSolidBrush` | Create solid color brush |
+| `GetStockObject` | Get standard system objects (pens, brushes) |
+| `PatBlt` | Fast fill rectangle with pattern |
+| `TextOutW` | Draw text (title bar, labels, tab names) |
+| `SetTextColor` | Set text color for drawing |
+| `SetBkMode` | Set background mode (TRANSPARENT, OPAQUE) |
+| `DrawEdge` | Draw beveled edge for 3D effect |
 
-### Icon & File Operations
+### Icon and File Operations
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `SHGetFileInfoW` | Get file icon, type, attributes from shell | CorralWindowIcons.cpp |
-| `ExtractIconExW` | Extract icon from file (alternative to SHGetFileInfo) | CorralWindowIcons.cpp |
-| `ShellExecuteW` | Execute/open file (double-click handler) | CorralWindowCommands.cpp |
-| `SHFileOperationW` | Delete file with recycle bin or permanent delete | CorralWindowCommands.cpp |
-| `GetFileAttributesW` | Check if file exists, is directory, etc. | CorralWindowIcons.cpp |
-| `CreateDirectoryW` | Create folder for config storage | Config.cpp |
+| API | Purpose |
+|-----|---------|
+| `SHGetFileInfoW` | Get file icon, type, attributes from shell |
+| `ExtractIconExW` | Extract icon from file (alternative to SHGetFileInfo) |
+| `ShellExecuteW` | Execute/open file (double-click handler) |
+| `SHFileOperationW` | Delete file with recycle bin or permanent delete |
+| `GetFileAttributesW` | Check if file exists, is directory, etc. |
+| `CreateDirectoryW` | Create folder for config storage |
 
-### Drag & Drop
+### Drag and Drop
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `RegisterDragDrop` | Register window as OLE drop target | CorralWindow.cpp:117 |
-| `RevokeDragDrop` | Unregister OLE drop target | CorralWindow.cpp:136 |
-| `OleInitialize` | Initialize OLE/COM (required for IDropTarget and drag-drop) | dllmain.cpp (worker thread) |
-| `OleUninitialize` | Uninitialize OLE/COM | dllmain.cpp (worker thread) |
-| `IDropTarget::DragEnter` | Called when drag enters window (accept/reject) | CorralDropTarget::DragEnter |
-| `IDropTarget::DragOver` | Called while dragging over window | CorralDropTarget::DragOver |
-| `IDropTarget::Drop` | Called when drop occurs | CorralDropTarget::Drop |
-| `OleGetClipboard` | Get clipboard data (IDataObject) | CorralDropTarget |
+| API | Purpose |
+|-----|---------|
+| `RegisterDragDrop` | Register window as OLE drop target |
+| `RevokeDragDrop` | Unregister OLE drop target |
+| `OleInitialize` | Initialize OLE/COM (required for IDropTarget and drag-drop) |
+| `OleUninitialize` | Uninitialize OLE/COM |
+| `IDropTarget::DragEnter` | Called when drag enters window (accept/reject) |
+| `IDropTarget::DragOver` | Called while dragging over window |
+| `IDropTarget::Drop` | Called when drop occurs |
+| `OleGetClipboard` | Get clipboard data (IDataObject) |
 
-### Process & Memory
+### Process and Memory
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `OpenProcess` | Open explorer.exe for cross-process memory access | DesktopIcons.cpp:69 |
-| `CloseHandle` | Close process handle | DesktopIcons.cpp:88 |
-| `VirtualAllocEx` | Allocate memory in explorer.exe | DesktopIcons.cpp:72 |
-| `VirtualFreeEx` | Free remote memory | DesktopIcons.cpp:87 |
-| `ReadProcessMemory` | Read data from explorer.exe memory | DesktopIcons.cpp:55 |
-| `WriteProcessMemory` | Write data to explorer.exe memory | DesktopIcons.cpp:50 |
-| `GetCurrentProcessId` | Get DexCorral process ID | IPC identification |
+| API | Purpose |
+|-----|---------|
+| `OpenProcess` | Open explorer.exe for cross-process memory access |
+| `CloseHandle` | Close process handle |
+| `VirtualAllocEx` | Allocate memory in explorer.exe |
+| `VirtualFreeEx` | Free remote memory |
+| `ReadProcessMemory` | Read data from explorer.exe memory |
+| `WriteProcessMemory` | Write data to explorer.exe memory |
+| `GetCurrentProcessId` | Get DexCorral process ID |
 
-### Synchronization & Events
+### Synchronization and Events
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `InitializeCriticalSection` | Create lock for hidden icon list | HookBridge.cpp |
-| `EnterCriticalSection` / `LeaveCriticalSection` | Thread-safe access to hidden icon list | HookBridge.cpp |
-| `CreateEventW` | Create named event (debug flag) | main.cpp:40 |
-| `OpenEventW` | Open named event for debug detection | CorralHook.cpp:56 |
-| `CloseHandle` | Close event handles | (frequent) |
+| API | Purpose |
+|-----|---------|
+| `InitializeCriticalSection` | Create lock for hidden icon list |
+| `EnterCriticalSection` / `LeaveCriticalSection` | Thread-safe access to hidden icon list |
+| `CreateEventW` | Create named event (debug flag) |
+| `OpenEventW` | Open named event for debug detection |
+| `CloseHandle` | Close event handles |
 
-### Registry & Configuration
+### Registry and Configuration
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `RegOpenKeyExW` | Open registry key (shortcut arrows) | CorralWindowIcons.cpp |
-| `RegQueryValueExW` | Query registry value | CorralWindowIcons.cpp |
-| `RegCloseKey` | Close registry key | CorralWindowIcons.cpp |
-| `SHGetKnownFolderPath` | Get desktop, appdata, public desktop paths | CorralWindowIcons.cpp, Config.cpp |
+| API | Purpose |
+|-----|---------|
+| `RegOpenKeyExW` | Open registry key (shortcut arrows) |
+| `RegQueryValueExW` | Query registry value |
+| `RegCloseKey` | Close registry key |
+| `SHGetKnownFolderPath` | Get desktop, appdata, public desktop paths |
 
-### Hooks & Callbacks
+### Hooks and Callbacks
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `SetWindowsHookExW` | Install global mouse hook (`WH_MOUSE_LL`) | MouseHook.cpp:24 |
-| `UnhookWindowsHookEx` | Remove global mouse hook | MouseHook.cpp:30 |
-| `CallNextHookEx` | Pass message to next hook in chain | MouseHook.cpp:92 |
-| `FindFirstChangeNotificationW` | Start monitoring folder for changes | FolderWatcher.cpp |
-| `FindNextChangeNotificationW` | Wait for next folder change | FolderWatcher.cpp |
-| `FindCloseChangeNotificationW` | Stop folder monitoring | FolderWatcher.cpp |
-| `SetWindowsHookExW` (subclass variant) | DLL injection hooks into explorer.exe | CorralHook.cpp (for subclassing setup) |
-| `SetWindowSubclass` | Subclass window with protected subclass chain | CorralHook.cpp (may use for SHELLDLL_DefView) |
+| API | Purpose |
+|-----|---------|
+| `SetWindowsHookExW` | Install global mouse hook (`WH_MOUSE_LL`) |
+| `UnhookWindowsHookEx` | Remove global mouse hook |
+| `CallNextHookEx` | Pass message to next hook in chain |
+| `FindFirstChangeNotificationW` | Start monitoring folder for changes |
+| `FindNextChangeNotificationW` | Wait for next folder change |
+| `FindCloseChangeNotificationW` | Stop folder monitoring |
+| `SetWindowsHookExW` (subclass variant) | DLL injection hooks into explorer.exe |
+| `SetWindowSubclass` | Subclass window with protected subclass chain |
 
-### Tray Icon & Notifications
+### Tray Icon and Notifications
 
-| API | Purpose | Where Used |
-|-----|---------|-----------|
-| `Shell_NotifyIconW` | Add/modify/delete tray icon | TrayIcon.cpp:22, 26, 31 |
-| `MessageBoxW` | Show message dialog | main.cpp (multiple) |
-| `ShellExecuteW` | Open URL, folder, etc. | CorralWindowCommands.cpp |
+| API | Purpose |
+|-----|---------|
+| `Shell_NotifyIconW` | Add/modify/delete tray icon |
+| `MessageBoxW` | Show message dialog |
+| `ShellExecuteW` | Open URL, folder, etc. |
 
 ### ListView Control Messages (Sent to Explorer)
 
