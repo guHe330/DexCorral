@@ -73,7 +73,6 @@ if (-not (Test-Path (Join-Path $BuildDir "DexCorral.exe"))) {
 # Copy executables and DLLs
 Write-Host "Copying binaries..." -ForegroundColor Green
 Copy-Item -Path (Join-Path $BuildDir "DexCorral.exe") -Destination $StagingDir
-Copy-Item -Path (Join-Path $BuildDir "DexCorral.Watchdog.exe") -Destination $StagingDir
 Copy-Item -Path (Join-Path $BuildDir "DexCorralHook.dll") -Destination $StagingDir
 
 # Copy manifest

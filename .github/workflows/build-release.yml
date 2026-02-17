@@ -86,7 +86,6 @@ jobs:
         
         # Copy files
         Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "package/"
-        Copy-Item "DexCorral/build/Release/DexCorral.Watchdog.exe" -Destination "package/"
         Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
