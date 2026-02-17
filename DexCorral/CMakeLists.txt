@@ -26,12 +26,12 @@ set_target_properties(DexCorral PROPERTIES
 # DexCorralHook DLL — monolith shell extension (all app logic + Explorer hook)
 add_library(DexCorralHook SHARED
     # Hook / shell extension code
-    ../CorralHook/src/dllmain.cpp
-    ../CorralHook/src/CorralHook.cpp
-    ../CorralHook/src/ClassFactory.cpp
-    ../CorralHook/src/ShellExtension.cpp
-    ../CorralHook/src/Registration.cpp
-    ../CorralHook/src/Guids.cpp
+    DexCorralHook/src/dllmain.cpp
+    DexCorralHook/src/CorralHook.cpp
+    DexCorralHook/src/ClassFactory.cpp
+    DexCorralHook/src/ShellExtension.cpp
+    DexCorralHook/src/Registration.cpp
+    DexCorralHook/src/Guids.cpp
     # App logic (moved from EXE)
     src/App.cpp
     src/DesktopIcons.cpp
@@ -51,7 +51,7 @@ add_library(DexCorralHook SHARED
 )
 
 target_include_directories(DexCorralHook PRIVATE
-    ../CorralHook/include
+    DexCorralHook/include
     include
 )
 
@@ -72,7 +72,7 @@ target_compile_definitions(DexCorralHook PRIVATE UNICODE _UNICODE NOMINMAX)
 
 # Use .def file for COM exports
 set_target_properties(DexCorralHook PROPERTIES
-    LINK_FLAGS "/DEF:\"${CMAKE_CURRENT_SOURCE_DIR}/../CorralHook/DexCorralHook.def\""
+    LINK_FLAGS "/DEF:\"${CMAKE_CURRENT_SOURCE_DIR}/DexCorralHook/DexCorralHook.def\""
 )
 
 set_property(TARGET DexCorralHook PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
