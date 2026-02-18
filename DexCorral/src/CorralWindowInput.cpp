@@ -145,6 +145,10 @@ void CorralWindow::OnMouseWheel(int delta) {
     scrollPosition -= scrollAmount;
     ClampScrollPosition();
     UpdateLayeredContent();
+
+    // Debounced reposition of real desktop icons to match new scroll state
+    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
 }
 
 void CorralWindow::StartScrollbarDrag(int y) {
@@ -183,6 +187,10 @@ void CorralWindow::EndScrollbarDrag() {
     if (isDraggingScrollbar) {
         isDraggingScrollbar = false;
         ReleaseCapture();
+
+        // Reposition real desktop icons to match final scroll state
+        KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+        SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
     }
 }
 

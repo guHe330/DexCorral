@@ -524,8 +524,12 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         }
 
         if (id == 113) { // Choose Font
+            // Convert point size to pixel height for LOGFONT
+            HDC hdc = GetDC(hDlg);
+            int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+            ReleaseDC(hDlg, hdc);
             LOGFONTW lf = {};
-            lf.lfHeight = -data->fontSize;
+            lf.lfHeight = -MulDiv(data->fontSize, dpi, 72);
             lf.lfWeight = FW_SEMIBOLD;
             lf.lfCharSet = DEFAULT_CHARSET;
             lf.lfQuality = CLEARTYPE_QUALITY;
@@ -539,7 +543,7 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
             if (ChooseFontW(&cf)) {
                 data->fontName = lf.lfFaceName;
-                data->fontSize = (lf.lfHeight < 0) ? -lf.lfHeight : lf.lfHeight;
+                data->fontSize = cf.iPointSize / 10;  // iPointSize is in 1/10 points
                 data->fontChanged = true;
                 SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
 

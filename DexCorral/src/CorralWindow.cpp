@@ -659,6 +659,15 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->OnOpacityAnimationTimer();
                 return 0;
             }
+            if (wParam == SCROLL_REPOSITION_TIMER_ID) {
+                KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+                // Reposition desktop icons to match scrolled positions
+                App* app = App::GetInstance();
+                if (app) {
+                    app->PositionHiddenIconsUnderCorrals();
+                }
+                return 0;
+            }
             break;
         case WM_FOLDER_CHANGED:
             window->OnFolderContentsChanged();
@@ -695,6 +704,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             KillTimer(hwnd, ANIMATION_TIMER_ID);
             KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
             KillTimer(hwnd, OPACITY_TIMER_ID);
+            KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
             return 0;
         }
     }

@@ -13,6 +13,7 @@
 
 static HMODULE g_hModule = nullptr;
 static HANDLE g_hWorkerThread = nullptr;
+static HANDLE g_hHookRetryThread = nullptr;
 static HANDLE g_hStopEvent = nullptr;  // Signaled to tell worker thread to quit
 static bool g_bInsideExplorer = false; // Only activate hook+app when loaded by Explorer
 
@@ -78,6 +79,39 @@ static DWORD WINAPI AppWorkerThread(LPVOID param) {
     return 0;
 }
 
+// Custom message to tell the App to refresh hidden icons after deferred hook init
+static const UINT WM_HOOK_READY = WM_APP + 100;
+
+// Retry thread: periodically attempts InitializeCorralHook() when the desktop
+// ListView isn't available yet (e.g., Explorer still starting up after PC restart).
+static DWORD WINAPI HookRetryThread(LPVOID param) {
+    const int MAX_RETRIES = 60;       // 60 retries
+    const DWORD RETRY_INTERVAL = 500; // 500ms between retries = 30 seconds total
+
+    for (int i = 0; i < MAX_RETRIES; i++) {
+        // Check if we should stop (DLL unloading)
+        if (WaitForSingleObject(g_hStopEvent, RETRY_INTERVAL) != WAIT_TIMEOUT) {
+            Log(L"HookRetryThread: Stop event signaled, aborting");
+            return 0;
+        }
+
+        if (InitializeCorralHook()) {
+            Log(L"HookRetryThread: Hook initialized successfully");
+
+            // Notify the App to re-push hidden icon data now that the hook is active
+            HWND hAppMsg = FindWindowW(L"DexCorralMessageWindow", nullptr);
+            if (hAppMsg) {
+                PostMessageW(hAppMsg, WM_HOOK_READY, 0, 0);
+                Log(L"HookRetryThread: Posted WM_HOOK_READY to App");
+            }
+            return 0;
+        }
+    }
+
+    Log(L"HookRetryThread: Gave up after all retries");
+    return 0;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
     switch (reason) {
     case DLL_PROCESS_ATTACH:
@@ -98,11 +132,18 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         if (InitializeCorralHook()) {
             Log(L"CorralHook: Initialized successfully");
         } else {
-            Log(L"CorralHook: Failed to initialize");
+            Log(L"CorralHook: Desktop ListView not ready, starting retry thread");
+            // Desktop ListView doesn't exist yet (Explorer still starting up).
+            // Start a retry thread that will keep trying until the desktop is ready.
+            // g_hStopEvent is created below, so create it early here for the retry thread.
+            g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            g_hHookRetryThread = CreateThread(nullptr, 0, HookRetryThread, nullptr, 0, nullptr);
         }
 
-        // Create stop event for worker thread
-        g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        // Create stop event for worker thread (may already exist if retry thread started)
+        if (!g_hStopEvent) {
+            g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        }
 
         // Launch worker thread for App message loop
         g_hWorkerThread = CreateThread(nullptr, 0, AppWorkerThread, nullptr, 0, nullptr);
@@ -121,6 +162,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         // Signal worker thread to stop
         if (g_hStopEvent) {
             SetEvent(g_hStopEvent);
+        }
+
+        // Wait for hook retry thread to finish
+        if (g_hHookRetryThread) {
+            WaitForSingleObject(g_hHookRetryThread, 2000);
+            CloseHandle(g_hHookRetryThread);
+            g_hHookRetryThread = nullptr;
         }
 
         // Wait for worker thread to finish (up to 5 seconds)

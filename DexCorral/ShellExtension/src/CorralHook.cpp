@@ -568,6 +568,15 @@ static LRESULT CALLBACK ListViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam
         return hit;
     }
 
+    // Suppress mouse hover on hidden icons — prevents "open with" tooltip and
+    // hot-tracking highlight that Explorer shows when the cursor passes over an icon
+    if (uMsg == WM_MOUSEMOVE) {
+        RefreshHiddenIconCache();
+        if (!g_HiddenIcons.empty() && IsClickOnHiddenIcon(hwnd, lParam)) {
+            return 0;
+        }
+    }
+
     // Refresh cache on relevant messages (cheap - just checks version counter)
     switch (uMsg) {
     case WM_LBUTTONDOWN:
@@ -748,6 +757,18 @@ static LRESULT CALLBACK ShellDefViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wP
 
     if (uMsg == WM_NOTIFY) {
         NMHDR* nmhdr = (NMHDR*)lParam;
+
+        // Suppress hot-tracking (hover highlight) on hidden icons
+        if (nmhdr->code == LVN_HOTTRACK && nmhdr->hwndFrom == g_hDesktopListView) {
+            NMLISTVIEW* nmlv = (NMLISTVIEW*)lParam;
+            if (nmlv->iItem >= 0 && !g_HiddenIcons.empty()) {
+                wchar_t buf[MAX_PATH] = {};
+                if (GetItemDisplayName(nmlv->iItem, buf, MAX_PATH) && ShouldHideIcon(buf)) {
+                    return -1;  // Cancel hot-tracking for this item
+                }
+            }
+        }
+
         if (nmhdr->code == NM_CUSTOMDRAW && nmhdr->hwndFrom == g_hDesktopListView) {
             NMLVCUSTOMDRAW* cd = (NMLVCUSTOMDRAW*)lParam;
 

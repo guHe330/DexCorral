@@ -141,7 +141,9 @@ void CorralWindow::UpdateLayeredContent() {
 
     // Draw tab titles
     std::wstring fontNameW = Utf8ToWide(config.HeaderFontName);
-    HFONT titleFont = CreateFontW(-config.HeaderFontSize, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+    // Convert point size to pixel height (matches font picker conventions)
+    int fontHeight = -MulDiv(config.HeaderFontSize, GetDpiForWindow(hwnd), 72);
+    HFONT titleFont = CreateFontW(fontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, fontNameW.c_str());
     HFONT oldFont = (HFONT)SelectObject(memDC, titleFont);
@@ -677,8 +679,12 @@ void CorralWindow::UpdateLayeredContent() {
                     icon.rect.right,
                     drawBottom
                 };
-                // Only draw if label area is visible
-                if (labelTop < visibleBottom && drawBottom > visibleTop) {
+                // Only draw if label area is fully within visible region.
+                // DrawThemeTextEx with DTT_COMPOSITED ignores GDI clip regions,
+                // so we skip the label entirely when it would overflow into the title bar
+                // (clamping the rect causes the label to visually "stick" at the border).
+                if (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop) {
+
                     HTHEME hTheme = OpenThemeData(hwnd, L"TextStyle");
                     if (hTheme) {
                         DTTOPTS dtOpts = {};

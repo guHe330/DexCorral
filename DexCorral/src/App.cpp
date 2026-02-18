@@ -386,23 +386,33 @@ void App::UpdateHookHiddenIcons() {
 }
 
 void App::PositionHiddenIconsUnderCorrals() {
-    // Position hidden icons at their corral's center so the corral window
-    // occludes them for drag-drop. Icons stay at valid screen coords —
-    // if DexCorral crashes, they reappear near where the corral was.
+    // Position hidden icons at per-icon screen positions matching their visual
+    // location in the corral. Icons visible in the corral viewport get positioned
+    // at their actual screen coords (under the corral window). Icons scrolled out
+    // of view get positioned just outside the corral edge. If DexCorral crashes,
+    // icons reappear near where the corral was.
     std::map<std::wstring, POINT2D> positions;
 
     for (const auto& corral : corrals) {
+        // Get per-icon positions from the active tab (already in ListView client coords)
+        auto iconPositions = corral->GetIconScreenPositions();
+        for (auto& [name, pos] : iconPositions) {
+            positions[name] = pos;
+        }
+
+        // For non-active tabs, position icons at corral center (they're not rendered)
         RECT r;
         if (!GetWindowRect(corral->GetHWND(), &r)) continue;
-
-        // Convert corral center to ListView client coords
         HWND hListView = DesktopIcons::GetDesktopListView();
         POINT center = { (r.left + r.right) / 2, (r.top + r.bottom) / 2 };
         if (hListView) {
             ScreenToClient(hListView, &center);
         }
 
-        for (const auto& tab : corral->GetConfig().Tabs) {
+        int activeTabIndex = corral->GetConfig().ActiveTabIndex;
+        for (int t = 0; t < (int)corral->GetConfig().Tabs.size(); t++) {
+            if (t == activeTabIndex) continue;  // Already handled by GetIconScreenPositions
+            const auto& tab = corral->GetConfig().Tabs[t];
             if (tab.IsVirtual) continue;
             for (const auto& fileUtf8 : tab.Files) {
                 std::wstring name;
@@ -966,6 +976,14 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     if (app && uMsg == WM_DISPLAYCHANGE) {
         app->OnDisplayChange();
+        return 0;
+    }
+
+    // Hook retry thread succeeded — refresh hidden icon data now that the hook is active
+    if (app && uMsg == (WM_APP + 100)) {
+        app->UpdateHookHiddenIcons();
+        app->PositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
         return 0;
     }
 

@@ -158,6 +158,12 @@ public:
     /// Opens folder browser to change the virtual corral's folder path
     void ChangeFolderPath();
 
+    /// Returns per-icon screen positions for all icons in the active tab.
+    /// Icons in the viewport get their actual screen position (under the corral).
+    /// Icons outside the viewport get positions just outside the corral edge.
+    /// Returns a map of display name → screen position (in ListView client coords).
+    std::map<std::wstring, POINT2D> GetIconScreenPositions() const;
+
 private:
     // Virtual corral support
     void LoadVirtualFolderIcons();  // Load icons from virtual folder path
@@ -356,6 +362,10 @@ private:
     std::unique_ptr<FolderWatcher> folderWatcher;
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
+
+    // Scroll-triggered icon repositioning
+    static const UINT_PTR SCROLL_REPOSITION_TIMER_ID = 4;
+    static const DWORD SCROLL_REPOSITION_DEBOUNCE_MS = 100;
 
     // OLE drop target
     CorralDropTarget* dropTarget = nullptr;

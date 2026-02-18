@@ -702,6 +702,62 @@ bool CorralWindow::HitTestIconLabel(int x, int y, int iconIndex) const {
 }
 
 // ============================================================================
+// Per-icon screen position calculation for desktop icon sync
+// ============================================================================
+
+std::map<std::wstring, POINT2D> CorralWindow::GetIconScreenPositions() const {
+    std::map<std::wstring, POINT2D> result;
+    if (icons.empty() || !hwnd) return result;
+
+    RECT windowRect;
+    if (!GetWindowRect(hwnd, &windowRect)) return result;
+
+    // Get the desktop ListView for coordinate conversion
+    HWND hListView = DesktopIcons::GetDesktopListView();
+
+    int visibleTop = GetIconAreaTop();
+    int visibleBottom = GetVisibleHeight();
+
+    for (const auto& icon : icons) {
+        // Calculate screen-space position of this icon's center (accounting for scroll)
+        int iconCenterX = (icon.iconRect.left + icon.iconRect.right) / 2;
+        int iconCenterY = (icon.iconRect.top + icon.iconRect.bottom) / 2 - scrollPosition;
+
+        // Check if icon is within the visible viewport
+        bool inViewport = (icon.rect.bottom - scrollPosition > visibleTop) &&
+                          (icon.rect.top - scrollPosition < visibleBottom);
+
+        POINT screenPt;
+        if (inViewport) {
+            // Icon is visible: position at its actual screen location
+            screenPt = { windowRect.left + iconCenterX, windowRect.top + iconCenterY };
+        } else {
+            // Icon is scrolled out: position just outside the corral edge
+            screenPt.x = windowRect.left + iconCenterX;
+            if (icon.rect.top - scrollPosition >= visibleBottom) {
+                // Below viewport: place just below corral bottom
+                screenPt.y = windowRect.bottom + 10;
+            } else {
+                // Above viewport: place just above corral top
+                screenPt.y = windowRect.top - 10;
+            }
+        }
+
+        // Convert screen coords to ListView client coords
+        if (hListView) {
+            ScreenToClient(hListView, &screenPt);
+        }
+
+        // Use display name as key (matches what HookBridge uses)
+        if (!icon.displayName.empty()) {
+            result[icon.displayName] = { screenPt.x, screenPt.y };
+        }
+    }
+
+    return result;
+}
+
+// ============================================================================
 // View mode support
 // ============================================================================
 

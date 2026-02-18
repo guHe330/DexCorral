@@ -67,7 +67,7 @@ struct CorralWindowConfig {
     // Appearance settings (per-corral)
     int TitleBarHeight = 32;                    // Header height in pixels (20-64)
     std::string HeaderFontName = "Segoe UI";    // Font face for header text
-    int HeaderFontSize = 13;                    // Font size (absolute value for CreateFont)
+    int HeaderFontSize = 10;                    // Font size in points (matches font picker)
     std::string HeaderFontColor = "#FFFFFF";    // RGB hex color for header text
     int IconOpacity = 255;                      // Icon transparency (0=invisible, 255=opaque)
     std::string IconTintColor = "#000000";      // Tint color for icons (RGB hex)
@@ -87,7 +87,7 @@ struct AppConfig {
     // Default appearance for new corrals
     int DefaultTitleBarHeight = 32;
     std::string DefaultHeaderFontName = "Segoe UI";
-    int DefaultHeaderFontSize = 13;
+    int DefaultHeaderFontSize = 10;
     std::string DefaultHeaderFontColor = "#FFFFFF";
     int DefaultIconOpacity = 255;
     std::string DefaultIconTintColor = "#000000";

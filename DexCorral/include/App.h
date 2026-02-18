@@ -121,6 +121,7 @@ public:
     void PushDesktopIconsFromCorrals();
 
     void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
+    void PositionHiddenIconsUnderCorrals();    // Reposition hidden icons to match corral scroll state
 
 private:
     void Initialize();
@@ -156,9 +157,6 @@ private:
     std::unique_ptr<DesktopMonitor> desktopMonitor;
     std::unique_ptr<MonitorManager> monitorManager;
     std::vector<std::unique_ptr<CorralWindow>> corrals;
-
-    // Hook integration (in-process shell extension)
-    void PositionHiddenIconsUnderCorrals();    // Move hidden icons under corral windows for drag-drop occlusion
 
     // Desktop icon push cache
     std::map<std::wstring, POINT2D> cachedDesktopIconPositions;
