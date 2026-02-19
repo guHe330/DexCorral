@@ -1,8 +1,12 @@
 # DexCorral
 
-> **Alpha** - This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorralCpp/issues).
-
 DexCorral is a high-performance, native C++ desktop organization tool for Windows. It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals".
+
+> **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team — just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
+
+> **Privacy & Trust.** DexCorral is completely ad-free, collects no telemetry or user data, and never communicates with any server. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. That's it — nothing leaves your machine.
+
+> **Alpha** — This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorralCpp/issues).
 
 ## Key Information
 
@@ -42,7 +46,7 @@ DexCorral is available for download on GitHub.
 3.  Place both files in the same folder and run `DexCorral.exe --register` (one-time setup, requires admin).
 4.  Restart Explorer or log out/in for the shell extension to load.
 
-> **Note:** The binaries and MSIX installer are currently unsigned. Windows SmartScreen may show a warning when you first run the application. Click "More info" then "Run anyway" to proceed. Code signing will be added at a later time.
+> **Note:** The binaries and installer are currently unsigned. This means Windows SmartScreen will show a warning on first run, and some antivirus software may flag the files as suspicious — this is normal for unsigned software from small developers. Click "More info" then "Run anyway" to proceed past SmartScreen. Code signing will be added at a later stage.
 
 ## Roadmap & Issues
 

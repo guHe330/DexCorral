@@ -62,6 +62,20 @@ void App::Initialize() {
         GetModuleHandleW(nullptr), this
     );
 
+    // Register for Explorer restart so we can re-add the tray icon
+    wmTaskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
+
+    // Register for shell image-list changes (e.g. Recycle Bin full→empty)
+    SHChangeNotifyEntry shcne = {};
+    shcne.pidl = nullptr;       // all items
+    shcne.fRecursive = TRUE;
+    shellNotifyId = SHChangeNotifyRegister(
+        messageWindow,
+        SHCNRF_ShellLevel | SHCNRF_NewDelivery,
+        SHCNE_UPDATEIMAGE,
+        WM_APP + 101,           // custom message
+        1, &shcne);
+
     // Load configuration
     LoadConfig();
 
@@ -127,6 +141,12 @@ void App::Initialize() {
 }
 
 void App::Shutdown() {
+    // Unregister shell change notifications
+    if (shellNotifyId) {
+        SHChangeNotifyDeregister(shellNotifyId);
+        shellNotifyId = 0;
+    }
+
     // Stop desktop monitor first
     if (desktopMonitor) {
         desktopMonitor->Stop();
@@ -984,6 +1004,25 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         app->UpdateHookHiddenIcons();
         app->PositionHiddenIconsUnderCorrals();
         HookBridge::RefreshDesktop();
+        return 0;
+    }
+
+    // Shell image list changed (e.g. Recycle Bin emptied/filled)
+    if (app && uMsg == (WM_APP + 101)) {
+        // Free the PIDL list delivered with SHCNRF_NewDelivery
+        LONG lEvent = 0;
+        PIDLIST_ABSOLUTE* pidls = nullptr;
+        HANDLE hLock = SHChangeNotification_Lock((HANDLE)wParam, (DWORD)lParam, &pidls, &lEvent);
+        if (hLock) {
+            SHChangeNotification_Unlock(hLock);
+        }
+        app->RefreshAllCorrals();
+        return 0;
+    }
+
+    // Explorer restarted — re-add the tray icon
+    if (app && app->wmTaskbarCreated && uMsg == app->wmTaskbarCreated) {
+        if (app->trayIcon) app->trayIcon->Show();
         return 0;
     }
 

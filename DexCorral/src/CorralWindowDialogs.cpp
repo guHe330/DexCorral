@@ -387,7 +387,8 @@ struct AppearanceDlgData {
 
     // Checkboxes
     bool useAsDefault;
-    bool applyToAll;
+    bool applyChangesToAll;   // Apply only changed settings to all corrals
+    bool applyEverythingToAll; // Copy full appearance to all corrals
 
     // Back-references for live preview
     CorralWindowConfig* corralConfig;
@@ -611,9 +612,22 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             return TRUE;
         }
 
+        // Mutual exclusion: checking one "apply to all" unchecks the other
+        if (id == 108 && HIWORD(wParam) == BN_CLICKED) {
+            if (SendDlgItemMessageW(hDlg, 108, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                SendDlgItemMessageW(hDlg, 109, BM_SETCHECK, BST_UNCHECKED, 0);
+            return TRUE;
+        }
+        if (id == 109 && HIWORD(wParam) == BN_CLICKED) {
+            if (SendDlgItemMessageW(hDlg, 109, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                SendDlgItemMessageW(hDlg, 108, BM_SETCHECK, BST_UNCHECKED, 0);
+            return TRUE;
+        }
+
         if (id == IDOK) {
             data->useAsDefault = (SendDlgItemMessageW(hDlg, 107, BM_GETCHECK, 0, 0) == BST_CHECKED);
-            data->applyToAll = (SendDlgItemMessageW(hDlg, 108, BM_GETCHECK, 0, 0) == BST_CHECKED);
+            data->applyChangesToAll = (SendDlgItemMessageW(hDlg, 108, BM_GETCHECK, 0, 0) == BST_CHECKED);
+            data->applyEverythingToAll = (SendDlgItemMessageW(hDlg, 109, BM_GETCHECK, 0, 0) == BST_CHECKED);
             EndDialog(hDlg, IDOK);
             return TRUE;
         }
@@ -773,7 +787,7 @@ void CorralWindow::ShowAppearanceDialog() {
     // Total height: ~225
 
     const int DLG_WIDTH = 220;
-    const int DLG_HEIGHT = 292;
+    const int DLG_HEIGHT = 308;
     const int ITEM_COUNT = 20;
 
     WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
@@ -873,15 +887,17 @@ void CorralWindow::ShowAppearanceDialog() {
     // === Checkboxes ===
     // Checkbox "Use as default" (ID 107)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 246, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
-    // Checkbox "Apply to all corrals" (ID 108)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 260, 200, 12, 108, 0xFFFF, 0x0080, L"Apply to all corrals");
+    // Checkbox "Apply changed settings to all corrals" (ID 108)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 260, 200, 12, 108, 0xFFFF, 0x0080, L"Apply changes to all corrals");
+    // Checkbox "Apply full appearance to all corrals" (ID 109)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 274, 200, 12, 109, 0xFFFF, 0x0080, L"Copy full style to all corrals");
 
     // === Buttons ===
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 275, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 275, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 291, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 291, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
 
     // Fix item count in the template header
-    ((DLGTEMPLATE*)dlgTemplate)->cdit = 36;
+    ((DLGTEMPLATE*)dlgTemplate)->cdit = 37;
 
     // Data prep
     AppearanceDlgData dlgData = {};
@@ -999,7 +1015,8 @@ void CorralWindow::ShowAppearanceDialog() {
                     config.IconSpacingXPercent, config.IconSpacingYPercent);
             }
 
-            if (dlgData.applyToAll) {
+            if (dlgData.applyChangesToAll) {
+                // Apply only the settings the user actually changed
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
                     dlgData.colorChanged,
                     config.TitleBarHeight, dlgData.titleBarHeightChanged,
@@ -1009,6 +1026,15 @@ void CorralWindow::ShowAppearanceDialog() {
                     config.IconTintColor, config.IconTintStrength, dlgData.tintChanged,
                     config.IconSpacingXPercent, config.IconSpacingYPercent,
                     dlgData.iconSpacingXChanged || dlgData.iconSpacingYChanged);
+            } else if (dlgData.applyEverythingToAll) {
+                // Copy full appearance to all corrals
+                app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
+                    true, config.TitleBarHeight, true,
+                    config.HeaderFontName, config.HeaderFontSize, true,
+                    config.HeaderFontColor, true,
+                    config.IconOpacity, true,
+                    config.IconTintColor, config.IconTintStrength, true,
+                    config.IconSpacingXPercent, config.IconSpacingYPercent, true);
             }
 
             app->SaveConfig();

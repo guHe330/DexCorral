@@ -36,10 +36,10 @@
 
 ### What's New
 
-- Smooth icon hover: mouse-over now fades out both opacity and color tint overlay
-- Fix scrollbar appearing when icons fit fully within the corral
-- Replace MSIX with Inno Setup installer, add `--silent` flag
-- Fix build pipeline path handling
+- Split "Apply to all corrals" into two clear options: "Apply changes to all" (only modified settings) and "Copy full style to all" (entire appearance)
+- Fix tray icon not reappearing after Explorer restart
+- Refresh corral icons when shell image list changes (e.g. Recycle Bin emptied/filled)
+- Updated README with privacy statement and clearer unsigned-software notice
 
 ### Known Issues
 

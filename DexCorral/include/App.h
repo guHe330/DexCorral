@@ -150,6 +150,8 @@ private:
     static App* instance;
 
     HWND messageWindow;
+    UINT wmTaskbarCreated = 0;     // RegisterWindowMessage("TaskbarCreated")
+    ULONG shellNotifyId = 0;       // SHChangeNotifyRegister token
     AppConfig config;
     std::string configPath;
     std::unique_ptr<MouseHook> mouseHook;
