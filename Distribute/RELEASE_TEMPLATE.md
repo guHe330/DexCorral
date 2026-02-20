@@ -36,8 +36,10 @@
 
 ### What's New
 
-- Fix Explorer not restarting after Inno Setup install/upgrade
-- Remove MSIX installer (Inno Setup is now the only installer)
+- Unified text rendering: two-pass shadow+foreground for readable labels on any wallpaper
+- Per-tab background colors in title bar
+- Resize snap: alignment snapping to all corrals on the same monitor
+- Resize snap: filter to same-monitor corrals only
 
 ### Known Issues
 

@@ -73,24 +73,40 @@ void CorralWindow::UpdateLayeredContent() {
         pixels[i] = bgPixel;
     }
 
-    // Title bar - darker overlay
-    BYTE titleAlpha = TITLE_TEXT_ALPHA;
-    BYTE titlePmR = (BYTE)((bgR * titleAlpha) / 255 / 2);  // Darker
-    BYTE titlePmG = (BYTE)((bgG * titleAlpha) / 255 / 2);
-    BYTE titlePmB = (BYTE)((bgB * titleAlpha) / 255 / 2);
-    DWORD titlePixel = (titleAlpha << 24) | (titlePmR << 16) | (titlePmG << 8) | titlePmB;
+    // Compute per-tab pixel colors (each tab uses its own ColorHex)
+    std::vector<DWORD> tabPixels(config.Tabs.size());
+    for (int i = 0; i < (int)config.Tabs.size(); i++) {
+        BYTE tabR = bgR, tabG = bgG, tabB = bgB;
+        const std::string& tabColorHex = config.Tabs[i].ColorHex;
+        if (!tabColorHex.empty() && tabColorHex[0] == '#' && tabColorHex.length() >= 9) {
+            unsigned int tabColorValue;
+            sscanf_s(tabColorHex.c_str() + 1, "%x", &tabColorValue);
+            tabR = (tabColorValue >> 16) & 0xFF;
+            tabG = (tabColorValue >> 8) & 0xFF;
+            tabB = tabColorValue & 0xFF;
+        }
 
-    // Active tab background (lighter than inactive tabs)
-    BYTE activeAlpha = 240;
-    BYTE activePmR = (BYTE)((bgR * activeAlpha) / 255);
-    BYTE activePmG = (BYTE)((bgG * activeAlpha) / 255);
-    BYTE activePmB = (BYTE)((bgB * activeAlpha) / 255);
-    DWORD activeTabPixel = (activeAlpha << 24) | (activePmR << 16) | (activePmG << 8) | activePmB;
+        if (i == config.ActiveTabIndex) {
+            // Active tab: bright, near-opaque
+            BYTE activeAlpha = 240;
+            BYTE pmR = (BYTE)((tabR * activeAlpha) / 255);
+            BYTE pmG = (BYTE)((tabG * activeAlpha) / 255);
+            BYTE pmB = (BYTE)((tabB * activeAlpha) / 255);
+            tabPixels[i] = (activeAlpha << 24) | (pmR << 16) | (pmG << 8) | pmB;
+        } else {
+            // Inactive tab: darker, more transparent
+            BYTE inactiveAlpha = TITLE_TEXT_ALPHA;
+            BYTE pmR = (BYTE)((tabR * inactiveAlpha) / 255 / 2);
+            BYTE pmG = (BYTE)((tabG * inactiveAlpha) / 255 / 2);
+            BYTE pmB = (BYTE)((tabB * inactiveAlpha) / 255 / 2);
+            tabPixels[i] = (inactiveAlpha << 24) | (pmR << 16) | (pmG << 8) | pmB;
+        }
+    }
 
     // Draw tab backgrounds
     for (int i = 0; i < (int)config.Tabs.size(); i++) {
         RECT tabRect = GetTabRect(i);
-        DWORD pixel = (i == config.ActiveTabIndex) ? activeTabPixel : titlePixel;
+        DWORD pixel = tabPixels[i];
 
         for (int y = tabRect.top; y < tabRect.bottom && y < h; y++) {
             for (int x = tabRect.left; x < tabRect.right && x < w; x++) {
@@ -202,7 +218,7 @@ void CorralWindow::UpdateLayeredContent() {
                         break;
                     }
                 }
-                pixels[y * w + x] = (tabIndex == config.ActiveTabIndex) ? activeTabPixel : titlePixel;
+                pixels[y * w + x] = (tabIndex >= 0) ? tabPixels[tabIndex] : 0;
             }
         }
     }
@@ -278,6 +294,25 @@ void CorralWindow::UpdateLayeredContent() {
         SelectClipRgn(memDC, clipRegion);
 
         bool isDetailsView = (GetActiveTab().GetViewMode() == ViewMode::Details);
+
+        // Open theme once for all text rendering (two-pass: shadow + foreground)
+        HTHEME hTextTheme = OpenThemeData(hwnd, L"TextStyle");
+        auto drawShadowedText = [&](const wchar_t* text, int len, DWORD flags, RECT rect, COLORREF color) {
+            if (!hTextTheme) return;
+            DTTOPTS dtOpts = {};
+            dtOpts.dwSize = sizeof(dtOpts);
+            dtOpts.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
+            // Shadow pass: black text with wide glow for contrast on light backgrounds
+            dtOpts.crText = RGB(0, 0, 0);
+            dtOpts.iGlowSize = 8;
+            RECT shadowRect = rect;
+            OffsetRect(&shadowRect, 1, 1);
+            DrawThemeTextEx(hTextTheme, memDC, 0, 0, text, len, flags, &shadowRect, &dtOpts);
+            // Foreground pass: actual color with tight glow
+            dtOpts.crText = color;
+            dtOpts.iGlowSize = 4;
+            DrawThemeTextEx(hTextTheme, memDC, 0, 0, text, len, flags, &rect, &dtOpts);
+        };
 
         for (int i = 0; i < (int)icons.size(); i++) {
             const auto& icon = icons[i];
@@ -495,98 +530,80 @@ void CorralWindow::UpdateLayeredContent() {
                 int dateCol = sizeCol + (int)(contentWidth * 0.15);
                 int syncCol = dateCol + (int)(contentWidth * 0.15);
 
-                SetTextColor(memDC, RGB(255, 255, 255));
+                // Draw detail columns (DrawThemeTextEx ignores clip regions, so guard visibility)
+                if (drawTop >= visibleTop && drawBottom <= visibleBottom) {
+                    // Draw name (bright white)
+                    RECT nameRect = { nameCol, drawTop, typeCol - 4, drawBottom };
+                    drawShadowedText(icon.displayName.c_str(), (int)icon.displayName.length(),
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
+                        nameRect, RGB(255, 255, 255));
 
-                // Draw name
-                RECT nameRect = { nameCol, drawTop, typeCol - 4, drawBottom };
-                DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
-                    &nameRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+                    // Draw type
+                    RECT typeRect = { typeCol, drawTop, sizeCol - 4, drawBottom };
+                    drawShadowedText(icon.fileType.c_str(), (int)icon.fileType.length(),
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
+                        typeRect, RGB(255, 255, 255));
 
-                // Draw type (dimmer color)
-                SetTextColor(memDC, RGB(180, 180, 180));
-                RECT typeRect = { typeCol, drawTop, sizeCol - 4, drawBottom };
-                DrawTextW(memDC, icon.fileType.c_str(), (int)icon.fileType.length(),
-                    &typeRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-                // Draw size
-                std::wstring sizeStr;
-                if (icon.fileSize < 1024) {
-                    sizeStr = std::to_wstring(icon.fileSize) + L" B";
-                } else if (icon.fileSize < 1024 * 1024) {
-                    sizeStr = std::to_wstring(icon.fileSize / 1024) + L" KB";
-                } else if (icon.fileSize < 1024 * 1024 * 1024) {
-                    sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024)) + L" MB";
-                } else {
-                    sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024 * 1024)) + L" GB";
-                }
-                RECT sizeRect = { sizeCol, drawTop, dateCol - 4, drawBottom };
-                DrawTextW(memDC, sizeStr.c_str(), (int)sizeStr.length(),
-                    &sizeRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-
-                // Draw date
-                FILETIME localTime;
-                SYSTEMTIME sysTime;
-                FileTimeToLocalFileTime(&icon.modifiedTime, &localTime);
-                FileTimeToSystemTime(&localTime, &sysTime);
-                wchar_t dateStr[32];
-                swprintf_s(dateStr, L"%02d/%02d/%04d", sysTime.wMonth, sysTime.wDay, sysTime.wYear);
-                RECT dateRect = { dateCol, drawTop, syncCol - 4, drawBottom };
-                DrawTextW(memDC, dateStr, -1,
-                    &dateRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-
-                // Draw sync status indicator
-                if (icon.syncStatus != SyncStatus::None) {
-                    const wchar_t* syncSymbol = L"";
-                    COLORREF syncColor = RGB(180, 180, 180);
-                    switch (icon.syncStatus) {
-                        case SyncStatus::Synced:
-                            syncSymbol = L"\u2713";  // Check mark
-                            syncColor = RGB(100, 200, 100);  // Green
-                            break;
-                        case SyncStatus::Syncing:
-                            syncSymbol = L"\u21BB";  // Circular arrows
-                            syncColor = RGB(100, 150, 255);  // Blue
-                            break;
-                        case SyncStatus::Pending:
-                            syncSymbol = L"\u23F1";  // Stopwatch/clock
-                            syncColor = RGB(100, 150, 255);  // Blue
-                            break;
-                        case SyncStatus::Error:
-                            syncSymbol = L"\u2717";  // X mark
-                            syncColor = RGB(255, 100, 100);  // Red
-                            break;
-                        case SyncStatus::CloudOnly:
-                            syncSymbol = L"\u2601";  // Cloud
-                            syncColor = RGB(150, 150, 255);  // Light blue
-                            break;
-                        default:
-                            break;
+                    // Draw size
+                    std::wstring sizeStr;
+                    if (icon.fileSize < 1024) {
+                        sizeStr = std::to_wstring(icon.fileSize) + L" B";
+                    } else if (icon.fileSize < 1024 * 1024) {
+                        sizeStr = std::to_wstring(icon.fileSize / 1024) + L" KB";
+                    } else if (icon.fileSize < 1024 * 1024 * 1024) {
+                        sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024)) + L" MB";
+                    } else {
+                        sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024 * 1024)) + L" GB";
                     }
-                    SetTextColor(memDC, syncColor);
-                    RECT syncRect = { syncCol, drawTop, icon.rect.right - 4, drawBottom };
-                    DrawTextW(memDC, syncSymbol, -1,
-                        &syncRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-                }
+                    RECT sizeRect = { sizeCol, drawTop, dateCol - 4, drawBottom };
+                    drawShadowedText(sizeStr.c_str(), (int)sizeStr.length(),
+                        DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                        sizeRect, RGB(255, 255, 255));
 
-                // Fix alpha for entire row text area (apply icon opacity + tint)
-                for (int py = drawTop; py < drawBottom && py < h; py++) {
-                    if (py < visibleTop) continue;
-                    for (int px = nameCol; px < icon.rect.right && px < w; px++) {
-                        if (px >= 0 && py >= 0) {
-                            DWORD pixel = pixels[py * w + px];
-                            BYTE a = (pixel >> 24) & 0xFF;
-                            BYTE r = (pixel >> 16) & 0xFF;
-                            BYTE g = (pixel >> 8) & 0xFF;
-                            BYTE b = pixel & 0xFF;
-                            if (a == 0 && (r > 0 || g > 0 || b > 0)) {
-                                if (tintStrength > 0) {
-                                    r = (BYTE)((r * tintInv + tintR * tintStrength) / 255);
-                                    g = (BYTE)((g * tintInv + tintG * tintStrength) / 255);
-                                    b = (BYTE)((b * tintInv + tintB * tintStrength) / 255);
-                                }
-                                pixels[py * w + px] = (iconAlpha << 24) | (((r * iconAlpha) / 255) << 16) | (((g * iconAlpha) / 255) << 8) | ((b * iconAlpha) / 255);
-                            }
+                    // Draw date
+                    FILETIME localTime;
+                    SYSTEMTIME sysTime;
+                    FileTimeToLocalFileTime(&icon.modifiedTime, &localTime);
+                    FileTimeToSystemTime(&localTime, &sysTime);
+                    wchar_t dateStr[32];
+                    swprintf_s(dateStr, L"%02d/%02d/%04d", sysTime.wMonth, sysTime.wDay, sysTime.wYear);
+                    RECT dateRect = { dateCol, drawTop, syncCol - 4, drawBottom };
+                    drawShadowedText(dateStr, -1,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                        dateRect, RGB(255, 255, 255));
+
+                    // Draw sync status indicator
+                    if (icon.syncStatus != SyncStatus::None) {
+                        const wchar_t* syncSymbol = L"";
+                        COLORREF syncColor = RGB(180, 180, 180);
+                        switch (icon.syncStatus) {
+                            case SyncStatus::Synced:
+                                syncSymbol = L"\u2713";  // Check mark
+                                syncColor = RGB(100, 200, 100);  // Green
+                                break;
+                            case SyncStatus::Syncing:
+                                syncSymbol = L"\u21BB";  // Circular arrows
+                                syncColor = RGB(100, 150, 255);  // Blue
+                                break;
+                            case SyncStatus::Pending:
+                                syncSymbol = L"\u23F1";  // Stopwatch/clock
+                                syncColor = RGB(100, 150, 255);  // Blue
+                                break;
+                            case SyncStatus::Error:
+                                syncSymbol = L"\u2717";  // X mark
+                                syncColor = RGB(255, 100, 100);  // Red
+                                break;
+                            case SyncStatus::CloudOnly:
+                                syncSymbol = L"\u2601";  // Cloud
+                                syncColor = RGB(150, 150, 255);  // Light blue
+                                break;
+                            default:
+                                break;
                         }
+                        RECT syncRect = { syncCol, drawTop, icon.rect.right - 4, drawBottom };
+                        drawShadowedText(syncSymbol, -1,
+                            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                            syncRect, syncColor);
                     }
                 }
 
@@ -684,37 +701,9 @@ void CorralWindow::UpdateLayeredContent() {
                 // so we skip the label entirely when it would overflow into the title bar
                 // (clamping the rect causes the label to visually "stick" at the border).
                 if (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop) {
-
-                    HTHEME hTheme = OpenThemeData(hwnd, L"TextStyle");
-                    if (hTheme) {
-                        DTTOPTS dtOpts = {};
-                        dtOpts.dwSize = sizeof(dtOpts);
-                        dtOpts.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
-                        dtOpts.crText = RGB(255, 255, 255);
-                        dtOpts.iGlowSize = 4;
-                        DrawThemeTextEx(hTheme, memDC, 0, 0,
-                            icon.displayName.c_str(), (int)icon.displayName.length(),
-                            DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
-                            &labelRect, &dtOpts);
-                        CloseThemeData(hTheme);
-                    } else {
-                        // Fallback: plain text with manual alpha fix
-                        SetTextColor(memDC, RGB(255, 255, 255));
-                        DrawTextW(memDC, icon.displayName.c_str(), (int)icon.displayName.length(),
-                            &labelRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
-                        for (int py = labelTop; py < drawBottom && py < h; py++) {
-                            if (py < visibleTop) continue;
-                            for (int px = icon.rect.left; px < icon.rect.right && px < w; px++) {
-                                if (px >= 0 && py >= 0) {
-                                    DWORD pixel = pixels[py * w + px];
-                                    if ((pixel >> 24) == 0 && (pixel & 0xFFFFFF) != 0) {
-                                        BYTE r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
-                                        pixels[py * w + px] = (255 << 24) | (r << 16) | (g << 8) | b;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    drawShadowedText(icon.displayName.c_str(), (int)icon.displayName.length(),
+                        DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+                        labelRect, RGB(255, 255, 255));
                 }
             }
         }
@@ -724,6 +713,11 @@ void CorralWindow::UpdateLayeredContent() {
             SelectObject(iconTempDC, iconTempOldBmp);
             DeleteObject(iconTempBmp);
             DeleteDC(iconTempDC);
+        }
+
+        // Clean up text theme
+        if (hTextTheme) {
+            CloseThemeData(hTextTheme);
         }
 
         // Remove clipping region

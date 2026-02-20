@@ -468,7 +468,7 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
     newRight = newLeft + newWidth;
     newBottom = newTop + newHeight;
 
-    // Snap to other corrals
+    // Snap to other corrals on the same monitor
     const auto& corrals = app->GetCorrals();
     for (const auto& other : corrals) {
         if (other->GetHWND() == hwnd) continue;
@@ -476,62 +476,82 @@ void CorralWindow::ApplyResizeSnap(int& newLeft, int& newTop, int& newWidth, int
         RECT otherRect;
         GetWindowRect(other->GetHWND(), &otherRect);
 
-        // Check vertical overlap
+        // Only snap to corrals on the same monitor
+        if (MonitorFromRect(&otherRect, MONITOR_DEFAULTTONEAREST) != hMon) continue;
+
+        // Check overlap for adjacent snapping (with gap)
         bool verticalOverlap = (newTop < otherRect.bottom + Dpi(SNAP_DISTANCE)) && (newBottom > otherRect.top - Dpi(SNAP_DISTANCE));
-        // Check horizontal overlap
         bool horizontalOverlap = (newLeft < otherRect.right + Dpi(SNAP_DISTANCE)) && (newRight > otherRect.left - Dpi(SNAP_DISTANCE));
 
+        // Adjacent snapping (with gap) - requires overlap in the perpendicular dimension
         if (verticalOverlap) {
             if (resizingLeft) {
-                // Snap left edge to their right edge (with gap)
                 if (std::abs(newLeft - otherRect.right - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
                     int oldRight = newRight;
                     newLeft = otherRect.right + Dpi(SNAP_GAP);
                     newWidth = oldRight - newLeft;
                 }
-                // Snap left edge to their left edge (align)
-                if (std::abs(newLeft - otherRect.left) < Dpi(SNAP_DISTANCE)) {
-                    int oldRight = newRight;
-                    newLeft = otherRect.left;
-                    newWidth = oldRight - newLeft;
-                }
             }
             if (resizingRight) {
-                // Snap right edge to their left edge (with gap)
                 if (std::abs(newRight - otherRect.left + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
                     newWidth = otherRect.left - newLeft - Dpi(SNAP_GAP);
                 }
-                // Snap right edge to their right edge (align)
-                if (std::abs(newRight - otherRect.right) < Dpi(SNAP_DISTANCE)) {
-                    newWidth = otherRect.right - newLeft;
-                }
             }
         }
-
         if (horizontalOverlap) {
             if (resizingTop) {
-                // Snap top edge to their bottom edge (with gap)
                 if (std::abs(newTop - otherRect.bottom - Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
                     int oldBottom = newBottom;
                     newTop = otherRect.bottom + Dpi(SNAP_GAP);
                     newHeight = oldBottom - newTop;
                 }
-                // Snap top edge to their top edge (align)
-                if (std::abs(newTop - otherRect.top) < Dpi(SNAP_DISTANCE)) {
-                    int oldBottom = newBottom;
-                    newTop = otherRect.top;
-                    newHeight = oldBottom - newTop;
-                }
             }
             if (resizingBottom) {
-                // Snap bottom edge to their top edge (with gap)
                 if (std::abs(newBottom - otherRect.top + Dpi(SNAP_GAP)) < Dpi(SNAP_DISTANCE)) {
                     newHeight = otherRect.top - newTop - Dpi(SNAP_GAP);
                 }
-                // Snap bottom edge to their bottom edge (align)
-                if (std::abs(newBottom - otherRect.bottom) < Dpi(SNAP_DISTANCE)) {
-                    newHeight = otherRect.bottom - newTop;
-                }
+            }
+        }
+
+        // Alignment snapping - align edges with any corral on the same monitor
+        if (resizingLeft) {
+            if (std::abs(newLeft - otherRect.left) < Dpi(SNAP_DISTANCE)) {
+                int oldRight = newRight;
+                newLeft = otherRect.left;
+                newWidth = oldRight - newLeft;
+            }
+            if (std::abs(newLeft - otherRect.right) < Dpi(SNAP_DISTANCE)) {
+                int oldRight = newRight;
+                newLeft = otherRect.right;
+                newWidth = oldRight - newLeft;
+            }
+        }
+        if (resizingRight) {
+            if (std::abs(newRight - otherRect.right) < Dpi(SNAP_DISTANCE)) {
+                newWidth = otherRect.right - newLeft;
+            }
+            if (std::abs(newRight - otherRect.left) < Dpi(SNAP_DISTANCE)) {
+                newWidth = otherRect.left - newLeft;
+            }
+        }
+        if (resizingTop) {
+            if (std::abs(newTop - otherRect.top) < Dpi(SNAP_DISTANCE)) {
+                int oldBottom = newBottom;
+                newTop = otherRect.top;
+                newHeight = oldBottom - newTop;
+            }
+            if (std::abs(newTop - otherRect.bottom) < Dpi(SNAP_DISTANCE)) {
+                int oldBottom = newBottom;
+                newTop = otherRect.bottom;
+                newHeight = oldBottom - newTop;
+            }
+        }
+        if (resizingBottom) {
+            if (std::abs(newBottom - otherRect.bottom) < Dpi(SNAP_DISTANCE)) {
+                newHeight = otherRect.bottom - newTop;
+            }
+            if (std::abs(newBottom - otherRect.top) < Dpi(SNAP_DISTANCE)) {
+                newHeight = otherRect.top - newTop;
             }
         }
 
