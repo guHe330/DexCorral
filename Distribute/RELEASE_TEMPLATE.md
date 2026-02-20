@@ -36,10 +36,8 @@
 
 ### What's New
 
-- Split "Apply to all corrals" into two clear options: "Apply changes to all" (only modified settings) and "Copy full style to all" (entire appearance)
-- Fix tray icon not reappearing after Explorer restart
-- Refresh corral icons when shell image list changes (e.g. Recycle Bin emptied/filled)
-- Updated README with privacy statement and clearer unsigned-software notice
+- Fix Explorer not restarting after Inno Setup install/upgrade
+- Remove MSIX installer (Inno Setup is now the only installer)
 
 ### Known Issues
 
