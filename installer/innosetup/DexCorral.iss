@@ -95,7 +95,7 @@ begin
     Log('Restarting Explorer to release old DLL');
     Exec('taskkill', '/F /IM explorer.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(3000);
-    Exec(ExpandConstant('{sys}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+    Exec(ExpandConstant('{win}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
     Sleep(2000);
   end;
 end;
@@ -126,7 +126,7 @@ begin
     Log('Restarting Explorer...');
     Exec('taskkill', '/F /IM explorer.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(3000);
-    Exec(ExpandConstant('{sys}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+    Exec(ExpandConstant('{win}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
     Sleep(2000);
     Log('Explorer restarted');
   end;
