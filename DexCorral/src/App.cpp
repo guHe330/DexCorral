@@ -1,4 +1,25 @@
 /**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * App.cpp - Main application controller and message pump
  *
  * Manages application initialization, shutdown, and the main message loop.
@@ -25,25 +46,29 @@
 static HANDLE g_AppStopEvent = nullptr;
 
 // Entry point called from the DLL worker thread
-extern "C" int RunApp(HANDLE hStopEvent) {
+extern "C" int RunApp(HANDLE hStopEvent)
+{
     g_AppStopEvent = hStopEvent;
     App app;
     return app.Run();
 }
 
-App* App::instance = nullptr;
+App *App::instance = nullptr;
 
-static const wchar_t* MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
-App::App() : messageWindow(nullptr) {
+static const wchar_t *MESSAGE_WINDOW_CLASS = L"DexCorralMessageWindow";
+App::App() : messageWindow(nullptr)
+{
     instance = this;
 }
 
-App::~App() {
+App::~App()
+{
     Shutdown();
     instance = nullptr;
 }
 
-void App::Initialize() {
+void App::Initialize()
+{
     // Register message window class
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -60,22 +85,21 @@ void App::Initialize() {
         0,
         0, 0, 0, 0,
         HWND_MESSAGE, nullptr,
-        GetModuleHandleW(nullptr), this
-    );
+        GetModuleHandleW(nullptr), this);
 
     // Register for Explorer restart so we can re-add the tray icon
     wmTaskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
 
     // Register for shell image-list changes (e.g. Recycle Bin full→empty)
-    SHChangeNotifyEntry shcne = {};
-    shcne.pidl = nullptr;       // all items
-    shcne.fRecursive = TRUE;
+    SHChangeNotifyEntry shcnentry = {};
+    shcnentry.pidl = nullptr; // all items
+    shcnentry.fRecursive = TRUE;
     shellNotifyId = SHChangeNotifyRegister(
         messageWindow,
         SHCNRF_ShellLevel | SHCNRF_NewDelivery,
         SHCNE_UPDATEIMAGE,
-        WM_APP + 101,           // custom message
-        1, &shcne);
+        WM_APP + 101, // custom message
+        1, &shcnentry);
 
     // Load configuration
     LoadConfig();
@@ -85,9 +109,12 @@ void App::Initialize() {
 
     // Setup mouse hook
     mouseHook = std::make_unique<MouseHook>();
-    mouseHook->SetLeftButtonDownCallback([this](POINT pt) { OnLeftButtonDown(pt); });
-    mouseHook->SetLeftButtonUpCallback([this](POINT pt) { OnLeftButtonUp(pt); });
-    mouseHook->SetMouseMoveCallback([this](POINT pt) { OnMouseMove(pt); });
+    mouseHook->SetLeftButtonDownCallback([this](POINT pt)
+                                         { OnLeftButtonDown(pt); });
+    mouseHook->SetLeftButtonUpCallback([this](POINT pt)
+                                       { OnLeftButtonUp(pt); });
+    mouseHook->SetMouseMoveCallback([this](POINT pt)
+                                    { OnMouseMove(pt); });
     // Note: Mousewheel events are NOT hooked - they pass through naturally to windows
     mouseHook->Start();
 
@@ -102,17 +129,18 @@ void App::Initialize() {
     // Default to true if not specified (backward compatibility)
     DesktopIcons::SetIconsVisible(config.DesktopIconsVisible);
 
-    if (corrals.empty()) {
+    if (corrals.empty())
+    {
         // First run: create a default catch-all corral at center of screen
         CorralWindowConfig defaultConfig;
         defaultConfig.Left = GetSystemMetrics(SM_CXSCREEN) / 2 - 150;
         defaultConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
         defaultConfig.Width = 300;
         defaultConfig.Height = 200;
-        
+
         CorralTabConfig tab;
         tab.Title = "Desktop";
-        tab.IsCatchAll = true;  // First corral is catch-all
+        tab.IsCatchAll = true; // First corral is catch-all
         defaultConfig.Tabs.push_back(tab);
 
         auto corral = std::make_unique<CorralWindow>(defaultConfig);
@@ -130,9 +158,12 @@ void App::Initialize() {
 
     // Start desktop monitoring
     desktopMonitor = std::make_unique<DesktopMonitor>();
-    desktopMonitor->SetFileAddedCallback([this](const std::wstring& fileName) { OnDesktopFileAdded(fileName); });
-    desktopMonitor->SetFileRenamedCallback([this](const std::wstring& oldName, const std::wstring& newName) { OnDesktopFileRenamed(oldName, newName); });
-    desktopMonitor->SetFileDeletedCallback([this](const std::wstring& fileName) { OnDesktopFileDeleted(fileName); });
+    desktopMonitor->SetFileAddedCallback([this](const std::wstring &fileName)
+                                         { OnDesktopFileAdded(fileName); });
+    desktopMonitor->SetFileRenamedCallback([this](const std::wstring &oldName, const std::wstring &newName)
+                                           { OnDesktopFileRenamed(oldName, newName); });
+    desktopMonitor->SetFileDeletedCallback([this](const std::wstring &fileName)
+                                           { OnDesktopFileDeleted(fileName); });
     desktopMonitor->Start();
 
     // Hook is in-process (shell extension) — just update hidden icon list
@@ -141,15 +172,18 @@ void App::Initialize() {
     HookBridge::RefreshDesktop();
 }
 
-void App::Shutdown() {
+void App::Shutdown()
+{
     // Unregister shell change notifications
-    if (shellNotifyId) {
+    if (shellNotifyId)
+    {
         SHChangeNotifyDeregister(shellNotifyId);
         shellNotifyId = 0;
     }
 
     // Stop desktop monitor first
-    if (desktopMonitor) {
+    if (desktopMonitor)
+    {
         desktopMonitor->Stop();
     }
 
@@ -167,22 +201,26 @@ void App::Shutdown() {
     corrals.clear();
 
     // Stop mouse hook
-    if (mouseHook) {
+    if (mouseHook)
+    {
         mouseHook->Stop();
     }
 }
 
-void App::LoadConfig() {
+void App::LoadConfig()
+{
     config = Config::Load();
 }
 
-void App::SaveConfig() {
+void App::SaveConfig()
+{
     // Update desktop icons state
     config.DesktopIconsVisible = DesktopIcons::AreIconsVisible();
 
     // Sync all corral configs from their current window states
     config.Corrals.clear();
-    for (auto& corral : corrals) {
+    for (auto &corral : corrals)
+    {
         corral->SyncConfigFromWindow();
         config.Corrals.push_back(corral->GetConfig());
     }
@@ -194,14 +232,18 @@ void App::SaveConfig() {
     HookBridge::RefreshDesktop();
 }
 
-void App::RestoreCorrals() {
-    for (auto& corralConfig : config.Corrals) {
+void App::RestoreCorrals()
+{
+    for (auto &corralConfig : config.Corrals)
+    {
         // Skip corrals with invalid dimensions (corrupted config)
-        if (corralConfig.Width < 50 || corralConfig.Height < 50) {
+        if (corralConfig.Width < 50 || corralConfig.Height < 50)
+        {
             corralConfig.Width = 300;
             corralConfig.Height = 200;
         }
-        if (corralConfig.Left < -1000 || corralConfig.Top < -1000) {
+        if (corralConfig.Left < -1000 || corralConfig.Top < -1000)
+        {
             corralConfig.Left = GetSystemMetrics(SM_CXSCREEN) / 2 - 150;
             corralConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
         }
@@ -212,9 +254,12 @@ void App::RestoreCorrals() {
     }
 }
 
-void App::RemoveCorral(CorralWindowConfig* configToRemove) {
-    for (auto it = corrals.begin(); it != corrals.end(); ++it) {
-        if (&(*it)->GetConfig() == configToRemove) {
+void App::RemoveCorral(CorralWindowConfig *configToRemove)
+{
+    for (auto it = corrals.begin(); it != corrals.end(); ++it)
+    {
+        if (&(*it)->GetConfig() == configToRemove)
+        {
             corrals.erase(it);
             break;
         }
@@ -222,18 +267,23 @@ void App::RemoveCorral(CorralWindowConfig* configToRemove) {
     SaveConfig();
 }
 
-void App::RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralTabConfig* exceptTab) {
+void App::RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab)
+{
     int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string fileNameStr(size - 1, 0);
     WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
 
     bool changed = false;
-    for (auto& corral : corrals) {
-        auto& corralConfig = corral->GetConfig();
-        for (auto& tab : corralConfig.Tabs) {
-            if (&tab != exceptTab) {
+    for (auto &corral : corrals)
+    {
+        auto &corralConfig = corral->GetConfig();
+        for (auto &tab : corralConfig.Tabs)
+        {
+            if (&tab != exceptTab)
+            {
                 auto it = std::find(tab.Files.begin(), tab.Files.end(), fileNameStr);
-                if (it != tab.Files.end()) {
+                if (it != tab.Files.end())
+                {
                     tab.Files.erase(it);
                     changed = true;
                 }
@@ -241,32 +291,39 @@ void App::RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralTabConf
         }
     }
 
-    if (changed) {
+    if (changed)
+    {
         SaveConfig();
         RefreshAllCorrals();
     }
 }
 
-void App::RefreshAllCorrals() {
-    for (auto& corral : corrals) {
+void App::RefreshAllCorrals()
+{
+    for (auto &corral : corrals)
+    {
         corral->LoadFiles();
     }
 }
 
-void App::RefreshAllCorralBackgrounds() {
-    for (auto& corral : corrals) {
+void App::RefreshAllCorralBackgrounds()
+{
+    for (auto &corral : corrals)
+    {
         corral->RecalculateLayout();
     }
 }
 
-void App::SetDefaultColorHex(const std::string& colorHex) {
+void App::SetDefaultColorHex(const std::string &colorHex)
+{
     config.DefaultColorHex = colorHex;
 }
 
-void App::SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
-    int fontSize, const std::string& fontColor, int iconOpacity,
-    const std::string& tintColor, int tintStrength,
-    int spacingX, int spacingY) {
+void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
+                               int fontSize, const std::string &fontColor, int iconOpacity,
+                               const std::string &tintColor, int tintStrength,
+                               int spacingX, int spacingY)
+{
     config.DefaultTitleBarHeight = titleBarHeight;
     config.DefaultHeaderFontName = fontName;
     config.DefaultHeaderFontSize = fontSize;
@@ -278,108 +335,135 @@ void App::SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
     config.DefaultIconSpacingYPercent = spacingY;
 }
 
-void App::ApplyColorToAllCorrals(const std::string& colorHex) {
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
+void App::ApplyColorToAllCorrals(const std::string &colorHex)
+{
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
             tab.ColorHex = colorHex;
         }
         corral->RecalculateLayout();
     }
 }
 
-void App::ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyColor,
-    int titleBarHeight, bool applyHeight,
-    const std::string& fontName, int fontSize, bool applyFont,
-    const std::string& fontColor, bool applyFontColor,
-    int iconOpacity, bool applyIconOpacity,
-    const std::string& tintColor, int tintStrength, bool applyTint,
-    int spacingX, int spacingY, bool applySpacing) {
-    for (auto& corral : corrals) {
-        auto& cfg = corral->GetConfig();
+void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
+                                      int titleBarHeight, bool applyHeight,
+                                      const std::string &fontName, int fontSize, bool applyFont,
+                                      const std::string &fontColor, bool applyFontColor,
+                                      int iconOpacity, bool applyIconOpacity,
+                                      const std::string &tintColor, int tintStrength, bool applyTint,
+                                      int spacingX, int spacingY, bool applySpacing)
+{
+    for (auto &corral : corrals)
+    {
+        auto &cfg = corral->GetConfig();
         bool needsLayoutRecalc = false;
 
-        if (applyColor) {
-            for (auto& tab : cfg.Tabs) {
+        if (applyColor)
+        {
+            for (auto &tab : cfg.Tabs)
+            {
                 tab.ColorHex = colorHex;
             }
         }
-        if (applyHeight) {
+        if (applyHeight)
+        {
             cfg.TitleBarHeight = titleBarHeight;
             needsLayoutRecalc = true;
         }
-        if (applyFont) {
+        if (applyFont)
+        {
             cfg.HeaderFontName = fontName;
             cfg.HeaderFontSize = fontSize;
         }
-        if (applyFontColor) cfg.HeaderFontColor = fontColor;
-        if (applyIconOpacity) {
+        if (applyFontColor)
+            cfg.HeaderFontColor = fontColor;
+        if (applyIconOpacity)
+        {
             cfg.IconOpacity = iconOpacity;
             corral->SetCurrentOpacity(iconOpacity);
         }
-        if (applyTint) {
+        if (applyTint)
+        {
             cfg.IconTintColor = tintColor;
             cfg.IconTintStrength = tintStrength;
             corral->SetCurrentTintStrength(tintStrength);
         }
-        if (applySpacing) {
+        if (applySpacing)
+        {
             cfg.IconSpacingXPercent = spacingX;
             cfg.IconSpacingYPercent = spacingY;
             needsLayoutRecalc = true;
         }
 
-        if (needsLayoutRecalc) {
+        if (needsLayoutRecalc)
+        {
             corral->RecalculateLayout();
-        } else {
+        }
+        else
+        {
             corral->RecalculateLayout();
         }
     }
 }
 
-void App::ToggleDesktopIcons() {
+void App::ToggleDesktopIcons()
+{
     bool currentlyVisible = DesktopIcons::AreIconsVisible();
     DesktopIcons::SetIconsVisible(!currentlyVisible);
     SaveConfig();
 }
 
-void App::ToggleShortcutArrows() {
+void App::ToggleShortcutArrows()
+{
     bool currentlyHidden = DesktopIcons::AreShortcutArrowsHidden();
     bool newState = !currentlyHidden;
 
     // Confirm with user since this requires Explorer restart
-    const wchar_t* message = newState
-        ? L"This will hide shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?"
-        : L"This will restore shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?";
+    const wchar_t *message = newState
+                                 ? L"This will hide shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?"
+                                 : L"This will restore shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?";
 
     int result = MessageBoxW(nullptr, message, L"DexCorral", MB_YESNO | MB_ICONQUESTION);
-    if (result != IDYES) {
+    if (result != IDYES)
+    {
         return;
     }
 
-    if (DesktopIcons::SetShortcutArrowsHidden(newState)) {
+    if (DesktopIcons::SetShortcutArrowsHidden(newState))
+    {
         config.HideShortcutArrows = newState;
         SaveConfig();
         DesktopIcons::RestartExplorer();
-    } else {
+    }
+    else
+    {
         MessageBoxW(nullptr, L"Failed to change shortcut arrow setting.\n\nThis may require administrator privileges.", L"DexCorral", MB_OK | MB_ICONWARNING);
     }
 }
 
-
-
-void App::UpdateHookHiddenIcons() {
+void App::UpdateHookHiddenIcons()
+{
     // Collect display names of all icons across all corrals and ALL tabs
     // (not just active tab - inactive tab icons should stay hidden too)
     std::vector<std::wstring> displayNames;
-    for (const auto& corral : corrals) {
-        for (const auto& tab : corral->GetConfig().Tabs) {
-            if (tab.IsVirtual) continue;  // Virtual tabs don't hide desktop icons
+    for (const auto &corral : corrals)
+    {
+        for (const auto &tab : corral->GetConfig().Tabs)
+        {
+            if (tab.IsVirtual)
+                continue; // Virtual tabs don't hide desktop icons
 
-            for (const auto& fileUtf8 : tab.Files) {
+            for (const auto &fileUtf8 : tab.Files)
+            {
                 // Special icon: resolve CLSID to display name
-                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8))
+                {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
                     std::wstring name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                    if (!name.empty()) {
+                    if (!name.empty())
+                    {
                         displayNames.push_back(name);
                     }
                     continue;
@@ -399,7 +483,8 @@ void App::UpdateHookHiddenIcons() {
     HookBridge::UpdateHiddenIcons(displayNames);
 }
 
-void App::PositionHiddenIconsUnderCorrals() {
+void App::PositionHiddenIconsUnderCorrals()
+{
     // Position hidden icons at per-icon screen positions matching their visual
     // location in the corral. Icons visible in the corral viewport get positioned
     // at their actual screen coords (under the corral window). Icons scrolled out
@@ -407,46 +492,59 @@ void App::PositionHiddenIconsUnderCorrals() {
     // icons reappear near where the corral was.
     std::map<std::wstring, POINT2D> positions;
 
-    for (const auto& corral : corrals) {
+    for (const auto &corral : corrals)
+    {
         // Get per-icon positions from the active tab (already in ListView client coords)
         auto iconPositions = corral->GetIconScreenPositions();
-        for (auto& [name, pos] : iconPositions) {
+        for (auto &[name, pos] : iconPositions)
+        {
             positions[name] = pos;
         }
 
         // For non-active tabs, position icons at corral center (they're not rendered)
         RECT r;
-        if (!GetWindowRect(corral->GetHWND(), &r)) continue;
+        if (!GetWindowRect(corral->GetHWND(), &r))
+            continue;
         HWND hListView = DesktopIcons::GetDesktopListView();
-        POINT center = { (r.left + r.right) / 2, (r.top + r.bottom) / 2 };
-        if (hListView) {
+        POINT center = {(r.left + r.right) / 2, (r.top + r.bottom) / 2};
+        if (hListView)
+        {
             ScreenToClient(hListView, &center);
         }
 
         int activeTabIndex = corral->GetConfig().ActiveTabIndex;
-        for (int t = 0; t < (int)corral->GetConfig().Tabs.size(); t++) {
-            if (t == activeTabIndex) continue;  // Already handled by GetIconScreenPositions
-            const auto& tab = corral->GetConfig().Tabs[t];
-            if (tab.IsVirtual) continue;
-            for (const auto& fileUtf8 : tab.Files) {
+        for (int t = 0; t < (int)corral->GetConfig().Tabs.size(); t++)
+        {
+            if (t == activeTabIndex)
+                continue; // Already handled by GetIconScreenPositions
+            const auto &tab = corral->GetConfig().Tabs[t];
+            if (tab.IsVirtual)
+                continue;
+            for (const auto &fileUtf8 : tab.Files)
+            {
                 std::wstring name;
-                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8))
+                {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
                     name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                } else {
+                }
+                else
+                {
                     int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
                     name.resize(size);
                     MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
                     name = IconUtils::StripLnkExtension(name);
                 }
-                if (!name.empty()) {
-                    positions[name] = { center.x, center.y };
+                if (!name.empty())
+                {
+                    positions[name] = {center.x, center.y};
                 }
             }
         }
     }
 
-    if (!positions.empty()) {
+    if (!positions.empty())
+    {
         DesktopIcons::PositionIcons(positions);
     }
 }
@@ -455,15 +553,20 @@ void App::PositionHiddenIconsUnderCorrals() {
 // Desktop icon push-out-of-way support
 // ============================================================================
 
-void App::CacheDesktopIconPositions() {
+void App::CacheDesktopIconPositions()
+{
     cachedDesktopIconPositions = DesktopIcons::GetAllIconPositions();
 
     // Remove icons that are hidden by corrals (they're managed, not free)
     auto it = cachedDesktopIconPositions.begin();
-    while (it != cachedDesktopIconPositions.end()) {
-        if (IsIconHiddenByCorral(it->first)) {
+    while (it != cachedDesktopIconPositions.end())
+    {
+        if (IsIconHiddenByCorral(it->first))
+        {
             it = cachedDesktopIconPositions.erase(it);
-        } else {
+        }
+        else
+        {
             ++it;
         }
     }
@@ -471,28 +574,38 @@ void App::CacheDesktopIconPositions() {
     desktopIconCacheValid = true;
 }
 
-void App::InvalidateDesktopIconCache() {
+void App::InvalidateDesktopIconCache()
+{
     desktopIconCacheValid = false;
     cachedDesktopIconPositions.clear();
 }
 
-bool App::IsIconHiddenByCorral(const std::wstring& displayName) const {
-    for (const auto& corral : corrals) {
-        for (const auto& tab : corral->GetConfig().Tabs) {
-            if (tab.IsVirtual) continue;
+bool App::IsIconHiddenByCorral(const std::wstring &displayName) const
+{
+    for (const auto &corral : corrals)
+    {
+        for (const auto &tab : corral->GetConfig().Tabs)
+        {
+            if (tab.IsVirtual)
+                continue;
 
-            for (const auto& fileUtf8 : tab.Files) {
+            for (const auto &fileUtf8 : tab.Files)
+            {
                 std::wstring name;
-                if (CorralWindow::IsSpecialIconEntry(fileUtf8)) {
+                if (CorralWindow::IsSpecialIconEntry(fileUtf8))
+                {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
                     name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                } else {
+                }
+                else
+                {
                     int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
                     name.resize(size);
                     MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
                     name = IconUtils::StripLnkExtension(name);
                 }
-                if (!name.empty() && _wcsicmp(name.c_str(), displayName.c_str()) == 0) {
+                if (!name.empty() && _wcsicmp(name.c_str(), displayName.c_str()) == 0)
+                {
                     return true;
                 }
             }
@@ -501,18 +614,22 @@ bool App::IsIconHiddenByCorral(const std::wstring& displayName) const {
     return false;
 }
 
-std::vector<RECT> App::GetAllCorralRects() const {
+std::vector<RECT> App::GetAllCorralRects() const
+{
     // Returns corral rects in desktop ListView client coordinates
     // (LVM_GETITEMPOSITION returns client coords, so we need to match)
     HWND hListView = DesktopIcons::GetDesktopListView();
     std::vector<RECT> rects;
-    for (const auto& corral : corrals) {
+    for (const auto &corral : corrals)
+    {
         RECT r;
-        if (GetWindowRect(corral->GetHWND(), &r)) {
-            if (hListView) {
+        if (GetWindowRect(corral->GetHWND(), &r))
+        {
+            if (hListView)
+            {
                 // Convert screen coords to ListView client coords
-                POINT topLeft = { r.left, r.top };
-                POINT bottomRight = { r.right, r.bottom };
+                POINT topLeft = {r.left, r.top};
+                POINT bottomRight = {r.right, r.bottom};
                 ScreenToClient(hListView, &topLeft);
                 ScreenToClient(hListView, &bottomRight);
                 r.left = topLeft.x;
@@ -526,7 +643,8 @@ std::vector<RECT> App::GetAllCorralRects() const {
     return rects;
 }
 
-static bool RectsOverlap(const RECT& a, const RECT& b) {
+static bool RectsOverlap(const RECT &a, const RECT &b)
+{
     return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
@@ -546,18 +664,21 @@ static bool RectsOverlap(const RECT& a, const RECT& b) {
  * Icons already off-screen (< -1000) are skipped. Icons are pushed to the nearest
  * free grid position rather than to arbitrary coordinates, maintaining alignment.
  */
-void App::PushDesktopIconsFromCorrals() {
-    if (!desktopIconCacheValid) {
+void App::PushDesktopIconsFromCorrals()
+{
+    if (!desktopIconCacheValid)
+    {
         CacheDesktopIconPositions();
     }
 
     auto corralRects = GetAllCorralRects();
-    if (corralRects.empty()) return;
+    if (corralRects.empty())
+        return;
 
     /// Icon bounding box size (approximate desktop icon footprint)
     const int ICON_W = 75;
     const int ICON_H = 75;
-    const int STEP = 75;  /// Push step size (one grid jump)
+    const int STEP = 75; /// Push step size (one grid jump)
 
     // Get screen bounds in ListView client coordinates
     HWND hListView = DesktopIcons::GetDesktopListView();
@@ -565,9 +686,10 @@ void App::PushDesktopIconsFromCorrals() {
     int screenTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
     int screenRight = screenLeft + GetSystemMetrics(SM_CXVIRTUALSCREEN);
     int screenBottom = screenTop + GetSystemMetrics(SM_CYVIRTUALSCREEN);
-    if (hListView) {
-        POINT tl = { screenLeft, screenTop };
-        POINT br = { screenRight, screenBottom };
+    if (hListView)
+    {
+        POINT tl = {screenLeft, screenTop};
+        POINT br = {screenRight, screenBottom};
         ScreenToClient(hListView, &tl);
         ScreenToClient(hListView, &br);
         screenLeft = tl.x;
@@ -577,18 +699,26 @@ void App::PushDesktopIconsFromCorrals() {
     }
 
     // Helper: check if a position is free (no corral overlap, no icon overlap, on screen)
-    auto isPositionFree = [&](int x, int y, const std::wstring& skipName) -> bool {
+    auto isPositionFree = [&](int x, int y, const std::wstring &skipName) -> bool
+    {
         if (x < screenLeft || y < screenTop ||
-            x + ICON_W > screenRight || y + ICON_H > screenBottom) return false;
-        RECT r = { x, y, x + ICON_W, y + ICON_H };
-        for (const auto& cr : corralRects) {
-            if (RectsOverlap(r, cr)) return false;
+            x + ICON_W > screenRight || y + ICON_H > screenBottom)
+            return false;
+        RECT r = {x, y, x + ICON_W, y + ICON_H};
+        for (const auto &cr : corralRects)
+        {
+            if (RectsOverlap(r, cr))
+                return false;
         }
-        for (const auto& [otherName, otherPos] : cachedDesktopIconPositions) {
-            if (otherName == skipName) continue;
-            if (otherPos.x < -1000 || otherPos.y < -1000) continue;
-            RECT otherRect = { otherPos.x, otherPos.y, otherPos.x + ICON_W, otherPos.y + ICON_H };
-            if (RectsOverlap(r, otherRect)) return false;
+        for (const auto &[otherName, otherPos] : cachedDesktopIconPositions)
+        {
+            if (otherName == skipName)
+                continue;
+            if (otherPos.x < -1000 || otherPos.y < -1000)
+                continue;
+            RECT otherRect = {otherPos.x, otherPos.y, otherPos.x + ICON_W, otherPos.y + ICON_H};
+            if (RectsOverlap(r, otherRect))
+                return false;
         }
         return true;
     };
@@ -596,21 +726,26 @@ void App::PushDesktopIconsFromCorrals() {
     bool anyMoved = false;
     std::vector<std::pair<std::wstring, POINT2D>> toMove;
 
-    for (auto& [name, pos] : cachedDesktopIconPositions) {
+    for (auto &[name, pos] : cachedDesktopIconPositions)
+    {
         // Skip icons far off-screen (already hidden)
-        if (pos.x < -1000 || pos.y < -1000) continue;
+        if (pos.x < -1000 || pos.y < -1000)
+            continue;
 
-        RECT iconRect = { pos.x, pos.y, pos.x + ICON_W, pos.y + ICON_H };
+        RECT iconRect = {pos.x, pos.y, pos.x + ICON_W, pos.y + ICON_H};
 
         // Find which corral this icon overlaps (if any)
-        const RECT* overlappingCorral = nullptr;
-        for (const auto& cr : corralRects) {
-            if (RectsOverlap(iconRect, cr)) {
+        const RECT *overlappingCorral = nullptr;
+        for (const auto &cr : corralRects)
+        {
+            if (RectsOverlap(iconRect, cr))
+            {
                 overlappingCorral = &cr;
                 break;
             }
         }
-        if (!overlappingCorral) continue;
+        if (!overlappingCorral)
+            continue;
 
         // Find nearest edge of the overlapping corral and push one step past it
         // Calculate distance to each edge from icon center
@@ -622,13 +757,17 @@ void App::PushDesktopIconsFromCorrals() {
         int distBottom = overlappingCorral->bottom - iconCenterY;
 
         // Try each direction, ordered by shortest distance to edge
-        struct PushDir { int dx; int dy; int dist; };
-        PushDir dirs[4] = {
-            { -1,  0, distLeft },
-            {  1,  0, distRight },
-            {  0, -1, distTop },
-            {  0,  1, distBottom }
+        struct PushDir
+        {
+            int dx;
+            int dy;
+            int dist;
         };
+        PushDir dirs[4] = {
+            {-1, 0, distLeft},
+            {1, 0, distRight},
+            {0, -1, distTop},
+            {0, 1, distBottom}};
         // Sort by distance (nearest edge first)
         for (int i = 0; i < 3; i++)
             for (int j = i + 1; j < 4; j++)
@@ -638,23 +777,28 @@ void App::PushDesktopIconsFromCorrals() {
         bool found = false;
         int newX = pos.x, newY = pos.y;
 
-        for (const auto& dir : dirs) {
-            for (int step = 1; step <= 40; step++) {
+        for (const auto &dir : dirs)
+        {
+            for (int step = 1; step <= 40; step++)
+            {
                 int candidateX = pos.x + dir.dx * STEP * step;
                 int candidateY = pos.y + dir.dy * STEP * step;
 
-                if (isPositionFree(candidateX, candidateY, name)) {
+                if (isPositionFree(candidateX, candidateY, name))
+                {
                     newX = candidateX;
                     newY = candidateY;
                     found = true;
                     break;
                 }
             }
-            if (found) break;
+            if (found)
+                break;
         }
 
-        if (newX != pos.x || newY != pos.y) {
-            toMove.push_back({ name, { newX, newY } });
+        if (newX != pos.x || newY != pos.y)
+        {
+            toMove.push_back({name, {newX, newY}});
             // Update cache so subsequent icons see the new position
             pos.x = newX;
             pos.y = newY;
@@ -663,29 +807,35 @@ void App::PushDesktopIconsFromCorrals() {
     }
 
     // Apply all moves
-    for (const auto& [name, newPos] : toMove) {
+    for (const auto &[name, newPos] : toMove)
+    {
         DesktopIcons::PositionIcon(name, newPos.x, newPos.y);
     }
-    if (anyMoved) {
+    if (anyMoved)
+    {
         HookBridge::RefreshDesktop();
     }
 }
 
-void App::OnLeftButtonDown(POINT pt) {
+void App::OnLeftButtonDown(POINT pt)
+{
     // Reserved for future desktop interactions
     // Currently no action on desktop click
 }
 
-void App::OnLeftButtonUp(POINT pt) {
+void App::OnLeftButtonUp(POINT pt)
+{
     // Global mouse up - could be used for drag-end if needed
     // But currently CorralWindow handles its own drag
 }
 
-void App::OnMouseMove(POINT pt) {
+void App::OnMouseMove(POINT pt)
+{
     // Handle mouse move if needed
 }
 
-void App::ShowTrayMenu() {
+void App::ShowTrayMenu()
+{
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, 3, L"About");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -709,17 +859,18 @@ void App::ShowTrayMenu() {
 
     DestroyMenu(menu);
 
-    switch (cmd) {
+    switch (cmd)
+    {
     case 3:
         ShowAbout();
         break;
-    case 1: {
+    case 1:
+    {
         int offsetX = (int)corrals.size() * 30;
         int offsetY = (int)corrals.size() * 30;
         POINT centerPt = {
             GetSystemMetrics(SM_CXSCREEN) / 2 + offsetX,
-            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY
-        };
+            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY};
         ShowCreationMenu(centerPt);
         break;
     }
@@ -729,24 +880,26 @@ void App::ShowTrayMenu() {
     case 4:
         SetAutostart(!IsAutostartEnabled());
         break;
-    case 5: {
+    case 5:
+    {
         int offsetX = (int)corrals.size() * 30;
         int offsetY = (int)corrals.size() * 30;
         POINT centerPt = {
             GetSystemMetrics(SM_CXSCREEN) / 2 + offsetX,
-            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY
-        };
+            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY};
         CreateVirtualCorralAt(centerPt);
         break;
     }
     }
 }
 
-void App::ShowCreationMenu(POINT pt) {
+void App::ShowCreationMenu(POINT pt)
+{
     CreateCorral(pt);
 }
 
-void App::ShowAbout() {
+void App::ShowAbout()
+{
     // Build the About message with GPL-3.0 license notice
     std::wstring aboutText = L"DexCorral - a free and open source Windows desktop icon organizer\n\n";
     aboutText += L"Version: ";
@@ -769,7 +922,8 @@ void App::ShowAbout() {
     MessageBoxW(messageWindow, aboutText.c_str(), L"About DexCorral", MB_OK | MB_ICONINFORMATION);
 }
 
-void App::CreateCorral(POINT pt) {
+void App::CreateCorral(POINT pt)
+{
     CorralWindowConfig newConfig;
 
     // Create at fixed default size centered on point
@@ -777,10 +931,10 @@ void App::CreateCorral(POINT pt) {
     newConfig.Top = (double)pt.y - 100;
     newConfig.Width = 300;
     newConfig.Height = 200;
-    
+
     CorralTabConfig tab;
     tab.Title = "New Corral";
-    tab.ColorHex = config.DefaultColorHex;  // Use saved default appearance
+    tab.ColorHex = config.DefaultColorHex; // Use saved default appearance
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
@@ -800,36 +954,44 @@ void App::CreateCorral(POINT pt) {
     SaveConfig();
 }
 
-void App::CreateCorralAt(POINT pt) {
+void App::CreateCorralAt(POINT pt)
+{
     CreateCorral(pt);
 }
 
-void App::CreateVirtualCorralAt(POINT pt) {
+void App::CreateVirtualCorralAt(POINT pt)
+{
     // Show folder browser dialog
-    IFileDialog* pfd = nullptr;
+    IFileDialog *pfd = nullptr;
     HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
-                                   IID_PPV_ARGS(&pfd));
-    if (FAILED(hr)) return;
+                                  IID_PPV_ARGS(&pfd));
+    if (FAILED(hr))
+        return;
 
     DWORD dwOptions;
     hr = pfd->GetOptions(&dwOptions);
-    if (SUCCEEDED(hr)) {
+    if (SUCCEEDED(hr))
+    {
         hr = pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
     }
 
-    if (SUCCEEDED(hr)) {
+    if (SUCCEEDED(hr))
+    {
         pfd->SetTitle(L"Select Folder for Virtual Corral");
     }
 
     hr = pfd->Show(messageWindow);
     std::wstring folderPath;
-    if (SUCCEEDED(hr)) {
-        IShellItem* psi = nullptr;
+    if (SUCCEEDED(hr))
+    {
+        IShellItem *psi = nullptr;
         hr = pfd->GetResult(&psi);
-        if (SUCCEEDED(hr)) {
+        if (SUCCEEDED(hr))
+        {
             PWSTR pszPath = nullptr;
             hr = psi->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
-            if (SUCCEEDED(hr)) {
+            if (SUCCEEDED(hr))
+            {
                 folderPath = pszPath;
                 CoTaskMemFree(pszPath);
             }
@@ -838,24 +1000,29 @@ void App::CreateVirtualCorralAt(POINT pt) {
     }
     pfd->Release();
 
-    if (folderPath.empty()) return;
+    if (folderPath.empty())
+        return;
 
     // Validate folder
     DWORD attrs = GetFileAttributesW(folderPath.c_str());
-    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+    {
         MessageBoxW(messageWindow, L"Invalid folder selected.", L"Error", MB_OK | MB_ICONWARNING);
         return;
     }
 
     // Check for network path
-    if (folderPath.length() >= 2 && folderPath[0] == L'\\' && folderPath[1] == L'\\') {
+    if (folderPath.length() >= 2 && folderPath[0] == L'\\' && folderPath[1] == L'\\')
+    {
         MessageBoxW(messageWindow, L"Network paths are not supported.", L"Error", MB_OK | MB_ICONWARNING);
         return;
     }
 
-    if (folderPath.length() >= 2 && folderPath[1] == L':') {
-        wchar_t rootPath[4] = { folderPath[0], L':', L'\\', L'\0' };
-        if (GetDriveTypeW(rootPath) == DRIVE_REMOTE) {
+    if (folderPath.length() >= 2 && folderPath[1] == L':')
+    {
+        wchar_t rootPath[4] = {folderPath[0], L':', L'\\', L'\0'};
+        if (GetDriveTypeW(rootPath) == DRIVE_REMOTE)
+        {
             MessageBoxW(messageWindow, L"Network drives are not supported.", L"Error", MB_OK | MB_ICONWARNING);
             return;
         }
@@ -863,8 +1030,7 @@ void App::CreateVirtualCorralAt(POINT pt) {
 
     // Extract folder name for title
     size_t lastSlash = folderPath.find_last_of(L"\\/");
-    std::wstring folderName = (lastSlash != std::wstring::npos) ?
-                              folderPath.substr(lastSlash + 1) : folderPath;
+    std::wstring folderName = (lastSlash != std::wstring::npos) ? folderPath.substr(lastSlash + 1) : folderPath;
 
     // Convert wide string to UTF-8
     int size = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), (int)folderPath.size(), nullptr, 0, nullptr, nullptr);
@@ -881,13 +1047,13 @@ void App::CreateVirtualCorralAt(POINT pt) {
     newConfig.Top = (double)pt.y - 100;
     newConfig.Width = 300;
     newConfig.Height = 200;
-    
+
     CorralTabConfig tab;
     tab.Title = utf8Name;
     tab.ColorHex = config.DefaultColorHex;
     tab.IsVirtual = true;
     tab.VirtualFolderPath = utf8Path;
-    tab.IsCatchAll = false;  // Virtual corrals cannot be catch-all
+    tab.IsCatchAll = false; // Virtual corrals cannot be catch-all
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
@@ -907,21 +1073,26 @@ void App::CreateVirtualCorralAt(POINT pt) {
     SaveConfig();
 }
 
-bool App::IsDesktopUnderMouse(POINT pt) {
+bool App::IsDesktopUnderMouse(POINT pt)
+{
     HWND hwnd = WindowFromPoint(pt);
-    if (!hwnd) return false;
+    if (!hwnd)
+        return false;
 
     wchar_t className[256];
-    while (hwnd) {
+    while (hwnd)
+    {
         GetClassNameW(hwnd, className, 256);
         std::wstring classStr(className);
 
-        if (classStr == L"Progman" || classStr == L"WorkerW") {
+        if (classStr == L"Progman" || classStr == L"WorkerW")
+        {
             return true;
         }
 
         HWND shellWindow = GetShellWindow();
-        if (hwnd == shellWindow) {
+        if (hwnd == shellWindow)
+        {
             return true;
         }
 
@@ -931,59 +1102,70 @@ bool App::IsDesktopUnderMouse(POINT pt) {
     return false;
 }
 
-bool App::IsAutostartEnabled() {
+bool App::IsAutostartEnabled()
+{
     // Shell extension mode: check ShellServiceObjectDelayLoad registry key
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
-        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad",
-        0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad",
+                      0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
         wchar_t value[256];
         DWORD size = sizeof(value);
         DWORD type = REG_SZ;
         LONG result = RegQueryValueExW(hKey, L"DexCorral",
-            nullptr, &type, (LPBYTE)value, &size);
+                                       nullptr, &type, (LPBYTE)value, &size);
         RegCloseKey(hKey);
         return result == ERROR_SUCCESS;
     }
     return false;
 }
 
-void App::SetAutostart(bool enable) {
+void App::SetAutostart(bool enable)
+{
     // Shell extension mode: register/unregister via DllRegisterServer/DllUnregisterServer
     // For now, autostart is always on when the shell extension is registered
     // The user can unregister via "DexCorral.exe --unregister"
 }
 
-LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    App* app = nullptr;
+LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    App *app = nullptr;
 
-    if (uMsg == WM_CREATE) {
-        CREATESTRUCTW* cs = (CREATESTRUCTW*)lParam;
-        app = (App*)cs->lpCreateParams;
+    if (uMsg == WM_CREATE)
+    {
+        CREATESTRUCTW *cs = (CREATESTRUCTW *)lParam;
+        app = (App *)cs->lpCreateParams;
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)app);
     }
-    else {
-        app = (App*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    else
+    {
+        app = (App *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
     }
 
-    if (app && uMsg == TrayIcon::WM_TRAYICON) {
-        if (lParam == WM_RBUTTONUP) {
+    if (app && uMsg == TrayIcon::WM_TRAYICON)
+    {
+        if (lParam == WM_RBUTTONUP)
+        {
             app->ShowTrayMenu();
             return 0;
         }
-        if (lParam == WM_LBUTTONDBLCLK) {
+        if (lParam == WM_LBUTTONDBLCLK)
+        {
             app->ToggleDesktopIcons();
             return 0;
         }
     }
 
-    if (app && uMsg == WM_DISPLAYCHANGE) {
+    if (app && uMsg == WM_DISPLAYCHANGE)
+    {
         app->OnDisplayChange();
         return 0;
     }
 
     // Hook retry thread succeeded — refresh hidden icon data now that the hook is active
-    if (app && uMsg == (WM_APP + 100)) {
+    if (app && uMsg == (WM_APP + 100))
+    {
         app->UpdateHookHiddenIcons();
         app->PositionHiddenIconsUnderCorrals();
         HookBridge::RefreshDesktop();
@@ -991,12 +1173,14 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Shell image list changed (e.g. Recycle Bin emptied/filled)
-    if (app && uMsg == (WM_APP + 101)) {
+    if (app && uMsg == (WM_APP + 101))
+    {
         // Free the PIDL list delivered with SHCNRF_NewDelivery
         LONG lEvent = 0;
-        PIDLIST_ABSOLUTE* pidls = nullptr;
+        PIDLIST_ABSOLUTE *pidls = nullptr;
         HANDLE hLock = SHChangeNotification_Lock((HANDLE)wParam, (DWORD)lParam, &pidls, &lEvent);
-        if (hLock) {
+        if (hLock)
+        {
             SHChangeNotification_Unlock(hLock);
         }
         app->RefreshAllCorrals();
@@ -1004,34 +1188,43 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Explorer restarted — re-add the tray icon
-    if (app && app->wmTaskbarCreated && uMsg == app->wmTaskbarCreated) {
-        if (app->trayIcon) app->trayIcon->Show();
+    if (app && app->wmTaskbarCreated && uMsg == app->wmTaskbarCreated)
+    {
+        if (app->trayIcon)
+            app->trayIcon->Show();
         return 0;
     }
 
     // Handle Windows shutdown/logoff
-    if (uMsg == WM_QUERYENDSESSION) {
+    if (uMsg == WM_QUERYENDSESSION)
+    {
         return TRUE;
     }
 
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
-int App::Run() {
+int App::Run()
+{
     Initialize();
 
     // If we have a stop event (shell extension mode), watch it alongside messages
-    if (g_AppStopEvent) {
+    if (g_AppStopEvent)
+    {
         MSG msg;
-        for (;;) {
+        for (;;)
+        {
             DWORD result = MsgWaitForMultipleObjects(1, &g_AppStopEvent, FALSE, INFINITE, QS_ALLINPUT);
-            if (result == WAIT_OBJECT_0) {
+            if (result == WAIT_OBJECT_0)
+            {
                 // Stop event signaled — DLL is being unloaded
                 break;
             }
             // Process all pending messages
-            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-                if (msg.message == WM_QUIT) goto done;
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+            {
+                if (msg.message == WM_QUIT)
+                    goto done;
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
@@ -1042,7 +1235,8 @@ int App::Run() {
 
     // Standalone mode (no stop event) — classic message loop
     MSG msg;
-    while (GetMessageW(&msg, nullptr, 0, 0)) {
+    while (GetMessageW(&msg, nullptr, 0, 0))
+    {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
@@ -1050,19 +1244,25 @@ int App::Run() {
     return (int)msg.wParam;
 }
 
-void App::EnsureCatchAllCorral() {
+void App::EnsureCatchAllCorral()
+{
     // Find if any corral is marked as catch-all
     bool foundCatchAll = false;
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
             // Virtual corrals cannot be catch-all
-            if (tab.IsVirtual) {
+            if (tab.IsVirtual)
+            {
                 tab.IsCatchAll = false;
                 continue;
             }
 
-            if (tab.IsCatchAll) {
-                if (foundCatchAll) {
+            if (tab.IsCatchAll)
+            {
+                if (foundCatchAll)
+                {
                     // Only one catch-all allowed
                     tab.IsCatchAll = false;
                 }
@@ -1072,34 +1272,46 @@ void App::EnsureCatchAllCorral() {
     }
 
     // If no catch-all exists, make the first non-virtual corral catch-all
-    if (!foundCatchAll && !corrals.empty()) {
-        for (auto& corral : corrals) {
+    if (!foundCatchAll && !corrals.empty())
+    {
+        for (auto &corral : corrals)
+        {
             bool found = false;
-            for (auto& tab : corral->GetConfig().Tabs) {
-                if (!tab.IsVirtual) {
+            for (auto &tab : corral->GetConfig().Tabs)
+            {
+                if (!tab.IsVirtual)
+                {
                     tab.IsCatchAll = true;
                     corral->RecalculateLayout();
                     found = true;
                     break;
                 }
             }
-            if (found) break;
+            if (found)
+                break;
         }
     }
 }
 
-CorralWindow* App::GetCatchAllCorral() {
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
-            if (tab.IsCatchAll && !tab.IsVirtual) {
+CorralWindow *App::GetCatchAllCorral()
+{
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            if (tab.IsCatchAll && !tab.IsVirtual)
+            {
                 return corral.get();
             }
         }
     }
     // Fallback to first non-virtual corral if no catch-all defined
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
-            if (!tab.IsVirtual) {
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            if (!tab.IsVirtual)
+            {
                 return corral.get();
             }
         }
@@ -1107,8 +1319,10 @@ CorralWindow* App::GetCatchAllCorral() {
     return nullptr;
 }
 
-void App::OnDisplayChange() {
-    if (!monitorManager) return;
+void App::OnDisplayChange()
+{
+    if (!monitorManager)
+        return;
 
     // Refresh monitor list
     monitorManager->Refresh();
@@ -1120,29 +1334,36 @@ void App::OnDisplayChange() {
     RefreshAllCorralBackgrounds();
 }
 
-void App::UpdateCorralPositions() {
-    if (!monitorManager) return;
+void App::UpdateCorralPositions()
+{
+    if (!monitorManager)
+        return;
 
-    const MonitorInfo* primaryMon = monitorManager->GetPrimaryMonitor();
-    if (!primaryMon) return;
+    const MonitorInfo *primaryMon = monitorManager->GetPrimaryMonitor();
+    if (!primaryMon)
+        return;
 
     bool configChanged = false;
 
-    for (auto& corral : corrals) {
-        CorralWindowConfig& cfg = corral->GetConfig();
-        const std::string& targetId = cfg.TargetMonitorId;
+    for (auto &corral : corrals)
+    {
+        CorralWindowConfig &cfg = corral->GetConfig();
+        const std::string &targetId = cfg.TargetMonitorId;
 
         // Check if target monitor is active
-        const MonitorInfo* targetMon = monitorManager->FindMonitor(targetId);
+        const MonitorInfo *targetMon = monitorManager->FindMonitor(targetId);
 
-        if (targetMon) {
+        if (targetMon)
+        {
             // Target monitor is active - restore/scale position
             auto it = cfg.MonitorPositions.find(targetId);
-            if (it != cfg.MonitorPositions.end()) {
-                MonitorPosition& stored = it->second;
+            if (it != cfg.MonitorPositions.end())
+            {
+                MonitorPosition &stored = it->second;
 
                 // Check if resolution changed
-                if (stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height) {
+                if (stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
+                {
                     // Scale position and size based on percentage (stored positions are relative to monitor)
                     double xPercent = (double)stored.Left / stored.RefWidth;
                     double yPercent = (double)stored.Top / stored.RefHeight;
@@ -1156,14 +1377,18 @@ void App::UpdateCorralPositions() {
                     int newHeight = (int)(hPercent * targetMon->height);
 
                     // Clamp relative position to monitor bounds
-                    if (newRelLeft + newWidth > targetMon->width) {
+                    if (newRelLeft + newWidth > targetMon->width)
+                    {
                         newRelLeft = targetMon->width - newWidth;
                     }
-                    if (newRelTop + newHeight > targetMon->height) {
+                    if (newRelTop + newHeight > targetMon->height)
+                    {
                         newRelTop = targetMon->height - newHeight;
                     }
-                    if (newRelLeft < 0) newRelLeft = 0;
-                    if (newRelTop < 0) newRelTop = 0;
+                    if (newRelLeft < 0)
+                        newRelLeft = 0;
+                    if (newRelTop < 0)
+                        newRelTop = 0;
 
                     // Convert to screen coordinates
                     int screenLeft = targetMon->bounds.left + newRelLeft;
@@ -1184,18 +1409,21 @@ void App::UpdateCorralPositions() {
                     cfg.Height = newHeight;
 
                     SetWindowPos(corral->GetHWND(), nullptr,
-                        screenLeft, screenTop, newWidth, newHeight,
-                        SWP_NOZORDER | SWP_NOACTIVATE);
+                                 screenLeft, screenTop, newWidth, newHeight,
+                                 SWP_NOZORDER | SWP_NOACTIVATE);
 
                     configChanged = true;
                 }
             }
-        } else if (!targetId.empty()) {
+        }
+        else if (!targetId.empty())
+        {
             // Target monitor is offline - move to primary monitor
             // Calculate position based on percentage from stored position
             auto it = cfg.MonitorPositions.find(targetId);
-            if (it != cfg.MonitorPositions.end()) {
-                MonitorPosition& stored = it->second;
+            if (it != cfg.MonitorPositions.end())
+            {
+                MonitorPosition &stored = it->second;
 
                 // Calculate percentages from original relative position
                 double xPercent = (double)stored.Left / stored.RefWidth;
@@ -1210,14 +1438,18 @@ void App::UpdateCorralPositions() {
                 int newHeight = (int)(hPercent * primaryMon->height);
 
                 // Clamp relative position to primary monitor bounds
-                if (newRelLeft + newWidth > primaryMon->width) {
+                if (newRelLeft + newWidth > primaryMon->width)
+                {
                     newRelLeft = primaryMon->width - newWidth;
                 }
-                if (newRelTop + newHeight > primaryMon->height) {
+                if (newRelTop + newHeight > primaryMon->height)
+                {
                     newRelTop = primaryMon->height - newHeight;
                 }
-                if (newRelLeft < 0) newRelLeft = 0;
-                if (newRelTop < 0) newRelTop = 0;
+                if (newRelLeft < 0)
+                    newRelLeft = 0;
+                if (newRelTop < 0)
+                    newRelTop = 0;
 
                 // Convert to screen coordinates
                 int screenLeft = primaryMon->bounds.left + newRelLeft;
@@ -1230,44 +1462,51 @@ void App::UpdateCorralPositions() {
                 cfg.Height = newHeight;
 
                 SetWindowPos(corral->GetHWND(), nullptr,
-                    screenLeft, screenTop, newWidth, newHeight,
-                    SWP_NOZORDER | SWP_NOACTIVATE);
+                             screenLeft, screenTop, newWidth, newHeight,
+                             SWP_NOZORDER | SWP_NOACTIVATE);
 
                 configChanged = true;
             }
         }
     }
 
-    if (configChanged) {
+    if (configChanged)
+    {
         SaveConfig();
     }
 }
 
-void App::OnDesktopFileAdded(const std::wstring& fileName) {
+void App::OnDesktopFileAdded(const std::wstring &fileName)
+{
     // Convert to UTF-8
     int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string fileNameStr(size - 1, 0);
     WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
 
     // Check if file is already in any corral
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
-            auto& files = tab.Files;
-            if (std::find(files.begin(), files.end(), fileNameStr) != files.end()) {
-                return;  // Already tracked
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            auto &files = tab.Files;
+            if (std::find(files.begin(), files.end(), fileNameStr) != files.end())
+            {
+                return; // Already tracked
             }
         }
     }
 
     // Add to catch-all corral
-    CorralWindow* catchAll = GetCatchAllCorral();
-    if (catchAll) {
+    CorralWindow *catchAll = GetCatchAllCorral();
+    if (catchAll)
+    {
         catchAll->AddFile(fileNameStr);
         SaveConfig();
     }
 }
 
-void App::OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& newName) {
+void App::OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName)
+{
     // Convert to UTF-8
     int oldSize = WideCharToMultiByte(CP_UTF8, 0, oldName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string oldNameStr(oldSize - 1, 0);
@@ -1279,11 +1518,14 @@ void App::OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& 
 
     // Update in all corrals
     bool changed = false;
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
-            auto& files = tab.Files;
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            auto &files = tab.Files;
             auto it = std::find(files.begin(), files.end(), oldNameStr);
-            if (it != files.end()) {
+            if (it != files.end())
+            {
                 *it = newNameStr;
                 corral->LoadFiles();
                 changed = true;
@@ -1291,12 +1533,14 @@ void App::OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& 
         }
     }
 
-    if (changed) {
+    if (changed)
+    {
         SaveConfig();
     }
 }
 
-void App::OnDesktopFileDeleted(const std::wstring& fileName) {
+void App::OnDesktopFileDeleted(const std::wstring &fileName)
+{
     // Convert to UTF-8
     int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string fileNameStr(size - 1, 0);
@@ -1304,11 +1548,14 @@ void App::OnDesktopFileDeleted(const std::wstring& fileName) {
 
     // Remove from all corrals
     bool changed = false;
-    for (auto& corral : corrals) {
-        for (auto& tab : corral->GetConfig().Tabs) {
-            auto& files = tab.Files;
+    for (auto &corral : corrals)
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            auto &files = tab.Files;
             auto it = std::find(files.begin(), files.end(), fileNameStr);
-            if (it != files.end()) {
+            if (it != files.end())
+            {
                 files.erase(it);
                 corral->LoadFiles();
                 changed = true;
@@ -1316,7 +1563,8 @@ void App::OnDesktopFileDeleted(const std::wstring& fileName) {
         }
     }
 
-    if (changed) {
+    if (changed)
+    {
         SaveConfig();
     }
 }

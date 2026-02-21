@@ -1,4 +1,25 @@
 /**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * CorralWindow.cpp - Core window class implementation
  *
  * Implements the main CorralWindow class which manages layered windows with per-pixel
@@ -25,7 +46,7 @@
 
 #pragma comment(lib, "msimg32.lib")
 
-static const wchar_t* CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
+static const wchar_t *CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
 
 /// Dead code: Incomplete precision touchpad support block.
 /// WM_POINTERWHEEL message handling was planned but never implemented (Windows 8+).
@@ -37,16 +58,20 @@ static const wchar_t* CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
 // String conversion utilities (used across all implementation files)
 // ============================================================================
 
-std::string CorralWindow::WideToUtf8(const std::wstring& wide) {
-    if (wide.empty()) return std::string();
+std::string CorralWindow::WideToUtf8(const std::wstring &wide)
+{
+    if (wide.empty())
+        return std::string();
     int size = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), nullptr, 0, nullptr, nullptr);
     std::string result(size, 0);
     WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), &result[0], size, nullptr, nullptr);
     return result;
 }
 
-std::wstring CorralWindow::Utf8ToWide(const std::string& utf8) {
-    if (utf8.empty()) return std::wstring();
+std::wstring CorralWindow::Utf8ToWide(const std::string &utf8)
+{
+    if (utf8.empty())
+        return std::wstring();
     int size = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), nullptr, 0);
     std::wstring result(size, 0);
     MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), &result[0], size);
@@ -57,22 +82,25 @@ std::wstring CorralWindow::Utf8ToWide(const std::string& utf8) {
 // Construction / Destruction
 // ============================================================================
 
-CorralWindow::CorralWindow(const CorralWindowConfig& cfg)
-    : config(cfg), isDragging(false), hwnd(nullptr) {
+CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
+    : config(cfg), isDragging(false), hwnd(nullptr)
+{
 
     // Ensure at least one tab exists
-    if (config.Tabs.empty()) {
+    if (config.Tabs.empty())
+    {
         CorralTabConfig tab;
         tab.Title = "New Tab";
         config.Tabs.push_back(tab);
     }
     // Clamp active tab index
-    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size()) {
+    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size())
+    {
         config.ActiveTabIndex = 0;
     }
 
-    dragStart = { 0, 0 };
-    dragStartRect = { 0, 0, 0, 0 };
+    dragStart = {0, 0};
+    dragStartRect = {0, 0, 0, 0};
     currentOpacity = (config.IconOpacity < 5) ? 5 : config.IconOpacity;
     currentTintStrength = config.IconTintStrength;
 
@@ -84,7 +112,8 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg)
     UpdateIconSpacingForViewMode();
 
     static bool classRegistered = false;
-    if (!classRegistered) {
+    if (!classRegistered)
+    {
         WNDCLASSEXW wc = {};
         wc.cbSize = sizeof(WNDCLASSEXW);
         wc.lpfnWndProc = WindowProc;
@@ -109,8 +138,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg)
         WS_POPUP | WS_VISIBLE,
         (int)config.Left, (int)config.Top,
         (int)config.Width, initialHeight,
-        nullptr, nullptr, GetModuleHandleW(nullptr), this
-    );
+        nullptr, nullptr, GetModuleHandleW(nullptr), this);
 
     // Register OLE drop target (replaces WS_EX_ACCEPTFILES for richer drop support)
     dropTarget = new CorralDropTarget(this);
@@ -120,23 +148,28 @@ CorralWindow::CorralWindow(const CorralWindowConfig& cfg)
     SyncConfigFromWindow();
 
     // Initialize folder watcher for virtual corrals (if active tab is virtual)
-    if (GetActiveTab().IsVirtual) {
+    if (GetActiveTab().IsVirtual)
+    {
         InitializeFolderWatcher();
     }
 }
 
-CorralWindow::~CorralWindow() {
+CorralWindow::~CorralWindow()
+{
     // Stop folder watcher
-    if (folderWatcher) {
+    if (folderWatcher)
+    {
         folderWatcher->Stop();
         folderWatcher.reset();
     }
     ClearIcons();
-    if (hwnd) {
+    if (hwnd)
+    {
         RevokeDragDrop(hwnd);
         DestroyWindow(hwnd);
     }
-    if (dropTarget) {
+    if (dropTarget)
+    {
         dropTarget->Release();
         dropTarget = nullptr;
     }
@@ -148,10 +181,13 @@ CorralWindow::~CorralWindow() {
 
 bool CorralWindow::s_enableDpiScaling = true;
 
-int CorralWindow::Dpi(int logicalPixels) const {
-    if (!s_enableDpiScaling || !hwnd) return logicalPixels;
+int CorralWindow::Dpi(int logicalPixels) const
+{
+    if (!s_enableDpiScaling || !hwnd)
+        return logicalPixels;
     int dpi = (int)GetDpiForWindow(hwnd);
-    if (dpi <= 0) dpi = 96;
+    if (dpi <= 0)
+        dpi = 96;
     return MulDiv(logicalPixels, dpi, 96);
 }
 
@@ -159,15 +195,17 @@ int CorralWindow::Dpi(int logicalPixels) const {
 // Static helpers
 // ============================================================================
 
-int CorralWindow::GetDesktopIconSize() {
+int CorralWindow::GetDesktopIconSize()
+{
     // Read icon size from registry
     // HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Shell\Bags\1\Desktop\IconSize
     HKEY hKey;
-    DWORD iconSizeValue = 48;  // Default medium icons
+    DWORD iconSizeValue = 48; // Default medium icons
 
     if (RegOpenKeyExW(HKEY_CURRENT_USER,
-        L"SOFTWARE\\Microsoft\\Windows\\Shell\\Bags\\1\\Desktop",
-        0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                      L"SOFTWARE\\Microsoft\\Windows\\Shell\\Bags\\1\\Desktop",
+                      0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
 
         DWORD size = sizeof(DWORD);
         DWORD type = REG_DWORD;
@@ -176,34 +214,42 @@ int CorralWindow::GetDesktopIconSize() {
     }
 
     // Clamp to reasonable values
-    if (iconSizeValue < 16) iconSizeValue = 16;
-    if (iconSizeValue > MAX_ICON_SIZE) iconSizeValue = MAX_ICON_SIZE;
+    if (iconSizeValue < 16)
+        iconSizeValue = 16;
+    if (iconSizeValue > MAX_ICON_SIZE)
+        iconSizeValue = MAX_ICON_SIZE;
 
     return (int)iconSizeValue;
 }
 
-void CorralWindow::GetDesktopIconSpacing(int& spacingX, int& spacingY) {
+void CorralWindow::GetDesktopIconSpacing(int &spacingX, int &spacingY)
+{
     // Query the desktop ListView's actual icon spacing directly.
     // LVM_GETITEMSPACING returns physical pixels (desktop is DPI-aware).
     HWND hListView = DesktopIcons::GetDesktopListView();
-    if (hListView) {
+    if (hListView)
+    {
         DWORD spacing = (DWORD)SendMessageW(hListView, LVM_GETITEMSPACING, FALSE, 0);
         int desktopSpacingX = LOWORD(spacing);
         int desktopSpacingY = HIWORD(spacing);
 
-        if (desktopSpacingX > 0 && desktopSpacingY > 0) {
+        if (desktopSpacingX > 0 && desktopSpacingY > 0)
+        {
             // GetDesktopIconSize() returns logical pixels; Dpi() scales to physical.
             // Both desktopSpacing and iconSize are now in physical pixels.
             int desktopIconSizePhysical = Dpi(GetDesktopIconSize());
-            if (desktopIconSizePhysical > 0) {
+            if (desktopIconSizePhysical > 0)
+            {
                 // Scale proportionally: keep the same ratio as the desktop grid
                 spacingX = desktopSpacingX * iconSize / desktopIconSizePhysical;
                 spacingY = desktopSpacingY * iconSize / desktopIconSizePhysical;
 
                 // Ensure minimum label space for 2 lines of text
                 int minLabel = Dpi(40);
-                if (spacingY < iconSize + minLabel) spacingY = iconSize + minLabel;
-                if (spacingX < iconSize + Dpi(32)) spacingX = iconSize + Dpi(32);
+                if (spacingY < iconSize + minLabel)
+                    spacingY = iconSize + minLabel;
+                if (spacingX < iconSize + Dpi(32))
+                    spacingX = iconSize + Dpi(32);
                 return;
             }
         }
@@ -214,17 +260,21 @@ void CorralWindow::GetDesktopIconSpacing(int& spacingX, int& spacingY) {
     spacingY = iconSize + Dpi(40);
 }
 
-std::wstring CorralWindow::GetDesktopPath() {
+std::wstring CorralWindow::GetDesktopPath()
+{
     wchar_t path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, path))) {
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, path)))
+    {
         return std::wstring(path);
     }
     return L"";
 }
 
-std::wstring CorralWindow::GetPublicDesktopPath() {
+std::wstring CorralWindow::GetPublicDesktopPath()
+{
     wchar_t path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_DESKTOPDIRECTORY, NULL, 0, path))) {
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_DESKTOPDIRECTORY, NULL, 0, path)))
+    {
         return std::wstring(path);
     }
     return L"";
@@ -234,59 +284,72 @@ std::wstring CorralWindow::GetPublicDesktopPath() {
 // Public methods
 // ============================================================================
 
-void CorralWindow::SendToBottom() {
-    if (hwnd) {
+void CorralWindow::SendToBottom()
+{
+    if (hwnd)
+    {
         SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 }
 
-void CorralWindow::Show() {
-    if (hwnd) {
+void CorralWindow::Show()
+{
+    if (hwnd)
+    {
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         SendToBottom();
 
-        if (GetActiveTab().IsVirtual) {
+        if (GetActiveTab().IsVirtual)
+        {
             // For virtual tabs, show window immediately and load icons asynchronously
             UpdateLayeredContent();
             PostMessageW(hwnd, WM_DEFERRED_LOAD, 0, 0);
-        } else {
-            LoadFiles();  // This calls UpdateLayeredContent
+        }
+        else
+        {
+            LoadFiles(); // This calls UpdateLayeredContent
         }
     }
 }
 
-void CorralWindow::Hide() {
-    if (hwnd) {
+void CorralWindow::Hide()
+{
+    if (hwnd)
+    {
         ShowWindow(hwnd, SW_HIDE);
     }
 }
 
-
-void CorralWindow::SyncConfigFromWindow() {
-    if (hwnd) {
+void CorralWindow::SyncConfigFromWindow()
+{
+    if (hwnd)
+    {
         RECT rect;
         GetWindowRect(hwnd, &rect);
         config.Left = rect.left;
         config.Top = rect.top;
         config.Width = rect.right - rect.left;
         // When rolled up, preserve the saved full height in config
-        if (!config.IsRolledUp) {
+        if (!config.IsRolledUp)
+        {
             config.Height = rect.bottom - rect.top;
             savedHeight = config.Height;
         }
         // When rolled up, config.Height keeps the savedHeight value
 
         // Update monitor position tracking
-        App* app = App::GetInstance();
-        if (app && app->GetMonitorManager()) {
-            MonitorManager* monMgr = app->GetMonitorManager();
-            const MonitorInfo* mon = monMgr->FindMonitorForRect(rect);
-            if (mon) {
+        App *app = App::GetInstance();
+        if (app && app->GetMonitorManager())
+        {
+            MonitorManager *monMgr = app->GetMonitorManager();
+            const MonitorInfo *mon = monMgr->FindMonitorForRect(rect);
+            if (mon)
+            {
                 // Update target monitor ID
                 config.TargetMonitorId = mon->deviceId;
 
                 // Store position for this monitor (relative to monitor origin)
-                MonitorPosition& pos = config.MonitorPositions[mon->deviceId];
+                MonitorPosition &pos = config.MonitorPositions[mon->deviceId];
                 pos.Left = (int)config.Left - mon->bounds.left;
                 pos.Top = (int)config.Top - mon->bounds.top;
                 pos.Width = (int)config.Width;
@@ -298,24 +361,31 @@ void CorralWindow::SyncConfigFromWindow() {
     }
 }
 
-void CorralWindow::LoadFiles() {
-    if (GetActiveTab().IsVirtual) {
+void CorralWindow::LoadFiles()
+{
+    if (GetActiveTab().IsVirtual)
+    {
         LoadVirtualFolderIcons();
-    } else {
+    }
+    else
+    {
         LoadIconImages();
     }
     CalculateIconLayout();
     UpdateLayeredContent();
 }
 
-void CorralWindow::AddFile(const std::string& fileName) {
+void CorralWindow::AddFile(const std::string &fileName)
+{
     // Virtual tabs don't accept manual file additions
-    if (GetActiveTab().IsVirtual) return;
+    if (GetActiveTab().IsVirtual)
+        return;
 
     // Check if already in this corral (active tab)
-    auto& files = GetActiveTab().Files;
+    auto &files = GetActiveTab().Files;
     auto it = std::find(files.begin(), files.end(), fileName);
-    if (it == files.end()) {
+    if (it == files.end())
+    {
         files.push_back(fileName);
         LoadFiles();
     }
@@ -325,19 +395,25 @@ void CorralWindow::AddFile(const std::string& fileName) {
 // Tab Management
 // ============================================================================
 
-CorralTabConfig& CorralWindow::GetActiveTab() {
-    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size()) {
+CorralTabConfig &CorralWindow::GetActiveTab()
+{
+    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size())
+    {
         config.ActiveTabIndex = 0;
-        if (config.Tabs.empty()) {
+        if (config.Tabs.empty())
+        {
             config.Tabs.push_back(CorralTabConfig());
         }
     }
     return config.Tabs[config.ActiveTabIndex];
 }
 
-const CorralTabConfig& CorralWindow::GetActiveTab() const {
-    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size()) {
-        if (config.Tabs.empty()) {
+const CorralTabConfig &CorralWindow::GetActiveTab() const
+{
+    if (config.ActiveTabIndex < 0 || config.ActiveTabIndex >= (int)config.Tabs.size())
+    {
+        if (config.Tabs.empty())
+        {
             static CorralTabConfig empty;
             return empty;
         }
@@ -346,17 +422,21 @@ const CorralTabConfig& CorralWindow::GetActiveTab() const {
     return config.Tabs[config.ActiveTabIndex];
 }
 
-void CorralWindow::SetActiveTab(int index) {
-    if (index >= 0 && index < (int)config.Tabs.size() && index != config.ActiveTabIndex) {
+void CorralWindow::SetActiveTab(int index)
+{
+    if (index >= 0 && index < (int)config.Tabs.size() && index != config.ActiveTabIndex)
+    {
         config.ActiveTabIndex = index;
 
         // Handle switching between virtual/regular
-        if (folderWatcher) {
+        if (folderWatcher)
+        {
             folderWatcher->Stop();
             folderWatcher.reset();
         }
 
-        if (GetActiveTab().IsVirtual) {
+        if (GetActiveTab().IsVirtual)
+        {
             InitializeFolderWatcher();
         }
 
@@ -367,20 +447,25 @@ void CorralWindow::SetActiveTab(int index) {
         scrollPosition = 0;
         LoadFiles();
 
-        if (App::GetInstance()) {
+        if (App::GetInstance())
+        {
             App::GetInstance()->SaveConfig();
         }
     }
 }
 
-void CorralWindow::AddTab(const CorralTabConfig& tab) {
+void CorralWindow::AddTab(const CorralTabConfig &tab)
+{
     config.Tabs.push_back(tab);
     SetActiveTab((int)config.Tabs.size() - 1);
 }
 
-void CorralWindow::DetachTab(int tabIndex) {
-    if (tabIndex < 0 || tabIndex >= (int)config.Tabs.size()) return;
-    if (config.Tabs.size() <= 1) return; // Can't detach the only tab
+void CorralWindow::DetachTab(int tabIndex)
+{
+    if (tabIndex < 0 || tabIndex >= (int)config.Tabs.size())
+        return;
+    if (config.Tabs.size() <= 1)
+        return; // Can't detach the only tab
 
     // Copy the tab to detach
     CorralTabConfig tabToDetach = config.Tabs[tabIndex];
@@ -389,15 +474,20 @@ void CorralWindow::DetachTab(int tabIndex) {
     config.Tabs.erase(config.Tabs.begin() + tabIndex);
 
     // Adjust active index if needed
-    if (config.ActiveTabIndex >= (int)config.Tabs.size()) {
+    if (config.ActiveTabIndex >= (int)config.Tabs.size())
+    {
         config.ActiveTabIndex = (int)config.Tabs.size() - 1;
-    } else if (config.ActiveTabIndex > tabIndex) {
+    }
+    else if (config.ActiveTabIndex > tabIndex)
+    {
         config.ActiveTabIndex--;
     }
 
     // Reload this window with remaining tabs
-    if (GetActiveTab().IsVirtual) {
-        if (folderWatcher) {
+    if (GetActiveTab().IsVirtual)
+    {
+        if (folderWatcher)
+        {
             folderWatcher->Stop();
             folderWatcher.reset();
         }
@@ -411,15 +501,17 @@ void CorralWindow::DetachTab(int tabIndex) {
     // Create new window for the detached tab
     RECT rect;
     GetWindowRect(hwnd, &rect);
-    POINT pt = { rect.left + 30, rect.top + 30 };
+    POINT pt = {rect.left + 30, rect.top + 30};
 
-    if (App::GetInstance()) {
+    if (App::GetInstance())
+    {
         App::GetInstance()->CreateCorralAt(pt);
 
         // Get the new corral and replace its default tab with our detached tab
-        const auto& corrals = App::GetInstance()->GetCorrals();
-        if (!corrals.empty()) {
-            CorralWindow* newWindow = corrals.back().get();
+        const auto &corrals = App::GetInstance()->GetCorrals();
+        if (!corrals.empty())
+        {
+            CorralWindow *newWindow = corrals.back().get();
             newWindow->GetConfig().Tabs.clear();
             newWindow->GetConfig().Tabs.push_back(tabToDetach);
             newWindow->GetConfig().ActiveTabIndex = 0;
@@ -431,11 +523,14 @@ void CorralWindow::DetachTab(int tabIndex) {
     }
 }
 
-void CorralWindow::MergeWith(CorralWindow* other) {
-    if (!other || other == this) return;
+void CorralWindow::MergeWith(CorralWindow *other)
+{
+    if (!other || other == this)
+        return;
 
     // Copy all tabs from other to this
-    for (const auto& tab : other->GetConfig().Tabs) {
+    for (const auto &tab : other->GetConfig().Tabs)
+    {
         config.Tabs.push_back(tab);
     }
 
@@ -443,27 +538,34 @@ void CorralWindow::MergeWith(CorralWindow* other) {
     SetActiveTab((int)config.Tabs.size() - (int)other->GetConfig().Tabs.size());
 
     // Remove the other corral
-    if (App::GetInstance()) {
+    if (App::GetInstance())
+    {
         App::GetInstance()->RemoveCorral(&other->GetConfig());
     }
 }
 
-int CorralWindow::HitTestTab(int x, int y) {
-    if (y >= GetTitleBarHeight()) return -1;
+int CorralWindow::HitTestTab(int x, int y)
+{
+    if (y >= GetTitleBarHeight())
+        return -1;
 
-    for (int i = 0; i < (int)config.Tabs.size(); i++) {
+    for (int i = 0; i < (int)config.Tabs.size(); i++)
+    {
         RECT tabRect = GetTabRect(i);
-        POINT pt = { x, y };
-        if (PtInRect(&tabRect, pt)) {
+        POINT pt = {x, y};
+        if (PtInRect(&tabRect, pt))
+        {
             return i;
         }
     }
     return -1;
 }
 
-RECT CorralWindow::GetTabRect(int index) const {
-    if (index < 0 || index >= (int)config.Tabs.size()) {
-        return { 0, 0, 0, 0 };
+RECT CorralWindow::GetTabRect(int index) const
+{
+    if (index < 0 || index >= (int)config.Tabs.size())
+    {
+        return {0, 0, 0, 0};
     }
 
     RECT clientRect;
@@ -477,28 +579,32 @@ RECT CorralWindow::GetTabRect(int index) const {
         index * tabWidth,
         0,
         (index + 1) * tabWidth,
-        GetTitleBarHeight()
-    };
+        GetTitleBarHeight()};
 }
 
 // ============================================================================
 // Window procedure
 // ============================================================================
 
-LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    CorralWindow* window = nullptr;
+LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    CorralWindow *window = nullptr;
 
-    if (uMsg == WM_CREATE) {
-        CREATESTRUCTW* cs = (CREATESTRUCTW*)lParam;
-        window = (CorralWindow*)cs->lpCreateParams;
+    if (uMsg == WM_CREATE)
+    {
+        CREATESTRUCTW *cs = (CREATESTRUCTW *)lParam;
+        window = (CorralWindow *)cs->lpCreateParams;
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)window);
     }
-    else {
-        window = (CorralWindow*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    else
+    {
+        window = (CorralWindow *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
     }
 
-    if (window) {
-        switch (uMsg) {
+    if (window)
+    {
+        switch (uMsg)
+        {
         case WM_PAINT:
             window->OnPaint();
             return 0;
@@ -520,20 +626,24 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         case WM_RBUTTONDOWN:
             window->OnRightButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
-        case WM_MOUSEMOVE: {
+        case WM_MOUSEMOVE:
+        {
             // Track mouse for hover-expand
-            if (!window->mouseInsideWindow) {
+            if (!window->mouseInsideWindow)
+            {
                 window->mouseInsideWindow = true;
-                TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, hwnd, 0 };
+                TRACKMOUSEEVENT tme = {sizeof(tme), TME_LEAVE, hwnd, 0};
                 TrackMouseEvent(&tme);
 
                 // Check if we should hover-expand
-                if (window->config.IsRolledUp && !window->isHoverExpanded && !window->isAnimating) {
+                if (window->config.IsRolledUp && !window->isHoverExpanded && !window->isAnimating)
+                {
                     window->StartHoverExpand();
                 }
 
                 // Fade to full opacity and remove tint on hover
-                if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0) {
+                if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0)
+                {
                     window->StartOpacityAnimation(255, 0);
                 }
             }
@@ -548,47 +658,56 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             GetClientRect(hwnd, &clientRect);
             int scrollbarRegionLeft = clientRect.right - window->Dpi(SCROLLBAR_WIDTH) - window->Dpi(SCROLLBAR_MARGIN) * 2;
             bool isOverScrollbarRegion = window->NeedsScrollbar() &&
-                                          x >= scrollbarRegionLeft &&
-                                          y >= window->GetIconAreaTop();
+                                         x >= scrollbarRegionLeft &&
+                                         y >= window->GetIconAreaTop();
 
             window->isScrollbarHovered = isOverScrollbarRegion;
 
             // Redraw if hover state changed
-            if (wasHovered != window->isScrollbarHovered) {
+            if (wasHovered != window->isScrollbarHovered)
+            {
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
 
             // Track hovered icon
-            if (!window->isDragging && !window->isResizing && !window->isDraggingIcon && !window->isDraggingScrollbar) {
+            if (!window->isDragging && !window->isResizing && !window->isDraggingIcon && !window->isDraggingScrollbar)
+            {
                 int prevHovered = window->hoveredIcon;
                 window->hoveredIcon = window->HitTestIcon(x, y);
-                if (prevHovered != window->hoveredIcon) {
+                if (prevHovered != window->hoveredIcon)
+                {
                     InvalidateRect(hwnd, nullptr, FALSE);
                 }
             }
 
-            if (window->isResizing) {
+            if (window->isResizing)
+            {
                 POINT pt;
                 GetCursorPos(&pt);
                 window->DoResize(pt.x, pt.y);
             }
-            else if (window->isDraggingScrollbar) {
+            else if (window->isDraggingScrollbar)
+            {
                 window->DoScrollbarDrag(GET_Y_LPARAM(lParam));
             }
-            else if (window->draggedIconIndex >= 0) {
+            else if (window->draggedIconIndex >= 0)
+            {
                 int x = GET_X_LPARAM(lParam);
                 int y = GET_Y_LPARAM(lParam);
                 // Check if we've moved enough to start a drag
                 int dx = x - window->iconDragStart.x;
                 int dy = y - window->iconDragStart.y;
-                if (!window->isDraggingIcon && (abs(dx) > window->Dpi(DRAG_THRESHOLD) || abs(dy) > window->Dpi(DRAG_THRESHOLD))) {
+                if (!window->isDraggingIcon && (abs(dx) > window->Dpi(DRAG_THRESHOLD) || abs(dy) > window->Dpi(DRAG_THRESHOLD)))
+                {
                     window->isDraggingIcon = true;
                 }
-                if (window->isDraggingIcon) {
+                if (window->isDraggingIcon)
+                {
                     window->OnIconDrag(x, y);
                 }
             }
-            else if (window->isDragging) {
+            else if (window->isDragging)
+            {
                 POINT pt;
                 GetCursorPos(&pt);
                 int newLeft = pt.x - (window->dragStart.x - window->dragStartRect.left);
@@ -597,15 +716,17 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 int height = window->dragStartRect.bottom - window->dragStartRect.top;
 
                 // Apply snap unless Shift is held
-                if (!(GetKeyState(VK_SHIFT) & 0x8000)) {
+                if (!(GetKeyState(VK_SHIFT) & 0x8000))
+                {
                     window->ApplySnap(newLeft, newTop, width, height);
                 }
 
                 SetWindowPos(hwnd, nullptr, newLeft, newTop, 0, 0,
-                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                             SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 
                 // Push desktop icons out of the way
-                if (App::GetInstance()) {
+                if (App::GetInstance())
+                {
                     App::GetInstance()->PushDesktopIconsFromCorrals();
                 }
             }
@@ -614,7 +735,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         case WM_MOUSEWHEEL:
             window->OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
             return 0;
-        case WM_POINTERWHEEL: {
+        case WM_POINTERWHEEL:
+        {
             // Handle precision touchpad scrolling (Windows 8+)
             // Extract wheel delta from pointer input
             int delta = GET_WHEEL_DELTA_WPARAM(wParam);
@@ -624,46 +746,66 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         // WM_DROPFILES removed - now handled by IDropTarget (CorralDropTarget)
         case WM_SETCURSOR:
             // Set resize cursor based on position
-            if (LOWORD(lParam) == HTCLIENT && !window->config.IsRolledUp) {
+            if (LOWORD(lParam) == HTCLIENT && !window->config.IsRolledUp)
+            {
                 POINT pt;
                 GetCursorPos(&pt);
                 ScreenToClient(hwnd, &pt);
                 int hit = window->HitTestResize(pt.x, pt.y);
                 LPCWSTR cursor = IDC_ARROW;
-                switch (hit) {
-                case HTLEFT: case HTRIGHT: cursor = IDC_SIZEWE; break;
-                case HTTOP: case HTBOTTOM: cursor = IDC_SIZENS; break;
-                case HTTOPLEFT: case HTBOTTOMRIGHT: cursor = IDC_SIZENWSE; break;
-                case HTTOPRIGHT: case HTBOTTOMLEFT: cursor = IDC_SIZENESW; break;
+                switch (hit)
+                {
+                case HTLEFT:
+                case HTRIGHT:
+                    cursor = IDC_SIZEWE;
+                    break;
+                case HTTOP:
+                case HTBOTTOM:
+                    cursor = IDC_SIZENS;
+                    break;
+                case HTTOPLEFT:
+                case HTBOTTOMRIGHT:
+                    cursor = IDC_SIZENWSE;
+                    break;
+                case HTTOPRIGHT:
+                case HTBOTTOMLEFT:
+                    cursor = IDC_SIZENESW;
+                    break;
                 }
                 SetCursor(LoadCursorW(nullptr, cursor));
                 return TRUE;
             }
             break;
         case WM_KEYDOWN:
-            if (wParam == VK_F2 && window->selectedIcon >= 0) {
+            if (wParam == VK_F2 && window->selectedIcon >= 0)
+            {
                 window->StartIconRename(window->selectedIcon);
                 return 0;
             }
             break;
         case WM_TIMER:
-            if (wParam == ANIMATION_TIMER_ID) {
+            if (wParam == ANIMATION_TIMER_ID)
+            {
                 window->OnAnimationTimer();
                 return 0;
             }
-            if (wParam == HOVER_CHECK_TIMER_ID) {
+            if (wParam == HOVER_CHECK_TIMER_ID)
+            {
                 window->OnHoverCheckTimer();
                 return 0;
             }
-            if (wParam == OPACITY_TIMER_ID) {
+            if (wParam == OPACITY_TIMER_ID)
+            {
                 window->OnOpacityAnimationTimer();
                 return 0;
             }
-            if (wParam == SCROLL_REPOSITION_TIMER_ID) {
+            if (wParam == SCROLL_REPOSITION_TIMER_ID)
+            {
                 KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
                 // Reposition desktop icons to match scrolled positions
-                App* app = App::GetInstance();
-                if (app) {
+                App *app = App::GetInstance();
+                if (app)
+                {
                     app->PositionHiddenIconsUnderCorrals();
                 }
                 return 0;
@@ -679,21 +821,25 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         case WM_MOUSELEAVE:
             window->mouseInsideWindow = false;
             // Reset hovered icon
-            if (window->hoveredIcon >= 0) {
+            if (window->hoveredIcon >= 0)
+            {
                 window->hoveredIcon = -1;
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             // Reset scrollbar hover state
-            if (window->isScrollbarHovered) {
+            if (window->isScrollbarHovered)
+            {
                 window->isScrollbarHovered = false;
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             // Start collapse if hover-expanded
-            if (window->isHoverExpanded && !window->isAnimating) {
+            if (window->isHoverExpanded && !window->isAnimating)
+            {
                 window->StartHoverCollapse();
             }
             // Fade back to configured opacity and tint
-            if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0) {
+            if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0)
+            {
                 window->StartOpacityAnimation(window->config.IconOpacity, window->config.IconTintStrength);
             }
             return 0;
@@ -716,21 +862,24 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 // Paint - Uses UpdateLayeredWindow for true per-pixel transparency
 // ============================================================================
 
-void CorralWindow::OnPaint() {
+void CorralWindow::OnPaint()
+{
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hwnd, &ps);
 
     // Check if we're currently in non-layered mode (during rename)
     LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    if (!(exStyle & WS_EX_LAYERED)) {
+    if (!(exStyle & WS_EX_LAYERED))
+    {
         // Paint a solid background when not layered
         RECT rect;
         GetClientRect(hwnd, &rect);
 
         // Use the active tab's background color
         BYTE bgR = 40, bgG = 40, bgB = 40;
-        const std::string& colorHex = GetActiveTab().ColorHex;
-        if (!colorHex.empty() && colorHex[0] == '#' && colorHex.length() >= 7) {
+        const std::string &colorHex = GetActiveTab().ColorHex;
+        if (!colorHex.empty() && colorHex[0] == '#' && colorHex.length() >= 7)
+        {
             unsigned int colorValue;
             sscanf_s(colorHex.c_str() + 1, "%x", &colorValue);
             bgR = (colorValue >> 16) & 0xFF;
@@ -744,7 +893,7 @@ void CorralWindow::OnPaint() {
 
         // Draw title bar background (darker)
         HBRUSH titleBrush = CreateSolidBrush(RGB(bgR / 2, bgG / 2, bgB / 2));
-        RECT titleBarRect = { 0, 0, rect.right, GetTitleBarHeight() };
+        RECT titleBarRect = {0, 0, rect.right, GetTitleBarHeight()};
         FillRect(hdc, &titleBarRect, titleBrush);
         DeleteObject(titleBrush);
 
@@ -752,44 +901,47 @@ void CorralWindow::OnPaint() {
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(255, 255, 255));
         HFONT titleFont = CreateFontW(-14, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+                                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
         std::wstring wtitle = Utf8ToWide(GetActiveTab().Title);
-        RECT titleRect = { 8, 8, rect.right - 8, 30 };
+        RECT titleRect = {8, 8, rect.right - 8, 30};
         DrawTextW(hdc, wtitle.c_str(), -1, &titleRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
         SelectObject(hdc, oldFont);
         DeleteObject(titleFont);
 
         // Draw icons
         HFONT labelFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+                                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         SelectObject(hdc, labelFont);
 
-        for (size_t i = 0; i < icons.size(); i++) {
-            const auto& icon = icons[i];
+        for (size_t i = 0; i < icons.size(); i++)
+        {
+            const auto &icon = icons[i];
             int drawTop = icon.iconRect.top - scrollPosition;
 
             // Skip if outside visible area
-            if (drawTop + iconSize < GetIconAreaTop() || drawTop > rect.bottom) continue;
+            if (drawTop + iconSize < GetIconAreaTop() || drawTop > rect.bottom)
+                continue;
 
             // Draw icon
-            if (icon.hIcon) {
+            if (icon.hIcon)
+            {
                 DrawIconEx(hdc, icon.iconRect.left, drawTop, icon.hIcon,
-                    iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                           iconSize, iconSize, 0, nullptr, DI_NORMAL);
             }
 
             // Draw label (skip the one being edited)
-            if ((int)i != renamingIconIndex) {
+            if ((int)i != renamingIconIndex)
+            {
                 RECT labelRect = {
                     icon.rect.left,
                     icon.iconRect.bottom + 2 - scrollPosition,
                     icon.rect.right,
-                    icon.rect.bottom - scrollPosition
-                };
+                    icon.rect.bottom - scrollPosition};
                 DrawTextW(hdc, icon.displayName.c_str(), -1, &labelRect,
-                    DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS);
+                          DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS);
             }
         }
 
@@ -799,7 +951,8 @@ void CorralWindow::OnPaint() {
     EndPaint(hwnd, &ps);
 
     // For layered windows, we use UpdateLayeredWindow instead of regular painting
-    if (exStyle & WS_EX_LAYERED) {
+    if (exStyle & WS_EX_LAYERED)
+    {
         UpdateLayeredContent();
     }
 }
@@ -808,13 +961,15 @@ void CorralWindow::OnPaint() {
 // Event handlers
 // ============================================================================
 
-void CorralWindow::OnSize() {
+void CorralWindow::OnSize()
+{
     SyncConfigFromWindow();
     CalculateIconLayout();
     UpdateLayeredContent();
 }
 
-void CorralWindow::OnMove() {
+void CorralWindow::OnMove()
+{
     SyncConfigFromWindow();
     UpdateLayeredContent();
 }

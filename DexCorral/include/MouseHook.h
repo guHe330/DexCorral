@@ -1,8 +1,30 @@
+/**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #pragma once
 #include <Windows.h>
 #include <functional>
 
-class MouseHook {
+class MouseHook
+{
 public:
     using MouseEventCallback = std::function<void(POINT)>;
     using MouseWheelCallback = std::function<void(POINT, int delta)>;
@@ -21,7 +43,7 @@ public:
 
 private:
     static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam);
-    static MouseHook* instance;
+    static MouseHook *instance;
 
     HHOOK hookHandle;
     MouseEventCallback leftButtonDownCallback;

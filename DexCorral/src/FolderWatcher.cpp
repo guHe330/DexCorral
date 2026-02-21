@@ -1,53 +1,86 @@
+/**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "FolderWatcher.h"
 
-FolderWatcher::FolderWatcher() : running(false), lastChangeTime(0) {
+FolderWatcher::FolderWatcher() : running(false), lastChangeTime(0)
+{
 }
 
-FolderWatcher::~FolderWatcher() {
+FolderWatcher::~FolderWatcher()
+{
     Stop();
 }
 
-void FolderWatcher::SetPath(const std::wstring& path) {
+void FolderWatcher::SetPath(const std::wstring &path)
+{
     bool wasRunning = running;
-    if (wasRunning) {
+    if (wasRunning)
+    {
         Stop();
     }
     watchPath = path;
-    if (wasRunning && !watchPath.empty()) {
+    if (wasRunning && !watchPath.empty())
+    {
         Start();
     }
 }
 
-void FolderWatcher::Start() {
-    if (running || watchPath.empty()) return;
+void FolderWatcher::Start()
+{
+    if (running || watchPath.empty())
+        return;
     running = true;
 
     stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
-    monitorThread = std::thread([this]() {
-        MonitorThread();
-    });
+    monitorThread = std::thread([this]()
+                                { MonitorThread(); });
 }
 
-void FolderWatcher::Stop() {
-    if (!running) return;
+void FolderWatcher::Stop()
+{
+    if (!running)
+        return;
     running = false;
 
-    if (stopEvent) {
+    if (stopEvent)
+    {
         SetEvent(stopEvent);
     }
 
-    if (monitorThread.joinable()) {
+    if (monitorThread.joinable())
+    {
         monitorThread.join();
     }
 
-    if (stopEvent) {
+    if (stopEvent)
+    {
         CloseHandle(stopEvent);
         stopEvent = nullptr;
     }
 }
 
-void FolderWatcher::MonitorThread() {
+void FolderWatcher::MonitorThread()
+{
     HANDLE hDir = CreateFileW(
         watchPath.c_str(),
         FILE_LIST_DIRECTORY,
@@ -55,10 +88,10 @@ void FolderWatcher::MonitorThread() {
         nullptr,
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-        nullptr
-    );
+        nullptr);
 
-    if (hDir == INVALID_HANDLE_VALUE) {
+    if (hDir == INVALID_HANDLE_VALUE)
+    {
         return;
     }
 
@@ -66,43 +99,49 @@ void FolderWatcher::MonitorThread() {
     OVERLAPPED overlapped = {};
     overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
-    while (running) {
+    while (running)
+    {
         DWORD bytesReturned = 0;
 
         BOOL success = ReadDirectoryChangesW(
             hDir,
             buffer,
             sizeof(buffer),
-            FALSE,  // Don't watch subtree
+            FALSE, // Don't watch subtree
             FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
             &bytesReturned,
             &overlapped,
-            nullptr
-        );
+            nullptr);
 
-        if (!success) {
+        if (!success)
+        {
             break;
         }
 
-        HANDLE handles[2] = { overlapped.hEvent, stopEvent };
+        HANDLE handles[2] = {overlapped.hEvent, stopEvent};
         DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
 
-        if (waitResult == WAIT_OBJECT_0) {
-            if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE)) {
+        if (waitResult == WAIT_OBJECT_0)
+        {
+            if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE))
+            {
                 // Debounce: only fire callback if enough time has passed
                 DWORD now = GetTickCount();
                 DWORD lastTime = lastChangeTime.load();
 
-                if (now - lastTime >= DEBOUNCE_MS) {
+                if (now - lastTime >= DEBOUNCE_MS)
+                {
                     lastChangeTime.store(now);
-                    if (changeCallback) {
+                    if (changeCallback)
+                    {
                         changeCallback();
                     }
                 }
             }
             ResetEvent(overlapped.hEvent);
         }
-        else {
+        else
+        {
             CancelIo(hDir);
             break;
         }

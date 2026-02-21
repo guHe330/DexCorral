@@ -1,4 +1,25 @@
 /**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * DesktopIcons.cpp - Cross-process desktop icon manipulation
  *
  * Implements cross-process access to the Explorer desktop ListView to read icon positions,
@@ -18,27 +39,31 @@
 
 #pragma comment(lib, "Shlwapi.lib")
 
-HWND DesktopIcons::GetDesktopListView() {
+HWND DesktopIcons::GetDesktopListView()
+{
     HWND progman = FindWindowW(L"Progman", nullptr);
     HWND shellDll = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
 
-    if (shellDll == nullptr) {
+    if (shellDll == nullptr)
+    {
         // Try WorkerW windows
-        EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+        EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
+                    {
             HWND shellDll = FindWindowExW(hwnd, nullptr, L"SHELLDLL_DefView", nullptr);
             if (shellDll != nullptr) {
                 *(HWND*)lParam = shellDll;
                 return FALSE;
             }
-            return TRUE;
-        }, (LPARAM)&shellDll);
+            return TRUE; }, (LPARAM)&shellDll);
     }
 
-    if (shellDll == nullptr) return nullptr;
+    if (shellDll == nullptr)
+        return nullptr;
     return FindWindowExW(shellDll, nullptr, L"SysListView32", nullptr);
 }
 
-std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index) {
+std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index)
+{
     LVITEMW lvItem = {};
     lvItem.mask = LVIF_TEXT;
     lvItem.iItem = index;
@@ -58,24 +83,29 @@ std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID p
     return std::wstring(buffer);
 }
 
-void DesktopIcons::HideIcon(const std::wstring& fileName) {
+void DesktopIcons::HideIcon(const std::wstring &fileName)
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return;
+    if (hListView == nullptr)
+        return;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
     DWORD processId;
     GetWindowThreadProcessId(hListView, &processId);
 
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr) return;
+    if (hProcess == nullptr)
+        return;
 
     LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
 
-        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0) {
+        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0)
+        {
             int x = ICON_HIDE_POSITION_X;
             int y = ICON_HIDE_POSITION_Y;
             LPARAM pos = MAKELPARAM(x & 0xFFFF, y);
@@ -88,17 +118,20 @@ void DesktopIcons::HideIcon(const std::wstring& fileName) {
     CloseHandle(hProcess);
 }
 
-bool DesktopIcons::IsPointOnIcon(int screenX, int screenY) {
+bool DesktopIcons::IsPointOnIcon(int screenX, int screenY)
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return false;
+    if (hListView == nullptr)
+        return false;
 
-    POINT pt = { screenX, screenY };
+    POINT pt = {screenX, screenY};
     ScreenToClient(hListView, &pt);
 
     DWORD processId;
     GetWindowThreadProcessId(hListView, &processId);
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr) return false;
+    if (hProcess == nullptr)
+        return false;
 
     LPVOID pRemoteInfo = VirtualAllocEx(hProcess, nullptr, 1024, MEM_COMMIT, PAGE_READWRITE);
 
@@ -115,34 +148,42 @@ bool DesktopIcons::IsPointOnIcon(int screenX, int screenY) {
     return index != -1;
 }
 
-int DesktopIcons::GetSelectedCount() {
+int DesktopIcons::GetSelectedCount()
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return 0;
+    if (hListView == nullptr)
+        return 0;
     return (int)SendMessageW(hListView, LVM_GETSELECTEDCOUNT, 0, 0);
 }
 
-void DesktopIcons::RefreshDesktop() {
+void DesktopIcons::RefreshDesktop()
+{
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 }
 
-void DesktopIcons::PositionIcon(const std::wstring& fileName, int x, int y) {
+void DesktopIcons::PositionIcon(const std::wstring &fileName, int x, int y)
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return;
+    if (hListView == nullptr)
+        return;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
     DWORD processId;
     GetWindowThreadProcessId(hListView, &processId);
 
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr) return;
+    if (hProcess == nullptr)
+        return;
 
     LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
 
-        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0) {
+        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0)
+        {
             LPARAM pos = MAKELPARAM(x & 0xFFFF, y);
             SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
             break;
@@ -153,28 +194,35 @@ void DesktopIcons::PositionIcon(const std::wstring& fileName, int x, int y) {
     CloseHandle(hProcess);
 }
 
-void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D>& iconPositions) {
-    if (iconPositions.empty()) return;
+void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions)
+{
+    if (iconPositions.empty())
+        return;
 
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return;
+    if (hListView == nullptr)
+        return;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
     DWORD processId;
     GetWindowThreadProcessId(hListView, &processId);
 
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr) return;
+    if (hProcess == nullptr)
+        return;
 
     LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
 
         // Case-insensitive lookup (display names may differ in case from filenames)
-        for (const auto& [name, pos2d] : iconPositions) {
-            if (_wcsicmp(text.c_str(), name.c_str()) == 0) {
+        for (const auto &[name, pos2d] : iconPositions)
+        {
+            if (_wcsicmp(text.c_str(), name.c_str()) == 0)
+            {
                 LPARAM pos = MAKELPARAM(pos2d.x & 0xFFFF, pos2d.y);
                 SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
                 break;
@@ -186,26 +234,31 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D>& iconPosi
     CloseHandle(hProcess);
 }
 
-POINT2D* DesktopIcons::GetIconPosition(const std::wstring& fileName) {
+POINT2D *DesktopIcons::GetIconPosition(const std::wstring &fileName)
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return nullptr;
+    if (hListView == nullptr)
+        return nullptr;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
     DWORD processId;
     GetWindowThreadProcessId(hListView, &processId);
 
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr) return nullptr;
+    if (hProcess == nullptr)
+        return nullptr;
 
     LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
 
-    POINT2D* result = nullptr;
+    POINT2D *result = nullptr;
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
 
-        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0) {
+        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0)
+        {
             LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
             SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
 
@@ -213,7 +266,7 @@ POINT2D* DesktopIcons::GetIconPosition(const std::wstring& fileName) {
             SIZE_T bytesRead;
             ReadProcessMemory(hProcess, pRemotePoint, &pt, 8, &bytesRead);
 
-            result = new POINT2D{ pt.x, pt.y };
+            result = new POINT2D{pt.x, pt.y};
 
             VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
             break;
@@ -226,26 +279,31 @@ POINT2D* DesktopIcons::GetIconPosition(const std::wstring& fileName) {
     return result;
 }
 
-std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions() {
+std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions()
+{
     std::map<std::wstring, POINT2D> result;
 
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return result;
+    if (hListView == nullptr)
+        return result;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
     DWORD processId;
     GetWindowThreadProcessId(hListView, &processId);
 
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr) return result;
+    if (hProcess == nullptr)
+        return result;
 
     LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
     LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
     LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
-        if (text.empty()) continue;
+        if (text.empty())
+            continue;
 
         SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
 
@@ -253,7 +311,7 @@ std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions() {
         SIZE_T bytesRead;
         ReadProcessMemory(hProcess, pRemotePoint, &pt, 8, &bytesRead);
 
-        result[text] = { pt.x, pt.y };
+        result[text] = {pt.x, pt.y};
     }
 
     VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
@@ -263,29 +321,35 @@ std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions() {
     return result;
 }
 
-void DesktopIcons::SetIconsVisible(bool visible) {
+void DesktopIcons::SetIconsVisible(bool visible)
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return;
+    if (hListView == nullptr)
+        return;
 
     ShowWindow(hListView, visible ? SW_SHOW : SW_HIDE);
 }
 
-bool DesktopIcons::AreIconsVisible() {
+bool DesktopIcons::AreIconsVisible()
+{
     HWND hListView = GetDesktopListView();
-    if (hListView == nullptr) return true;
+    if (hListView == nullptr)
+        return true;
 
     return IsWindowVisible(hListView) != FALSE;
 }
 
 // Registry key for shell icon overlays
-static const wchar_t* SHELL_ICONS_KEY = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons";
-static const wchar_t* SHORTCUT_ARROW_VALUE = L"29";
+static const wchar_t *SHELL_ICONS_KEY = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons";
+static const wchar_t *SHORTCUT_ARROW_VALUE = L"29";
 
-bool DesktopIcons::SetShortcutArrowsHidden(bool hidden) {
+bool DesktopIcons::SetShortcutArrowsHidden(bool hidden)
+{
     HKEY hKey;
     LONG result;
 
-    if (hidden) {
+    if (hidden)
+    {
         // Create or open the Shell Icons key
         result = RegCreateKeyExW(
             HKEY_LOCAL_MACHINE,
@@ -296,10 +360,10 @@ bool DesktopIcons::SetShortcutArrowsHidden(bool hidden) {
             KEY_SET_VALUE,
             nullptr,
             &hKey,
-            nullptr
-        );
+            nullptr);
 
-        if (result != ERROR_SUCCESS) {
+        if (result != ERROR_SUCCESS)
+        {
             // Try HKEY_CURRENT_USER as fallback (doesn't require admin)
             result = RegCreateKeyExW(
                 HKEY_CURRENT_USER,
@@ -310,39 +374,41 @@ bool DesktopIcons::SetShortcutArrowsHidden(bool hidden) {
                 KEY_SET_VALUE,
                 nullptr,
                 &hKey,
-                nullptr
-            );
+                nullptr);
         }
 
-        if (result != ERROR_SUCCESS) {
+        if (result != ERROR_SUCCESS)
+        {
             return false;
         }
 
         // Set value "29" to an empty string to hide the arrow
         // Using a blank icon reference removes the overlay
-        const wchar_t* blankValue = L"%systemroot%\\System32\\shell32.dll,-50";
+        const wchar_t *blankValue = L"%systemroot%\\System32\\shell32.dll,-50";
         result = RegSetValueExW(
             hKey,
             SHORTCUT_ARROW_VALUE,
             0,
             REG_EXPAND_SZ,
-            (const BYTE*)blankValue,
-            (DWORD)((wcslen(blankValue) + 1) * sizeof(wchar_t))
-        );
+            (const BYTE *)blankValue,
+            (DWORD)((wcslen(blankValue) + 1) * sizeof(wchar_t)));
 
         RegCloseKey(hKey);
         return result == ERROR_SUCCESS;
     }
-    else {
+    else
+    {
         // Delete the value to restore default arrow
         result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, SHELL_ICONS_KEY, 0, KEY_SET_VALUE, &hKey);
-        if (result == ERROR_SUCCESS) {
+        if (result == ERROR_SUCCESS)
+        {
             RegDeleteValueW(hKey, SHORTCUT_ARROW_VALUE);
             RegCloseKey(hKey);
         }
 
         result = RegOpenKeyExW(HKEY_CURRENT_USER, SHELL_ICONS_KEY, 0, KEY_SET_VALUE, &hKey);
-        if (result == ERROR_SUCCESS) {
+        if (result == ERROR_SUCCESS)
+        {
             RegDeleteValueW(hKey, SHORTCUT_ARROW_VALUE);
             RegCloseKey(hKey);
         }
@@ -351,30 +417,35 @@ bool DesktopIcons::SetShortcutArrowsHidden(bool hidden) {
     }
 }
 
-bool DesktopIcons::AreShortcutArrowsHidden() {
+bool DesktopIcons::AreShortcutArrowsHidden()
+{
     HKEY hKey;
     LONG result;
 
     // Check HKEY_LOCAL_MACHINE first
     result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, SHELL_ICONS_KEY, 0, KEY_QUERY_VALUE, &hKey);
-    if (result == ERROR_SUCCESS) {
+    if (result == ERROR_SUCCESS)
+    {
         DWORD type;
         DWORD size = 0;
         result = RegQueryValueExW(hKey, SHORTCUT_ARROW_VALUE, nullptr, &type, nullptr, &size);
         RegCloseKey(hKey);
-        if (result == ERROR_SUCCESS && size > 0) {
+        if (result == ERROR_SUCCESS && size > 0)
+        {
             return true;
         }
     }
 
     // Check HKEY_CURRENT_USER
     result = RegOpenKeyExW(HKEY_CURRENT_USER, SHELL_ICONS_KEY, 0, KEY_QUERY_VALUE, &hKey);
-    if (result == ERROR_SUCCESS) {
+    if (result == ERROR_SUCCESS)
+    {
         DWORD type;
         DWORD size = 0;
         result = RegQueryValueExW(hKey, SHORTCUT_ARROW_VALUE, nullptr, &type, nullptr, &size);
         RegCloseKey(hKey);
-        if (result == ERROR_SUCCESS && size > 0) {
+        if (result == ERROR_SUCCESS && size > 0)
+        {
             return true;
         }
     }
@@ -382,15 +453,18 @@ bool DesktopIcons::AreShortcutArrowsHidden() {
     return false;
 }
 
-void DesktopIcons::RestartExplorer() {
+void DesktopIcons::RestartExplorer()
+{
     // Find and terminate explorer.exe
     HWND shellWindow = GetShellWindow();
-    if (shellWindow) {
+    if (shellWindow)
+    {
         DWORD pid;
         GetWindowThreadProcessId(shellWindow, &pid);
 
         HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-        if (hProcess) {
+        if (hProcess)
+        {
             TerminateProcess(hProcess, 0);
             CloseHandle(hProcess);
         }
@@ -403,34 +477,40 @@ void DesktopIcons::RestartExplorer() {
     ShellExecuteW(nullptr, L"open", L"explorer.exe", nullptr, nullptr, SW_SHOWNORMAL);
 }
 
-
-std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons() {
+std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons()
+{
     std::vector<SpecialDesktopIcon> result;
 
     // Get the desktop IShellFolder
-    IShellFolder* pDesktop = nullptr;
-    if (FAILED(SHGetDesktopFolder(&pDesktop))) return result;
+    IShellFolder *pDesktop = nullptr;
+    if (FAILED(SHGetDesktopFolder(&pDesktop)))
+        return result;
 
     // Enumerate desktop items
-    IEnumIDList* pEnum = nullptr;
-    if (FAILED(pDesktop->EnumObjects(nullptr, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &pEnum))) {
+    IEnumIDList *pEnum = nullptr;
+    if (FAILED(pDesktop->EnumObjects(nullptr, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &pEnum)))
+    {
         pDesktop->Release();
         return result;
     }
 
     LPITEMIDLIST pidlChild = nullptr;
-    while (pEnum->Next(1, &pidlChild, nullptr) == S_OK) {
+    while (pEnum->Next(1, &pidlChild, nullptr) == S_OK)
+    {
         // Get the parsing name - special items return "::{GUID}"
         STRRET strret;
-        if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidlChild, SHGDN_FORPARSING, &strret))) {
+        if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidlChild, SHGDN_FORPARSING, &strret)))
+        {
             wchar_t parseName[MAX_PATH] = {};
             StrRetToBufW(&strret, pidlChild, parseName, MAX_PATH);
 
             // Special shell items have parsing names starting with "::"
-            if (parseName[0] == L':' && parseName[1] == L':') {
+            if (parseName[0] == L':' && parseName[1] == L':')
+            {
                 // Get the localized display name
                 STRRET strretDisplay;
-                if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidlChild, SHGDN_NORMAL, &strretDisplay))) {
+                if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidlChild, SHGDN_NORMAL, &strretDisplay)))
+                {
                     wchar_t displayName[MAX_PATH] = {};
                     StrRetToBufW(&strretDisplay, pidlChild, displayName, MAX_PATH);
 
@@ -450,24 +530,28 @@ std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons() {
     return result;
 }
 
-std::wstring DesktopIcons::GetSpecialIconDisplayName(const std::wstring& clsid) {
+std::wstring DesktopIcons::GetSpecialIconDisplayName(const std::wstring &clsid)
+{
     // Build the parsing name "::{CLSID}" and resolve to display name
     std::wstring parseName = L"::" + clsid;
 
     LPITEMIDLIST pidl = nullptr;
-    if (FAILED(SHParseDisplayName(parseName.c_str(), nullptr, &pidl, 0, nullptr)) || !pidl) {
+    if (FAILED(SHParseDisplayName(parseName.c_str(), nullptr, &pidl, 0, nullptr)) || !pidl)
+    {
         return L"";
     }
 
-    IShellFolder* pDesktop = nullptr;
-    if (FAILED(SHGetDesktopFolder(&pDesktop))) {
+    IShellFolder *pDesktop = nullptr;
+    if (FAILED(SHGetDesktopFolder(&pDesktop)))
+    {
         CoTaskMemFree(pidl);
         return L"";
     }
 
     STRRET strret;
     std::wstring displayName;
-    if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidl, SHGDN_NORMAL, &strret))) {
+    if (SUCCEEDED(pDesktop->GetDisplayNameOf(pidl, SHGDN_NORMAL, &strret)))
+    {
         wchar_t buf[MAX_PATH] = {};
         StrRetToBufW(&strret, pidl, buf, MAX_PATH);
         displayName = buf;

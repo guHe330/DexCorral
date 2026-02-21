@@ -1,4 +1,25 @@
 /**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * App.h - Main application controller
  *
  * Manages application initialization, shutdown, and the main message loop.
@@ -25,7 +46,8 @@ class CorralWindow;
 /**
  * Main application class managing corrals, configuration, and system integration.
  */
-class App {
+class App
+{
 public:
     /// Constructor initializing the application
     App();
@@ -38,10 +60,10 @@ public:
     void SaveConfig();
 
     /// Removes a corral and all its tabs
-    void RemoveCorral(CorralWindowConfig* config);
+    void RemoveCorral(CorralWindowConfig *config);
 
     /// Removes a file from all corrals except the specified tab
-    void RemoveFileFromOtherCorrals(const std::wstring& fileName, CorralTabConfig* exceptTab);
+    void RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab);
 
     /// Refreshes all corrals' content (folder contents, icons, etc.)
     void RefreshAllCorrals();
@@ -62,33 +84,33 @@ public:
     void SetAutostart(bool enable);
 
     /// Sets the default corral background color (hex format, e.g., "FF0000" for red)
-    void SetDefaultColorHex(const std::string& colorHex);
+    void SetDefaultColorHex(const std::string &colorHex);
 
     /**
      * Sets default appearance for all new corrals.
      * Parameters: titleBarHeight, fontName, fontSize, fontColor (hex),
      * iconOpacity (0-100), tintColor (hex), tintStrength (0-100), spacingX, spacingY (pixels)
      */
-    void SetDefaultAppearance(int titleBarHeight, const std::string& fontName,
-        int fontSize, const std::string& fontColor, int iconOpacity,
-        const std::string& tintColor, int tintStrength,
-        int spacingX, int spacingY);
+    void SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
+                              int fontSize, const std::string &fontColor, int iconOpacity,
+                              const std::string &tintColor, int tintStrength,
+                              int spacingX, int spacingY);
 
     /// Applies the specified background color to all existing corrals
-    void ApplyColorToAllCorrals(const std::string& colorHex);
+    void ApplyColorToAllCorrals(const std::string &colorHex);
 
     /**
      * Applies appearance settings to all existing corrals with selective updating.
      * Boolean flags determine which settings are applied (changed flags pattern).
      * Only settings with corresponding flags set to true are updated.
      */
-    void ApplyAppearanceToAllCorrals(const std::string& colorHex, bool applyColor,
-        int titleBarHeight, bool applyHeight,
-        const std::string& fontName, int fontSize, bool applyFont,
-        const std::string& fontColor, bool applyFontColor,
-        int iconOpacity, bool applyIconOpacity,
-        const std::string& tintColor, int tintStrength, bool applyTint,
-        int spacingX, int spacingY, bool applySpacing);
+    void ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
+                                     int titleBarHeight, bool applyHeight,
+                                     const std::string &fontName, int fontSize, bool applyFont,
+                                     const std::string &fontColor, bool applyFontColor,
+                                     int iconOpacity, bool applyIconOpacity,
+                                     const std::string &tintColor, int tintStrength, bool applyTint,
+                                     int spacingX, int spacingY, bool applySpacing);
 
     /// Creates a new corral at the specified screen coordinates
     void CreateCorralAt(POINT pt);
@@ -97,10 +119,10 @@ public:
     void CreateVirtualCorralAt(POINT pt);
 
     /// Returns pointer to monitor manager (tracks display configuration)
-    MonitorManager* GetMonitorManager() { return monitorManager.get(); }
+    MonitorManager *GetMonitorManager() { return monitorManager.get(); }
 
     /// Returns const reference to the list of all active corrals
-    const std::vector<std::unique_ptr<CorralWindow>>& GetCorrals() const { return corrals; }
+    const std::vector<std::unique_ptr<CorralWindow>> &GetCorrals() const { return corrals; }
 
     /// Called when display configuration changes (monitors added/removed/resolution changed)
     void OnDisplayChange();
@@ -109,7 +131,7 @@ public:
     void UpdateCorralPositions();
 
     /// Returns the singleton App instance
-    static App* GetInstance() { return instance; }
+    static App *GetInstance() { return instance; }
 
     /// Caches current desktop icon positions for push-out-of-way algorithm
     void CacheDesktopIconPositions();
@@ -120,8 +142,8 @@ public:
     /// Moves desktop icons out of the way if they overlap with corrals
     void PushDesktopIconsFromCorrals();
 
-    void UpdateHookHiddenIcons();              // Push hidden icon list to shared memory
-    void PositionHiddenIconsUnderCorrals();    // Reposition hidden icons to match corral scroll state
+    void UpdateHookHiddenIcons();           // Push hidden icon list to shared memory
+    void PositionHiddenIconsUnderCorrals(); // Reposition hidden icons to match corral scroll state
 
 private:
     void Initialize();
@@ -140,18 +162,18 @@ private:
 
     // Desktop monitoring callbacks
     void EnsureCatchAllCorral();
-    CorralWindow* GetCatchAllCorral();
-    void OnDesktopFileAdded(const std::wstring& fileName);
-    void OnDesktopFileRenamed(const std::wstring& oldName, const std::wstring& newName);
-    void OnDesktopFileDeleted(const std::wstring& fileName);
+    CorralWindow *GetCatchAllCorral();
+    void OnDesktopFileAdded(const std::wstring &fileName);
+    void OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName);
+    void OnDesktopFileDeleted(const std::wstring &fileName);
 
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    static App* instance;
+    static App *instance;
 
     HWND messageWindow;
-    UINT wmTaskbarCreated = 0;     // RegisterWindowMessage("TaskbarCreated")
-    ULONG shellNotifyId = 0;       // SHChangeNotifyRegister token
+    UINT wmTaskbarCreated = 0; // RegisterWindowMessage("TaskbarCreated")
+    ULONG shellNotifyId = 0;   // SHChangeNotifyRegister token
     AppConfig config;
     std::string configPath;
     std::unique_ptr<MouseHook> mouseHook;
@@ -163,6 +185,6 @@ private:
     // Desktop icon push cache
     std::map<std::wstring, POINT2D> cachedDesktopIconPositions;
     bool desktopIconCacheValid = false;
-    bool IsIconHiddenByCorral(const std::wstring& displayName) const;
+    bool IsIconHiddenByCorral(const std::wstring &displayName) const;
     std::vector<RECT> GetAllCorralRects() const;
 };

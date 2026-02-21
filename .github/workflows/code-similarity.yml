@@ -1,0 +1,35 @@
+name: Code Similarity Scan
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fossology:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run FOSSology scan (Docker)
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/project \
+            fossology/fossology \
+            /usr/local/share/fossology/fo_cli \
+            --upload /project \
+            --scan nomos,monk \
+            --output /project/fossology-report.json \
+            --format json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: fossology-report
+          path: fossology-report.json
+- name: Fail on detected matches
+        run: |
+          if grep -q "match" fossology-report.json; then
+            echo "Possible copied code detected"
+            exit 1
+          fi          
