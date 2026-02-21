@@ -6,10 +6,37 @@ Write-Host "Checking required tools for building DexCorral...`n" -ForegroundColo
 
 $allGood = $true
 
-# Check CMake
+# Check CMake (standalone on PATH, or bundled with Visual Studio)
 Write-Host "[1/4] Checking CMake..." -ForegroundColor Yellow
+$cmakeExe = $null
+$cmakeSource = ""
+
+# 1. Try cmake on PATH first
 try {
-    $cmakeVersionOutput = cmake --version 2>&1 | Select-Object -First 1
+    $cmakeOnPath = cmake --version 2>&1 | Select-Object -First 1
+    if ($cmakeOnPath -match "cmake version") {
+        $cmakeExe = "cmake"
+        $cmakeSource = "standalone"
+    }
+} catch { }
+
+# 2. If not on PATH, look inside the Visual Studio installation
+if (-not $cmakeExe) {
+    $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vsWhere) {
+        $vsInstallPath = & $vsWhere -latest -property installationPath 2>$null
+        if ($vsInstallPath) {
+            $vsCmake = Join-Path $vsInstallPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+            if (Test-Path $vsCmake) {
+                $cmakeExe = $vsCmake
+                $cmakeSource = "Visual Studio"
+            }
+        }
+    }
+}
+
+if ($cmakeExe) {
+    $cmakeVersionOutput = & $cmakeExe --version 2>&1 | Select-Object -First 1
     if ($cmakeVersionOutput -match "cmake version (\d+\.\d+\.\d+)") {
         $cmakeVersion = $matches[1]
         $versionParts = $cmakeVersion.Split('.')
@@ -17,16 +44,17 @@ try {
         $minor = [int]$versionParts[1]
 
         if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 15)) {
-            Write-Host "      ✓ CMake $cmakeVersion (minimum 3.15 required)" -ForegroundColor Green
+            Write-Host "      ✓ CMake $cmakeVersion via $cmakeSource (minimum 3.15 required)" -ForegroundColor Green
         } else {
             Write-Host "      ✗ CMake $cmakeVersion is too old (minimum 3.15 required)" -ForegroundColor Red
             Write-Host "        Install: winget install Kitware.CMake" -ForegroundColor Gray
             $allGood = $false
         }
     }
-} catch {
-    Write-Host "      ✗ CMake not found" -ForegroundColor Red
-    Write-Host "        Install: winget install Kitware.CMake" -ForegroundColor Gray
+} else {
+    Write-Host "      ✗ CMake not found (checked PATH and Visual Studio installation)" -ForegroundColor Red
+    Write-Host "        Install via VS Installer: add 'C++ CMake tools for Windows' component" -ForegroundColor Gray
+    Write-Host "        Or standalone: winget install Kitware.CMake" -ForegroundColor Gray
     $allGood = $false
 }
 

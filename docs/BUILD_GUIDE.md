@@ -9,6 +9,10 @@ How to build DexCorral from source.
 - Windows 10 SDK (included with the workload above)
 - Internet access on first build (CMake fetches Google Test automatically)
 
+## Verify your environment
+
+To confirm all prerequisites are present: `.\DexCorral\check-env.ps1`
+
 ## Build
 
 Run from the repo root or the `DexCorral/` directory:
