@@ -48,6 +48,8 @@ add_library(DexCorralHook SHARED
     src/MonitorManager.cpp
     src/FolderWatcher.cpp
     src/HookBridge.cpp
+    src/IconUtils.cpp
+    src/LayoutMath.cpp
 )
 
 target_include_directories(DexCorralHook PRIVATE
@@ -78,3 +80,33 @@ set_target_properties(DexCorralHook PROPERTIES
 set_property(TARGET DexCorralHook PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # nlohmann/json is included as a single header in include/nlohmann/json.hpp
+
+# ============================================================================
+# Unit tests (Google Test via FetchContent)
+# ============================================================================
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+# Match the static CRT used by the main targets
+set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+add_executable(DexCorralTests
+    tests/test_config.cpp
+    tests/test_layout.cpp
+    tests/test_icon_utils.cpp
+    src/LayoutMath.cpp
+    src/IconUtils.cpp
+)
+
+target_include_directories(DexCorralTests PRIVATE include)
+target_link_libraries(DexCorralTests PRIVATE GTest::gtest_main)
+target_compile_definitions(DexCorralTests PRIVATE UNICODE _UNICODE NOMINMAX)
+set_property(TARGET DexCorralTests PROPERTY MSVC_RUNTIME_LIBRARY
+    "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+enable_testing()
+add_test(NAME DexCorralTests COMMAND DexCorralTests)

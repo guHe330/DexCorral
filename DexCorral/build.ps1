@@ -3,6 +3,7 @@
 
 param(
     [switch]$Clean,
+    [switch]$SkipTests,
     [string]$BuildType = "Release"
 )
 
@@ -130,6 +131,30 @@ if ($exitCode -eq 0) {
     Write-Host ""
     Write-Host "To install:   DexCorral.exe --register  (run as Admin)" -ForegroundColor Cyan
     Write-Host "To uninstall: DexCorral.exe --unregister" -ForegroundColor Cyan
+
+    # Run unit tests
+    $testsExe = Join-Path $buildDir "DexCorralTests.exe"
+    if ($SkipTests) {
+        Write-Host ""
+        Write-Host "Tests skipped (-SkipTests)" -ForegroundColor DarkGray
+    } elseif (Test-Path $testsExe) {
+        Write-Host ""
+        Write-Host "Running unit tests..." -ForegroundColor Green
+        & $testsExe
+        $testExitCode = $LASTEXITCODE
+        if ($testExitCode -ne 0) {
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Red
+            Write-Host "UNIT TESTS FAILED — zip/installer skipped" -ForegroundColor Red
+            Write-Host "Fix failures before shipping." -ForegroundColor Red
+            Write-Host "========================================" -ForegroundColor Red
+            exit $testExitCode
+        }
+        Write-Host "All tests passed." -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "DexCorralTests.exe not found — skipping tests" -ForegroundColor DarkGray
+    }
 
     # Create release zip
     $zipPath = Join-Path $buildDir "DexCorral.zip"

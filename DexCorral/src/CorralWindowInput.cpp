@@ -9,6 +9,7 @@
 #include "CorralWindow.h"
 #include "App.h"
 #include "DesktopIcons.h"
+#include "IconUtils.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <ShlObj.h>
@@ -1225,14 +1226,7 @@ void CorralWindow::OnIconDragEnd() {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(draggedFile);
                     displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
                 } else {
-                    displayName = Utf8ToWide(draggedFile);
-                    // Strip .lnk to get display name (matches ListView item text)
-                    if (displayName.length() > 4) {
-                        std::wstring ext = displayName.substr(displayName.length() - 4);
-                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
-                            displayName = displayName.substr(0, displayName.length() - 4);
-                        }
-                    }
+                    displayName = IconUtils::StripLnkExtension(Utf8ToWide(draggedFile));
                 }
 
                 if (!displayName.empty()) {

@@ -1,65 +1,83 @@
 # Build Guide
 
-This document describes how to build DexCorral from source.
+How to build DexCorral from source.
 
 ## Prerequisites
 
-To build the project, you need the following tools installed:
+- Visual Studio 2022 with the **Desktop development with C++** workload
+- CMake 3.15 or later (included with Visual Studio, or install separately)
+- Windows 10 SDK (included with the workload above)
+- Internet access on first build (CMake fetches Google Test automatically)
 
-*   Visual Studio 2022 or later (with "Desktop development with C++" workload)
-*   CMake 3.15 or later
-*   Windows 10 SDK (usually included with Visual Studio)
+## Build
+
+Run from the repo root or the `DexCorral/` directory:
+
+```powershell
+cd DexCorral
+powershell -File build.ps1
+```
+
+The script:
+1. Kills any running DexCorral process (unlocks the exe for relinking).
+2. Restarts Explorer if `DexCorralHook.dll` is locked by the shell.
+3. Configures and builds with CMake + Ninja (falls back to NMake if Ninja is absent).
+4. Runs the unit tests — build stops here if any test fails.
+5. Packages `DexCorral.zip` from the two output binaries.
+6. Builds the Inno Setup installer if ISCC is available.
+
+Output goes to `DexCorral/build/`.
+
+## Build switches
+
+| Switch | Description |
+|--------|-------------|
+| `-Clean` | Delete `DexCorral/build/` before building (full rebuild). |
+| `-SkipTests` | Skip running unit tests after a successful build. |
+| `-BuildType <type>` | CMake build type. Default: `Release`. Use `Debug` for a debug build. |
+
+```powershell
+# Full clean rebuild
+powershell -File build.ps1 -Clean
+
+# Quick iteration — skip tests
+powershell -File build.ps1 -SkipTests
+
+# Debug build
+powershell -File build.ps1 -BuildType Debug
+
+# Combine switches
+powershell -File build.ps1 -Clean -BuildType Debug -SkipTests
+```
+
+## Run tests manually
+
+```powershell
+DexCorral\build\DexCorralTests.exe
+```
+
+For Win32-dependent behaviour that cannot be unit tested (Explorer hook, drag-drop, DPI scaling, multi-monitor, etc.) see [INTEGRATION_TESTS.md](../INTEGRATION_TESTS.md).
+
+## Output binaries
+
+| File | Description |
+|------|-------------|
+| `build/DexCorralHook.dll` | Monolith shell extension — all app logic + Explorer hook. |
+| `build/DexCorral.exe` | Registration tool (run once as admin to install the shell extension). |
+| `build/DexCorralTests.exe` | Unit test runner. |
+| `build/DexCorral.zip` | Release archive containing the two distributable binaries. |
+
+## Unlock the DLL manually
+
+If the build fails because `DexCorralHook.dll` is locked by Explorer and the script's automatic unlock doesn't work:
+
+```powershell
+Stop-Process -Name explorer -Force; Start-Sleep 3; Start-Process explorer.exe
+```
 
 ## Dependencies
 
-The project uses the following third-party libraries:
-
-*   **nlohmann/json**: A header-only JSON library for C++. It is included in the source tree under `DexCorral/include/nlohmann/`.
-
-## Build Instructions
-
-You can build the project using the provided PowerShell script or manually via CMake.
-
-### Automated Build (PowerShell)
-
-Run the following command from the root of the repository:
-
-```powershell
-.\build.ps1
-```
-
-This script will:
-1.  Create a `build` directory.
-2.  Run CMake to generate the Visual Studio solution.
-3.  Build the project in Release configuration.
-
-### Manual Build
-
-If you prefer to run the commands manually:
-
-1.  Open a terminal (PowerShell or Command Prompt).
-2.  Navigate to the `DexCorralCpp` directory.
-3.  Create and enter a build directory:
-    ```powershell
-    mkdir build
-    cd build
-    ```
-4.  Generate the build files:
-    ```powershell
-    cmake .. -G "Visual Studio 17 2022" -A x64
-    ```
-5.  Build the project:
-    ```powershell
-    cmake --build . --config Release
-    ```
-
-## Output
-
-After a successful build, the executable `DexCorralCpp.exe` will be located in:
-`DexCorralCpp/build/Release/DexCorralCpp.exe`
-
-## Folder Structure
-
-*   `DexCorralCpp/include/`: Header files (.h)
-*   `DexCorralCpp/src/`: Source files (.cpp)
-*   `DexCorralCpp/include/nlohmann/`: Third-party JSON library
+| Dependency | How it's included |
+|------------|-------------------|
+| [nlohmann/json](https://github.com/nlohmann/json) 3.11.3 | Single header checked into `DexCorral/include/nlohmann/json.hpp` |
+| [Google Test](https://github.com/google/googletest) 1.14.0 | Downloaded by CMake `FetchContent` on first build; cached in the build tree |

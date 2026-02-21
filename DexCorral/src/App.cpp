@@ -10,6 +10,7 @@
 #include "App.h"
 #include "CorralWindow.h"
 #include "DesktopIcons.h"
+#include "IconUtils.h"
 #include "DesktopMonitor.h"
 #include "HookBridge.h"
 #include "Version.h"
@@ -384,18 +385,11 @@ void App::UpdateHookHiddenIcons() {
                     continue;
                 }
 
-                // Convert UTF-8 filename to wide
+                // Convert UTF-8 filename to wide and strip .lnk extension
                 int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
                 std::wstring wName(size, 0);
                 MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
-
-                // Strip .lnk extension to get display name (same as CorralWindowIcons.cpp)
-                if (wName.length() > 4) {
-                    std::wstring ext = wName.substr(wName.length() - 4);
-                    if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
-                        wName = wName.substr(0, wName.length() - 4);
-                    }
-                }
+                wName = IconUtils::StripLnkExtension(wName);
 
                 displayNames.push_back(wName);
             }
@@ -443,12 +437,7 @@ void App::PositionHiddenIconsUnderCorrals() {
                     int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
                     name.resize(size);
                     MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
-                    if (name.length() > 4) {
-                        std::wstring ext = name.substr(name.length() - 4);
-                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
-                            name = name.substr(0, name.length() - 4);
-                        }
-                    }
+                    name = IconUtils::StripLnkExtension(name);
                 }
                 if (!name.empty()) {
                     positions[name] = { center.x, center.y };
@@ -501,13 +490,7 @@ bool App::IsIconHiddenByCorral(const std::wstring& displayName) const {
                     int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
                     name.resize(size);
                     MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
-                    // Strip .lnk extension
-                    if (name.length() > 4) {
-                        std::wstring ext = name.substr(name.length() - 4);
-                        if (_wcsicmp(ext.c_str(), L".lnk") == 0) {
-                            name = name.substr(0, name.length() - 4);
-                        }
-                    }
+                    name = IconUtils::StripLnkExtension(name);
                 }
                 if (!name.empty() && _wcsicmp(name.c_str(), displayName.c_str()) == 0) {
                     return true;

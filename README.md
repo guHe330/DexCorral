@@ -1,10 +1,11 @@
 # DexCorral
 
-DexCorral is a high-performance, native C++ desktop organization tool for Windows. It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals".
+DexCorral is a native C++ desktop organization tool for Windows. 
+It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals".
 
-> **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team — just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
+> **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team, just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
 
-> **Privacy & Trust.** DexCorral is completely ad-free, collects no telemetry or user data, and never communicates with any server. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. That's it — nothing leaves your machine.
+> **Privacy & Trust.** DexCorral is ad-free, collects no telemetry or user data, and never communicates with any server. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. That's it — nothing leaves your machine.
 
 > **Alpha** — This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorralCpp/issues).
 
@@ -13,7 +14,7 @@ DexCorral is a high-performance, native C++ desktop organization tool for Window
 *   **Status**: Alpha (read-only repo until beta)
 *   **Version**: C++ Native (Win32)
 *   **Executable Size**: ~750KB (exe + dll)
-*   **Platform**: Windows 10 / 11
+*   **Platform**: Windows 11
 *   **License**: MIT
 
 ## Features
@@ -52,6 +53,12 @@ DexCorral is available for download on GitHub.
 
 *   [Planned Features](https://github.com/guHe330/DexCorralCpp/issues?q=is%3Aissue+label%3Aenhancement) - Upcoming features and improvements
 *   [Known Bugs](https://github.com/guHe330/DexCorralCpp/issues?q=is%3Aissue+label%3Abug) - Open bug reports
+
+## Testing
+
+Unit tests (config JSON round-trips, layout math, string utilities) run automatically at the end of `build.ps1`. To skip them during quick iteration: `build.ps1 -SkipTests`. To run manually: `DexCorral/build/DexCorralTests.exe`.
+
+For Win32-dependent behaviour that can't be unit tested (Explorer hook, drag-drop, DPI scaling, etc.) see [INTEGRATION_TESTS.md](INTEGRATION_TESTS.md).
 
 ## Documentation
 

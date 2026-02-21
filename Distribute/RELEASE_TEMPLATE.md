@@ -36,10 +36,10 @@
 
 ### What's New
 
-- Unified text rendering: two-pass shadow+foreground for readable labels on any wallpaper
-- Per-tab background colors in title bar
-- Resize snap: alignment snapping to all corrals on the same monitor
-- Resize snap: filter to same-monitor corrals only
+- Unit test suite (Google Test via CMake FetchContent): config JSON round-trips, layout math, icon utils
+- `IconUtils` and `LayoutMath` modules extracted as pure testable functions
+- `build.ps1 -SkipTests` switch; tests now run automatically after each successful build
+- Updated build guide and README
 
 ### Known Issues
 
