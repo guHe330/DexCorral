@@ -1,7 +1,8 @@
 # DexCorral
 
-DexCorral is a native C++ desktop organization tool for Windows. 
+DexCorral is a native C++ desktop organization tool for Windows.
 It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals".
+Corrals can also act as virtual folders — point one at a directory and its contents appear directly on your desktop, neatly contained within the Corral.
 
 > **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team, just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
 
@@ -15,7 +16,7 @@ It helps you keep your desktop clean by grouping icons into shaded, customizable
 *   **Version**: C++ Native (Win32)
 *   **Executable Size**: ~750KB (exe + dll)
 *   **Platform**: Windows 11
-*   **License**: MIT
+*   **License**: GPLv3
 
 ## Features
 
@@ -27,6 +28,7 @@ It helps you keep your desktop clean by grouping icons into shaded, customizable
 *   **Persistence**: Your Corral layout and icon assignments are saved and restored automatically.
 
 ### User Interface
+*   **Fully Adjustable Opacity**: Corrals range from completely transparent to fully opaque — at full opacity the Corral fill disappears entirely, letting your desktop wallpaper, live backgrounds, or animated scenes show through unobstructed while icons remain perfectly organized on top.
 *   **Layered Transparency**: Uses Windows layered windows for smooth semi-transparent color overlays.
 *   **Icon Hover Effects**: Visual hover highlights when mousing over icons in corrals.
 *   **Drop-on-Icon**: Drop files onto icons inside corrals (e.g., drop a file onto an executable to open it).
@@ -40,14 +42,18 @@ It helps you keep your desktop clean by grouping icons into shaded, customizable
 
 ## Installation
 
-DexCorral is available for download on GitHub.
+DexCorral is available for download on the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
 
-1.  Navigate to the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
-2.  Download the latest release containing `DexCorral.exe` and `DexCorralHook.dll`.
-3.  Place both files in the same folder and run `DexCorral.exe --register` (one-time setup, requires admin).
+### Installer (recommended)
+
+Download and run the provided installer. Because the binaries are currently unsigned, Windows SmartScreen will likely block it on first run — click **More info** then **Run anyway** to proceed. Some antivirus software may also flag the files as suspicious; this is normal for unsigned software from small developers. Code signing will be added at a later stage.
+
+### Manual Installation
+
+1.  Download the latest release containing `DexCorral.exe` and `DexCorralHook.dll`.
+2.  Place both files in the same folder (e.g. `C:\Program Files\DexCorral\`).
+3.  Open a command prompt **as Administrator** and run `DexCorral.exe --register` (one-time setup).
 4.  Restart Explorer or log out/in for the shell extension to load.
-
-> **Note:** The binaries and installer are currently unsigned. This means Windows SmartScreen will show a warning on first run, and some antivirus software may flag the files as suspicious — this is normal for unsigned software from small developers. Click "More info" then "Run anyway" to proceed past SmartScreen. Code signing will be added at a later stage.
 
 ## Roadmap & Issues
 
@@ -68,11 +74,6 @@ For Win32-dependent behaviour that can't be unit tested (Explorer hook, drag-dro
 *   [Build Guide](docs/BUILD_GUIDE.md): Instructions for compiling the project from source.
 
 Per-release notes are also available on the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
-
-## Future Plans
-
-*   **Custom icons**: The application and tray currently use default Windows icons. Custom branding icons for the exe, DLL, tray, and MSIX package are planned.
-*   **Lighter config parser**: Replace [nlohmann/json](https://github.com/nlohmann/json) with a lighter-weight config parser. The current single-header library is ~25K lines for what amounts to basic load/save of a flat config structure. A minimal custom parser or a smaller library would reduce compile times and binary size.
 
 ## Third-Party Libraries
 
