@@ -1,35 +1,51 @@
-name: Code Similarity Scan
-
+name: Scancode Toolkit
 on:
   workflow_dispatch:
 
 jobs:
-  fossology:
+  scancode:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Run FOSSology scan (Docker)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install scancode-toolkit
+        run: pip install scancode-toolkit
+
+      - name: Run scan
         run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/project \
-            fossology/fossology \
-            /usr/local/share/fossology/fo_cli \
-            --upload /project \
-            --scan nomos,monk \
-            --output /project/fossology-report.json \
-            --format json
+          scancode \
+            --license \
+            --copyright \
+            --json-pp scancode-report.json \
+            .
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: fossology-report
-          path: fossology-report.json
-- name: Fail on detected matches
+          name: scancode-report
+          path: scancode-report.json
+
+      - name: Fail on license policy violations
         run: |
-          if grep -q "match" fossology-report.json; then
-            echo "Possible copied code detected"
-            exit 1
-          fi          
+          python - <<'EOF'
+          import json, sys
+          with open("scancode-report.json") as f:
+              report = json.load(f)
+          violations = [
+              file["path"]
+              for file in report.get("files", [])
+              for lic in file.get("licenses", [])
+              if lic.get("category") in ("Copyleft", "Proprietary Free")
+          ]
+          if violations:
+              print("License violations found in:")
+              print("\n".join(violations))
+              sys.exit(1)
+          print("No violations found.")
+          EOF
