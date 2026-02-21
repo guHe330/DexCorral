@@ -107,19 +107,19 @@ struct AppConfig
 {
     std::vector<CorralWindowConfig> Corrals;
     bool DesktopIconsVisible = true;
-    std::string DefaultColorHex = "#99000000"; // Default appearance for new corrals
+    std::string DefaultColorHex = "#7F0000FF"; // Default appearance for new corrals
     bool HideShortcutArrows = false;           // Hide the small arrow overlay on shortcut icons
 
     // Default appearance for new corrals
-    int DefaultTitleBarHeight = 32;
-    std::string DefaultHeaderFontName = "Segoe UI";
+    int DefaultTitleBarHeight = 26;
+    std::string DefaultHeaderFontName = "Segoe UI Semibold";
     int DefaultHeaderFontSize = 10;
     std::string DefaultHeaderFontColor = "#FFFFFF";
-    int DefaultIconOpacity = 255;
-    std::string DefaultIconTintColor = "#000000";
-    int DefaultIconTintStrength = 0;
-    int DefaultIconSpacingXPercent = 100;
-    int DefaultIconSpacingYPercent = 100;
+    int DefaultIconOpacity = 210;
+    std::string DefaultIconTintColor = "#0000FF";
+    int DefaultIconTintStrength = 28;
+    int DefaultIconSpacingXPercent = 91;
+    int DefaultIconSpacingYPercent = 85;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent)
 };

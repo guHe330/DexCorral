@@ -773,24 +773,31 @@ static LRESULT CALLBACK ShellDefViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wP
             NMLVCUSTOMDRAW* cd = (NMLVCUSTOMDRAW*)lParam;
 
             switch (cd->nmcd.dwDrawStage) {
-            case CDDS_PREPAINT:
-                return CDRF_NOTIFYITEMDRAW;
+            case CDDS_PREPAINT: {
+                // Call original chain first so other third-party hooks get
+                // their PREPAINT notification, then ensure we also get per-item callbacks.
+                LRESULT originalResult = CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+                return originalResult | CDRF_NOTIFYITEMDRAW;
+            }
 
             case CDDS_ITEMPREPAINT: {
                 // Check version counter - no kernel calls if unchanged
                 RefreshHiddenIconCache();
 
-                if (g_HiddenIcons.empty()) return CDRF_DODEFAULT;
+                if (!g_HiddenIcons.empty()) {
+                    // Get this icon's display name
+                    int itemIndex = (int)cd->nmcd.dwItemSpec;
+                    wchar_t buf[MAX_PATH] = {};
+                    GetItemDisplayName(itemIndex, buf, MAX_PATH);
 
-                // Get this icon's display name
-                int itemIndex = (int)cd->nmcd.dwItemSpec;
-                wchar_t buf[MAX_PATH] = {};
-                GetItemDisplayName(itemIndex, buf, MAX_PATH);
-
-                if (buf[0] && ShouldHideIcon(buf)) {
-                    return CDRF_SKIPDEFAULT;
+                    if (buf[0] && ShouldHideIcon(buf)) {
+                        return CDRF_SKIPDEFAULT;
+                    }
                 }
-                return CDRF_DODEFAULT;
+
+                // Not a DexCorral icon - let the original chain decide.
+                // This preserves other hooks' ability to hide their own icons.
+                return CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
             }
             }
         }

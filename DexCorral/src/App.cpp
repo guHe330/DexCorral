@@ -141,7 +141,19 @@ void App::Initialize()
         CorralTabConfig tab;
         tab.Title = "Desktop";
         tab.IsCatchAll = true; // First corral is catch-all
+        tab.ColorHex = config.DefaultColorHex;
         defaultConfig.Tabs.push_back(tab);
+
+        // Apply default appearance settings (same as CreateCorral)
+        defaultConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+        defaultConfig.HeaderFontName = config.DefaultHeaderFontName;
+        defaultConfig.HeaderFontSize = config.DefaultHeaderFontSize;
+        defaultConfig.HeaderFontColor = config.DefaultHeaderFontColor;
+        defaultConfig.IconOpacity = config.DefaultIconOpacity;
+        defaultConfig.IconTintColor = config.DefaultIconTintColor;
+        defaultConfig.IconTintStrength = config.DefaultIconTintStrength;
+        defaultConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
+        defaultConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
 
         auto corral = std::make_unique<CorralWindow>(defaultConfig);
         corral->Show();

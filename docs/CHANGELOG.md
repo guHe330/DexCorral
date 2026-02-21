@@ -9,6 +9,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.0.15] - 2026-02-21
+
+### Fixed
+- Compatibility with third-party NM_CUSTOMDRAW hooks: pass-through to original chain in `CDDS_PREPAINT` and for non-corral icons in `CDDS_ITEMPREPAINT`
+- First-launch corral now inherits default appearance settings (color, font, opacity, tint, spacing) from `AppConfig` defaults
+
+### Changed
+- Updated built-in defaults for new corrals: semi-transparent blue tint, compact spacing, slimmer title bar, Segoe UI Semibold header font
+
+---
+
 ## [1.0.14] - 2026-02-21
 
 ### Added

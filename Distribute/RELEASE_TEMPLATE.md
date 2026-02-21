@@ -36,10 +36,9 @@
 
 ### What's New
 
-- Unit test suite (Google Test via CMake FetchContent): config JSON round-trips, layout math, icon utils
-- `IconUtils` and `LayoutMath` modules extracted as pure testable functions
-- `build.ps1 -SkipTests` switch; tests now run automatically after each successful build
-- Updated build guide and README
+- Compatibility fix with third-party NM_CUSTOMDRAW hooks: DexCorral now passes through to the original chain for non-corral icons
+- Updated default appearance settings for new corrals (color, font, opacity, tint, spacing)
+- First-launch corral now correctly inherits default appearance settings from AppConfig
 
 ### Known Issues
 
