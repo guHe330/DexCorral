@@ -1,4 +1,25 @@
 /**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * CorralWindowCommands.cpp - Context menu handling and animation
  *
  * Implements right-click context menu and associated file operations (open, rename,
@@ -17,31 +38,38 @@
 // File-local helper functions for folder browsing
 // ============================================================================
 
-static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t* title) {
+static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title)
+{
     std::wstring result;
 
-    IFileDialog* pfd = nullptr;
+    IFileDialog *pfd = nullptr;
     HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
-                                   IID_PPV_ARGS(&pfd));
-    if (SUCCEEDED(hr)) {
+                                  IID_PPV_ARGS(&pfd));
+    if (SUCCEEDED(hr))
+    {
         DWORD dwOptions;
         hr = pfd->GetOptions(&dwOptions);
-        if (SUCCEEDED(hr)) {
+        if (SUCCEEDED(hr))
+        {
             hr = pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
         }
 
-        if (SUCCEEDED(hr)) {
+        if (SUCCEEDED(hr))
+        {
             pfd->SetTitle(title);
         }
 
         hr = pfd->Show(hwndOwner);
-        if (SUCCEEDED(hr)) {
-            IShellItem* psi = nullptr;
+        if (SUCCEEDED(hr))
+        {
+            IShellItem *psi = nullptr;
             hr = pfd->GetResult(&psi);
-            if (SUCCEEDED(hr)) {
+            if (SUCCEEDED(hr))
+            {
                 PWSTR pszPath = nullptr;
                 hr = psi->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
-                if (SUCCEEDED(hr)) {
+                if (SUCCEEDED(hr))
+                {
                     result = pszPath;
                     CoTaskMemFree(pszPath);
                 }
@@ -54,29 +82,35 @@ static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t* title) {
     return result;
 }
 
-static bool ValidateLocalFolder(const std::wstring& path, std::wstring& errorMsg) {
+static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg)
+{
     DWORD attrs = GetFileAttributesW(path.c_str());
-    if (attrs == INVALID_FILE_ATTRIBUTES) {
+    if (attrs == INVALID_FILE_ATTRIBUTES)
+    {
         errorMsg = L"The specified folder does not exist.";
         return false;
     }
 
-    if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+    if (!(attrs & FILE_ATTRIBUTE_DIRECTORY))
+    {
         errorMsg = L"The specified path is not a folder.";
         return false;
     }
 
     // Check for network path (starts with \\)
-    if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\') {
+    if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\')
+    {
         errorMsg = L"Network paths are not supported. Please select a local folder.";
         return false;
     }
 
     // Check if it's a network drive
-    if (path.length() >= 2 && path[1] == L':') {
-        wchar_t rootPath[4] = { path[0], L':', L'\\', L'\0' };
+    if (path.length() >= 2 && path[1] == L':')
+    {
+        wchar_t rootPath[4] = {path[0], L':', L'\\', L'\0'};
         UINT driveType = GetDriveTypeW(rootPath);
-        if (driveType == DRIVE_REMOTE) {
+        if (driveType == DRIVE_REMOTE)
+        {
             errorMsg = L"Network drives are not supported. Please select a local folder.";
             return false;
         }
@@ -89,12 +123,14 @@ static bool ValidateLocalFolder(const std::wstring& path, std::wstring& errorMsg
 // Context menu
 // ============================================================================
 
-void CorralWindow::ShowContextMenu(int x, int y) {
+void CorralWindow::ShowContextMenu(int x, int y)
+{
     HMENU menu = CreatePopupMenu();
 
     // Tab operations
     AppendMenuW(menu, MF_STRING, 15, L"Add Tab");
-    if (config.Tabs.size() > 1) {
+    if (config.Tabs.size() > 1)
+    {
         AppendMenuW(menu, MF_STRING, 14, L"Detach Tab");
     }
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -103,7 +139,8 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     AppendMenuW(menu, MF_STRING, 2, L"Appearance...");
 
     // Change Folder option for virtual tabs
-    if (GetActiveTab().IsVirtual) {
+    if (GetActiveTab().IsVirtual)
+    {
         AppendMenuW(menu, MF_STRING, 7, L"Change Folder...");
     }
 
@@ -120,18 +157,22 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
     // Catch-all option - only for non-virtual tabs
-    if (!GetActiveTab().IsVirtual) {
+    if (!GetActiveTab().IsVirtual)
+    {
         UINT catchAllFlags = MF_STRING | (GetActiveTab().IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
         AppendMenuW(menu, catchAllFlags, 3, L"Catch-All (receives new files)");
     }
 
     // Add Special Icons submenu - only for non-virtual tabs
     std::vector<SpecialDesktopIcon> specialIcons;
-    if (!GetActiveTab().IsVirtual) {
+    if (!GetActiveTab().IsVirtual)
+    {
         specialIcons = DesktopIcons::GetSpecialDesktopIcons();
-        if (!specialIcons.empty()) {
+        if (!specialIcons.empty())
+        {
             HMENU specialMenu = CreatePopupMenu();
-            for (int i = 0; i < (int)specialIcons.size() && i < 20; i++) {
+            for (int i = 0; i < (int)specialIcons.size() && i < 20; i++)
+            {
                 // Check if already in this corral
                 std::string shellEntry = "shell:" + WideToUtf8(specialIcons[i].clsid);
                 bool alreadyAdded = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), shellEntry) != GetActiveTab().Files.end();
@@ -153,13 +194,16 @@ void CorralWindow::ShowContextMenu(int x, int y) {
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
     // Delete Corral or Close Tab depending on tab count
-    if (config.Tabs.size() > 1) {
+    if (config.Tabs.size() > 1)
+    {
         AppendMenuW(menu, MF_STRING, 4, L"Close Tab");
-    } else {
+    }
+    else
+    {
         AppendMenuW(menu, MF_STRING, 4, L"Delete Corral");
     }
 
-    POINT pt = { x, y };
+    POINT pt = {x, y};
     ClientToScreen(hwnd, &pt);
 
     SetForegroundWindow(hwnd);
@@ -169,25 +213,36 @@ void CorralWindow::ShowContextMenu(int x, int y) {
 
     DestroyMenu(menu);
 
-    switch (cmd) {
-    case 1: ShowRenameDialog(); break;
-    case 2: ShowAppearanceDialog(); break;
-    case 3: ToggleCatchAll(); break;
-    case 4: DeleteCorral(); break;
+    switch (cmd)
+    {
+    case 1:
+        ShowRenameDialog();
+        break;
+    case 2:
+        ShowAppearanceDialog();
+        break;
+    case 3:
+        ToggleCatchAll();
+        break;
+    case 4:
+        DeleteCorral();
+        break;
     case 5:
-        if (App::GetInstance()) {
+        if (App::GetInstance())
+        {
             App::GetInstance()->ToggleDesktopIcons();
         }
         break;
     case 6:
-        if (App::GetInstance()) {
+        if (App::GetInstance())
+        {
             // Find a good position for the new corral
             RECT currentRect;
             GetWindowRect(hwnd, &currentRect);
 
             // Get screen dimensions
             HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            MONITORINFO mi = { sizeof(mi) };
+            MONITORINFO mi = {sizeof(mi)};
             GetMonitorInfo(hMon, &mi);
 
             POINT newPos;
@@ -200,13 +255,15 @@ void CorralWindow::ShowContextMenu(int x, int y) {
             newPos.y = currentRect.top + corralHeight / 2;
 
             // If that would go off screen, try below
-            if (newPos.x + corralWidth / 2 > mi.rcWork.right) {
+            if (newPos.x + corralWidth / 2 > mi.rcWork.right)
+            {
                 newPos.x = currentRect.left + corralWidth / 2;
                 newPos.y = currentRect.bottom + gap + corralHeight / 2;
             }
 
             // If that would also go off screen, offset from current
-            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom) {
+            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom)
+            {
                 newPos.x = currentRect.left + 50 + corralWidth / 2;
                 newPos.y = currentRect.top + 50 + corralHeight / 2;
             }
@@ -220,12 +277,13 @@ void CorralWindow::ShowContextMenu(int x, int y) {
         break;
     case 8:
         // New Virtual Corral
-        if (App::GetInstance()) {
+        if (App::GetInstance())
+        {
             RECT currentRect;
             GetWindowRect(hwnd, &currentRect);
 
             HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            MONITORINFO mi = { sizeof(mi) };
+            MONITORINFO mi = {sizeof(mi)};
             GetMonitorInfo(hMon, &mi);
 
             POINT newPos;
@@ -236,12 +294,14 @@ void CorralWindow::ShowContextMenu(int x, int y) {
             newPos.x = currentRect.right + gap + corralWidth / 2;
             newPos.y = currentRect.top + corralHeight / 2;
 
-            if (newPos.x + corralWidth / 2 > mi.rcWork.right) {
+            if (newPos.x + corralWidth / 2 > mi.rcWork.right)
+            {
                 newPos.x = currentRect.left + corralWidth / 2;
                 newPos.y = currentRect.bottom + gap + corralHeight / 2;
             }
 
-            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom) {
+            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom)
+            {
                 newPos.x = currentRect.left + 50 + corralWidth / 2;
                 newPos.y = currentRect.top + 50 + corralHeight / 2;
             }
@@ -249,35 +309,51 @@ void CorralWindow::ShowContextMenu(int x, int y) {
             App::GetInstance()->CreateVirtualCorralAt(newPos);
         }
         break;
-    case 10: SetViewMode(ViewMode::SmallIcons); break;
-    case 11: SetViewMode(ViewMode::MediumIcons); break;
-    case 12: SetViewMode(ViewMode::LargeIcons); break;
-    case 13: SetViewMode(ViewMode::Details); break;
-    case 14: DetachTab(config.ActiveTabIndex); break;
+    case 10:
+        SetViewMode(ViewMode::SmallIcons);
+        break;
+    case 11:
+        SetViewMode(ViewMode::MediumIcons);
+        break;
+    case 12:
+        SetViewMode(ViewMode::LargeIcons);
+        break;
+    case 13:
+        SetViewMode(ViewMode::Details);
+        break;
+    case 14:
+        DetachTab(config.ActiveTabIndex);
+        break;
     default:
         // Handle special icon additions (IDs 20-39)
-        if (cmd >= 20 && cmd < 40) {
+        if (cmd >= 20 && cmd < 40)
+        {
             int idx = cmd - 20;
-            if (idx < (int)specialIcons.size()) {
+            if (idx < (int)specialIcons.size())
+            {
                 std::string shellEntry = "shell:" + WideToUtf8(specialIcons[idx].clsid);
                 auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), shellEntry);
-                if (it == GetActiveTab().Files.end()) {
+                if (it == GetActiveTab().Files.end())
+                {
                     GetActiveTab().Files.push_back(shellEntry);
                     LoadFiles();
-                    if (App::GetInstance()) {
+                    if (App::GetInstance())
+                    {
                         App::GetInstance()->SaveConfig();
                     }
                 }
             }
         }
         break;
-    case 15: {
+    case 15:
+    {
         // Add new empty tab
         CorralTabConfig newTab;
         newTab.Title = "New Tab";
-        newTab.ColorHex = GetActiveTab().ColorHex;  // Inherit color from current tab
+        newTab.ColorHex = GetActiveTab().ColorHex; // Inherit color from current tab
         AddTab(newTab);
-        if (App::GetInstance()) {
+        if (App::GetInstance())
+        {
             App::GetInstance()->SaveConfig();
         }
         break;
@@ -289,46 +365,59 @@ void CorralWindow::ShowContextMenu(int x, int y) {
 // Command handlers
 // ============================================================================
 
-void CorralWindow::SetViewMode(ViewMode mode) {
-    if (GetActiveTab().GetViewMode() == mode) return;
+void CorralWindow::SetViewMode(ViewMode mode)
+{
+    if (GetActiveTab().GetViewMode() == mode)
+        return;
 
     GetActiveTab().SetViewMode(mode);
     iconSize = GetIconSizeForViewMode();
     UpdateIconSpacingForViewMode();
 
     // Reload icons to get appropriate size (uses LoadFiles which handles both normal and virtual corrals)
-    scrollPosition = 0;  // Reset scroll when changing view
+    scrollPosition = 0; // Reset scroll when changing view
     LoadFiles();
 
-    if (App::GetInstance()) {
+    if (App::GetInstance())
+    {
         App::GetInstance()->SaveConfig();
     }
 }
 
-void CorralWindow::DeleteCorral() {
+void CorralWindow::DeleteCorral()
+{
     // If there are multiple tabs, just close the active tab
-    if (config.Tabs.size() > 1) {
-        if (MessageBoxW(hwnd, L"Close this tab?", L"Confirm Close", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+    if (config.Tabs.size() > 1)
+    {
+        if (MessageBoxW(hwnd, L"Close this tab?", L"Confirm Close", MB_YESNO | MB_ICONQUESTION) == IDYES)
+        {
             config.Tabs.erase(config.Tabs.begin() + config.ActiveTabIndex);
-            if (config.ActiveTabIndex >= (int)config.Tabs.size()) {
+            if (config.ActiveTabIndex >= (int)config.Tabs.size())
+            {
                 config.ActiveTabIndex = (int)config.Tabs.size() - 1;
             }
             SetActiveTab(config.ActiveTabIndex);
-            if (App::GetInstance()) {
+            if (App::GetInstance())
+            {
                 App::GetInstance()->SaveConfig();
             }
         }
-    } else {
+    }
+    else
+    {
         // Only one tab - delete the entire window
-        if (MessageBoxW(hwnd, L"Delete this corral?", L"Confirm Delete", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-            if (App::GetInstance()) {
+        if (MessageBoxW(hwnd, L"Delete this corral?", L"Confirm Delete", MB_YESNO | MB_ICONQUESTION) == IDYES)
+        {
+            if (App::GetInstance())
+            {
                 App::GetInstance()->RemoveCorral(&config);
             }
         }
     }
 }
 
-void CorralWindow::ToggleRollUp() {
+void CorralWindow::ToggleRollUp()
+{
     // Cancel any hover animation in progress
     isHoverExpanded = false;
     isAnimating = false;
@@ -337,16 +426,18 @@ void CorralWindow::ToggleRollUp() {
 
     config.IsRolledUp = !config.IsRolledUp;
 
-    if (config.IsRolledUp) {
+    if (config.IsRolledUp)
+    {
         // Save current height before rolling up
         savedHeight = config.Height;
         SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, GetTitleBarHeight(),
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
-    else {
+    else
+    {
         // Restore to saved height
         SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, (int)savedHeight,
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         config.Height = savedHeight;
     }
 
@@ -354,52 +445,65 @@ void CorralWindow::ToggleRollUp() {
     CalculateIconLayout();
     UpdateLayeredContent();
 
-    if (App::GetInstance()) {
+    if (App::GetInstance())
+    {
         App::GetInstance()->SaveConfig();
     }
 }
 
-void CorralWindow::ToggleCatchAll() {
-    App* app = App::GetInstance();
-    if (!app) return;
+void CorralWindow::ToggleCatchAll()
+{
+    App *app = App::GetInstance();
+    if (!app)
+        return;
 
-    if (GetActiveTab().IsCatchAll) {
+    if (GetActiveTab().IsCatchAll)
+    {
         // Already catch-all - can't unset (must always have one)
         // Just ignore or could show a message
         return;
     }
 
     // Set this tab as catch-all and remove from all others
-    for (const auto& corral : app->GetCorrals()) {
-        for (auto& tab : corral->GetConfig().Tabs) {
-            if (&tab != &GetActiveTab() && tab.IsCatchAll) {
+    for (const auto &corral : app->GetCorrals())
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            if (&tab != &GetActiveTab() && tab.IsCatchAll)
+            {
                 tab.IsCatchAll = false;
             }
         }
-        if (corral.get() != this) {
-            corral->UpdateLayeredContent();  // Remove symbol
+        if (corral.get() != this)
+        {
+            corral->UpdateLayeredContent(); // Remove symbol
         }
     }
 
     GetActiveTab().IsCatchAll = true;
-    UpdateLayeredContent();  // Show symbol
+    UpdateLayeredContent(); // Show symbol
     app->SaveConfig();
 }
 
-void CorralWindow::ChangeFolderPath() {
-    if (!GetActiveTab().IsVirtual) return;
+void CorralWindow::ChangeFolderPath()
+{
+    if (!GetActiveTab().IsVirtual)
+        return;
 
     std::wstring newPath = BrowseForLocalFolder(hwnd, L"Select Folder for Virtual Corral");
-    if (newPath.empty()) return;
+    if (newPath.empty())
+        return;
 
     std::wstring errorMsg;
-    if (!ValidateLocalFolder(newPath, errorMsg)) {
+    if (!ValidateLocalFolder(newPath, errorMsg))
+    {
         MessageBoxW(hwnd, errorMsg.c_str(), L"Invalid Folder", MB_OK | MB_ICONWARNING);
         return;
     }
 
     // Stop existing watcher
-    if (folderWatcher) {
+    if (folderWatcher)
+    {
         folderWatcher->Stop();
         folderWatcher.reset();
     }
@@ -409,8 +513,7 @@ void CorralWindow::ChangeFolderPath() {
 
     // Update title to folder name
     size_t lastSlash = newPath.find_last_of(L"\\/");
-    std::wstring folderName = (lastSlash != std::wstring::npos) ?
-                              newPath.substr(lastSlash + 1) : newPath;
+    std::wstring folderName = (lastSlash != std::wstring::npos) ? newPath.substr(lastSlash + 1) : newPath;
     GetActiveTab().Title = WideToUtf8(folderName);
     SetWindowTextW(hwnd, folderName.c_str());
 
@@ -423,7 +526,8 @@ void CorralWindow::ChangeFolderPath() {
     SendToBottom();
 
     // Save config
-    if (App::GetInstance()) {
+    if (App::GetInstance())
+    {
         App::GetInstance()->SaveConfig();
     }
 }
@@ -432,8 +536,10 @@ void CorralWindow::ChangeFolderPath() {
 // Hover-expand animation for rolled-up corrals
 // ============================================================================
 
-void CorralWindow::StartHoverExpand() {
-    if (!config.IsRolledUp || isHoverExpanded || isAnimating) return;
+void CorralWindow::StartHoverExpand()
+{
+    if (!config.IsRolledUp || isHoverExpanded || isAnimating)
+        return;
 
     RECT rect;
     GetWindowRect(hwnd, &rect);
@@ -444,17 +550,20 @@ void CorralWindow::StartHoverExpand() {
     int expandedHeight = (int)savedHeight;
     int bottomIfDown = rect.top + expandedHeight;
 
-    expandUpward = (bottomIfDown > screenHeight - 50);  // 50px buffer for taskbar
+    expandUpward = (bottomIfDown > screenHeight - 50); // 50px buffer for taskbar
 
     animationStartHeight = rect.bottom - rect.top;
     animationTargetHeight = expandedHeight;
     animationStartTop = rect.top;
 
-    if (expandUpward) {
+    if (expandUpward)
+    {
         // Move window up while expanding
         animationTargetTop = rect.top - (expandedHeight - animationStartHeight);
-    } else {
-        animationTargetTop = rect.top;  // Stay in place
+    }
+    else
+    {
+        animationTargetTop = rect.top; // Stay in place
     }
 
     animationStartTime = GetTickCount();
@@ -465,8 +574,10 @@ void CorralWindow::StartHoverExpand() {
     SetTimer(hwnd, ANIMATION_TIMER_ID, 16, nullptr);
 }
 
-void CorralWindow::StartHoverCollapse() {
-    if (!isHoverExpanded || isAnimating) return;
+void CorralWindow::StartHoverCollapse()
+{
+    if (!isHoverExpanded || isAnimating)
+        return;
 
     RECT rect;
     GetWindowRect(hwnd, &rect);
@@ -475,11 +586,14 @@ void CorralWindow::StartHoverCollapse() {
     animationTargetHeight = GetTitleBarHeight();
     animationStartTop = rect.top;
 
-    if (expandUpward) {
+    if (expandUpward)
+    {
         // Move window back down while collapsing
         animationTargetTop = rect.top + (animationStartHeight - GetTitleBarHeight());
-    } else {
-        animationTargetTop = rect.top;  // Stay in place
+    }
+    else
+    {
+        animationTargetTop = rect.top; // Stay in place
     }
 
     animationStartTime = GetTickCount();
@@ -488,24 +602,30 @@ void CorralWindow::StartHoverCollapse() {
     SetTimer(hwnd, ANIMATION_TIMER_ID, 16, nullptr);
 }
 
-void CorralWindow::OnAnimationTimer() {
+void CorralWindow::OnAnimationTimer()
+{
     DWORD elapsed = GetTickCount() - animationStartTime;
     float progress = (float)elapsed / ANIMATION_DURATION;
 
-    if (progress >= 1.0f) {
+    if (progress >= 1.0f)
+    {
         progress = 1.0f;
         isAnimating = false;
         KillTimer(hwnd, ANIMATION_TIMER_ID);
 
         // If we just collapsed, mark as not hover-expanded
-        if (animationTargetHeight == GetTitleBarHeight()) {
+        if (animationTargetHeight == GetTitleBarHeight())
+        {
             isHoverExpanded = false;
         }
 
         // Start hover check timer to detect when mouse leaves
-        if (isHoverExpanded) {
+        if (isHoverExpanded)
+        {
             SetTimer(hwnd, HOVER_CHECK_TIMER_ID, 100, nullptr);
-        } else {
+        }
+        else
+        {
             KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
         }
     }
@@ -517,14 +637,15 @@ void CorralWindow::OnAnimationTimer() {
     int currentTop = animationStartTop + (int)((animationTargetTop - animationStartTop) * easedProgress);
 
     SetWindowPos(hwnd, nullptr, (int)config.Left, currentTop, (int)config.Width, currentHeight,
-        SWP_NOZORDER | SWP_NOACTIVATE);
+                 SWP_NOZORDER | SWP_NOACTIVATE);
 
     // Recalculate layout and redraw
     CalculateIconLayout();
     UpdateLayeredContent();
 }
 
-void CorralWindow::OnHoverCheckTimer() {
+void CorralWindow::OnHoverCheckTimer()
+{
     // Check if mouse is still inside the window
     POINT pt;
     GetCursorPos(&pt);
@@ -532,38 +653,45 @@ void CorralWindow::OnHoverCheckTimer() {
     RECT rect;
     GetWindowRect(hwnd, &rect);
 
-    if (!PtInRect(&rect, pt)) {
+    if (!PtInRect(&rect, pt))
+    {
         // Mouse has left - collapse
         mouseInsideWindow = false;
         KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
-        if (isHoverExpanded && !isAnimating) {
+        if (isHoverExpanded && !isAnimating)
+        {
             StartHoverCollapse();
         }
     }
 }
 
-void CorralWindow::StartOpacityAnimation(int target) {
+void CorralWindow::StartOpacityAnimation(int target)
+{
     StartOpacityAnimation(target, (target == 255) ? 0 : config.IconTintStrength);
 }
 
-void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal) {
+void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal)
+{
     bool opacityChanged = (currentOpacity != target);
     bool tintChanged = (currentTintStrength != tintTargetVal);
-    if (!opacityChanged && !tintChanged) return;  // Already at target
+    if (!opacityChanged && !tintChanged)
+        return; // Already at target
     opacityStart = currentOpacity;
     opacityTarget = target;
     tintStart = currentTintStrength;
     tintTarget = tintTargetVal;
     opacityAnimationStartTime = GetTickCount();
     isOpacityAnimating = true;
-    SetTimer(hwnd, OPACITY_TIMER_ID, 16, nullptr);  // ~60fps
+    SetTimer(hwnd, OPACITY_TIMER_ID, 16, nullptr); // ~60fps
 }
 
-void CorralWindow::OnOpacityAnimationTimer() {
+void CorralWindow::OnOpacityAnimationTimer()
+{
     DWORD elapsed = GetTickCount() - opacityAnimationStartTime;
     float progress = (float)elapsed / OPACITY_ANIMATION_DURATION;
 
-    if (progress >= 1.0f) {
+    if (progress >= 1.0f)
+    {
         progress = 1.0f;
         isOpacityAnimating = false;
         KillTimer(hwnd, OPACITY_TIMER_ID);
@@ -573,12 +701,16 @@ void CorralWindow::OnOpacityAnimationTimer() {
     float easedProgress = 1.0f - (1.0f - progress) * (1.0f - progress);
 
     currentOpacity = opacityStart + (int)((opacityTarget - opacityStart) * easedProgress);
-    if (currentOpacity < 0) currentOpacity = 0;
-    if (currentOpacity > 255) currentOpacity = 255;
+    if (currentOpacity < 0)
+        currentOpacity = 0;
+    if (currentOpacity > 255)
+        currentOpacity = 255;
 
     currentTintStrength = tintStart + (int)((tintTarget - tintStart) * easedProgress);
-    if (currentTintStrength < 0) currentTintStrength = 0;
-    if (currentTintStrength > 255) currentTintStrength = 255;
+    if (currentTintStrength < 0)
+        currentTintStrength = 0;
+    if (currentTintStrength > 255)
+        currentTintStrength = 255;
 
     UpdateLayeredContent();
 }

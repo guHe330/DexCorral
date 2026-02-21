@@ -1,4 +1,25 @@
 /**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * CorralWindowDialogs.cpp - Settings dialogs, inline rename, and file dialogs
  *
  * Implements all dialog user interfaces using in-memory DLGTEMPLATE construction
@@ -19,13 +40,16 @@
 // Icon rename support (inline edit control)
 // ============================================================================
 
-void CorralWindow::StartIconRename(int iconIndex) {
-    if (iconIndex < 0 || iconIndex >= (int)icons.size() || isRenamingIcon) {
+void CorralWindow::StartIconRename(int iconIndex)
+{
+    if (iconIndex < 0 || iconIndex >= (int)icons.size() || isRenamingIcon)
+    {
         return;
     }
 
     // Special shell icons cannot be renamed
-    if (icons[iconIndex].isSpecialIcon) return;
+    if (icons[iconIndex].isSpecialIcon)
+        return;
 
     isRenamingIcon = true;
     renamingIconIndex = iconIndex;
@@ -56,14 +80,14 @@ void CorralWindow::StartIconRename(int iconIndex) {
         hwnd,
         nullptr,
         GetModuleHandleW(nullptr),
-        nullptr
-    );
+        nullptr);
 
-    if (hEditControl) {
+    if (hEditControl)
+    {
         // Set font to match the label
         HFONT hFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+                                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                  CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         SendMessageW(hEditControl, WM_SETFONT, (WPARAM)hFont, TRUE);
 
         // Select all text
@@ -77,15 +101,19 @@ void CorralWindow::StartIconRename(int iconIndex) {
     }
 }
 
-void CorralWindow::EndIconRename(bool save) {
-    if (!isRenamingIcon || !hEditControl) {
+void CorralWindow::EndIconRename(bool save)
+{
+    if (!isRenamingIcon || !hEditControl)
+    {
         return;
     }
 
-    if (save && renamingIconIndex >= 0 && renamingIconIndex < (int)icons.size()) {
+    if (save && renamingIconIndex >= 0 && renamingIconIndex < (int)icons.size())
+    {
         // Get the new name from edit control
         int len = GetWindowTextLengthW(hEditControl);
-        if (len > 0) {
+        if (len > 0)
+        {
             std::wstring newName(len + 1, L'\0');
             GetWindowTextW(hEditControl, &newName[0], len + 1);
             newName.resize(len);
@@ -93,31 +121,36 @@ void CorralWindow::EndIconRename(bool save) {
             // Trim whitespace
             size_t start = newName.find_first_not_of(L" \t\r\n");
             size_t end = newName.find_last_not_of(L" \t\r\n");
-            if (start != std::wstring::npos && end != std::wstring::npos) {
+            if (start != std::wstring::npos && end != std::wstring::npos)
+            {
                 newName = newName.substr(start, end - start + 1);
             }
 
             // Only rename if name actually changed and is not empty
-            if (!newName.empty() && newName != originalName) {
+            if (!newName.empty() && newName != originalName)
+            {
                 // Get the original file path
                 std::wstring oldPath = icons[renamingIconIndex].fullPath;
 
                 // Build new path
                 size_t lastSlash = oldPath.find_last_of(L"\\");
                 std::wstring newPath;
-                if (lastSlash != std::wstring::npos) {
+                if (lastSlash != std::wstring::npos)
+                {
                     newPath = oldPath.substr(0, lastSlash + 1) + newName;
 
                     // Add .lnk extension if it's a shortcut and not already present
                     bool oldPathIsLnk = oldPath.length() >= 4 && oldPath.substr(oldPath.length() - 4) == L".lnk";
                     bool newNameIsLnk = newName.length() >= 4 && newName.substr(newName.length() - 4) == L".lnk";
-                    if (oldPathIsLnk && !newNameIsLnk) {
+                    if (oldPathIsLnk && !newNameIsLnk)
+                    {
                         newPath += L".lnk";
                     }
                 }
 
                 // Attempt to rename the file
-                if (!newPath.empty() && MoveFileW(oldPath.c_str(), newPath.c_str())) {
+                if (!newPath.empty() && MoveFileW(oldPath.c_str(), newPath.c_str()))
+                {
                     // Update the icon data
                     icons[renamingIconIndex].fullPath = newPath;
                     icons[renamingIconIndex].wFileName = newPath.substr(lastSlash + 1);
@@ -125,23 +158,28 @@ void CorralWindow::EndIconRename(bool save) {
                     // Update display name (without .lnk)
                     std::wstring displayName = icons[renamingIconIndex].wFileName;
                     bool displayNameIsLnk = displayName.length() >= 4 && displayName.substr(displayName.length() - 4) == L".lnk";
-                    if (displayNameIsLnk) {
+                    if (displayNameIsLnk)
+                    {
                         displayName = displayName.substr(0, displayName.length() - 4);
                     }
                     icons[renamingIconIndex].displayName = displayName;
 
                     // Update config
-                    if (renamingIconIndex < (int)GetActiveTab().Files.size()) {
+                    if (renamingIconIndex < (int)GetActiveTab().Files.size())
+                    {
                         GetActiveTab().Files[renamingIconIndex] = WideToUtf8(icons[renamingIconIndex].wFileName);
                     }
 
-                    if (App::GetInstance()) {
+                    if (App::GetInstance())
+                    {
                         App::GetInstance()->SaveConfig();
                     }
-                } else {
+                }
+                else
+                {
                     // Rename failed - could show error message
                     MessageBoxW(hwnd, L"Failed to rename file. The file may be in use or you may not have permission.",
-                               L"Rename Error", MB_OK | MB_ICONERROR);
+                                L"Rename Error", MB_OK | MB_ICONERROR);
                 }
             }
         }
@@ -156,7 +194,8 @@ void CorralWindow::EndIconRename(bool save) {
     renamingIconIndex = -1;
     originalName.clear();
 
-    if (editToDestroy) {
+    if (editToDestroy)
+    {
         DestroyWindow(editToDestroy);
     }
 
@@ -170,16 +209,21 @@ void CorralWindow::EndIconRename(bool save) {
 }
 
 LRESULT CALLBACK CorralWindow::EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
-                                                  UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
-    CorralWindow* window = (CorralWindow*)dwRefData;
+                                                UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+{
+    CorralWindow *window = (CorralWindow *)dwRefData;
 
-    switch (uMsg) {
+    switch (uMsg)
+    {
     case WM_KEYDOWN:
-        if (wParam == VK_RETURN) {
+        if (wParam == VK_RETURN)
+        {
             // Enter - save and end rename
             window->EndIconRename(true);
             return 0;
-        } else if (wParam == VK_ESCAPE) {
+        }
+        else if (wParam == VK_ESCAPE)
+        {
             // Escape - cancel rename
             window->EndIconRename(false);
             return 0;
@@ -204,11 +248,14 @@ LRESULT CALLBACK CorralWindow::EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wPa
 // Rename dialog
 // ============================================================================
 
-static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_INITDIALOG: {
+static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_INITDIALOG:
+    {
         SetWindowLongPtrW(hDlg, GWLP_USERDATA, lParam);
-        wchar_t* initialText = (wchar_t*)lParam;
+        wchar_t *initialText = (wchar_t *)lParam;
         SetDlgItemTextW(hDlg, 101, initialText);
 
         HWND hEdit = GetDlgItem(hDlg, 101);
@@ -216,7 +263,8 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         SetFocus(hEdit);
 
         HWND hParent = GetParent(hDlg);
-        if (hParent) {
+        if (hParent)
+        {
             RECT parentRect, dlgRect;
             GetWindowRect(hParent, &parentRect);
             GetWindowRect(hDlg, &dlgRect);
@@ -225,17 +273,21 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
 
             // Get monitor work area
             HMONITOR hMon = MonitorFromWindow(hParent, MONITOR_DEFAULTTONEAREST);
-            MONITORINFO mi = { sizeof(mi) };
+            MONITORINFO mi = {sizeof(mi)};
             GetMonitorInfo(hMon, &mi);
 
             int cx = parentRect.left + (parentRect.right - parentRect.left - dlgWidth) / 2;
             int cy = parentRect.top + (parentRect.bottom - parentRect.top - dlgHeight) / 2;
 
             // Clamp to monitor bounds
-            if (cx + dlgWidth > mi.rcWork.right) cx = mi.rcWork.right - dlgWidth;
-            if (cx < mi.rcWork.left) cx = mi.rcWork.left;
-            if (cy + dlgHeight > mi.rcWork.bottom) cy = mi.rcWork.bottom - dlgHeight;
-            if (cy < mi.rcWork.top) cy = mi.rcWork.top;
+            if (cx + dlgWidth > mi.rcWork.right)
+                cx = mi.rcWork.right - dlgWidth;
+            if (cx < mi.rcWork.left)
+                cx = mi.rcWork.left;
+            if (cy + dlgHeight > mi.rcWork.bottom)
+                cy = mi.rcWork.bottom - dlgHeight;
+            if (cy < mi.rcWork.top)
+                cy = mi.rcWork.top;
 
             SetWindowPos(hDlg, nullptr, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
@@ -243,15 +295,17 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         return FALSE;
     }
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK) {
+        if (LOWORD(wParam) == IDOK)
+        {
             wchar_t buffer[256];
             GetDlgItemTextW(hDlg, 101, buffer, 256);
-            wchar_t* result = (wchar_t*)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
+            wchar_t *result = (wchar_t *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
             wcscpy_s(result, 256, buffer);
             EndDialog(hDlg, IDOK);
             return TRUE;
         }
-        if (LOWORD(wParam) == IDCANCEL) {
+        if (LOWORD(wParam) == IDCANCEL)
+        {
             EndDialog(hDlg, IDCANCEL);
             return TRUE;
         }
@@ -263,11 +317,12 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
     return FALSE;
 }
 
-void CorralWindow::ShowRenameDialog() {
+void CorralWindow::ShowRenameDialog()
+{
     WORD dlgTemplate[512] = {};
-    WORD* p = dlgTemplate;
+    WORD *p = dlgTemplate;
 
-    DLGTEMPLATE* dlg = (DLGTEMPLATE*)p;
+    DLGTEMPLATE *dlg = (DLGTEMPLATE *)p;
     dlg->style = DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT;
     dlg->cdit = 3;
     dlg->cx = 180;
@@ -277,50 +332,68 @@ void CorralWindow::ShowRenameDialog() {
     *p++ = 0;
     *p++ = 0;
 
-    const wchar_t* dlgTitle = L"Rename Corral";
+    const wchar_t *dlgTitle = L"Rename Corral";
     size_t titleLen = wcslen(dlgTitle) + 1;
     memcpy(p, dlgTitle, titleLen * sizeof(wchar_t));
     p += titleLen;
 
     *p++ = 9;
-    const wchar_t* fontName = L"Segoe UI";
+    const wchar_t *fontName = L"Segoe UI";
     size_t fontLen = wcslen(fontName) + 1;
     memcpy(p, fontName, fontLen * sizeof(wchar_t));
     p += fontLen;
 
-    if ((ULONG_PTR)p % 4) p++;
+    if ((ULONG_PTR)p % 4)
+        p++;
 
-    DLGITEMTEMPLATE* item = (DLGITEMTEMPLATE*)p;
+    DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *)p;
     item->style = WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL;
-    item->x = 8; item->y = 8; item->cx = 164; item->cy = 14;
+    item->x = 8;
+    item->y = 8;
+    item->cx = 164;
+    item->cy = 14;
     item->id = 101;
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0081;
-    *p++ = 0; *p++ = 0;
+    *p++ = 0xFFFF;
+    *p++ = 0x0081;
+    *p++ = 0;
+    *p++ = 0;
 
-    if ((ULONG_PTR)p % 4) p++;
+    if ((ULONG_PTR)p % 4)
+        p++;
 
-    item = (DLGITEMTEMPLATE*)p;
+    item = (DLGITEMTEMPLATE *)p;
     item->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP;
-    item->x = 70; item->y = 30; item->cx = 50; item->cy = 14;
+    item->x = 70;
+    item->y = 30;
+    item->cx = 50;
+    item->cy = 14;
     item->id = IDOK;
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    const wchar_t* okText = L"OK";
+    *p++ = 0xFFFF;
+    *p++ = 0x0080;
+    const wchar_t *okText = L"OK";
     memcpy(p, okText, 3 * sizeof(wchar_t));
-    p += 3; *p++ = 0;
+    p += 3;
+    *p++ = 0;
 
-    if ((ULONG_PTR)p % 4) p++;
+    if ((ULONG_PTR)p % 4)
+        p++;
 
-    item = (DLGITEMTEMPLATE*)p;
+    item = (DLGITEMTEMPLATE *)p;
     item->style = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
-    item->x = 124; item->y = 30; item->cx = 50; item->cy = 14;
+    item->x = 124;
+    item->y = 30;
+    item->cx = 50;
+    item->cy = 14;
     item->id = IDCANCEL;
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = 0x0080;
-    const wchar_t* cancelText = L"Cancel";
+    *p++ = 0xFFFF;
+    *p++ = 0x0080;
+    const wchar_t *cancelText = L"Cancel";
     memcpy(p, cancelText, 7 * sizeof(wchar_t));
-    p += 7; *p++ = 0;
+    p += 7;
+    *p++ = 0;
 
     wchar_t nameBuffer[256] = {};
     std::wstring currentTitle = Utf8ToWide(GetActiveTab().Title);
@@ -328,14 +401,14 @@ void CorralWindow::ShowRenameDialog() {
 
     INT_PTR result = DialogBoxIndirectParamW(
         GetModuleHandleW(nullptr),
-        (DLGTEMPLATE*)dlgTemplate,
+        (DLGTEMPLATE *)dlgTemplate,
         hwnd,
         RenameDlgProc,
-        (LPARAM)nameBuffer
-    );
+        (LPARAM)nameBuffer);
     SendToBottom();
 
-    if (result == IDOK && wcslen(nameBuffer) > 0) {
+    if (result == IDOK && wcslen(nameBuffer) > 0)
+    {
         int sz = WideCharToMultiByte(CP_UTF8, 0, nameBuffer, -1, nullptr, 0, nullptr, nullptr);
         std::string newTitle(sz - 1, 0);
         WideCharToMultiByte(CP_UTF8, 0, nameBuffer, -1, &newTitle[0], sz, nullptr, nullptr);
@@ -344,7 +417,8 @@ void CorralWindow::ShowRenameDialog() {
         SetWindowTextW(hwnd, nameBuffer);
         UpdateLayeredContent();
 
-        if (App::GetInstance()) {
+        if (App::GetInstance())
+        {
             App::GetInstance()->SaveConfig();
         }
     }
@@ -354,13 +428,14 @@ void CorralWindow::ShowRenameDialog() {
 // Appearance dialog
 // ============================================================================
 
-struct AppearanceDlgData {
+struct AppearanceDlgData
+{
     // Background color & opacity
     BYTE alpha;
     COLORREF color;
     HBRUSH hBrush;
     HWND previewWindow;
-    std::string* colorHex;
+    std::string *colorHex;
     bool colorChanged;
 
     // Header settings
@@ -387,28 +462,34 @@ struct AppearanceDlgData {
 
     // Checkboxes
     bool useAsDefault;
-    bool applyChangesToAll;   // Apply only changed settings to all corrals
+    bool applyChangesToAll;    // Apply only changed settings to all corrals
     bool applyEverythingToAll; // Copy full appearance to all corrals
 
     // Back-references for live preview
-    CorralWindowConfig* corralConfig;
-    CorralWindow* corralWindow;  // For triggering layout recalculation
+    CorralWindowConfig *corralConfig;
+    CorralWindow *corralWindow; // For triggering layout recalculation
 };
 
-static void AppearanceUpdateLivePreview(AppearanceDlgData* data, bool relayout = false) {
-    if (relayout && data->corralWindow) {
+static void AppearanceUpdateLivePreview(AppearanceDlgData *data, bool relayout = false)
+{
+    if (relayout && data->corralWindow)
+    {
         data->corralWindow->RecalculateLayout();
-        return;  // RecalculateLayout already calls UpdateLayeredContent
+        return; // RecalculateLayout already calls UpdateLayeredContent
     }
-    if (data->previewWindow) InvalidateRect(data->previewWindow, nullptr, FALSE);
+    if (data->previewWindow)
+        InvalidateRect(data->previewWindow, nullptr, FALSE);
 }
 
-static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
-    AppearanceDlgData* data = (AppearanceDlgData*)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
+static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    AppearanceDlgData *data = (AppearanceDlgData *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
 
-    switch (msg) {
-    case WM_INITDIALOG: {
-        data = (AppearanceDlgData*)lParam;
+    switch (msg)
+    {
+    case WM_INITDIALOG:
+    {
+        data = (AppearanceDlgData *)lParam;
         SetWindowLongPtrW(hDlg, GWLP_USERDATA, (LONG_PTR)data);
 
         // Create brushes
@@ -464,7 +545,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
         // Position below parent corral
         HWND hParent = GetParent(hDlg);
-        if (hParent) {
+        if (hParent)
+        {
             RECT parentRect, dlgRect;
             GetWindowRect(hParent, &parentRect);
             GetWindowRect(hDlg, &dlgRect);
@@ -473,31 +555,41 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             int parentWidth = parentRect.right - parentRect.left;
 
             HMONITOR hMon = MonitorFromWindow(hParent, MONITOR_DEFAULTTONEAREST);
-            MONITORINFO mi = { sizeof(mi) };
+            MONITORINFO mi = {sizeof(mi)};
             GetMonitorInfo(hMon, &mi);
 
             int cx = parentRect.left + (parentWidth - dlgWidth) / 2;
             int cy = parentRect.bottom + 5;
-            if (cy + dlgHeight > mi.rcWork.bottom) cy = parentRect.top - dlgHeight - 5;
-            if (cy < mi.rcWork.top) cy = mi.rcWork.top;
-            if (cx + dlgWidth > mi.rcWork.right) cx = mi.rcWork.right - dlgWidth;
-            if (cx < mi.rcWork.left) cx = mi.rcWork.left;
+            if (cy + dlgHeight > mi.rcWork.bottom)
+                cy = parentRect.top - dlgHeight - 5;
+            if (cy < mi.rcWork.top)
+                cy = mi.rcWork.top;
+            if (cx + dlgWidth > mi.rcWork.right)
+                cx = mi.rcWork.right - dlgWidth;
+            if (cx < mi.rcWork.left)
+                cx = mi.rcWork.left;
 
             SetWindowPos(hDlg, nullptr, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
         return TRUE;
     }
-    case WM_CTLCOLORSTATIC: {
+    case WM_CTLCOLORSTATIC:
+    {
         int ctrlId = GetDlgCtrlID((HWND)lParam);
-        if (ctrlId == 105 && data) return (INT_PTR)data->hBrush;
-        if (ctrlId == 114 && data) return (INT_PTR)data->fontColorBrush;
-        if (ctrlId == 118 && data) return (INT_PTR)data->tintColorBrush;
+        if (ctrlId == 105 && data)
+            return (INT_PTR)data->hBrush;
+        if (ctrlId == 114 && data)
+            return (INT_PTR)data->fontColorBrush;
+        if (ctrlId == 118 && data)
+            return (INT_PTR)data->tintColorBrush;
         break;
     }
-    case WM_COMMAND: {
+    case WM_COMMAND:
+    {
         int id = LOWORD(wParam);
 
-        if (id == 106) { // Change Background Color
+        if (id == 106)
+        { // Change Background Color
             static COLORREF customColors[16] = {};
             CHOOSECOLORW cc = {};
             cc.lStructSize = sizeof(CHOOSECOLORW);
@@ -506,10 +598,12 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             cc.rgbResult = data->color;
             cc.Flags = CC_FULLOPEN | CC_RGBINIT;
 
-            if (ChooseColorW(&cc)) {
+            if (ChooseColorW(&cc))
+            {
                 data->color = cc.rgbResult;
                 data->colorChanged = true;
-                if (data->hBrush) DeleteObject(data->hBrush);
+                if (data->hBrush)
+                    DeleteObject(data->hBrush);
                 data->hBrush = CreateSolidBrush(data->color);
                 InvalidateRect(GetDlgItem(hDlg, 105), nullptr, TRUE);
 
@@ -524,7 +618,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             return TRUE;
         }
 
-        if (id == 113) { // Choose Font
+        if (id == 113)
+        { // Choose Font
             // Convert point size to pixel height for LOGFONT
             HDC hdc = GetDC(hDlg);
             int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
@@ -542,14 +637,16 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             cf.lpLogFont = &lf;
             cf.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL;
 
-            if (ChooseFontW(&cf)) {
+            if (ChooseFontW(&cf))
+            {
                 data->fontName = lf.lfFaceName;
-                data->fontSize = cf.iPointSize / 10;  // iPointSize is in 1/10 points
+                data->fontSize = cf.iPointSize / 10; // iPointSize is in 1/10 points
                 data->fontChanged = true;
                 SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
 
                 // Live preview
-                if (data->corralConfig) {
+                if (data->corralConfig)
+                {
                     data->corralConfig->HeaderFontName.resize(WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, nullptr, 0, nullptr, nullptr) - 1);
                     WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, &data->corralConfig->HeaderFontName[0], (int)data->corralConfig->HeaderFontName.size() + 1, nullptr, nullptr);
                     data->corralConfig->HeaderFontSize = data->fontSize;
@@ -559,7 +656,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             return TRUE;
         }
 
-        if (id == 115) { // Change Font Color
+        if (id == 115)
+        { // Change Font Color
             static COLORREF customFontColors[16] = {};
             CHOOSECOLORW cc = {};
             cc.lStructSize = sizeof(CHOOSECOLORW);
@@ -568,15 +666,18 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             cc.rgbResult = data->fontColor;
             cc.Flags = CC_FULLOPEN | CC_RGBINIT;
 
-            if (ChooseColorW(&cc)) {
+            if (ChooseColorW(&cc))
+            {
                 data->fontColor = cc.rgbResult;
                 data->fontColorChanged = true;
-                if (data->fontColorBrush) DeleteObject(data->fontColorBrush);
+                if (data->fontColorBrush)
+                    DeleteObject(data->fontColorBrush);
                 data->fontColorBrush = CreateSolidBrush(data->fontColor);
                 InvalidateRect(GetDlgItem(hDlg, 114), nullptr, TRUE);
 
                 // Live preview
-                if (data->corralConfig) {
+                if (data->corralConfig)
+                {
                     char hexBuf[16];
                     sprintf_s(hexBuf, "#%02X%02X%02X", GetRValue(data->fontColor), GetGValue(data->fontColor), GetBValue(data->fontColor));
                     data->corralConfig->HeaderFontColor = hexBuf;
@@ -586,7 +687,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             return TRUE;
         }
 
-        if (id == 119) { // Change Tint Color
+        if (id == 119)
+        { // Change Tint Color
             static COLORREF customTintColors[16] = {};
             CHOOSECOLORW cc = {};
             cc.lStructSize = sizeof(CHOOSECOLORW);
@@ -595,14 +697,17 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             cc.rgbResult = data->tintColor;
             cc.Flags = CC_FULLOPEN | CC_RGBINIT;
 
-            if (ChooseColorW(&cc)) {
+            if (ChooseColorW(&cc))
+            {
                 data->tintColor = cc.rgbResult;
                 data->tintChanged = true;
-                if (data->tintColorBrush) DeleteObject(data->tintColorBrush);
+                if (data->tintColorBrush)
+                    DeleteObject(data->tintColorBrush);
                 data->tintColorBrush = CreateSolidBrush(data->tintColor);
                 InvalidateRect(GetDlgItem(hDlg, 118), nullptr, TRUE);
 
-                if (data->corralConfig) {
+                if (data->corralConfig)
+                {
                     char hexBuf[16];
                     sprintf_s(hexBuf, "#%02X%02X%02X", GetRValue(data->tintColor), GetGValue(data->tintColor), GetBValue(data->tintColor));
                     data->corralConfig->IconTintColor = hexBuf;
@@ -613,36 +718,42 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         }
 
         // Mutual exclusion: checking one "apply to all" unchecks the other
-        if (id == 108 && HIWORD(wParam) == BN_CLICKED) {
+        if (id == 108 && HIWORD(wParam) == BN_CLICKED)
+        {
             if (SendDlgItemMessageW(hDlg, 108, BM_GETCHECK, 0, 0) == BST_CHECKED)
                 SendDlgItemMessageW(hDlg, 109, BM_SETCHECK, BST_UNCHECKED, 0);
             return TRUE;
         }
-        if (id == 109 && HIWORD(wParam) == BN_CLICKED) {
+        if (id == 109 && HIWORD(wParam) == BN_CLICKED)
+        {
             if (SendDlgItemMessageW(hDlg, 109, BM_GETCHECK, 0, 0) == BST_CHECKED)
                 SendDlgItemMessageW(hDlg, 108, BM_SETCHECK, BST_UNCHECKED, 0);
             return TRUE;
         }
 
-        if (id == IDOK) {
+        if (id == IDOK)
+        {
             data->useAsDefault = (SendDlgItemMessageW(hDlg, 107, BM_GETCHECK, 0, 0) == BST_CHECKED);
             data->applyChangesToAll = (SendDlgItemMessageW(hDlg, 108, BM_GETCHECK, 0, 0) == BST_CHECKED);
             data->applyEverythingToAll = (SendDlgItemMessageW(hDlg, 109, BM_GETCHECK, 0, 0) == BST_CHECKED);
             EndDialog(hDlg, IDOK);
             return TRUE;
         }
-        if (id == IDCANCEL) {
+        if (id == IDCANCEL)
+        {
             EndDialog(hDlg, IDCANCEL);
             return TRUE;
         }
         break;
     }
-    case WM_HSCROLL: {
+    case WM_HSCROLL:
+    {
         HWND hCtrl = (HWND)lParam;
         int pos = (int)SendMessageW(hCtrl, TBM_GETPOS, 0, 0);
         wchar_t label[32];
 
-        if (hCtrl == GetDlgItem(hDlg, 102)) { // Background opacity
+        if (hCtrl == GetDlgItem(hDlg, 102))
+        { // Background opacity
             data->alpha = (BYTE)pos;
             data->colorChanged = true;
             swprintf_s(label, L"%d%%", (pos * 100) / 255);
@@ -656,75 +767,100 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             *data->colorHex = hexBuf;
             AppearanceUpdateLivePreview(data);
         }
-        else if (hCtrl == GetDlgItem(hDlg, 110)) { // Header height
+        else if (hCtrl == GetDlgItem(hDlg, 110))
+        { // Header height
             data->titleBarHeight = pos;
             data->titleBarHeightChanged = true;
             swprintf_s(label, L"%dpx", pos);
             SetDlgItemTextW(hDlg, 111, label);
 
-            if (data->corralConfig) {
+            if (data->corralConfig)
+            {
                 data->corralConfig->TitleBarHeight = pos;
-                AppearanceUpdateLivePreview(data, true);  // relayout needed
+                AppearanceUpdateLivePreview(data, true); // relayout needed
             }
         }
-        else if (hCtrl == GetDlgItem(hDlg, 116)) { // Icon opacity
+        else if (hCtrl == GetDlgItem(hDlg, 116))
+        { // Icon opacity
             data->iconOpacity = pos;
             data->iconOpacityChanged = true;
             swprintf_s(label, L"%d%%", (pos * 100) / 255);
             SetDlgItemTextW(hDlg, 117, label);
 
-            if (data->corralConfig) {
+            if (data->corralConfig)
+            {
                 data->corralConfig->IconOpacity = pos;
                 // Update currentOpacity so SourceConstantAlpha reflects the change
-                if (data->corralWindow) {
+                if (data->corralWindow)
+                {
                     data->corralWindow->SetCurrentOpacity(pos);
                 }
                 AppearanceUpdateLivePreview(data);
             }
         }
-        else if (hCtrl == GetDlgItem(hDlg, 120)) { // Tint strength
+        else if (hCtrl == GetDlgItem(hDlg, 120))
+        { // Tint strength
             data->tintStrength = pos;
             data->tintChanged = true;
             swprintf_s(label, L"%d%%", (pos * 100) / 255);
             SetDlgItemTextW(hDlg, 121, label);
 
-            if (data->corralConfig) {
+            if (data->corralConfig)
+            {
                 data->corralConfig->IconTintStrength = pos;
-                if (data->corralWindow) {
+                if (data->corralWindow)
+                {
                     data->corralWindow->SetCurrentTintStrength(pos);
                 }
                 AppearanceUpdateLivePreview(data);
             }
         }
-        else if (hCtrl == GetDlgItem(hDlg, 130)) { // Horizontal spacing
+        else if (hCtrl == GetDlgItem(hDlg, 130))
+        { // Horizontal spacing
             data->iconSpacingX = pos;
             data->iconSpacingXChanged = true;
             swprintf_s(label, L"%d%%", pos);
             SetDlgItemTextW(hDlg, 131, label);
 
-            if (data->corralConfig) {
+            if (data->corralConfig)
+            {
                 data->corralConfig->IconSpacingXPercent = pos;
-                AppearanceUpdateLivePreview(data, true);  // relayout needed
+                AppearanceUpdateLivePreview(data, true); // relayout needed
             }
         }
-        else if (hCtrl == GetDlgItem(hDlg, 132)) { // Vertical spacing
+        else if (hCtrl == GetDlgItem(hDlg, 132))
+        { // Vertical spacing
             data->iconSpacingY = pos;
             data->iconSpacingYChanged = true;
             swprintf_s(label, L"%d%%", pos);
             SetDlgItemTextW(hDlg, 133, label);
 
-            if (data->corralConfig) {
+            if (data->corralConfig)
+            {
                 data->corralConfig->IconSpacingYPercent = pos;
-                AppearanceUpdateLivePreview(data, true);  // relayout needed
+                AppearanceUpdateLivePreview(data, true); // relayout needed
             }
         }
         return TRUE;
     }
     case WM_DESTROY:
-        if (data) {
-            if (data->hBrush) { DeleteObject(data->hBrush); data->hBrush = nullptr; }
-            if (data->fontColorBrush) { DeleteObject(data->fontColorBrush); data->fontColorBrush = nullptr; }
-            if (data->tintColorBrush) { DeleteObject(data->tintColorBrush); data->tintColorBrush = nullptr; }
+        if (data)
+        {
+            if (data->hBrush)
+            {
+                DeleteObject(data->hBrush);
+                data->hBrush = nullptr;
+            }
+            if (data->fontColorBrush)
+            {
+                DeleteObject(data->fontColorBrush);
+                data->fontColorBrush = nullptr;
+            }
+            if (data->tintColorBrush)
+            {
+                DeleteObject(data->tintColorBrush);
+                data->tintColorBrush = nullptr;
+            }
         }
         return TRUE;
     }
@@ -732,22 +868,31 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 }
 
 // Helper to add a dialog item to the in-memory template
-static WORD* AddDlgItem(WORD* p, DWORD style, short x, short y, short cx, short cy, WORD id,
-                         WORD classHi, WORD classLo, const wchar_t* text) {
+static WORD *AddDlgItem(WORD *p, DWORD style, short x, short y, short cx, short cy, WORD id,
+                        WORD classHi, WORD classLo, const wchar_t *text)
+{
     // Align to DWORD boundary
-    if ((ULONG_PTR)p % 4) p++;
+    if ((ULONG_PTR)p % 4)
+        p++;
 
-    DLGITEMTEMPLATE* item = (DLGITEMTEMPLATE*)p;
+    DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *)p;
     item->style = style;
-    item->x = x; item->y = y; item->cx = cx; item->cy = cy;
+    item->x = x;
+    item->y = y;
+    item->cx = cx;
+    item->cy = cy;
     item->id = id;
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF; *p++ = classLo;
-    if (text) {
+    *p++ = 0xFFFF;
+    *p++ = classLo;
+    if (text)
+    {
         size_t len = wcslen(text) + 1;
         memcpy(p, text, len * sizeof(wchar_t));
         p += len;
-    } else {
+    }
+    else
+    {
         *p++ = 0;
     }
     *p++ = 0; // no creation data
@@ -755,15 +900,20 @@ static WORD* AddDlgItem(WORD* p, DWORD style, short x, short y, short cx, short 
 }
 
 // Helper to add a trackbar (custom class name)
-static WORD* AddTrackbar(WORD* p, DWORD style, short x, short y, short cx, short cy, WORD id) {
-    if ((ULONG_PTR)p % 4) p++;
+static WORD *AddTrackbar(WORD *p, DWORD style, short x, short y, short cx, short cy, WORD id)
+{
+    if ((ULONG_PTR)p % 4)
+        p++;
 
-    DLGITEMTEMPLATE* item = (DLGITEMTEMPLATE*)p;
+    DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *)p;
     item->style = style;
-    item->x = x; item->y = y; item->cx = cx; item->cy = cy;
+    item->x = x;
+    item->y = y;
+    item->cx = cx;
+    item->cy = cy;
     item->id = id;
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    const wchar_t* cls = L"msctls_trackbar32";
+    const wchar_t *cls = L"msctls_trackbar32";
     size_t len = wcslen(cls) + 1;
     memcpy(p, cls, len * sizeof(wchar_t));
     p += len;
@@ -772,7 +922,8 @@ static WORD* AddTrackbar(WORD* p, DWORD style, short x, short y, short cx, short
     return p;
 }
 
-void CorralWindow::ShowAppearanceDialog() {
+void CorralWindow::ShowAppearanceDialog()
+{
     // Build dynamic title
     std::wstring wTitle = Utf8ToWide(GetActiveTab().Title);
     std::wstring dlgTitleStr = L"Appearance: " + wTitle;
@@ -791,24 +942,27 @@ void CorralWindow::ShowAppearanceDialog() {
     const int ITEM_COUNT = 20;
 
     WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
-    WORD* p = dlgTemplate;
+    WORD *p = dlgTemplate;
 
-    DLGTEMPLATE* dlg = (DLGTEMPLATE*)p;
+    DLGTEMPLATE *dlg = (DLGTEMPLATE *)p;
     dlg->style = DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT;
     dlg->cdit = ITEM_COUNT;
     dlg->cx = DLG_WIDTH;
     dlg->cy = DLG_HEIGHT;
     p += sizeof(DLGTEMPLATE) / sizeof(WORD);
 
-    *p++ = 0; *p++ = 0; // menu, class
+    *p++ = 0;
+    *p++ = 0; // menu, class
 
     size_t len = wcslen(dlgTitleStr.c_str()) + 1;
-    memcpy(p, dlgTitleStr.c_str(), len * sizeof(wchar_t)); p += len;
+    memcpy(p, dlgTitleStr.c_str(), len * sizeof(wchar_t));
+    p += len;
 
     *p++ = 9; // font size
-    const wchar_t* strFont = L"Segoe UI";
+    const wchar_t *strFont = L"Segoe UI";
     len = wcslen(strFont) + 1;
-    memcpy(p, strFont, len * sizeof(wchar_t)); p += len;
+    memcpy(p, strFont, len * sizeof(wchar_t));
+    p += len;
 
     // === Background Color group ===
     // 1. Group box
@@ -897,7 +1051,7 @@ void CorralWindow::ShowAppearanceDialog() {
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 291, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
 
     // Fix item count in the template header
-    ((DLGTEMPLATE*)dlgTemplate)->cdit = 37;
+    ((DLGTEMPLATE *)dlgTemplate)->cdit = 37;
 
     // Data prep
     AppearanceDlgData dlgData = {};
@@ -909,8 +1063,9 @@ void CorralWindow::ShowAppearanceDialog() {
     dlgData.corralWindow = this;
 
     // Parse background color
-    const std::string& colorHexRef = GetActiveTab().ColorHex;
-    if (!colorHexRef.empty() && colorHexRef[0] == '#' && colorHexRef.length() >= 9) {
+    const std::string &colorHexRef = GetActiveTab().ColorHex;
+    if (!colorHexRef.empty() && colorHexRef[0] == '#' && colorHexRef.length() >= 9)
+    {
         unsigned int colorValue;
         sscanf_s(colorHexRef.c_str() + 1, "%x", &colorValue);
         dlgData.alpha = (colorValue >> 24) & 0xFF;
@@ -927,8 +1082,9 @@ void CorralWindow::ShowAppearanceDialog() {
 
     // Parse font color
     dlgData.fontColor = RGB(255, 255, 255);
-    const std::string& fcHex = config.HeaderFontColor;
-    if (!fcHex.empty() && fcHex[0] == '#' && fcHex.length() >= 7) {
+    const std::string &fcHex = config.HeaderFontColor;
+    if (!fcHex.empty() && fcHex[0] == '#' && fcHex.length() >= 7)
+    {
         unsigned int fcVal;
         sscanf_s(fcHex.c_str() + 1, "%x", &fcVal);
         dlgData.fontColor = RGB((fcVal >> 16) & 0xFF, (fcVal >> 8) & 0xFF, fcVal & 0xFF);
@@ -938,8 +1094,9 @@ void CorralWindow::ShowAppearanceDialog() {
 
     // Parse tint color
     dlgData.tintColor = RGB(0, 0, 0);
-    const std::string& tintHex = config.IconTintColor;
-    if (!tintHex.empty() && tintHex[0] == '#' && tintHex.length() >= 7) {
+    const std::string &tintHex = config.IconTintColor;
+    if (!tintHex.empty() && tintHex[0] == '#' && tintHex.length() >= 7)
+    {
         unsigned int tintVal;
         sscanf_s(tintHex.c_str() + 1, "%x", &tintVal);
         dlgData.tintColor = RGB((tintVal >> 16) & 0xFF, (tintVal >> 8) & 0xFF, tintVal & 0xFF);
@@ -962,14 +1119,14 @@ void CorralWindow::ShowAppearanceDialog() {
 
     INT_PTR result = DialogBoxIndirectParamW(
         GetModuleHandleW(nullptr),
-        (DLGTEMPLATE*)dlgTemplate,
+        (DLGTEMPLATE *)dlgTemplate,
         hwnd,
         AppearanceDlgProc,
-        (LPARAM)&dlgData
-    );
+        (LPARAM)&dlgData);
     SendToBottom();
 
-    if (result != IDOK) {
+    if (result != IDOK)
+    {
         // Restore all settings on cancel
         GetActiveTab().ColorHex = originalColor;
         config.TitleBarHeight = originalTitleBarHeight;
@@ -984,7 +1141,9 @@ void CorralWindow::ShowAppearanceDialog() {
         config.IconSpacingYPercent = originalSpacingY;
         CalculateIconLayout();
         UpdateLayeredContent();
-    } else {
+    }
+    else
+    {
         // Apply final values
         config.TitleBarHeight = dlgData.titleBarHeight;
         config.HeaderFontName = WideToUtf8(dlgData.fontName);
@@ -1005,36 +1164,41 @@ void CorralWindow::ShowAppearanceDialog() {
         CalculateIconLayout();
         UpdateLayeredContent();
 
-        App* app = App::GetInstance();
-        if (app) {
-            if (dlgData.useAsDefault) {
+        App *app = App::GetInstance();
+        if (app)
+        {
+            if (dlgData.useAsDefault)
+            {
                 app->SetDefaultColorHex(GetActiveTab().ColorHex);
                 app->SetDefaultAppearance(config.TitleBarHeight, config.HeaderFontName,
-                    config.HeaderFontSize, config.HeaderFontColor, config.IconOpacity,
-                    config.IconTintColor, config.IconTintStrength,
-                    config.IconSpacingXPercent, config.IconSpacingYPercent);
+                                          config.HeaderFontSize, config.HeaderFontColor, config.IconOpacity,
+                                          config.IconTintColor, config.IconTintStrength,
+                                          config.IconSpacingXPercent, config.IconSpacingYPercent);
             }
 
-            if (dlgData.applyChangesToAll) {
+            if (dlgData.applyChangesToAll)
+            {
                 // Apply only the settings the user actually changed
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
-                    dlgData.colorChanged,
-                    config.TitleBarHeight, dlgData.titleBarHeightChanged,
-                    config.HeaderFontName, config.HeaderFontSize, dlgData.fontChanged,
-                    config.HeaderFontColor, dlgData.fontColorChanged,
-                    config.IconOpacity, dlgData.iconOpacityChanged,
-                    config.IconTintColor, config.IconTintStrength, dlgData.tintChanged,
-                    config.IconSpacingXPercent, config.IconSpacingYPercent,
-                    dlgData.iconSpacingXChanged || dlgData.iconSpacingYChanged);
-            } else if (dlgData.applyEverythingToAll) {
+                                                 dlgData.colorChanged,
+                                                 config.TitleBarHeight, dlgData.titleBarHeightChanged,
+                                                 config.HeaderFontName, config.HeaderFontSize, dlgData.fontChanged,
+                                                 config.HeaderFontColor, dlgData.fontColorChanged,
+                                                 config.IconOpacity, dlgData.iconOpacityChanged,
+                                                 config.IconTintColor, config.IconTintStrength, dlgData.tintChanged,
+                                                 config.IconSpacingXPercent, config.IconSpacingYPercent,
+                                                 dlgData.iconSpacingXChanged || dlgData.iconSpacingYChanged);
+            }
+            else if (dlgData.applyEverythingToAll)
+            {
                 // Copy full appearance to all corrals
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
-                    true, config.TitleBarHeight, true,
-                    config.HeaderFontName, config.HeaderFontSize, true,
-                    config.HeaderFontColor, true,
-                    config.IconOpacity, true,
-                    config.IconTintColor, config.IconTintStrength, true,
-                    config.IconSpacingXPercent, config.IconSpacingYPercent, true);
+                                                 true, config.TitleBarHeight, true,
+                                                 config.HeaderFontName, config.HeaderFontSize, true,
+                                                 config.HeaderFontColor, true,
+                                                 config.IconOpacity, true,
+                                                 config.IconTintColor, config.IconTintStrength, true,
+                                                 config.IconSpacingXPercent, config.IconSpacingYPercent, true);
             }
 
             app->SaveConfig();

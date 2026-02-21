@@ -1,31 +1,60 @@
+/**
+ * DexCorral - a free and open source Windows desktop icon organizer
+ * Copyright (C) 2026 Gunter Heiss
+ *
+ * For more information see: https://dexcorral.com
+ * The DexCorral project is hosted on GitHub: https://github.com/guHe330/DexCorral
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "DesktopMonitor.h"
 #include <ShlObj.h>
 
-DesktopMonitor::DesktopMonitor() : running(false) {
+DesktopMonitor::DesktopMonitor() : running(false)
+{
 }
 
-DesktopMonitor::~DesktopMonitor() {
+DesktopMonitor::~DesktopMonitor()
+{
     Stop();
 }
 
-std::wstring DesktopMonitor::GetDesktopPath() {
+std::wstring DesktopMonitor::GetDesktopPath()
+{
     wchar_t path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, path))) {
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, path)))
+    {
         return std::wstring(path);
     }
     return L"";
 }
 
-std::wstring DesktopMonitor::GetPublicDesktopPath() {
+std::wstring DesktopMonitor::GetPublicDesktopPath()
+{
     wchar_t path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_DESKTOPDIRECTORY, NULL, 0, path))) {
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_DESKTOPDIRECTORY, NULL, 0, path)))
+    {
         return std::wstring(path);
     }
     return L"";
 }
 
-void DesktopMonitor::Start() {
-    if (running) return;
+void DesktopMonitor::Start()
+{
+    if (running)
+        return;
     running = true;
 
     // Create stop events
@@ -36,47 +65,56 @@ void DesktopMonitor::Start() {
     std::wstring userPath = GetDesktopPath();
     std::wstring publicPath = GetPublicDesktopPath();
 
-    if (!userPath.empty()) {
-        userDesktopThread = std::thread([this, userPath]() {
-            MonitorThread(userPath);
-        });
+    if (!userPath.empty())
+    {
+        userDesktopThread = std::thread([this, userPath]()
+                                        { MonitorThread(userPath); });
     }
 
-    if (!publicPath.empty() && publicPath != userPath) {
-        publicDesktopThread = std::thread([this, publicPath]() {
-            MonitorThread(publicPath);
-        });
+    if (!publicPath.empty() && publicPath != userPath)
+    {
+        publicDesktopThread = std::thread([this, publicPath]()
+                                          { MonitorThread(publicPath); });
     }
 }
 
-void DesktopMonitor::Stop() {
-    if (!running) return;
+void DesktopMonitor::Stop()
+{
+    if (!running)
+        return;
     running = false;
 
     // Signal threads to stop
-    if (userStopEvent) SetEvent(userStopEvent);
-    if (publicStopEvent) SetEvent(publicStopEvent);
+    if (userStopEvent)
+        SetEvent(userStopEvent);
+    if (publicStopEvent)
+        SetEvent(publicStopEvent);
 
     // Wait for threads to finish
-    if (userDesktopThread.joinable()) {
+    if (userDesktopThread.joinable())
+    {
         userDesktopThread.join();
     }
-    if (publicDesktopThread.joinable()) {
+    if (publicDesktopThread.joinable())
+    {
         publicDesktopThread.join();
     }
 
     // Clean up events
-    if (userStopEvent) {
+    if (userStopEvent)
+    {
         CloseHandle(userStopEvent);
         userStopEvent = nullptr;
     }
-    if (publicStopEvent) {
+    if (publicStopEvent)
+    {
         CloseHandle(publicStopEvent);
         publicStopEvent = nullptr;
     }
 }
 
-void DesktopMonitor::MonitorThread(const std::wstring& path) {
+void DesktopMonitor::MonitorThread(const std::wstring &path)
+{
     HANDLE hDir = CreateFileW(
         path.c_str(),
         FILE_LIST_DIRECTORY,
@@ -84,10 +122,10 @@ void DesktopMonitor::MonitorThread(const std::wstring& path) {
         nullptr,
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-        nullptr
-    );
+        nullptr);
 
-    if (hDir == INVALID_HANDLE_VALUE) {
+    if (hDir == INVALID_HANDLE_VALUE)
+    {
         return;
     }
 
@@ -95,36 +133,40 @@ void DesktopMonitor::MonitorThread(const std::wstring& path) {
     OVERLAPPED overlapped = {};
     overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
-    while (running) {
+    while (running)
+    {
         DWORD bytesReturned = 0;
 
         BOOL success = ReadDirectoryChangesW(
             hDir,
             buffer,
             sizeof(buffer),
-            FALSE,  // Don't watch subtree
+            FALSE, // Don't watch subtree
             FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME,
             &bytesReturned,
             &overlapped,
-            nullptr
-        );
+            nullptr);
 
-        if (!success) {
+        if (!success)
+        {
             break;
         }
 
         // Wait for either the directory change or stop signal
-        HANDLE handles[2] = { overlapped.hEvent, userStopEvent ? userStopEvent : publicStopEvent };
+        HANDLE handles[2] = {overlapped.hEvent, userStopEvent ? userStopEvent : publicStopEvent};
         DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
 
-        if (waitResult == WAIT_OBJECT_0) {
+        if (waitResult == WAIT_OBJECT_0)
+        {
             // Directory change occurred
-            if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE)) {
+            if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE))
+            {
                 ProcessNotification(buffer, bytesReturned);
             }
             ResetEvent(overlapped.hEvent);
         }
-        else {
+        else
+        {
             // Stop signal or error
             CancelIo(hDir);
             break;
@@ -135,24 +177,30 @@ void DesktopMonitor::MonitorThread(const std::wstring& path) {
     CloseHandle(hDir);
 }
 
-void DesktopMonitor::ProcessNotification(BYTE* buffer, DWORD bytesReturned) {
-    if (bytesReturned == 0) return;
+void DesktopMonitor::ProcessNotification(BYTE *buffer, DWORD bytesReturned)
+{
+    if (bytesReturned == 0)
+        return;
 
-    FILE_NOTIFY_INFORMATION* info = (FILE_NOTIFY_INFORMATION*)buffer;
+    FILE_NOTIFY_INFORMATION *info = (FILE_NOTIFY_INFORMATION *)buffer;
 
-    while (true) {
+    while (true)
+    {
         // Extract filename (it's not null-terminated)
         std::wstring fileName(info->FileName, info->FileNameLength / sizeof(WCHAR));
 
-        switch (info->Action) {
+        switch (info->Action)
+        {
         case FILE_ACTION_ADDED:
-            if (fileAddedCallback) {
+            if (fileAddedCallback)
+            {
                 fileAddedCallback(fileName);
             }
             break;
 
         case FILE_ACTION_REMOVED:
-            if (fileDeletedCallback) {
+            if (fileDeletedCallback)
+            {
                 fileDeletedCallback(fileName);
             }
             break;
@@ -162,7 +210,8 @@ void DesktopMonitor::ProcessNotification(BYTE* buffer, DWORD bytesReturned) {
             break;
 
         case FILE_ACTION_RENAMED_NEW_NAME:
-            if (!pendingOldName.empty() && fileRenamedCallback) {
+            if (!pendingOldName.empty() && fileRenamedCallback)
+            {
                 fileRenamedCallback(pendingOldName, fileName);
                 pendingOldName.clear();
             }
@@ -170,9 +219,10 @@ void DesktopMonitor::ProcessNotification(BYTE* buffer, DWORD bytesReturned) {
         }
 
         // Move to next entry
-        if (info->NextEntryOffset == 0) {
+        if (info->NextEntryOffset == 0)
+        {
             break;
         }
-        info = (FILE_NOTIFY_INFORMATION*)((BYTE*)info + info->NextEntryOffset);
+        info = (FILE_NOTIFY_INFORMATION *)((BYTE *)info + info->NextEntryOffset);
     }
 }
