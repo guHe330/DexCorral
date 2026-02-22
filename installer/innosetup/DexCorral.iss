@@ -41,7 +41,7 @@ MinVersion=10.0.17763
 ; Allow upgrading over existing install without asking
 UsePreviousAppDir=yes
 CloseApplications=no
-; Suppress the per-user areas warning (we only delete user config on uninstall)
+; Suppress the per-user areas warning (user config may be deleted on uninstall if user chooses)
 UsedUserAreasWarning=no
 
 [Languages]
@@ -66,11 +66,35 @@ Filename: "{app}\DexCorral.exe"; Parameters: "--unregister --silent"; RunOnceId:
 Filename: "{cmd}"; Parameters: "/c taskkill /F /IM explorer.exe & timeout /t 3 /nobreak & start explorer.exe"; RunOnceId: "RestartExplorer"; Flags: runhidden waituntilterminated
 
 [UninstallDelete]
-; Clean up config directory
-Type: filesandordirs; Name: "{localappdata}\DexCorral"
-Type: filesandordirs; Name: "{userappdata}\DexCorral"
+; Config directory is handled conditionally in [Code] (user is asked whether to keep it)
 
 [Code]
+
+// Whether the user chose to keep their config during uninstall
+var
+  g_KeepConfig: Boolean;
+
+// Win32 imports used for install-time polling and shell notification
+function FindWindowW(ClassName: String; WindowName: Integer): Integer;
+  external 'FindWindowW@user32.dll stdcall';
+
+procedure SHChangeNotify(wEventId: Cardinal; uFlags: Cardinal; dwItem1: Integer; dwItem2: Integer);
+  external 'SHChangeNotify@shell32.dll stdcall';
+
+// Poll for a window by class name (returns True as soon as it appears)
+function WaitForWindow(ClassName: String; MaxRetries: Integer; SleepMs: Integer): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 0 to MaxRetries - 1 do begin
+    if FindWindowW(ClassName, 0) <> 0 then begin
+      Result := True;
+      Exit;
+    end;
+    Sleep(SleepMs);
+  end;
+end;
 
 // Upgrade support: unregister old shell extension and restart Explorer
 // before copying new files, so the DLL is not locked by Explorer.
@@ -127,7 +151,29 @@ begin
     Exec('taskkill', '/F /IM explorer.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(3000);
     Exec(ExpandConstant('{win}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
-    Sleep(2000);
+
+    // Wait for the Explorer desktop shell to be ready (Progman = desktop host window)
+    Log('Waiting for Explorer shell to be ready...');
+    WaitForWindow('Progman', 20, 500);  // up to 10 s
+
+    // Give SSO / overlay handlers a moment to finish loading
+    Sleep(1500);
+
+    // Check whether the DexCorral App thread has started (its message window appears)
+    if FindWindowW('DexCorralMessageWindow', 0) = 0 then begin
+      // DLL was not yet loaded — nudge Explorer by broadcasting SHCNE_ASSOCCHANGED.
+      // This causes Explorer to reload icon overlay handlers, which loads our DLL.
+      Log('DexCorral App not detected, sending shell change notification...');
+      SHChangeNotify($08000000, $0000, 0, 0);  // SHCNE_ASSOCCHANGED | SHCNF_IDLIST
+
+      // Wait up to 5 s for the App to appear
+      if WaitForWindow('DexCorralMessageWindow', 10, 500) then
+        Log('DexCorral App started successfully')
+      else
+        Log('DexCorral App did not start (user can right-click the desktop to activate)');
+    end else
+      Log('DexCorral App already running');
+
     Log('Explorer restarted');
   end;
 end;
@@ -139,6 +185,23 @@ begin
   if CurUninstallStep = usUninstall then begin
     Exec('taskkill', '/F /IM DexCorral.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(500);
+
+    // Ask whether to keep the user's configuration files
+    g_KeepConfig := MsgBox(
+      'Would you like to keep your DexCorral configuration?' + #13#10 +
+      #13#10 +
+      'Your corral layouts and appearance settings are stored in:' + #13#10 +
+      '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 +
+      #13#10 +
+      'Click Yes to keep them for future use, or No to delete everything.',
+      mbConfirmation, MB_YESNO) = IDYES;
+  end;
+
+  if CurUninstallStep = usPostUninstall then begin
+    if not g_KeepConfig then begin
+      DelTree(ExpandConstant('{localappdata}\DexCorral'), True, True, True);
+      DelTree(ExpandConstant('{userappdata}\DexCorral'), True, True, True);
+    end;
   end;
 end;
 

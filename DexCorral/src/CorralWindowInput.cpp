@@ -923,6 +923,11 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
         SyncConfigFromWindow();
         if (App::GetInstance())
         {
+            // Final push at resting position: fast moves can coalesce WM_MOUSEMOVE
+            // events, leaving icons under the corral. Re-read fresh positions and push
+            // once more, matching what EndResize() does.
+            App::GetInstance()->CacheDesktopIconPositions();
+            App::GetInstance()->PushDesktopIconsFromCorrals();
             App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
