@@ -350,7 +350,10 @@ void CorralWindow::ShowContextMenu(int x, int y)
         // Add new empty tab
         CorralTabConfig newTab;
         newTab.Title = "New Tab";
-        newTab.ColorHex = GetActiveTab().ColorHex; // Inherit color from current tab
+        newTab.ColorHex = GetActiveTab().ColorHex;             // Inherit color from current tab
+        newTab.HeaderFontName = GetActiveTab().HeaderFontName;  // Inherit font from current tab
+        newTab.HeaderFontSize = GetActiveTab().HeaderFontSize;
+        newTab.HeaderFontColor = GetActiveTab().HeaderFontColor;
         AddTab(newTab);
         if (App::GetInstance())
         {

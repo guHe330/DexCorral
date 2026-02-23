@@ -185,31 +185,37 @@ void CorralWindow::UpdateLayeredContent()
 
     SetBkMode(memDC, TRANSPARENT);
 
-    // Parse header font color from config
-    BYTE fontR = 255, fontG = 255, fontB = 255;
-    const std::string &fontColorHex = config.HeaderFontColor;
-    if (!fontColorHex.empty() && fontColorHex[0] == '#' && fontColorHex.length() >= 7)
-    {
-        unsigned int fontColorVal;
-        sscanf_s(fontColorHex.c_str() + 1, "%x", &fontColorVal);
-        fontR = (fontColorVal >> 16) & 0xFF;
-        fontG = (fontColorVal >> 8) & 0xFF;
-        fontB = fontColorVal & 0xFF;
-    }
-    SetTextColor(memDC, RGB(fontR, fontG, fontB));
-
-    // Draw tab titles
-    std::wstring fontNameW = Utf8ToWide(config.HeaderFontName);
-    // Convert point size to pixel height (matches font picker conventions)
-    int fontHeight = -MulDiv(config.HeaderFontSize, GetDpiForWindow(hwnd), 72);
-    HFONT titleFont = CreateFontW(fontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                  CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, fontNameW.c_str());
-    HFONT oldFont = (HFONT)SelectObject(memDC, titleFont);
+    // Draw tab titles — each tab uses its own font settings
+    HFONT oldFont = nullptr;
+    HFONT lastFont = nullptr;
 
     for (int i = 0; i < (int)config.Tabs.size(); i++)
     {
         const CorralTabConfig &tab = config.Tabs[i];
+
+        // Parse this tab's header font color
+        BYTE fontR = 255, fontG = 255, fontB = 255;
+        const std::string &fontColorHex = tab.HeaderFontColor;
+        if (!fontColorHex.empty() && fontColorHex[0] == '#' && fontColorHex.length() >= 7)
+        {
+            unsigned int fontColorVal;
+            sscanf_s(fontColorHex.c_str() + 1, "%x", &fontColorVal);
+            fontR = (fontColorVal >> 16) & 0xFF;
+            fontG = (fontColorVal >> 8) & 0xFF;
+            fontB = fontColorVal & 0xFF;
+        }
+        SetTextColor(memDC, RGB(fontR, fontG, fontB));
+
+        // Create this tab's font
+        std::wstring fontNameW = Utf8ToWide(tab.HeaderFontName);
+        int fontHeight = -MulDiv(tab.HeaderFontSize, GetDpiForWindow(hwnd), 72);
+        HFONT titleFont = CreateFontW(fontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, fontNameW.c_str());
+        HFONT prevFont = (HFONT)SelectObject(memDC, titleFont);
+        if (oldFont == nullptr)
+            oldFont = prevFont; // Save the very first original font to restore later
+
         std::wstring wtitle = Utf8ToWide(tab.Title);
 
         // Add symbol prefix
@@ -229,10 +235,16 @@ void CorralWindow::UpdateLayeredContent()
 
         DrawTextW(memDC, wtitle.c_str(), (int)wtitle.length(), &tabRect,
                   DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+
+        if (lastFont)
+            DeleteObject(lastFont);
+        lastFont = titleFont;
     }
 
-    SelectObject(memDC, oldFont);
-    DeleteObject(titleFont);
+    if (oldFont)
+        SelectObject(memDC, oldFont);
+    if (lastFont)
+        DeleteObject(lastFont);
 
     /**
      * Alpha channel fix-up for GDI-drawn title/tab area.

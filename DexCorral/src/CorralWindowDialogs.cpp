@@ -467,6 +467,7 @@ struct AppearanceDlgData
 
     // Back-references for live preview
     CorralWindowConfig *corralConfig;
+    CorralTabConfig *activeTabConfig;  // Active tab — font settings live here
     CorralWindow *corralWindow; // For triggering layout recalculation
 };
 
@@ -645,11 +646,11 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
                 SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
 
                 // Live preview
-                if (data->corralConfig)
+                if (data->activeTabConfig)
                 {
-                    data->corralConfig->HeaderFontName.resize(WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, nullptr, 0, nullptr, nullptr) - 1);
-                    WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, &data->corralConfig->HeaderFontName[0], (int)data->corralConfig->HeaderFontName.size() + 1, nullptr, nullptr);
-                    data->corralConfig->HeaderFontSize = data->fontSize;
+                    data->activeTabConfig->HeaderFontName.resize(WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, nullptr, 0, nullptr, nullptr) - 1);
+                    WideCharToMultiByte(CP_UTF8, 0, data->fontName.c_str(), -1, &data->activeTabConfig->HeaderFontName[0], (int)data->activeTabConfig->HeaderFontName.size() + 1, nullptr, nullptr);
+                    data->activeTabConfig->HeaderFontSize = data->fontSize;
                     AppearanceUpdateLivePreview(data);
                 }
             }
@@ -676,11 +677,11 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
                 InvalidateRect(GetDlgItem(hDlg, 114), nullptr, TRUE);
 
                 // Live preview
-                if (data->corralConfig)
+                if (data->activeTabConfig)
                 {
                     char hexBuf[16];
                     sprintf_s(hexBuf, "#%02X%02X%02X", GetRValue(data->fontColor), GetGValue(data->fontColor), GetBValue(data->fontColor));
-                    data->corralConfig->HeaderFontColor = hexBuf;
+                    data->activeTabConfig->HeaderFontColor = hexBuf;
                     AppearanceUpdateLivePreview(data);
                 }
             }
@@ -1060,6 +1061,7 @@ void CorralWindow::ShowAppearanceDialog()
     dlgData.previewWindow = hwnd;
     dlgData.colorHex = &GetActiveTab().ColorHex;
     dlgData.corralConfig = &config;
+    dlgData.activeTabConfig = &GetActiveTab();
     dlgData.corralWindow = this;
 
     // Parse background color
@@ -1075,14 +1077,14 @@ void CorralWindow::ShowAppearanceDialog()
         dlgData.color = RGB(r, g, b);
     }
 
-    // Header settings from config
+    // Header settings — height is per-corral, font is per-tab (active tab)
     dlgData.titleBarHeight = config.TitleBarHeight;
-    dlgData.fontName = Utf8ToWide(config.HeaderFontName);
-    dlgData.fontSize = config.HeaderFontSize;
+    dlgData.fontName = Utf8ToWide(GetActiveTab().HeaderFontName);
+    dlgData.fontSize = GetActiveTab().HeaderFontSize;
 
-    // Parse font color
+    // Parse font color from active tab
     dlgData.fontColor = RGB(255, 255, 255);
-    const std::string &fcHex = config.HeaderFontColor;
+    const std::string &fcHex = GetActiveTab().HeaderFontColor;
     if (!fcHex.empty() && fcHex[0] == '#' && fcHex.length() >= 7)
     {
         unsigned int fcVal;
@@ -1108,9 +1110,9 @@ void CorralWindow::ShowAppearanceDialog()
     // Save originals for cancel
     std::string originalColor = GetActiveTab().ColorHex;
     int originalTitleBarHeight = config.TitleBarHeight;
-    std::string originalFontName = config.HeaderFontName;
-    int originalFontSize = config.HeaderFontSize;
-    std::string originalFontColor = config.HeaderFontColor;
+    std::string originalFontName = GetActiveTab().HeaderFontName;
+    int originalFontSize = GetActiveTab().HeaderFontSize;
+    std::string originalFontColor = GetActiveTab().HeaderFontColor;
     int originalIconOpacity = config.IconOpacity;
     std::string originalTintColor = config.IconTintColor;
     int originalTintStrength = config.IconTintStrength;
@@ -1130,9 +1132,9 @@ void CorralWindow::ShowAppearanceDialog()
         // Restore all settings on cancel
         GetActiveTab().ColorHex = originalColor;
         config.TitleBarHeight = originalTitleBarHeight;
-        config.HeaderFontName = originalFontName;
-        config.HeaderFontSize = originalFontSize;
-        config.HeaderFontColor = originalFontColor;
+        GetActiveTab().HeaderFontName = originalFontName;
+        GetActiveTab().HeaderFontSize = originalFontSize;
+        GetActiveTab().HeaderFontColor = originalFontColor;
         config.IconOpacity = originalIconOpacity;
         config.IconTintColor = originalTintColor;
         config.IconTintStrength = originalTintStrength;
@@ -1144,13 +1146,13 @@ void CorralWindow::ShowAppearanceDialog()
     }
     else
     {
-        // Apply final values
+        // Apply final values — height to corral, font to active tab only
         config.TitleBarHeight = dlgData.titleBarHeight;
-        config.HeaderFontName = WideToUtf8(dlgData.fontName);
-        config.HeaderFontSize = dlgData.fontSize;
+        GetActiveTab().HeaderFontName = WideToUtf8(dlgData.fontName);
+        GetActiveTab().HeaderFontSize = dlgData.fontSize;
         char fcBuf[16];
         sprintf_s(fcBuf, "#%02X%02X%02X", GetRValue(dlgData.fontColor), GetGValue(dlgData.fontColor), GetBValue(dlgData.fontColor));
-        config.HeaderFontColor = fcBuf;
+        GetActiveTab().HeaderFontColor = fcBuf;
         config.IconOpacity = dlgData.iconOpacity;
 
         char tintBuf[16];
@@ -1170,8 +1172,8 @@ void CorralWindow::ShowAppearanceDialog()
             if (dlgData.useAsDefault)
             {
                 app->SetDefaultColorHex(GetActiveTab().ColorHex);
-                app->SetDefaultAppearance(config.TitleBarHeight, config.HeaderFontName,
-                                          config.HeaderFontSize, config.HeaderFontColor, config.IconOpacity,
+                app->SetDefaultAppearance(config.TitleBarHeight, GetActiveTab().HeaderFontName,
+                                          GetActiveTab().HeaderFontSize, GetActiveTab().HeaderFontColor, config.IconOpacity,
                                           config.IconTintColor, config.IconTintStrength,
                                           config.IconSpacingXPercent, config.IconSpacingYPercent);
             }
@@ -1182,8 +1184,8 @@ void CorralWindow::ShowAppearanceDialog()
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
                                                  dlgData.colorChanged,
                                                  config.TitleBarHeight, dlgData.titleBarHeightChanged,
-                                                 config.HeaderFontName, config.HeaderFontSize, dlgData.fontChanged,
-                                                 config.HeaderFontColor, dlgData.fontColorChanged,
+                                                 GetActiveTab().HeaderFontName, GetActiveTab().HeaderFontSize, dlgData.fontChanged,
+                                                 GetActiveTab().HeaderFontColor, dlgData.fontColorChanged,
                                                  config.IconOpacity, dlgData.iconOpacityChanged,
                                                  config.IconTintColor, config.IconTintStrength, dlgData.tintChanged,
                                                  config.IconSpacingXPercent, config.IconSpacingYPercent,
@@ -1194,8 +1196,8 @@ void CorralWindow::ShowAppearanceDialog()
                 // Copy full appearance to all corrals
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
                                                  true, config.TitleBarHeight, true,
-                                                 config.HeaderFontName, config.HeaderFontSize, true,
-                                                 config.HeaderFontColor, true,
+                                                 GetActiveTab().HeaderFontName, GetActiveTab().HeaderFontSize, true,
+                                                 GetActiveTab().HeaderFontColor, true,
                                                  config.IconOpacity, true,
                                                  config.IconTintColor, config.IconTintStrength, true,
                                                  config.IconSpacingXPercent, config.IconSpacingYPercent, true);

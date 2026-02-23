@@ -143,13 +143,13 @@ void App::Initialize()
         tab.Title = "Desktop";
         tab.IsCatchAll = true; // First corral is catch-all
         tab.ColorHex = config.DefaultColorHex;
+        tab.HeaderFontName = config.DefaultHeaderFontName;
+        tab.HeaderFontSize = config.DefaultHeaderFontSize;
+        tab.HeaderFontColor = config.DefaultHeaderFontColor;
         defaultConfig.Tabs.push_back(tab);
 
         // Apply default appearance settings (same as CreateCorral)
         defaultConfig.TitleBarHeight = config.DefaultTitleBarHeight;
-        defaultConfig.HeaderFontName = config.DefaultHeaderFontName;
-        defaultConfig.HeaderFontSize = config.DefaultHeaderFontSize;
-        defaultConfig.HeaderFontColor = config.DefaultHeaderFontColor;
         defaultConfig.IconOpacity = config.DefaultIconOpacity;
         defaultConfig.IconTintColor = config.DefaultIconTintColor;
         defaultConfig.IconTintStrength = config.DefaultIconTintStrength;
@@ -385,13 +385,20 @@ void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyCol
             cfg.TitleBarHeight = titleBarHeight;
             needsLayoutRecalc = true;
         }
-        if (applyFont)
+        if (applyFont || applyFontColor)
         {
-            cfg.HeaderFontName = fontName;
-            cfg.HeaderFontSize = fontSize;
+            int activeIdx = cfg.ActiveTabIndex;
+            if (activeIdx >= 0 && activeIdx < (int)cfg.Tabs.size())
+            {
+                if (applyFont)
+                {
+                    cfg.Tabs[activeIdx].HeaderFontName = fontName;
+                    cfg.Tabs[activeIdx].HeaderFontSize = fontSize;
+                }
+                if (applyFontColor)
+                    cfg.Tabs[activeIdx].HeaderFontColor = fontColor;
+            }
         }
-        if (applyFontColor)
-            cfg.HeaderFontColor = fontColor;
         if (applyIconOpacity)
         {
             cfg.IconOpacity = iconOpacity;
@@ -948,13 +955,13 @@ void App::CreateCorral(POINT pt)
     CorralTabConfig tab;
     tab.Title = "New Corral";
     tab.ColorHex = config.DefaultColorHex; // Use saved default appearance
+    tab.HeaderFontName = config.DefaultHeaderFontName;
+    tab.HeaderFontSize = config.DefaultHeaderFontSize;
+    tab.HeaderFontColor = config.DefaultHeaderFontColor;
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
     newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
-    newConfig.HeaderFontName = config.DefaultHeaderFontName;
-    newConfig.HeaderFontSize = config.DefaultHeaderFontSize;
-    newConfig.HeaderFontColor = config.DefaultHeaderFontColor;
     newConfig.IconOpacity = config.DefaultIconOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
@@ -1067,13 +1074,13 @@ void App::CreateVirtualCorralAt(POINT pt)
     tab.IsVirtual = true;
     tab.VirtualFolderPath = utf8Path;
     tab.IsCatchAll = false; // Virtual corrals cannot be catch-all
+    tab.HeaderFontName = config.DefaultHeaderFontName;
+    tab.HeaderFontSize = config.DefaultHeaderFontSize;
+    tab.HeaderFontColor = config.DefaultHeaderFontColor;
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
     newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
-    newConfig.HeaderFontName = config.DefaultHeaderFontName;
-    newConfig.HeaderFontSize = config.DefaultHeaderFontSize;
-    newConfig.HeaderFontColor = config.DefaultHeaderFontColor;
     newConfig.IconOpacity = config.DefaultIconOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;

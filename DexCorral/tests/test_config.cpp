@@ -55,10 +55,7 @@ TEST(CorralWindowConfig, Defaults) {
     EXPECT_DOUBLE_EQ(c.Height, 200.0);
     EXPECT_FALSE(c.IsRolledUp);
     EXPECT_EQ(c.ActiveTabIndex, 0);
-    EXPECT_EQ(c.TitleBarHeight, 32);
-    EXPECT_EQ(c.HeaderFontName, "Segoe UI");
-    EXPECT_EQ(c.HeaderFontSize, 10);
-    EXPECT_EQ(c.HeaderFontColor, "#FFFFFF");
+    EXPECT_EQ(c.TitleBarHeight, 32);  // Header height is per-corral
     EXPECT_EQ(c.IconOpacity, 255);
     EXPECT_EQ(c.IconTintColor, "#000000");
     EXPECT_EQ(c.IconTintStrength, 0);
@@ -78,6 +75,10 @@ TEST(CorralTabConfig, Defaults) {
     EXPECT_FALSE(c.IsCatchAll);
     EXPECT_FALSE(c.IsVirtual);
     EXPECT_TRUE(c.VirtualFolderPath.empty());
+    // Header font is per-tab
+    EXPECT_EQ(c.HeaderFontName, "Segoe UI");
+    EXPECT_EQ(c.HeaderFontSize, 10);
+    EXPECT_EQ(c.HeaderFontColor, "#FFFFFF");
 }
 
 // ---------------------------------------------------------------------------
@@ -112,9 +113,6 @@ TEST(CorralWindowConfig, RoundTrip) {
     orig.IsRolledUp = true;
     orig.ActiveTabIndex = 2;
     orig.TitleBarHeight = 48;
-    orig.HeaderFontName = "Arial";
-    orig.HeaderFontSize = 12;
-    orig.HeaderFontColor = "#AABBCC";
     orig.IconOpacity = 180;
     orig.IconTintColor = "#FF0000";
     orig.IconTintStrength = 64;
@@ -124,6 +122,9 @@ TEST(CorralWindowConfig, RoundTrip) {
 
     CorralTabConfig tab;
     tab.Title = "Alpha";
+    tab.HeaderFontName = "Arial";
+    tab.HeaderFontSize = 12;
+    tab.HeaderFontColor = "#AABBCC";
     orig.Tabs.push_back(tab);
 
     MonitorPosition mp;
@@ -140,9 +141,6 @@ TEST(CorralWindowConfig, RoundTrip) {
     EXPECT_TRUE(back.IsRolledUp);
     EXPECT_EQ(back.ActiveTabIndex, 2);
     EXPECT_EQ(back.TitleBarHeight, 48);
-    EXPECT_EQ(back.HeaderFontName, "Arial");
-    EXPECT_EQ(back.HeaderFontSize, 12);
-    EXPECT_EQ(back.HeaderFontColor, "#AABBCC");
     EXPECT_EQ(back.IconOpacity, 180);
     EXPECT_EQ(back.IconTintColor, "#FF0000");
     EXPECT_EQ(back.IconTintStrength, 64);
@@ -151,6 +149,9 @@ TEST(CorralWindowConfig, RoundTrip) {
     EXPECT_EQ(back.TargetMonitorId, "DISPLAY1");
     ASSERT_EQ(back.Tabs.size(), 1u);
     EXPECT_EQ(back.Tabs[0].Title, "Alpha");
+    EXPECT_EQ(back.Tabs[0].HeaderFontName, "Arial");
+    EXPECT_EQ(back.Tabs[0].HeaderFontSize, 12);
+    EXPECT_EQ(back.Tabs[0].HeaderFontColor, "#AABBCC");
     ASSERT_EQ(back.MonitorPositions.count("DISPLAY1"), 1u);
     EXPECT_EQ(back.MonitorPositions.at("DISPLAY1").RefWidth, 1920);
 }
