@@ -36,6 +36,7 @@ static CRITICAL_SECTION s_Lock;
 static std::vector<std::wstring> s_HiddenNames;
 static volatile DWORD s_Version = 0;
 static bool s_Initialized = false;
+static bool s_DebugLogging = false;
 
 void HookBridge::Initialize()
 {
@@ -83,6 +84,16 @@ DWORD HookBridge::GetHiddenIconNames(std::vector<std::wstring> &out)
     DWORD ver = s_Version;
     LeaveCriticalSection(&s_Lock);
     return ver;
+}
+
+void HookBridge::SetDebugLogging(bool enable)
+{
+    s_DebugLogging = enable;
+}
+
+bool HookBridge::IsDebugLogging()
+{
+    return s_DebugLogging;
 }
 
 void HookBridge::RefreshDesktop()

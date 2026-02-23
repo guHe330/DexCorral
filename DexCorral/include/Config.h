@@ -52,7 +52,7 @@ struct MonitorPosition
     int RefWidth = 1920;  /// Reference monitor width when position was saved
     int RefHeight = 1080; /// Reference monitor height when position was saved
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(MonitorPosition, Left, Top, Width, Height, RefWidth, RefHeight)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MonitorPosition, Left, Top, Width, Height, RefWidth, RefHeight)
 };
 
 /// Configuration for a single tab within a corral window
@@ -120,8 +120,9 @@ struct AppConfig
     int DefaultIconTintStrength = 28;
     int DefaultIconSpacingXPercent = 91;
     int DefaultIconSpacingYPercent = 85;
+    bool DebugLogging = false;             // Write debug log files (dllmain.log, CorralHook.log)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging)
 };
 
 class Config

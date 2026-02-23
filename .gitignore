@@ -55,6 +55,7 @@
 # Build directories
 build/
 vs2022/
+vs_build/
 
 # Installer build artifacts
 installer/msix/staging/

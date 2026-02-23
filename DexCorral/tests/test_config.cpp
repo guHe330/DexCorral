@@ -33,17 +33,17 @@ static nlohmann::json toJson(const CorralTabConfig& c) {
 TEST(AppConfig, Defaults) {
     AppConfig c;
     EXPECT_TRUE(c.DesktopIconsVisible);
-    EXPECT_EQ(c.DefaultColorHex, "#99000000");
+    EXPECT_EQ(c.DefaultColorHex, "#7F0000FF");
     EXPECT_FALSE(c.HideShortcutArrows);
-    EXPECT_EQ(c.DefaultTitleBarHeight, 32);
-    EXPECT_EQ(c.DefaultHeaderFontName, "Segoe UI");
+    EXPECT_EQ(c.DefaultTitleBarHeight, 26);
+    EXPECT_EQ(c.DefaultHeaderFontName, "Segoe UI Semibold");
     EXPECT_EQ(c.DefaultHeaderFontSize, 10);
     EXPECT_EQ(c.DefaultHeaderFontColor, "#FFFFFF");
-    EXPECT_EQ(c.DefaultIconOpacity, 255);
-    EXPECT_EQ(c.DefaultIconTintColor, "#000000");
-    EXPECT_EQ(c.DefaultIconTintStrength, 0);
-    EXPECT_EQ(c.DefaultIconSpacingXPercent, 100);
-    EXPECT_EQ(c.DefaultIconSpacingYPercent, 100);
+    EXPECT_EQ(c.DefaultIconOpacity, 210);
+    EXPECT_EQ(c.DefaultIconTintColor, "#0000FF");
+    EXPECT_EQ(c.DefaultIconTintStrength, 28);
+    EXPECT_EQ(c.DefaultIconSpacingXPercent, 91);
+    EXPECT_EQ(c.DefaultIconSpacingYPercent, 85);
     EXPECT_TRUE(c.Corrals.empty());
 }
 
@@ -201,7 +201,7 @@ TEST(MissingField, WindowTitleBarHeight_GetsDefault) {
 TEST(MissingField, AppIconOpacity_GetsDefault) {
     nlohmann::json j = R"({"Corrals":[]})"_json;
     auto cfg = j.get<AppConfig>();
-    EXPECT_EQ(cfg.DefaultIconOpacity, 255);
+    EXPECT_EQ(cfg.DefaultIconOpacity, 210);
 }
 
 TEST(MissingField, IconTintStrength_GetsDefault) {

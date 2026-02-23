@@ -74,6 +74,7 @@ static void InitLogPath() {
 }
 
 static void Log(const wchar_t* format, ...) {
+    if (!HookBridge::IsDebugLogging()) return;
     InitLogPath();
 
     va_list args;

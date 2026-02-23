@@ -60,6 +60,28 @@ jobs:
         Set-Content $versionH -Value $content
         Write-Host "Updated Version.h to $version"
 
+    - name: Update RC file versions
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $parts = $version -split '\.'
+        $major = $parts[0]; $minor = $parts[1]; $patch = $parts[2]
+        $commaVer = "$major,$minor,$patch,0"
+        $dotVer   = "$major.$minor.$patch.0"
+
+        foreach ($rcFile in @(
+            "DexCorral/DexCorral.rc",
+            "DexCorral/ShellExtension/DexCorralHook.rc"
+        )) {
+            $content = Get-Content $rcFile -Raw
+            $content = $content -replace 'FILEVERSION\s+[\d,]+',    "FILEVERSION     $commaVer"
+            $content = $content -replace 'PRODUCTVERSION\s+[\d,]+', "PRODUCTVERSION  $commaVer"
+            $content = $content -replace '"FileVersion",\s+"[^"]*"',    """FileVersion"",       ""$dotVer"""
+            $content = $content -replace '"ProductVersion",\s+"[^"]*"', """ProductVersion"",    ""$dotVer"""
+            Set-Content $rcFile -Value $content
+            Write-Host "Updated $rcFile to $dotVer"
+        }
+
     - name: Configure CMake
       run: cmake -S DexCorral -B DexCorral/build -G "Visual Studio 17 2022" -A x64
 

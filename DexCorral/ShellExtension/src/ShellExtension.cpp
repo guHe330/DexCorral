@@ -3,12 +3,21 @@
 #include "App.h"
 #include <strsafe.h>
 
+// Defined in dllmain.cpp (same DLL) — always-on log, no IsDebugLogging gate
+void DllLog(const wchar_t* format, ...);
+
+// Defined in dllmain.cpp — starts hook and App threads once, safe to call outside DllMain
+void StartAppIfNeeded(const wchar_t* caller);
+
 // Menu command IDs
 enum {
     IDM_NEW_CORRAL = 0,
     IDM_NEW_VIRTUAL_CORRAL,
     IDM_COUNT
 };
+
+// IsMemberOf is called for every file Explorer renders — log only the first call
+static bool g_IsMemberOfLogged = false;
 
 DexCorralShellExt::DexCorralShellExt() = default;
 DexCorralShellExt::~DexCorralShellExt() = default;
@@ -67,6 +76,12 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::Initialize(PCIDLIST_ABSOLUTE pidlFo
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::QueryContextMenu(HMENU hmenu, UINT indexMenu,
     UINT idCmdFirst, UINT idCmdLast, UINT uFlags) {
+    DllLog(L"QueryContextMenu: called (uFlags=0x%X)", uFlags);
+
+    // Ensure App is running — this is the right-click (ContextMenuHandler) load path.
+    // Loader lock is not held here, so thread creation is safe.
+    StartAppIfNeeded(L"QueryContextMenu");
+
     // Don't add items if Explorer is asking for default verb only
     if (uFlags & CMF_DEFAULTONLY)
         return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 0);
@@ -120,10 +135,8 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::GetCommandString(UINT_PTR idCmd, UI
     }
 }
 
-// IOleCommandTarget — required for ShellServiceObjectDelayLoad
-// Explorer creates our COM object on startup via CoCreateInstance,
-// then calls Exec. We don't need to do anything here since the DLL's
-// DLL_PROCESS_ATTACH already started the hook and worker thread.
+// IOleCommandTarget — SharedTaskScheduler path.
+// Explorer calls CoCreateInstance on our CLSID then calls Exec() at startup.
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::QueryStatus(const GUID* pguidCmdGroup, ULONG cCmds,
     OLECMD prgCmds[], OLECMDTEXT* pCmdText) {
@@ -132,7 +145,10 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::QueryStatus(const GUID* pguidCmdGro
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::Exec(const GUID* pguidCmdGroup, DWORD nCmdID,
     DWORD nCmdexecopt, VARIANT* pvaIn, VARIANT* pvaOut) {
-    // Explorer calls this on startup — everything is already initialized in DLL_PROCESS_ATTACH
+    // Explorer calls this after loading the DLL via SharedTaskScheduler.
+    // The loader lock is no longer held here, so thread creation is safe.
+    DllLog(L"Exec: called (SharedTaskScheduler path) nCmdID=%lu", nCmdID);
+    StartAppIfNeeded(L"Exec");
     return S_OK;
 }
 
@@ -142,15 +158,30 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::Exec(const GUID* pguidCmdGroup, DWO
 // All methods return S_FALSE / E_FAIL so we never actually show an overlay.
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::IsMemberOf(PCWSTR pwszPath, DWORD dwAttrib) {
+    // Log only the first call to avoid spamming — this fires per-file
+    if (!g_IsMemberOfLogged) {
+        g_IsMemberOfLogged = true;
+        DllLog(L"IsMemberOf: first call (path=%s) — triggering StartAppIfNeeded", pwszPath ? pwszPath : L"<null>");
+        StartAppIfNeeded(L"IsMemberOf");
+    }
     return S_FALSE;  // Never overlay any file
 }
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::GetOverlayInfo(PWSTR pwszIconFile, int cchMax,
     int* pIndex, DWORD* pdwFlags) {
+    // Explorer calls GetOverlayInfo before GetPriority/IsMemberOf in practice on Windows 11.
+    // When we return E_FAIL, Explorer skips GetPriority and IsMemberOf entirely, making
+    // GetOverlayInfo the only reliable overlay-path trigger we receive at boot.
+    DllLog(L"GetOverlayInfo: called — triggering StartAppIfNeeded");
+    StartAppIfNeeded(L"GetOverlayInfo");
     return E_FAIL;  // No overlay icon
 }
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::GetPriority(int* pPriority) {
+    // Explorer calls this once per session when initializing overlay handlers (at startup).
+    // Reliable trigger: fires before IsMemberOf and before any files are rendered.
+    DllLog(L"GetPriority: called — triggering StartAppIfNeeded");
+    StartAppIfNeeded(L"GetPriority");
     if (pPriority) *pPriority = 100;  // Low priority (doesn't matter since IsMemberOf always returns S_FALSE)
     return S_OK;
 }

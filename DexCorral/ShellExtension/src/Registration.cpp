@@ -6,7 +6,7 @@
 
 // CLSID as string: {7A3B9E42-D1F8-4C6A-B5E3-9F2A1D8C4E7B}
 static const wchar_t* CLSID_STRING = L"{7A3B9E42-D1F8-4C6A-B5E3-9F2A1D8C4E7B}";
-static const wchar_t* EXTENSION_NAME = L"DexCorral Desktop Organizer";
+static const wchar_t* EXTENSION_NAME = L"DexCorral";
 
 static HRESULT SetRegistryValue(HKEY hKeyRoot, const wchar_t* subKey,
     const wchar_t* valueName, const wchar_t* data) {
@@ -55,11 +55,19 @@ HRESULT RegisterShellExtension(const wchar_t* dllPath) {
     hr = SetRegistryValue(HKEY_CLASSES_ROOT, keyPath, L"ThreadingModel", L"Apartment");
     if (FAILED(hr)) return hr;
 
-    // 2. Register ShellServiceObjectDelayLoad (auto-load into Explorer on startup)
-    // SharedTaskScheduler is deprecated on Windows 10/11 — ShellServiceObjectDelayLoad is the modern equivalent
+    // 2. Register SharedTaskScheduler (auto-load into Explorer on startup)
+    // Clean up stray subkey left by older installs that used the wrong format.
+    StringCchPrintfW(keyPath, 512,
+        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler\\%s",
+        CLSID_STRING);
+    DeleteRegistryKey(HKEY_LOCAL_MACHINE, keyPath);
+    // Explorer calls CoCreateInstance on every CLSID listed here during startup,
+    // loading the DLL in-process. ShellServiceObjectDelayLoad is no longer honored
+    // for third-party DLLs on Windows 10/11.
+    // Structure: value name = CLSID, value data = display name.
     hr = SetRegistryValue(HKEY_LOCAL_MACHINE,
-        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad",
-        L"DexCorral", CLSID_STRING);
+        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler",
+        CLSID_STRING, EXTENSION_NAME);
     if (FAILED(hr)) return hr;
 
     // 3. Register icon overlay handler (Explorer loads ALL overlay handlers on startup)
@@ -75,7 +83,7 @@ HRESULT RegisterShellExtension(const wchar_t* dllPath) {
         nullptr, CLSID_STRING);
     if (FAILED(hr)) return hr;
 
-    // 4. Notify Explorer of the change
+    // 5. Notify Explorer of the change
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 
     return S_OK;
@@ -92,7 +100,16 @@ HRESULT UnregisterShellExtension() {
     DeleteRegistryKey(HKEY_CLASSES_ROOT,
         L"Directory\\Background\\ShellEx\\ContextMenuHandlers\\DexCorral");
 
-    // Remove ShellServiceObjectDelayLoad entry
+    // Remove SharedTaskScheduler entries (both the correct value and any stray subkey)
+    DeleteRegistryValue(HKEY_LOCAL_MACHINE,
+        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler",
+        CLSID_STRING);
+    StringCchPrintfW(keyPath, 512,
+        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler\\%s",
+        CLSID_STRING);
+    DeleteRegistryKey(HKEY_LOCAL_MACHINE, keyPath);
+
+    // Remove ShellServiceObjectDelayLoad entry (written by older installs)
     DeleteRegistryValue(HKEY_LOCAL_MACHINE,
         L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad",
         L"DexCorral");

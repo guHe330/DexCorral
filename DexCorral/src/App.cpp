@@ -103,6 +103,7 @@ void App::Initialize()
 
     // Load configuration
     LoadConfig();
+    HookBridge::SetDebugLogging(config.DebugLogging);
 
     // Create monitor manager (before corrals)
     monitorManager = std::make_unique<MonitorManager>();
@@ -1116,16 +1117,17 @@ bool App::IsDesktopUnderMouse(POINT pt)
 
 bool App::IsAutostartEnabled()
 {
-    // Shell extension mode: check ShellServiceObjectDelayLoad registry key
+    // Check SharedTaskScheduler — this is what RegisterShellExtension actually writes.
+    // (ShellServiceObjectDelayLoad is no longer honored for third-party DLLs on Win10/11.)
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
-                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad",
+                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler",
                       0, KEY_READ, &hKey) == ERROR_SUCCESS)
     {
         wchar_t value[256];
         DWORD size = sizeof(value);
         DWORD type = REG_SZ;
-        LONG result = RegQueryValueExW(hKey, L"DexCorral",
+        LONG result = RegQueryValueExW(hKey, L"{7A3B9E42-D1F8-4C6A-B5E3-9F2A1D8C4E7B}",
                                        nullptr, &type, (LPBYTE)value, &size);
         RegCloseKey(hKey);
         return result == ERROR_SUCCESS;

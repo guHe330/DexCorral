@@ -74,6 +74,12 @@ Filename: "{cmd}"; Parameters: "/c taskkill /F /IM explorer.exe & timeout /t 3 /
 var
   g_KeepConfig: Boolean;
 
+// Helper: convert Boolean to string (InnoSetup Pascal lacks a built-in BoolToStr)
+function BoolToStr(Value: Boolean): String;
+begin
+  if Value then Result := 'True' else Result := 'False';
+end;
+
 // Win32 imports used for install-time polling and shell notification
 function FindWindowW(ClassName: String; WindowName: Integer): Integer;
   external 'FindWindowW@user32.dll stdcall';
@@ -130,51 +136,84 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
+  ProgmanFound: Boolean;
+  AppFound: Boolean;
 begin
   if CurStep = ssPostInstall then begin
+    Log('--- DexCorral post-install sequence ---');
+    Log('Install dir: ' + ExpandConstant('{app}'));
+    Log('AppData dir: ' + ExpandConstant('{userappdata}'));
+
     // Register the shell extension
-    Log('Registering shell extension...');
+    Log('Step 1: Registering shell extension via DexCorral.exe --register...');
     if Exec(ExpandConstant('{app}\DexCorral.exe'), '--register --silent',
             ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then begin
-      Log('DexCorral.exe --register exited with code: ' + IntToStr(ResultCode));
-      if ResultCode <> 0 then
+      Log('Step 1 result: DexCorral.exe --register exited with code=' + IntToStr(ResultCode));
+      if ResultCode <> 0 then begin
+        Log('Step 1 ERROR: registration failed. Check that DLL exists and regsvr32 succeeded.');
         MsgBox('Shell extension registration failed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 +
                'Try running "DexCorral.exe --register" manually as Administrator.', mbError, MB_OK);
+      end;
     end else begin
-      Log('Failed to launch DexCorral.exe --register');
+      Log('Step 1 ERROR: Failed to launch DexCorral.exe --register (exe missing?)');
       MsgBox('Could not run DexCorral.exe to register the shell extension.' + #13#10 +
              'Try running "DexCorral.exe --register" manually as Administrator.', mbError, MB_OK);
     end;
 
-    // Restart Explorer so it loads the new DLL
-    Log('Restarting Explorer...');
+    // Kill and restart Explorer so it loads the newly registered DLL
+    Log('Step 2: Killing explorer.exe...');
     Exec('taskkill', '/F /IM explorer.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Log('Step 2: taskkill exit code=' + IntToStr(ResultCode));
     Sleep(3000);
+
+    Log('Step 3: Starting explorer.exe...');
     Exec(ExpandConstant('{win}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+    Log('Step 3: explorer start exit code=' + IntToStr(ResultCode));
 
     // Wait for the Explorer desktop shell to be ready (Progman = desktop host window)
-    Log('Waiting for Explorer shell to be ready...');
-    WaitForWindow('Progman', 20, 500);  // up to 10 s
+    Log('Step 4: Waiting for Progman (Explorer shell ready)...');
+    ProgmanFound := WaitForWindow('Progman', 30, 500);  // up to 15 s
+    Log('Step 4: Progman found=' + BoolToStr(ProgmanFound));
+    if not ProgmanFound then
+      Log('Step 4 WARNING: Progman never appeared — Explorer may be slow or failed to start');
 
-    // Give SSO / overlay handlers a moment to finish loading
-    Sleep(1500);
+    // Give overlay handlers a moment to finish loading and call GetPriority/IsMemberOf
+    Log('Step 5: Waiting 3s for overlay handlers and SharedTaskScheduler to initialize...');
+    Sleep(3000);
 
     // Check whether the DexCorral App thread has started (its message window appears)
-    if FindWindowW('DexCorralMessageWindow', 0) = 0 then begin
-      // DLL was not yet loaded — nudge Explorer by broadcasting SHCNE_ASSOCCHANGED.
-      // This causes Explorer to reload icon overlay handlers, which loads our DLL.
-      Log('DexCorral App not detected, sending shell change notification...');
+    AppFound := FindWindowW('DexCorralMessageWindow', 0) <> 0;
+    Log('Step 6: DexCorralMessageWindow found (immediate)=' + BoolToStr(AppFound));
+
+    if not AppFound then begin
+      // DLL may not have started yet — nudge Explorer by broadcasting SHCNE_ASSOCCHANGED.
+      // This causes Explorer to reload icon overlay handlers, which calls GetPriority.
+      Log('Step 6: App not detected. Sending SHCNE_ASSOCCHANGED to nudge overlay reload...');
       SHChangeNotify($08000000, $0000, 0, 0);  // SHCNE_ASSOCCHANGED | SHCNF_IDLIST
 
-      // Wait up to 5 s for the App to appear
-      if WaitForWindow('DexCorralMessageWindow', 10, 500) then
-        Log('DexCorral App started successfully')
-      else
-        Log('DexCorral App did not start (user can right-click the desktop to activate)');
-    end else
-      Log('DexCorral App already running');
+      // Wait up to 10 s for the App to appear
+      AppFound := WaitForWindow('DexCorralMessageWindow', 20, 500);
+      Log('Step 6: DexCorralMessageWindow found (after nudge)=' + BoolToStr(AppFound));
 
-    Log('Explorer restarted');
+      if AppFound then
+        Log('Step 6: SUCCESS — DexCorral App started after shell notification')
+      else begin
+        Log('Step 6: App did not start within timeout.');
+        Log('  -> Check ' + ExpandConstant('{userappdata}') + '\DexCorral\dllmain.log for startup trace.');
+        Log('  -> User can right-click the desktop to manually activate until reboot.');
+      end;
+    end else
+      Log('Step 6: SUCCESS — DexCorral App was already running');
+
+    // Copy the InnoSetup log to the DexCorral AppData folder for easy access
+    Log('Step 7: Copying setup log to AppData...');
+    if FileCopy(ExpandConstant('{log}'),
+                ExpandConstant('{userappdata}\DexCorral\install.log'), False) then
+      Log('Step 7: Setup log copied to ' + ExpandConstant('{userappdata}\DexCorral\install.log'))
+    else
+      Log('Step 7: Could not copy setup log (AppData folder may not exist yet)');
+
+    Log('--- DexCorral post-install sequence complete ---');
   end;
 end;
 
@@ -188,11 +227,9 @@ begin
 
     // Ask whether to keep the user's configuration files
     g_KeepConfig := MsgBox(
-      'Would you like to keep your DexCorral configuration?' + #13#10 +
-      #13#10 +
+      'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
       'Your corral layouts and appearance settings are stored in:' + #13#10 +
-      '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 +
-      #13#10 +
+      '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
       'Click Yes to keep them for future use, or No to delete everything.',
       mbConfirmation, MB_YESNO) = IDYES;
   end;

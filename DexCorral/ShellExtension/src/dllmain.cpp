@@ -16,34 +16,46 @@ static HANDLE g_hWorkerThread = nullptr;
 static HANDLE g_hHookRetryThread = nullptr;
 static HANDLE g_hStopEvent = nullptr;  // Signaled to tell worker thread to quit
 static bool g_bInsideExplorer = false; // Only activate hook+app when loaded by Explorer
+static LONG g_AppStarted = 0;          // Set to 1 once StartAppIfNeeded() has run
 
 // RunApp is defined in App.cpp — compiled into the same DLL
 extern "C" int RunApp(HANDLE hStopEvent);
 
-// Log to file (always on, writes to %APPDATA%/DexCorral/dllmain.log)
+// Always-on log — writes regardless of DebugLogging config flag.
+// Critical: we must capture startup failures that happen before the App reads config.
+// Non-static so ShellExtension.cpp (same DLL) can call it via forward declaration.
 static wchar_t g_DllMainLogPath[MAX_PATH] = {};
 
-static void Log(const wchar_t* message) {
-    if (!g_DllMainLogPath[0]) {
-        wchar_t* appData = nullptr;
-        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData))) {
-            wchar_t dir[MAX_PATH];
-            swprintf_s(dir, L"%s\\DexCorral", appData);
-            CreateDirectoryW(dir, nullptr);
-            swprintf_s(g_DllMainLogPath, L"%s\\dllmain.log", dir);
-            CoTaskMemFree(appData);
-        } else {
-            GetTempPathW(MAX_PATH, g_DllMainLogPath);
-            wcscat_s(g_DllMainLogPath, L"dllmain.log");
-        }
+static void InitDllLogPath() {
+    if (g_DllMainLogPath[0]) return;
+    wchar_t* appData = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData))) {
+        wchar_t dir[MAX_PATH];
+        swprintf_s(dir, L"%s\\DexCorral", appData);
+        CreateDirectoryW(dir, nullptr);
+        swprintf_s(g_DllMainLogPath, L"%s\\dllmain.log", dir);
+        CoTaskMemFree(appData);
+    } else {
+        GetTempPathW(MAX_PATH, g_DllMainLogPath);
+        wcscat_s(g_DllMainLogPath, L"dllmain.log");
     }
+}
+
+void DllLog(const wchar_t* format, ...) {
+    InitDllLogPath();
+
+    wchar_t message[1024];
+    va_list args;
+    va_start(args, format);
+    vswprintf_s(message, format, args);
+    va_end(args);
 
     HANDLE hFile = CreateFileW(g_DllMainLogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
                                OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile != INVALID_HANDLE_VALUE) {
         SYSTEMTIME st;
         GetLocalTime(&st);
-        wchar_t buffer[512];
+        wchar_t buffer[1200];
         swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] %s\r\n",
                    st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
 
@@ -51,6 +63,16 @@ static void Log(const wchar_t* message) {
         WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
         CloseHandle(hFile);
     }
+}
+
+// Kept as alias so internal callers don't all need renaming
+static void Log(const wchar_t* format, ...) {
+    wchar_t message[1024];
+    va_list args;
+    va_start(args, format);
+    vswprintf_s(message, format, args);
+    va_end(args);
+    DllLog(L"%s", message);
 }
 
 static bool IsRunningInsideExplorer() {
@@ -63,16 +85,20 @@ static bool IsRunningInsideExplorer() {
 
 // Worker thread: runs the App message loop (corral windows, tray icon, config, etc.)
 static DWORD WINAPI AppWorkerThread(LPVOID param) {
-    Log(L"AppWorkerThread: Starting");
+    Log(L"AppWorkerThread: Starting (tid=%lu)", GetCurrentThreadId());
 
-    OleInitialize(nullptr);
+    HRESULT hrOle = OleInitialize(nullptr);
+    Log(L"AppWorkerThread: OleInitialize hr=0x%08X", (unsigned)hrOle);
 
     INITCOMMONCONTROLSEX icc = {};
     icc.dwSize = sizeof(icc);
     icc.dwICC = ICC_BAR_CLASSES;
-    InitCommonControlsEx(&icc);
+    BOOL iccOk = InitCommonControlsEx(&icc);
+    Log(L"AppWorkerThread: InitCommonControlsEx=%d", iccOk);
 
-    RunApp(g_hStopEvent);
+    Log(L"AppWorkerThread: Calling RunApp...");
+    int ret = RunApp(g_hStopEvent);
+    Log(L"AppWorkerThread: RunApp returned %d", ret);
 
     OleUninitialize();
     Log(L"AppWorkerThread: Exiting");
@@ -118,46 +144,29 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         g_hModule = hModule;
         DisableThreadLibraryCalls(hModule);
         g_bInsideExplorer = IsRunningInsideExplorer();
-        Log(L"CorralHook: DLL_PROCESS_ATTACH");
 
         // Initialize HookBridge (critical section) regardless of context
         HookBridge::Initialize();
 
-        if (!g_bInsideExplorer) {
-            // Loaded by registration tool — only COM exports needed, no hook/app
-            Log(L"CorralHook: Not in Explorer, skipping hook and app initialization");
-            break;
+        {
+            wchar_t exePath[MAX_PATH] = {};
+            GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+            Log(L"CorralHook: DLL_PROCESS_ATTACH — host=%s insideExplorer=%d pid=%lu",
+                exePath, g_bInsideExplorer, GetCurrentProcessId());
         }
 
-        if (InitializeCorralHook()) {
-            Log(L"CorralHook: Initialized successfully");
-        } else {
-            Log(L"CorralHook: Desktop ListView not ready, starting retry thread");
-            // Desktop ListView doesn't exist yet (Explorer still starting up).
-            // Start a retry thread that will keep trying until the desktop is ready.
-            // g_hStopEvent is created below, so create it early here for the retry thread.
-            g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-            g_hHookRetryThread = CreateThread(nullptr, 0, HookRetryThread, nullptr, 0, nullptr);
-        }
-
-        // Create stop event for worker thread (may already exist if retry thread started)
-        if (!g_hStopEvent) {
-            g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-        }
-
-        // Launch worker thread for App message loop
-        g_hWorkerThread = CreateThread(nullptr, 0, AppWorkerThread, nullptr, 0, nullptr);
-        if (g_hWorkerThread) {
-            Log(L"CorralHook: Worker thread launched");
-        } else {
-            Log(L"CorralHook: Failed to launch worker thread");
-        }
+        // Do NOT start threads here. The loader lock is held during DllMain — starting
+        // threads that call OleInitialize() or load DLLs risks a deadlock, causing
+        // Explorer to silently abort the load when loaded via SharedTaskScheduler.
+        // Actual startup is deferred to StartAppIfNeeded(), called from Exec() (the
+        // SharedTaskScheduler path) or overlay handler methods (GetPriority/IsMemberOf).
+        Log(L"CorralHook: DLL_PROCESS_ATTACH done — waiting for deferred StartAppIfNeeded");
         break;
 
     case DLL_PROCESS_DETACH:
-        Log(L"CorralHook: DLL_PROCESS_DETACH");
+        Log(L"CorralHook: DLL_PROCESS_DETACH (appStarted=%d)", g_AppStarted);
 
-        if (!g_bInsideExplorer) break;  // Nothing to clean up
+        if (!g_bInsideExplorer || !g_AppStarted) break;  // Nothing to clean up
 
         // Signal worker thread to stop
         if (g_hStopEvent) {
@@ -190,17 +199,60 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
     return TRUE;
 }
 
+// === Deferred startup ===
+
+// Called from Exec() (SharedTaskScheduler) or overlay handler methods or right-click.
+// At that point the loader lock is no longer held, so thread creation is safe.
+// caller is a short string identifying the callsite, e.g. L"Exec", L"GetPriority".
+void StartAppIfNeeded(const wchar_t* caller) {
+    if (!g_bInsideExplorer) {
+        DllLog(L"StartAppIfNeeded [%s]: not inside Explorer, skipping", caller);
+        return;
+    }
+    if (InterlockedCompareExchange(&g_AppStarted, 1, 0) != 0) {
+        DllLog(L"StartAppIfNeeded [%s]: already started, no-op", caller);
+        return;
+    }
+
+    DllLog(L"StartAppIfNeeded [%s]: FIRST CALL — launching hook + App threads", caller);
+
+    g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!g_hStopEvent) {
+        DllLog(L"StartAppIfNeeded [%s]: CreateEvent FAILED err=%lu", caller, GetLastError());
+    }
+
+    if (InitializeCorralHook()) {
+        DllLog(L"StartAppIfNeeded [%s]: Hook initialized immediately", caller);
+    } else {
+        DllLog(L"StartAppIfNeeded [%s]: Desktop ListView not ready, starting retry thread", caller);
+        g_hHookRetryThread = CreateThread(nullptr, 0, HookRetryThread, nullptr, 0, nullptr);
+        if (!g_hHookRetryThread)
+            DllLog(L"StartAppIfNeeded [%s]: HookRetryThread CreateThread FAILED err=%lu", caller, GetLastError());
+        else
+            DllLog(L"StartAppIfNeeded [%s]: HookRetryThread started tid=%lu", caller, GetThreadId(g_hHookRetryThread));
+    }
+
+    g_hWorkerThread = CreateThread(nullptr, 0, AppWorkerThread, nullptr, 0, nullptr);
+    if (g_hWorkerThread) {
+        DllLog(L"StartAppIfNeeded [%s]: AppWorkerThread started tid=%lu", caller, GetThreadId(g_hWorkerThread));
+    } else {
+        DllLog(L"StartAppIfNeeded [%s]: AppWorkerThread CreateThread FAILED err=%lu", caller, GetLastError());
+    }
+}
+
 // === COM Exports ===
 
 STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {
     if (!ppv) return E_POINTER;
 
     if (IsEqualCLSID(rclsid, CLSID_DexCorralShellExt)) {
+        DllLog(L"DllGetClassObject: Creating DexCorralClassFactory (pid=%lu)", GetCurrentProcessId());
         auto* factory = new (std::nothrow) DexCorralClassFactory();
         if (!factory) return E_OUTOFMEMORY;
 
         HRESULT hr = factory->QueryInterface(riid, ppv);
         factory->Release();
+        DllLog(L"DllGetClassObject: QueryInterface hr=0x%08X", (unsigned)hr);
         return hr;
     }
 

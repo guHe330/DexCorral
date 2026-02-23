@@ -10,6 +10,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # Registration tool (minimal EXE)
 add_executable(DexCorral WIN32
     src/main.cpp
+    DexCorral.rc
 )
 
 target_compile_definitions(DexCorral PRIVATE UNICODE _UNICODE)
@@ -25,6 +26,7 @@ set_target_properties(DexCorral PROPERTIES
 
 # DexCorralHook DLL — monolith shell extension (all app logic + Explorer hook)
 add_library(DexCorralHook SHARED
+    ShellExtension/DexCorralHook.rc
     # Hook / shell extension code
     ShellExtension/src/dllmain.cpp
     ShellExtension/src/CorralHook.cpp
