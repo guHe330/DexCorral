@@ -240,6 +240,21 @@ void StartAppIfNeeded(const wchar_t* caller) {
     }
 }
 
+// === Startup injection hook ===
+
+// Called by DexCorral.exe --startup via SetWindowsHookEx(WH_GETMESSAGE, ..., explorerThreadId).
+// Windows injects this DLL into Explorer's address space. On the first message processed by
+// Explorer's Progman thread, this proc fires, starts the App, and returns. DexCorral.exe
+// then calls UnhookWindowsHookEx and exits — the DLL stays resident (DllCanUnloadNow → S_FALSE).
+extern "C" __declspec(dllexport) LRESULT CALLBACK WakeHookProc(int code, WPARAM wParam, LPARAM lParam)
+{
+    // Only call StartAppIfNeeded once — g_AppStarted goes 0→1 on first call and
+    // stays 1 thereafter, so we skip the function entirely for every subsequent message.
+    if (code >= 0 && g_AppStarted == 0)
+        StartAppIfNeeded(L"WakeHookProc");
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
 // === COM Exports ===
 
 STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {

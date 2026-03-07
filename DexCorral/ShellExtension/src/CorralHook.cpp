@@ -50,6 +50,7 @@ static bool g_CompactionPending = false;    // True while waiting for Explorer t
 static bool g_OurAutoArrange = false;       // Our own auto-arrange state (Explorer's is always OFF)
 static bool g_AllowAutoArrangeStyle = false; // Temporarily allow LVS_AUTOARRANGE for sort commands
 
+
 // ============================================================================
 // Debug logging - always on, writes to %APPDATA%/DexCorral/CorralHook.log
 // ============================================================================
@@ -309,12 +310,23 @@ static void CALLBACK SortFixupTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, 
     }
 
     RefreshHiddenIconCache();
-    if (g_HiddenIcons.empty()) return;
 
-    Log(L"SortFixupTimer: Deferred compaction (Explorer idle)");
-    g_InsideCustomSort = true;
-    CompactVisibleIcons(g_hDesktopListView);
-    g_InsideCustomSort = false;
+    if (!g_HiddenIcons.empty()) {
+        Log(L"SortFixupTimer: Deferred compaction (Explorer idle)");
+        g_InsideCustomSort = true;
+        CompactVisibleIcons(g_hDesktopListView);
+        g_InsideCustomSort = false;
+    }
+
+    // Tell the app thread to re-park hidden icons under their corrals.
+    // The app knows each icon's exact screen position within its corral,
+    // which the hook cannot determine. This also prevents hidden icons from
+    // acting as mouse-over or drop targets at incorrect desktop positions.
+    HWND appWnd = HookBridge::GetAppMessageWindow();
+    if (appWnd) {
+        PostMessage(appWnd, WM_APP + 100, 0, 0);
+        Log(L"SortFixupTimer: Posted repark notification to app");
+    }
 }
 
 static void ScheduleCompaction(HWND hwnd, const wchar_t* source) {

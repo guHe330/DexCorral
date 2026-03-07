@@ -41,14 +41,25 @@ TrayIcon::~TrayIcon()
     Hide();
 }
 
-void TrayIcon::Show()
+bool TrayIcon::Show()
 {
-    Shell_NotifyIconW(NIM_ADD, &nid);
+    if (m_visible) {
+        Shell_NotifyIconW(NIM_MODIFY, &nid);
+        return true;
+    }
+    if (Shell_NotifyIconW(NIM_ADD, &nid)) {
+        m_visible = true;
+        return true;
+    }
+    return false;  // Shell not ready yet; caller should retry later
 }
 
 void TrayIcon::Hide()
 {
-    Shell_NotifyIconW(NIM_DELETE, &nid);
+    if (m_visible) {
+        Shell_NotifyIconW(NIM_DELETE, &nid);
+        m_visible = false;
+    }
 }
 
 void TrayIcon::UpdateTooltip(const std::wstring &tooltip)

@@ -110,17 +110,20 @@ LRESULT CALLBACK MouseHook::MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
             break;
         case WM_MOUSEWHEEL:
         {
-            // For tool windows, we need to manually route the message to the window under the cursor
-            // Get the window under the cursor
+            // Only re-route scroll to DexCorral tool windows — they don't receive
+            // WM_MOUSEWHEEL naturally because of WS_EX_TOOLWINDOW style.
+            // For all other windows, let the message pass through normally.
             HWND hwndUnder = WindowFromPoint(pt);
             if (hwndUnder)
             {
-                // Send the mousewheel message directly to that window
-                int delta = (short)HIWORD(mouseInfo->mouseData);
-                // Forward with proper wParam/lParam format for WM_MOUSEWHEEL
-                SendMessageW(hwndUnder, WM_MOUSEWHEEL, MAKEWPARAM(0, delta), MAKELPARAM(pt.x, pt.y));
-                // Consume the event to prevent default routing (which wouldn't work for tool windows anyway)
-                return 1;
+                wchar_t className[64] = {};
+                GetClassNameW(hwndUnder, className, _countof(className));
+                if (wcscmp(className, L"DexCorralWindowClass") == 0)
+                {
+                    int delta = (short)HIWORD(mouseInfo->mouseData);
+                    SendMessageW(hwndUnder, WM_MOUSEWHEEL, MAKEWPARAM(0, delta), MAKELPARAM(pt.x, pt.y));
+                    return 1;
+                }
             }
             break;
         }

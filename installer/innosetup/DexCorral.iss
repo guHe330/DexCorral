@@ -59,6 +59,13 @@ Name: "{group}\{#MyAppName} - Register"; Filename: "{app}\DexCorral.exe"; Parame
 Name: "{group}\{#MyAppName} - Unregister"; Filename: "{app}\DexCorral.exe"; Parameters: "--unregister"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
+[Registry]
+; Start DexCorral at login by injecting into Explorer (brief EXE, then exits).
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
+  ValueType: string; ValueName: "DexCorral"; \
+  ValueData: """{app}\DexCorral.exe"" --startup --silent"; \
+  Flags: uninsdeletevalue
+
 [UninstallRun]
 ; Unregister the shell extension (silent)
 Filename: "{app}\DexCorral.exe"; Parameters: "--unregister --silent"; RunOnceId: "UnregisterHook"; Flags: runhidden waituntilterminated
@@ -83,9 +90,6 @@ end;
 // Win32 imports used for install-time polling and shell notification
 function FindWindowW(ClassName: String; WindowName: Integer): Integer;
   external 'FindWindowW@user32.dll stdcall';
-
-procedure SHChangeNotify(wEventId: Cardinal; uFlags: Cardinal; dwItem1: Integer; dwItem2: Integer);
-  external 'SHChangeNotify@shell32.dll stdcall';
 
 // Poll for a window by class name (returns True as soon as it appears)
 function WaitForWindow(ClassName: String; MaxRetries: Integer; SleepMs: Integer): Boolean;
@@ -136,7 +140,6 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
-  ProgmanFound: Boolean;
   AppFound: Boolean;
 begin
   if CurStep = ssPostInstall then begin
@@ -160,58 +163,33 @@ begin
              'Try running "DexCorral.exe --register" manually as Administrator.', mbError, MB_OK);
     end;
 
-    // Kill and restart Explorer so it loads the newly registered DLL
-    Log('Step 2: Killing explorer.exe...');
-    Exec('taskkill', '/F /IM explorer.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Log('Step 2: taskkill exit code=' + IntToStr(ResultCode));
-    Sleep(3000);
+    // Inject DexCorralHook.dll into the running Explorer via WH_GETMESSAGE hook.
+    // DexCorral.exe --startup finds Explorer's Progman thread, injects the DLL,
+    // waits ~1 s for the App to start inside Explorer, then exits.
+    // No Explorer restart needed — the existing session is used.
+    Log('Step 2: Running DexCorral.exe --startup to inject into Explorer...');
+    if Exec(ExpandConstant('{app}\DexCorral.exe'), '--startup --silent',
+            ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      Log('Step 2: --startup exited with code=' + IntToStr(ResultCode))
+    else
+      Log('Step 2 ERROR: Failed to launch DexCorral.exe --startup');
 
-    Log('Step 3: Starting explorer.exe...');
-    Exec(ExpandConstant('{win}\explorer.exe'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
-    Log('Step 3: explorer start exit code=' + IntToStr(ResultCode));
-
-    // Wait for the Explorer desktop shell to be ready (Progman = desktop host window)
-    Log('Step 4: Waiting for Progman (Explorer shell ready)...');
-    ProgmanFound := WaitForWindow('Progman', 30, 500);  // up to 15 s
-    Log('Step 4: Progman found=' + BoolToStr(ProgmanFound));
-    if not ProgmanFound then
-      Log('Step 4 WARNING: Progman never appeared — Explorer may be slow or failed to start');
-
-    // Give overlay handlers a moment to finish loading and call GetPriority/IsMemberOf
-    Log('Step 5: Waiting 3s for overlay handlers and SharedTaskScheduler to initialize...');
-    Sleep(3000);
-
-    // Check whether the DexCorral App thread has started (its message window appears)
-    AppFound := FindWindowW('DexCorralMessageWindow', 0) <> 0;
-    Log('Step 6: DexCorralMessageWindow found (immediate)=' + BoolToStr(AppFound));
-
+    // Verify the App is running (its hidden message window should now exist)
+    AppFound := WaitForWindow('DexCorralMessageWindow', 10, 300);
+    Log('Step 3: DexCorralMessageWindow found=' + BoolToStr(AppFound));
     if not AppFound then begin
-      // DLL may not have started yet — nudge Explorer by broadcasting SHCNE_ASSOCCHANGED.
-      // This causes Explorer to reload icon overlay handlers, which calls GetPriority.
-      Log('Step 6: App not detected. Sending SHCNE_ASSOCCHANGED to nudge overlay reload...');
-      SHChangeNotify($08000000, $0000, 0, 0);  // SHCNE_ASSOCCHANGED | SHCNF_IDLIST
-
-      // Wait up to 10 s for the App to appear
-      AppFound := WaitForWindow('DexCorralMessageWindow', 20, 500);
-      Log('Step 6: DexCorralMessageWindow found (after nudge)=' + BoolToStr(AppFound));
-
-      if AppFound then
-        Log('Step 6: SUCCESS — DexCorral App started after shell notification')
-      else begin
-        Log('Step 6: App did not start within timeout.');
-        Log('  -> Check ' + ExpandConstant('{userappdata}') + '\DexCorral\dllmain.log for startup trace.');
-        Log('  -> User can right-click the desktop to manually activate until reboot.');
-      end;
+      Log('Step 3: App not detected — user can right-click desktop to activate manually.');
+      Log('  -> Startup injection will retry automatically on next login via Run key.');
     end else
-      Log('Step 6: SUCCESS — DexCorral App was already running');
+      Log('Step 3: SUCCESS — DexCorral App is running');
 
     // Copy the InnoSetup log to the DexCorral AppData folder for easy access
-    Log('Step 7: Copying setup log to AppData...');
+    Log('Step 4: Copying setup log to AppData...');
     if FileCopy(ExpandConstant('{log}'),
                 ExpandConstant('{userappdata}\DexCorral\install.log'), False) then
-      Log('Step 7: Setup log copied to ' + ExpandConstant('{userappdata}\DexCorral\install.log'))
+      Log('Step 4: Setup log copied to ' + ExpandConstant('{userappdata}\DexCorral\install.log'))
     else
-      Log('Step 7: Could not copy setup log (AppData folder may not exist yet)');
+      Log('Step 4: Could not copy setup log (AppData folder may not exist yet)');
 
     Log('--- DexCorral post-install sequence complete ---');
   end;

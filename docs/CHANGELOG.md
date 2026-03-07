@@ -9,6 +9,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.0.16] - 2026-03-07
+
+### Added
+- Startup injection via `DexCorral.exe --startup`: injects DexCorralHook.dll into Explorer via WH_GETMESSAGE hook, replacing Explorer restart
+- `DesktopFilter` window: blocks mouse and OLE drop interaction at hidden icon positions on the desktop
+- `WakeHookProc` DLL export for startup hook injection
+- `HookBridge::SetAppMessageWindow` / `GetAppMessageWindow` for hook-to-app notifications
+- Tray icon retry timer when shell notification area is not ready at early startup
+- Auto-start via `HKCU\...\Run` registry key (set by installer)
+- Hook posts `WM_APP+100` repark notification to app after sort/compaction
+
+### Fixed
+- Win+D (Show Desktop) no longer hides corral windows (Progman ownership + WM_WINDOWPOSCHANGING guard)
+- Mouse wheel routing scoped to DexCorral windows only — no longer swallows scroll in other applications
+- About dialog: corrected website URL (was .app, now .com) and GitHub username typo
+- License in README corrected from MIT to GPLv3
+
+### Changed
+- Installer no longer kills/restarts Explorer; uses `--startup` injection instead
+- `main.cpp` refactored: `--debug` flag removed, `--startup` flag added, cleaner arg parsing
+- `TrayIcon::Show()` now returns bool indicating success; tracks visibility state
+
+---
+
 ## [1.0.15] - 2026-02-21
 
 ### Fixed

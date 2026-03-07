@@ -41,6 +41,13 @@
 #include <Psapi.h>
 #include <cstdlib>
 #include <algorithm>
+#include <stdexcept>
+
+// Always-on log defined in dllmain.cpp (same DLL) — fires regardless of DebugLogging config.
+void DllLog(const wchar_t* format, ...);
+
+// Timer ID for retrying Shell_NotifyIconW(NIM_ADD) when the shell isn't ready at startup.
+static const UINT_PTR TRAY_RETRY_TIMER = 1;
 
 // Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
 static HANDLE g_AppStopEvent = nullptr;
@@ -49,8 +56,16 @@ static HANDLE g_AppStopEvent = nullptr;
 extern "C" int RunApp(HANDLE hStopEvent)
 {
     g_AppStopEvent = hStopEvent;
-    App app;
-    return app.Run();
+    try {
+        App app;
+        return app.Run();
+    } catch (const std::exception& e) {
+        DllLog(L"RunApp: EXCEPTION — %S", e.what());
+        return -1;
+    } catch (...) {
+        DllLog(L"RunApp: UNKNOWN EXCEPTION");
+        return -1;
+    }
 }
 
 App *App::instance = nullptr;
@@ -69,6 +84,8 @@ App::~App()
 
 void App::Initialize()
 {
+    DllLog(L"App::Initialize: starting");
+
     // Register message window class
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -87,6 +104,9 @@ void App::Initialize()
         HWND_MESSAGE, nullptr,
         GetModuleHandleW(nullptr), this);
 
+    // Register with HookBridge so the hook can post notifications here
+    HookBridge::SetAppMessageWindow(messageWindow);
+
     // Register for Explorer restart so we can re-add the tray icon
     wmTaskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
 
@@ -104,6 +124,8 @@ void App::Initialize()
     // Load configuration
     LoadConfig();
     HookBridge::SetDebugLogging(config.DebugLogging);
+    DllLog(L"App::Initialize: config loaded — %zu corrals, DebugLogging=%d",
+           config.Corrals.size(), config.DebugLogging ? 1 : 0);
 
     // Create monitor manager (before corrals)
     monitorManager = std::make_unique<MonitorManager>();
@@ -122,9 +144,18 @@ void App::Initialize()
     // Create tray icon
     HICON icon = LoadIconW(nullptr, IDI_APPLICATION);
     trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, L"DexCorral - Double-click desktop to hide icons");
+    if (!trayIcon->IsVisible()) {
+        // Shell notification area not ready yet (we're loaded very early in Explorer startup).
+        // Start a retry timer; WM_TASKBARCREATED will also retry when Explorer is fully up.
+        DllLog(L"App::Initialize: tray NIM_ADD pending — starting retry timer");
+        SetTimer(messageWindow, TRAY_RETRY_TIMER, 500, nullptr);
+    } else {
+        DllLog(L"App::Initialize: tray icon added successfully");
+    }
 
     // Restore corrals
     RestoreCorrals();
+    DllLog(L"App::Initialize: %zu corrals restored", corrals.size());
 
     // Restore desktop icons state
     // Default to true if not specified (backward compatibility)
@@ -183,6 +214,8 @@ void App::Initialize()
     UpdateHookHiddenIcons();
     PositionHiddenIconsUnderCorrals();
     HookBridge::RefreshDesktop();
+
+    DllLog(L"App::Initialize: done");
 }
 
 void App::Shutdown()
@@ -936,8 +969,8 @@ void App::ShowAbout()
     aboutText += L"GNU General Public License for more details.\n\n";
     aboutText += L"You should have received a copy of the GNU General Public License\n";
     aboutText += L"along with this program.  If not, see https://www.gnu.org/licenses/\n\n";
-    aboutText += L"Website: https://dexcorral.app\n";
-    aboutText += L"GitHub: https://github.com/guHe300/DexCorral";
+    aboutText += L"Website: https://dexcorral.com\n";
+    aboutText += L"GitHub: https://github.com/guHe330/DexCorral";
 
     MessageBoxW(messageWindow, aboutText.c_str(), L"About DexCorral", MB_OK | MB_ICONINFORMATION);
 }
@@ -1208,9 +1241,20 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    // Retry timer — fired when Shell_NotifyIconW(NIM_ADD) failed at startup
+    if (uMsg == WM_TIMER && wParam == TRAY_RETRY_TIMER)
+    {
+        if (app && app->trayIcon && app->trayIcon->Show()) {
+            KillTimer(hwnd, TRAY_RETRY_TIMER);
+            DllLog(L"App: TRAY_RETRY_TIMER — tray icon added successfully");
+        }
+        return 0;
+    }
+
     // Explorer restarted — re-add the tray icon
     if (app && app->wmTaskbarCreated && uMsg == app->wmTaskbarCreated)
     {
+        DllLog(L"App: WM_TASKBARCREATED — Explorer restarted, retrying tray icon");
         if (app->trayIcon)
             app->trayIcon->Show();
         return 0;
@@ -1228,6 +1272,8 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 int App::Run()
 {
     Initialize();
+
+    DllLog(L"App::Run: entering message loop");
 
     // If we have a stop event (shell extension mode), watch it alongside messages
     if (g_AppStopEvent)

@@ -52,6 +52,11 @@ public:
     static void Initialize();
     static void Cleanup();
 
+    // Register the app's message window so the hook can post notifications to it.
+    // Called by App::Initialize() immediately after creating the message window.
+    static void SetAppMessageWindow(HWND hwnd);
+    static HWND GetAppMessageWindow();
+
     // Debug logging flag — set from config after load, read by dllmain/CorralHook Log()
     static void SetDebugLogging(bool enable);
     static bool IsDebugLogging();

@@ -37,6 +37,7 @@ static std::vector<std::wstring> s_HiddenNames;
 static volatile DWORD s_Version = 0;
 static bool s_Initialized = false;
 static bool s_DebugLogging = false;
+static volatile HWND s_AppMessageWindow = nullptr;
 
 void HookBridge::Initialize()
 {
@@ -84,6 +85,16 @@ DWORD HookBridge::GetHiddenIconNames(std::vector<std::wstring> &out)
     DWORD ver = s_Version;
     LeaveCriticalSection(&s_Lock);
     return ver;
+}
+
+void HookBridge::SetAppMessageWindow(HWND hwnd)
+{
+    s_AppMessageWindow = hwnd;
+}
+
+HWND HookBridge::GetAppMessageWindow()
+{
+    return s_AppMessageWindow;
 }
 
 void HookBridge::SetDebugLogging(bool enable)

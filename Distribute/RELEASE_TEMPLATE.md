@@ -36,9 +36,14 @@
 
 ### What's New
 
-- Compatibility fix with third-party NM_CUSTOMDRAW hooks: DexCorral now passes through to the original chain for non-corral icons
-- Updated default appearance settings for new corrals (color, font, opacity, tint, spacing)
-- First-launch corral now correctly inherits default appearance settings from AppConfig
+- Startup injection: new `--startup` flag injects DexCorralHook.dll into Explorer via WH_GETMESSAGE hook — no Explorer restart needed on install or login
+- Win+D immunity: corral windows are now owned by Progman and block SWP_HIDEWINDOW, so Show Desktop no longer hides them
+- Desktop filter window blocks mouse/drop interaction at hidden icon positions
+- Tray icon retry: handles shell notification area not being ready at early Explorer startup
+- Mouse wheel fix: WM_MOUSEWHEEL re-routing now scoped to DexCorral windows only, no longer swallowing scroll in other apps
+- Hook-to-app repark notification: hidden icons are repositioned under their corrals after sort/compaction
+- Installer simplified: no Explorer restart during install, auto-start via Run registry key
+- Fixed About dialog URL and GitHub link
 
 ### Known Issues
 

@@ -393,6 +393,9 @@ private:
     static const UINT_PTR SCROLL_REPOSITION_TIMER_ID = 4;
     static const DWORD SCROLL_REPOSITION_DEBOUNCE_MS = 100;
 
+    // Prevent Win+D (Show Desktop) from hiding corrals
+    bool allowHide = false;
+
     // OLE drop target
     CorralDropTarget *dropTarget = nullptr;
 };

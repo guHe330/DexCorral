@@ -131,6 +131,10 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     // If rolled up, create with title bar height; otherwise use full height
     int initialHeight = config.IsRolledUp ? GetTitleBarHeight() : (int)config.Height;
 
+    // Set Progman (desktop) as owner so Win+D treats corrals as part of the desktop.
+    // Owned popups of Progman are immune to Show Desktop minimize/hide.
+    HWND progman = FindWindowW(L"Progman", nullptr);
+
     hwnd = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_LAYERED,
         CORRAL_WINDOW_CLASS,
@@ -138,7 +142,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
         WS_POPUP | WS_VISIBLE,
         (int)config.Left, (int)config.Top,
         (int)config.Width, initialHeight,
-        nullptr, nullptr, GetModuleHandleW(nullptr), this);
+        progman, nullptr, GetModuleHandleW(nullptr), this);
 
     // Register OLE drop target (replaces WS_EX_ACCEPTFILES for richer drop support)
     dropTarget = new CorralDropTarget(this);
@@ -316,7 +320,9 @@ void CorralWindow::Hide()
 {
     if (hwnd)
     {
+        allowHide = true;
         ShowWindow(hwnd, SW_HIDE);
+        allowHide = false;
     }
 }
 
@@ -843,6 +849,18 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->StartOpacityAnimation(window->config.IconOpacity, window->config.IconTintStrength);
             }
             return 0;
+        case WM_WINDOWPOSCHANGING:
+        {
+            // Prevent Show Desktop from hiding corral windows.
+            // Primary defense is Progman ownership (set at creation), but this
+            // strips SWP_HIDEWINDOW as a fallback for edge cases.
+            auto *wp = reinterpret_cast<WINDOWPOS *>(lParam);
+            if (wp && (wp->flags & SWP_HIDEWINDOW) && !window->allowHide)
+            {
+                wp->flags &= ~SWP_HIDEWINDOW;
+            }
+            return 0;
+        }
         case WM_MOUSEACTIVATE:
             // Prevent corral from being brought to front when clicked
             return MA_NOACTIVATE;

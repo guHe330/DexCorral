@@ -31,11 +31,13 @@ public:
     TrayIcon(HWND hwnd, HICON icon, const std::wstring &tooltip);
     ~TrayIcon();
 
-    void Show();
+    bool Show();   // Returns true if the icon was successfully added/updated.
     void Hide();
     void UpdateTooltip(const std::wstring &tooltip);
+    bool IsVisible() const { return m_visible; }
 
 private:
     HWND hwnd;
     NOTIFYICONDATAW nid;
+    bool m_visible = false;
 };
