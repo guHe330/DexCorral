@@ -26,3 +26,11 @@ void CleanupCorralHook();
  * Returns true if the hook is currently active and subclassing the desktop ListView.
  */
 bool IsCorralHookActive();
+
+/**
+ * Returns true if the hook was deliberately not installed this session because
+ * Explorer died repeatedly while the hook was active (safe mode). The app
+ * should inform the user via a tray notice. The failure counter is reset on
+ * entering safe mode, so the next session attempts the hook again.
+ */
+bool IsCorralHookSafeMode();

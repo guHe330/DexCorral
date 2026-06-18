@@ -3,7 +3,7 @@
 #include "App.h"
 #include <strsafe.h>
 
-// Defined in dllmain.cpp (same DLL) — always-on log, no IsDebugLogging gate
+// Defined in dllmain.cpp (same DLL) — gated by the DebugLogging config flag
 void DllLog(const wchar_t* format, ...);
 
 // Defined in dllmain.cpp — starts hook and App threads once, safe to call outside DllMain

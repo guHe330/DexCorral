@@ -47,6 +47,25 @@ struct SpecialDesktopIcon
     std::wstring displayName; /// Localized display name (e.g., "Recycle Bin")
 };
 
+/// A request to position one desktop icon, identified canonically.
+/// parsingName (full path or "::{CLSID}") is the primary identity; when it is
+/// empty the icon is matched by display name, restricted to visible icons so
+/// a free icon can never be confused with a hidden name-twin.
+struct IconPositionRequest
+{
+    std::wstring displayName; /// Desktop ListView item text (fallback identity)
+    std::wstring parsingName; /// Canonical shell identity; may be empty
+    POINT2D pt;               /// Target position in desktop ListView client coords
+};
+
+/// Snapshot of one desktop icon: identity plus current position
+struct DesktopIconInfo
+{
+    std::wstring displayName; /// Desktop ListView item text
+    std::wstring parsingName; /// Canonical shell identity; may be empty
+    POINT2D pt;               /// Current position in desktop ListView client coords
+};
+
 /**
  * Static utility class for desktop icon manipulation.
  * Provides cross-process access to Explorer's desktop ListView to read icon positions
@@ -55,9 +74,6 @@ struct SpecialDesktopIcon
 class DesktopIcons
 {
 public:
-    /// Hides a single desktop icon by moving it off-screen
-    static void HideIcon(const std::wstring &fileName);
-
     /// Returns true if the specified screen point is over a desktop icon
     static bool IsPointOnIcon(int screenX, int screenY);
 
@@ -73,11 +89,22 @@ public:
     /// Positions multiple icons according to the provided map of name->position
     static void PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions);
 
-    /// Returns the current screen position of an icon, or nullptr if not found
-    static POINT2D *GetIconPosition(const std::wstring &fileName);
+    /**
+     * Positions icons by shell identity. Executed by the Explorer hook on the
+     * UI thread (parsing-name matching); falls back to display-name matching
+     * via PositionIcons if the hook is not active.
+     */
+    static void PositionIconsByPath(const std::vector<IconPositionRequest> &requests);
 
     /// Returns a map of all desktop icon names to their current positions
     static std::map<std::wstring, POINT2D> GetAllIconPositions();
+
+    /**
+     * Returns all desktop icons with identity (parsing name) and position,
+     * via the Explorer hook snapshot service. Falls back to display-name-only
+     * entries (empty parsing names) if the hook is not active.
+     */
+    static std::vector<DesktopIconInfo> GetAllIconsWithIdentity();
 
     /// Hides or shows all desktop icons (entire ListView)
     static void SetIconsVisible(bool visible);
@@ -105,6 +132,14 @@ public:
 
     /// Returns the localized display name for a special icon CLSID
     static std::wstring GetSpecialIconDisplayName(const std::wstring &clsid);
+
+    /**
+     * Returns the shell display name for a file path — exactly what Explorer
+     * shows on the desktop. Respects "Hide extensions for known file types"
+     * and strips .lnk. Falls back to the filename (minus .lnk) if the shell
+     * query fails (e.g. file no longer exists).
+     */
+    static std::wstring GetShellDisplayName(const std::wstring &fullPath);
 
 private:
     /// Helper to extract text from remote ListView item using cross-process access

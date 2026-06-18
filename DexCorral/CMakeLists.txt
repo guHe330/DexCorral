@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.15)
-project(DexCorral VERSION 0.1.0 LANGUAGES CXX)
+
+# Single source of truth for the version: include/Version.h (see that file's header).
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/Version.h" _dexcorral_version_h)
+string(REGEX MATCH "DEXCORRAL_VERSION_MAJOR ([0-9]+)" _ "${_dexcorral_version_h}")
+set(_dexcorral_ver_major "${CMAKE_MATCH_1}")
+string(REGEX MATCH "DEXCORRAL_VERSION_MINOR ([0-9]+)" _ "${_dexcorral_version_h}")
+set(_dexcorral_ver_minor "${CMAKE_MATCH_1}")
+string(REGEX MATCH "DEXCORRAL_VERSION_PATCH ([0-9]+)" _ "${_dexcorral_version_h}")
+set(_dexcorral_ver_patch "${CMAKE_MATCH_1}")
+
+project(DexCorral VERSION ${_dexcorral_ver_major}.${_dexcorral_ver_minor}.${_dexcorral_ver_patch} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -52,6 +62,7 @@ add_library(DexCorralHook SHARED
     src/HookBridge.cpp
     src/IconUtils.cpp
     src/LayoutMath.cpp
+    src/UpdateChecker.cpp
 )
 
 target_include_directories(DexCorralHook PRIVATE
@@ -70,6 +81,7 @@ target_link_libraries(DexCorralHook PRIVATE
     uuid
     psapi
     shlwapi
+    winhttp
 )
 
 target_compile_definitions(DexCorralHook PRIVATE UNICODE _UNICODE NOMINMAX)

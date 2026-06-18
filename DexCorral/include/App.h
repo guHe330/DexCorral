@@ -31,11 +31,13 @@
 #pragma once
 #include <Windows.h>
 #include <memory>
+#include <mutex>
 #include <vector>
 #include <map>
 #include <string>
 #include "Config.h"
 #include "DesktopIcons.h"
+#include "HookBridge.h"
 #include "MouseHook.h"
 #include "TrayIcon.h"
 #include "DesktopMonitor.h"
@@ -73,6 +75,16 @@ public:
 
     /// Toggles visibility of desktop icons
     void ToggleDesktopIcons();
+
+    /**
+     * Quick-hide: hides/shows everything at once — native desktop icons plus
+     * all corral windows (fade animation). Triggered by double-clicking an
+     * empty spot on the desktop. Corrals with ExcludeFromQuickHide stay visible.
+     */
+    void ToggleQuickHide();
+
+    /// Returns true while quick-hide is active (everything hidden)
+    bool IsQuickHideActive() const { return quickHideActive; }
 
     /// Toggles shortcut arrow overlay on icons (requires Explorer restart)
     void ToggleShortcutArrows();
@@ -145,6 +157,15 @@ public:
     void UpdateHookHiddenIcons();           // Push hidden icon list to shared memory
     void PositionHiddenIconsUnderCorrals(); // Reposition hidden icons to match corral scroll state
 
+    /**
+     * Keeps an old identity (display + parsing name) hidden for a grace
+     * period after a rename. The shell updates the desktop item
+     * asynchronously, so for a moment the item still carries the pre-rename
+     * identity — hiding both prevents the icon from flickering onto the
+     * desktop during the transition.
+     */
+    void AddTransientHiddenIcon(const std::wstring &displayName, const std::wstring &parsingName);
+
 private:
     void Initialize();
     void Shutdown();
@@ -152,13 +173,35 @@ private:
     void RestoreCorrals();
     void ShowTrayMenu();
     void ShowAbout();
+
+    // Opt-in update check (AppConfig::CheckForUpdates). Spawns an async GitHub
+    // Releases query; the result arrives as WM_UPDATE_CHECK_DONE. userInitiated
+    // bypasses the 24h throttle and surfaces "up to date" / "couldn't check".
+    void StartUpdateCheck(bool userInitiated);
+    std::wstring pendingUpdateUrl; // Release page opened when the update balloon is clicked
     void ShowCreationMenu(POINT pt);
     void CreateCorral(POINT pt);
     bool IsDesktopUnderMouse(POINT pt);
 
+    /**
+     * Returns true if the point is on an empty spot of the desktop: the window
+     * under the point is Explorer's desktop (ListView/DefView/Progman/WorkerW,
+     * not a corral or another app) and — when checkIcons — no icon is hit there.
+     */
+    bool IsPointOnEmptyDesktop(POINT pt, bool checkIcons);
+
     void OnLeftButtonDown(POINT pt);
     void OnLeftButtonUp(POINT pt);
     void OnMouseMove(POINT pt);
+
+    // Quick-hide state
+    bool quickHideActive = false;
+    bool desktopIconsVisibleBeforeQuickHide = true; // Restored when quick-hide ends
+
+    // Double-click detection for the low-level mouse hook (WH_MOUSE_LL delivers
+    // no WM_LBUTTONDBLCLK, so pair consecutive clicks manually)
+    DWORD lastClickTick = 0;
+    POINT lastClickPt = {};
 
     // Desktop monitoring callbacks
     void EnsureCatchAllCorral();
@@ -166,6 +209,21 @@ private:
     void OnDesktopFileAdded(const std::wstring &fileName);
     void OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName);
     void OnDesktopFileDeleted(const std::wstring &fileName);
+
+    // Deferred catch-all adoption: new desktop files are queued and only
+    // adopted once Explorer's inline rename (New > ... edit box) has finished
+    void ProcessPendingAdoptions();
+    std::vector<std::wstring> pendingAdoptions;
+    std::mutex pendingAdoptionsLock;
+
+    // Transition aliases for renames (see AddTransientHiddenIcon)
+    struct TransientHiddenIcon
+    {
+        HiddenIconInfo icon;
+        DWORD expiresAtTick;
+    };
+    std::vector<TransientHiddenIcon> transientHiddenIcons;
+    std::mutex transientHiddenLock;
 
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -182,9 +240,12 @@ private:
     std::unique_ptr<MonitorManager> monitorManager;
     std::vector<std::unique_ptr<CorralWindow>> corrals;
 
-    // Desktop icon push cache
-    std::map<std::wstring, POINT2D> cachedDesktopIconPositions;
+    // Desktop icon push cache (free icons only — corral-owned ones filtered out)
+    std::vector<DesktopIconInfo> cachedDesktopIconPositions;
     bool desktopIconCacheValid = false;
-    bool IsIconHiddenByCorral(const std::wstring &displayName) const;
     std::vector<RECT> GetAllCorralRects() const;
+
+    // Identities (display + parsing name) of every icon owned by any corral —
+    // shared by hidden-list updates and the push cache filter
+    std::vector<HiddenIconInfo> CollectCorralIconIdentities() const;
 };

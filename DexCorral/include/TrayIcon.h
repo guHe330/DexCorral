@@ -34,6 +34,7 @@ public:
     bool Show();   // Returns true if the icon was successfully added/updated.
     void Hide();
     void UpdateTooltip(const std::wstring &tooltip);
+    bool ShowBalloon(const std::wstring &title, const std::wstring &text); // Notification balloon; icon must be visible
     bool IsVisible() const { return m_visible; }
 
 private:

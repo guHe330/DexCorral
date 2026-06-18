@@ -387,6 +387,11 @@ void CorralWindow::LoadIconImages()
 
     for (const auto &fileName : GetActiveTab().Files)
     {
+        // Guard against empty entries — they would resolve to the desktop
+        // folder itself and render as a ghost "Desktop" icon
+        if (fileName.empty())
+            continue;
+
         CorralIcon ci;
 
         // Check if this is a special shell icon (e.g. "shell:{645FF040-...}")
@@ -401,18 +406,6 @@ void CorralWindow::LoadIconImages()
 
         ci.fileName = fileName;
         ci.wFileName = Utf8ToWide(fileName);
-
-        // Create display name (hide .lnk extension like Windows does)
-        ci.displayName = ci.wFileName;
-        if (ci.displayName.length() > 4)
-        {
-            std::wstring ext = ci.displayName.substr(ci.displayName.length() - 4);
-            // Case-insensitive comparison for .lnk
-            if (ext == L".lnk" || ext == L".LNK" || ext == L".Lnk")
-            {
-                ci.displayName = ci.displayName.substr(0, ci.displayName.length() - 4);
-            }
-        }
 
         // Try user desktop first, then public desktop
         std::wstring userPath = desktopPath + L"\\" + ci.wFileName;
@@ -430,6 +423,10 @@ void CorralWindow::LoadIconImages()
         {
             ci.fullPath = userPath;
         }
+
+        // Display name exactly as Explorer shows it — respects "Hide extensions
+        // for known file types" and strips .lnk
+        ci.displayName = DesktopIcons::GetShellDisplayName(ci.fullPath);
 
         // Load the shell icon at proper resolution
         ci.hIcon = ExtractHighResIcon(ci.fullPath, iconSize);
@@ -535,19 +532,11 @@ void CorralWindow::LoadVirtualFolderIcons()
         CorralIcon ci;
         ci.wFileName = findData.cFileName;
         ci.fileName = WideToUtf8(ci.wFileName);
-        ci.displayName = ci.wFileName;
         ci.fullPath = folderPath + L"\\" + ci.wFileName;
 
-        // Hide .lnk extension like Windows does
-        if (ci.displayName.length() > 4)
-        {
-            std::wstring ext = ci.displayName.substr(ci.displayName.length() - 4);
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
-            if (ext == L".lnk")
-            {
-                ci.displayName = ci.displayName.substr(0, ci.displayName.length() - 4);
-            }
-        }
+        // Display name exactly as Explorer shows it — respects "Hide extensions
+        // for known file types" and strips .lnk
+        ci.displayName = DesktopIcons::GetShellDisplayName(ci.fullPath);
 
         // Load shell icon at proper resolution
         ci.hIcon = ExtractHighResIcon(ci.fullPath, iconSize);
@@ -796,9 +785,9 @@ bool CorralWindow::HitTestIconLabel(int x, int y, int iconIndex) const
 // Per-icon screen position calculation for desktop icon sync
 // ============================================================================
 
-std::map<std::wstring, POINT2D> CorralWindow::GetIconScreenPositions() const
+std::vector<IconPositionRequest> CorralWindow::GetIconScreenPositions() const
 {
-    std::map<std::wstring, POINT2D> result;
+    std::vector<IconPositionRequest> result;
     if (icons.empty() || !hwnd)
         return result;
 
@@ -850,10 +839,14 @@ std::map<std::wstring, POINT2D> CorralWindow::GetIconScreenPositions() const
             ScreenToClient(hListView, &screenPt);
         }
 
-        // Use display name as key (matches what HookBridge uses)
-        if (!icon.displayName.empty())
+        // Identify the icon canonically (parsing name) with display fallback
+        IconPositionRequest req;
+        req.displayName = icon.displayName;
+        req.parsingName = icon.isSpecialIcon ? (L"::" + icon.clsid) : icon.fullPath;
+        req.pt = {screenPt.x, screenPt.y};
+        if (!req.displayName.empty() || !req.parsingName.empty())
         {
-            result[icon.displayName] = {screenPt.x, screenPt.y};
+            result.push_back(std::move(req));
         }
     }
 

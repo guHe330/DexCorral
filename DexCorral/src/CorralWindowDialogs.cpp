@@ -34,6 +34,7 @@
 #include <windowsx.h>
 #include <commdlg.h>
 #include <commctrl.h>
+#include <algorithm>
 #include <cstdio>
 
 // ============================================================================
@@ -84,11 +85,22 @@ void CorralWindow::StartIconRename(int iconIndex)
 
     if (hEditControl)
     {
-        // Set font to match the label
-        HFONT hFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                  CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-        SendMessageW(hEditControl, WM_SETFONT, (WPARAM)hFont, TRUE);
+        // Set font to match the rendered icon label. The labels use the
+        // system icon title font (DPI-aware, SPI_GETICONTITLELOGFONT); a
+        // hardcoded -11px font would render much smaller on high-DPI displays.
+        LOGFONTW iconLogFont = {};
+        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0))
+        {
+            iconLogFont.lfQuality = CLEARTYPE_QUALITY;
+            hEditFont = CreateFontIndirectW(&iconLogFont);
+        }
+        else
+        {
+            hEditFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        }
+        SendMessageW(hEditControl, WM_SETFONT, (WPARAM)hEditFont, TRUE);
 
         // Select all text
         SendMessageW(hEditControl, EM_SETSEL, 0, -1);
@@ -139,40 +151,60 @@ void CorralWindow::EndIconRename(bool save)
                 {
                     newPath = oldPath.substr(0, lastSlash + 1) + newName;
 
-                    // Add .lnk extension if it's a shortcut and not already present
-                    bool oldPathIsLnk = oldPath.length() >= 4 && oldPath.substr(oldPath.length() - 4) == L".lnk";
-                    bool newNameIsLnk = newName.length() >= 4 && newName.substr(newName.length() - 4) == L".lnk";
-                    if (oldPathIsLnk && !newNameIsLnk)
+                    // The editable name is the shell display name, which may
+                    // omit the extension (.lnk, or any extension when "hide
+                    // extensions" is on). Re-append it like Explorer does so
+                    // the rename can't silently change the file type.
+                    std::wstring oldFileName = oldPath.substr(lastSlash + 1);
+                    const std::wstring &shownName = icons[renamingIconIndex].displayName;
+                    if (oldFileName.length() > shownName.length() &&
+                        _wcsnicmp(oldFileName.c_str(), shownName.c_str(), shownName.length()) == 0 &&
+                        oldFileName[shownName.length()] == L'.')
                     {
-                        newPath += L".lnk";
+                        std::wstring hiddenExt = oldFileName.substr(shownName.length());
+                        bool newNameHasExt = newName.length() >= hiddenExt.length() &&
+                            _wcsicmp(newName.c_str() + newName.length() - hiddenExt.length(), hiddenExt.c_str()) == 0;
+                        if (!newNameHasExt)
+                        {
+                            newPath += hiddenExt;
+                        }
                     }
                 }
 
                 // Attempt to rename the file
                 if (!newPath.empty() && MoveFileW(oldPath.c_str(), newPath.c_str()))
                 {
+                    std::string oldFileUtf8 = icons[renamingIconIndex].fileName;
+                    std::wstring oldDisplayName = icons[renamingIconIndex].displayName;
+
                     // Update the icon data
                     icons[renamingIconIndex].fullPath = newPath;
                     icons[renamingIconIndex].wFileName = newPath.substr(lastSlash + 1);
+                    icons[renamingIconIndex].fileName = WideToUtf8(icons[renamingIconIndex].wFileName);
+                    icons[renamingIconIndex].displayName = DesktopIcons::GetShellDisplayName(newPath);
 
-                    // Update display name (without .lnk)
-                    std::wstring displayName = icons[renamingIconIndex].wFileName;
-                    bool displayNameIsLnk = displayName.length() >= 4 && displayName.substr(displayName.length() - 4) == L".lnk";
-                    if (displayNameIsLnk)
+                    // Update config: match by old value (icons and Files indices
+                    // can drift when an entry failed to load)
+                    auto &files = GetActiveTab().Files;
+                    auto fit = std::find(files.begin(), files.end(), oldFileUtf8);
+                    if (fit != files.end())
                     {
-                        displayName = displayName.substr(0, displayName.length() - 4);
-                    }
-                    icons[renamingIconIndex].displayName = displayName;
-
-                    // Update config
-                    if (renamingIconIndex < (int)GetActiveTab().Files.size())
-                    {
-                        GetActiveTab().Files[renamingIconIndex] = WideToUtf8(icons[renamingIconIndex].wFileName);
+                        *fit = icons[renamingIconIndex].fileName;
                     }
 
                     if (App::GetInstance())
                     {
                         App::GetInstance()->SaveConfig();
+                        // The icon's identity (path and display name) changed.
+                        // Keep the OLD identity hidden as a transition alias —
+                        // the shell updates the desktop item asynchronously, and
+                        // until it does, the item still matches the old identity.
+                        // Then refresh the hidden list (now containing both) and
+                        // re-park. Result: no frame where the icon is unmatched
+                        // and flickers onto the desktop.
+                        App::GetInstance()->AddTransientHiddenIcon(oldDisplayName, oldPath);
+                        App::GetInstance()->UpdateHookHiddenIcons();
+                        App::GetInstance()->PositionHiddenIconsUnderCorrals();
                     }
                 }
                 else
@@ -197,6 +229,12 @@ void CorralWindow::EndIconRename(bool save)
     if (editToDestroy)
     {
         DestroyWindow(editToDestroy);
+    }
+
+    if (hEditFont)
+    {
+        DeleteObject(hEditFont);
+        hEditFont = nullptr;
     }
 
     // Restore layered window style (was disabled for child edit control to work)

@@ -87,6 +87,7 @@ struct CorralWindowConfig
     double Width = 300;
     double Height = 200;
     bool IsRolledUp = false;
+    bool ExcludeFromQuickHide = false; // Corral stays visible during quick-hide (double-click desktop)
     std::vector<CorralTabConfig> Tabs;
     int ActiveTabIndex = 0;
 
@@ -102,7 +103,7 @@ struct CorralWindowConfig
     int IconSpacingXPercent = 100;         // Horizontal icon spacing (50-200%)
     int IconSpacingYPercent = 100;         // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig
@@ -122,9 +123,14 @@ struct AppConfig
     int DefaultIconTintStrength = 28;
     int DefaultIconSpacingXPercent = 91;
     int DefaultIconSpacingYPercent = 85;
-    bool DebugLogging = false;             // Write debug log files (dllmain.log, CorralHook.log)
+    bool DebugLogging = false;             // Write debug log files (dllmain.log, CorralHook.log, CorralHook_DropTarget.log, CorralDrop.log)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging)
+    // Update check (opt-in, off by default). Checks the GitHub Releases API at
+    // most once per 24h on startup and notifies via a tray balloon — no auto-download.
+    bool CheckForUpdates = false;
+    long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch)
 };
 
 class Config

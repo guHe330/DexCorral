@@ -1089,7 +1089,8 @@ void CorralWindow::UpdateLayeredContent()
     BLENDFUNCTION blend = {};
     blend.BlendOp = AC_SRC_OVER;
     blend.BlendFlags = 0;
-    blend.SourceConstantAlpha = 255;
+    // Whole-window alpha is 255 except during a quick-hide fade
+    blend.SourceConstantAlpha = (BYTE)quickHideAlpha;
     blend.AlphaFormat = AC_SRC_ALPHA;
 
     UpdateLayeredWindow(hwnd, screenDC, &ptDst, &sizeWnd, memDC, &ptSrc, 0, &blend, ULW_ALPHA);

@@ -8,6 +8,7 @@ How to build DexCorral from source.
 - CMake 3.15 or later (included with Visual Studio, or install separately)
 - Windows 10 SDK (included with the workload above)
 - Internet access on first build (CMake fetches Google Test automatically)
+- Optional: [Inno Setup 6](https://jrsoftware.org/isdl.php) — if installed, the build script also produces the installer
 
 ## Verify your environment
 
@@ -26,9 +27,9 @@ The script:
 1. Kills any running DexCorral process (unlocks the exe for relinking).
 2. Restarts Explorer if `DexCorralHook.dll` is locked by the shell.
 3. Configures and builds with CMake + Ninja (falls back to NMake if Ninja is absent).
-4. Runs the unit tests — build stops here if any test fails.
+4. Runs the unit tests — if any test fails, the build stops and the zip/installer steps are skipped.
 5. Packages `DexCorral.zip` from the two output binaries.
-6. Builds the Inno Setup installer if ISCC is available.
+6. Builds the Inno Setup installer if ISCC is available (output: `installer/innosetup/output/DexCorral_<version>_Setup.exe`).
 
 Output goes to `DexCorral/build/`.
 
@@ -60,7 +61,7 @@ powershell -File build.ps1 -Clean -BuildType Debug -SkipTests
 DexCorral\build\DexCorralTests.exe
 ```
 
-For Win32-dependent behaviour that cannot be unit tested (Explorer hook, drag-drop, DPI scaling, multi-monitor, etc.) see [INTEGRATION_TESTS.md](../INTEGRATION_TESTS.md).
+For Win32-dependent behaviour that cannot be unit tested (Explorer hook, drag-drop, DPI scaling, multi-monitor, etc.) see [INTEGRATION_TESTS.md](INTEGRATION_TESTS.md).
 
 ## Output binaries
 
@@ -70,6 +71,17 @@ For Win32-dependent behaviour that cannot be unit tested (Explorer hook, drag-dr
 | `build/DexCorral.exe` | Registration tool (run once as admin to install the shell extension). |
 | `build/DexCorralTests.exe` | Unit test runner. |
 | `build/DexCorral.zip` | Release archive containing the two distributable binaries. |
+
+## Run your build
+
+From `DexCorral/build/`, as Administrator:
+
+```powershell
+.\DexCorral.exe --register   # one-time shell extension registration
+.\DexCorral.exe --startup    # inject into the running Explorer (no restart needed)
+```
+
+After the first registration, rebuilding the DLL only requires Explorer to reload it — the build script handles unlocking automatically. To remove the registration: `DexCorral.exe --unregister`.
 
 ## Unlock the DLL manually
 

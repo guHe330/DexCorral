@@ -67,3 +67,15 @@ void TrayIcon::UpdateTooltip(const std::wstring &tooltip)
     wcsncpy_s(nid.szTip, tooltip.c_str(), _TRUNCATE);
     Shell_NotifyIconW(NIM_MODIFY, &nid);
 }
+
+bool TrayIcon::ShowBalloon(const std::wstring &title, const std::wstring &text)
+{
+    if (!m_visible)
+        return false;
+    NOTIFYICONDATAW balloon = nid;
+    balloon.uFlags = NIF_INFO;
+    balloon.dwInfoFlags = NIIF_WARNING;
+    wcsncpy_s(balloon.szInfoTitle, title.c_str(), _TRUNCATE);
+    wcsncpy_s(balloon.szInfo, text.c_str(), _TRUNCATE);
+    return Shell_NotifyIconW(NIM_MODIFY, &balloon) != FALSE;
+}

@@ -42,12 +42,16 @@
 
 // ============================================================================
 // Drag-drop logging (writes to %APPDATA%/DexCorral/CorralDrop.log)
+// Gated by the DebugLogging config flag like every other log file.
 // ============================================================================
 
 static wchar_t g_CorralDropLogPath[MAX_PATH] = {};
 
 static void LogCorralDrop(const wchar_t *fmt, ...)
 {
+    if (!HookBridge::IsDebugLogging())
+        return;
+
     if (!g_CorralDropLogPath[0])
     {
         wchar_t *appData = nullptr;
@@ -1472,19 +1476,30 @@ void CorralWindow::OnIconDragEnd()
                 app->SaveConfig();
                 app->UpdateHookHiddenIcons();
 
-                // Position the icon at the drop location on the desktop
-                std::wstring displayName;
+                // Position the icon at the drop location on the desktop,
+                // identified canonically so a name-twin can't be moved instead
+                IconPositionRequest req;
                 if (CorralWindow::IsSpecialIconEntry(draggedFile))
                 {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(draggedFile);
-                    displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                    req.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                    req.parsingName = L"::" + clsid;
                 }
                 else
                 {
-                    displayName = IconUtils::StripLnkExtension(Utf8ToWide(draggedFile));
+                    std::wstring wFileName = Utf8ToWide(draggedFile);
+                    std::wstring fullPath = GetDesktopPath() + L"\\" + wFileName;
+                    if (GetFileAttributesW(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+                    {
+                        std::wstring pubPath = GetPublicDesktopPath() + L"\\" + wFileName;
+                        if (GetFileAttributesW(pubPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+                            fullPath = pubPath;
+                    }
+                    req.parsingName = fullPath;
+                    req.displayName = DesktopIcons::GetShellDisplayName(fullPath);
                 }
 
-                if (!displayName.empty())
+                if (!req.displayName.empty() || !req.parsingName.empty())
                 {
                     // Convert screen coords to desktop ListView client coords
                     HWND hListView = DesktopIcons::GetDesktopListView();
@@ -1492,7 +1507,8 @@ void CorralWindow::OnIconDragEnd()
                     {
                         POINT clientPt = screenPt;
                         ScreenToClient(hListView, &clientPt);
-                        DesktopIcons::PositionIcon(displayName, clientPt.x, clientPt.y);
+                        req.pt = {clientPt.x, clientPt.y};
+                        DesktopIcons::PositionIconsByPath({req});
                     }
                 }
             }

@@ -21,8 +21,10 @@ static LONG g_AppStarted = 0;          // Set to 1 once StartAppIfNeeded() has r
 // RunApp is defined in App.cpp — compiled into the same DLL
 extern "C" int RunApp(HANDLE hStopEvent);
 
-// Always-on log — writes regardless of DebugLogging config flag.
-// Critical: we must capture startup failures that happen before the App reads config.
+// Debug log — gated by the DebugLogging config flag like every other log
+// file. HookBridge::IsDebugLogging bootstraps the flag straight from
+// config.json on first use, so startup failures that happen before the App
+// reads the config are still captured when DebugLogging is enabled.
 // Non-static so ShellExtension.cpp (same DLL) can call it via forward declaration.
 static wchar_t g_DllMainLogPath[MAX_PATH] = {};
 
@@ -42,6 +44,7 @@ static void InitDllLogPath() {
 }
 
 void DllLog(const wchar_t* format, ...) {
+    if (!HookBridge::IsDebugLogging()) return;
     InitDllLogPath();
 
     wchar_t message[1024];
@@ -67,6 +70,7 @@ void DllLog(const wchar_t* format, ...) {
 
 // Kept as alias so internal callers don't all need renaming
 static void Log(const wchar_t* format, ...) {
+    if (!HookBridge::IsDebugLogging()) return;
     wchar_t message[1024];
     va_list args;
     va_start(args, format);

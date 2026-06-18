@@ -145,7 +145,7 @@ if ($exitCode -eq 0) {
         if ($testExitCode -ne 0) {
             Write-Host ""
             Write-Host "========================================" -ForegroundColor Red
-            Write-Host "UNIT TESTS FAILED — zip/installer skipped" -ForegroundColor Red
+            Write-Host "UNIT TESTS FAILED - zip/installer skipped" -ForegroundColor Red
             Write-Host "Fix failures before shipping." -ForegroundColor Red
             Write-Host "========================================" -ForegroundColor Red
             exit $testExitCode
@@ -153,7 +153,7 @@ if ($exitCode -eq 0) {
         Write-Host "All tests passed." -ForegroundColor Green
     } else {
         Write-Host ""
-        Write-Host "DexCorralTests.exe not found — skipping tests" -ForegroundColor DarkGray
+        Write-Host "DexCorralTests.exe not found - skipping tests" -ForegroundColor DarkGray
     }
 
     # Create release zip
@@ -182,7 +182,22 @@ if ($exitCode -eq 0) {
         if (Test-Path $issFile) {
             Write-Host ""
             Write-Host "Building installer..." -ForegroundColor Green
-            & $iscc $issFile
+
+            # Pull the version from Version.h (single source of truth) and pass it
+            # to ISCC, otherwise the .iss falls back to its hardcoded 0.1.0 default.
+            $versionHeader = Join-Path $sourceDir "include\Version.h"
+            $setupVersion = $null
+            if (Test-Path $versionHeader) {
+                $m = Select-String -Path $versionHeader -Pattern 'DEXCORRAL_VERSION\s+L"([0-9]+\.[0-9]+\.[0-9]+)"' | Select-Object -First 1
+                if ($m) { $setupVersion = $m.Matches[0].Groups[1].Value }
+            }
+            if ($setupVersion) {
+                Write-Host "Installer version: $setupVersion" -ForegroundColor Cyan
+                & $iscc "/DMyAppVersion=$setupVersion" $issFile
+            } else {
+                Write-Host "WARNING: Could not read version from Version.h; installer will use the .iss default." -ForegroundColor Yellow
+                & $iscc $issFile
+            }
             if ($LASTEXITCODE -eq 0) {
                 $setupExe = Join-Path $sourceDir "..\installer\innosetup\output" | Get-ChildItem -Filter "DexCorral_*_Setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($setupExe) {

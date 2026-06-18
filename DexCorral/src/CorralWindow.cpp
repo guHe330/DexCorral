@@ -300,6 +300,15 @@ void CorralWindow::Show()
 {
     if (hwnd)
     {
+        // Showing through the normal path cancels any quick-hide state
+        if (isQuickHideAnimating)
+        {
+            KillTimer(hwnd, QUICKHIDE_TIMER_ID);
+            isQuickHideAnimating = false;
+        }
+        isQuickHidden = false;
+        quickHideAlpha = 255;
+
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         SendToBottom();
 
@@ -383,6 +392,9 @@ void CorralWindow::LoadFiles()
 
 void CorralWindow::AddFile(const std::string &fileName)
 {
+    if (fileName.empty())
+        return;
+
     // Virtual tabs don't accept manual file additions
     if (GetActiveTab().IsVirtual)
         return;
@@ -805,6 +817,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->OnOpacityAnimationTimer();
                 return 0;
             }
+            if (wParam == QUICKHIDE_TIMER_ID)
+            {
+                window->OnQuickHideAnimationTimer();
+                return 0;
+            }
             if (wParam == SCROLL_REPOSITION_TIMER_ID)
             {
                 KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
@@ -915,12 +932,14 @@ void CorralWindow::OnPaint()
         FillRect(hdc, &titleBarRect, titleBrush);
         DeleteObject(titleBrush);
 
-        // Draw title text
+        // Draw title text (match the layered render: tab's header font/size)
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(255, 255, 255));
-        HFONT titleFont = CreateFontW(-14, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+        std::wstring titleFontNameW = Utf8ToWide(GetActiveTab().HeaderFontName);
+        int titleFontHeight = -MulDiv(GetActiveTab().HeaderFontSize, GetDpiForWindow(hwnd), 72);
+        HFONT titleFont = CreateFontW(titleFontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
                                       DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, titleFontNameW.c_str());
         HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
         std::wstring wtitle = Utf8ToWide(GetActiveTab().Title);
         RECT titleRect = {8, 8, rect.right - 8, 30};
@@ -928,10 +947,21 @@ void CorralWindow::OnPaint()
         SelectObject(hdc, oldFont);
         DeleteObject(titleFont);
 
-        // Draw icons
-        HFONT labelFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        // Draw icons. Use the system icon title font (DPI-aware) so labels
+        // match the layered render and don't shrink during inline rename.
+        LOGFONTW iconLogFont = {};
+        HFONT labelFont;
+        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0))
+        {
+            iconLogFont.lfQuality = CLEARTYPE_QUALITY;
+            labelFont = CreateFontIndirectW(&iconLogFont);
+        }
+        else
+        {
+            labelFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        }
         SelectObject(hdc, labelFont);
 
         for (size_t i = 0; i < icons.size(); i++)

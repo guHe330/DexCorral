@@ -33,54 +33,47 @@ jobs:
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "tag=$tag" >> $env:GITHUB_OUTPUT
 
-    - name: Update CMakeLists.txt version
+    - name: Verify Version.h matches tag
       shell: pwsh
       run: |
-        $version = "${{ steps.get_version.outputs.version }}"
-        $cmakePath = "DexCorral/CMakeLists.txt"
-        $content = Get-Content $cmakePath -Raw
-        $content = $content -replace 'project\(DexCorral VERSION \d+\.\d+\.\d+', "project(DexCorral VERSION $version"
-        Set-Content $cmakePath -Value $content
-        Write-Host "Updated CMakeLists.txt to version $version"
-
-    - name: Update Version.h
-      shell: pwsh
-      run: |
+        # Version.h is the single source of truth (CMakeLists + .rc derive from it).
+        # The tag must match it exactly, so a release can't ship a stale version.
         $version = "${{ steps.get_version.outputs.version }}"
         $parts = $version -split '\.'
-        $major = $parts[0]
-        $minor = $parts[1]
-        $patch = $parts[2]
-        $versionH = "DexCorral/include/Version.h"
-        $content = Get-Content $versionH -Raw
-        $content = $content -replace '#define DEXCORRAL_VERSION L"[^"]*"', "#define DEXCORRAL_VERSION L""$version"""
-        $content = $content -replace '#define DEXCORRAL_VERSION_MAJOR \d+', "#define DEXCORRAL_VERSION_MAJOR $major"
-        $content = $content -replace '#define DEXCORRAL_VERSION_MINOR \d+', "#define DEXCORRAL_VERSION_MINOR $minor"
-        $content = $content -replace '#define DEXCORRAL_VERSION_PATCH \d+', "#define DEXCORRAL_VERSION_PATCH $patch"
-        Set-Content $versionH -Value $content
-        Write-Host "Updated Version.h to $version"
-
-    - name: Update RC file versions
-      shell: pwsh
-      run: |
-        $version = "${{ steps.get_version.outputs.version }}"
-        $parts = $version -split '\.'
+        if ($parts.Count -ne 3) { throw "Tag version '$version' is not X.Y.Z" }
         $major = $parts[0]; $minor = $parts[1]; $patch = $parts[2]
-        $commaVer = "$major,$minor,$patch,0"
-        $dotVer   = "$major.$minor.$patch.0"
 
-        foreach ($rcFile in @(
-            "DexCorral/DexCorral.rc",
-            "DexCorral/ShellExtension/DexCorralHook.rc"
-        )) {
-            $content = Get-Content $rcFile -Raw
-            $content = $content -replace 'FILEVERSION\s+[\d,]+',    "FILEVERSION     $commaVer"
-            $content = $content -replace 'PRODUCTVERSION\s+[\d,]+', "PRODUCTVERSION  $commaVer"
-            $content = $content -replace '"FileVersion",\s+"[^"]*"',    """FileVersion"",       ""$dotVer"""
-            $content = $content -replace '"ProductVersion",\s+"[^"]*"', """ProductVersion"",    ""$dotVer"""
-            Set-Content $rcFile -Value $content
-            Write-Host "Updated $rcFile to $dotVer"
+        $versionH = Get-Content "DexCorral/include/Version.h" -Raw
+
+        if ($versionH -notmatch '#define DEXCORRAL_VERSION L"([^"]*)"') {
+            throw "Could not find DEXCORRAL_VERSION in Version.h"
         }
+        $fileVersion = $Matches[1]
+        if ($fileVersion -ne $version) {
+            throw "Tag v$version does not match Version.h ($fileVersion). Bump Version.h before tagging."
+        }
+
+        $checks = @{
+            'DEXCORRAL_VERSION_MAJOR'  = $major
+            'DEXCORRAL_VERSION_MINOR'  = $minor
+            'DEXCORRAL_VERSION_PATCH'  = $patch
+        }
+        foreach ($name in $checks.Keys) {
+            if ($versionH -notmatch "#define $name (\d+)") { throw "Could not find $name in Version.h" }
+            if ($Matches[1] -ne $checks[$name]) {
+                throw "$name ($($Matches[1])) does not match tag part ($($checks[$name]))"
+            }
+        }
+
+        $expectedDotted = "$major.$minor.$patch.0"
+        if ($versionH -notmatch '#define DEXCORRAL_VERSION_DOTTED "([^"]*)"') {
+            throw "Could not find DEXCORRAL_VERSION_DOTTED in Version.h"
+        }
+        if ($Matches[1] -ne $expectedDotted) {
+            throw "DEXCORRAL_VERSION_DOTTED ($($Matches[1])) does not match expected $expectedDotted"
+        }
+
+        Write-Host "Version OK: Version.h is consistent with tag v$version"
 
     - name: Configure CMake
       run: cmake -S DexCorral -B DexCorral/build -G "Visual Studio 17 2022" -A x64

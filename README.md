@@ -22,17 +22,21 @@ Corrals can also act as virtual folders — point one at a directory and its con
 
 ### Desktop Organization
 *   **Custom Corrals**: Create multiple shaded areas ("Corrals") on your desktop to group related shortcuts and files.
-*   **Icon Anchoring**: Icons are positioned precisely behind Corral windows, ensuring they stay organized.
+*   **Tabs**: Each Corral can hold multiple tabs, each with its own icon group, color, view mode, and header font.
+*   **Virtual Folders**: Point a Corral at any directory and its contents appear on your desktop, kept in sync as the folder changes.
+*   **Real Desktop Icons**: A lightweight Explorer shell extension hides corral-owned icons from the desktop and protects them from auto-arrange, sorting, and rubber-band selection — they stay real icons with full Explorer behavior.
 *   **Auto-Arrange Management**: Takes over Explorer's auto-arrange, compacts visible icons to remove gaps left by hidden ones.
 *   **Catch-All System**: Automatically capture new desktop items into a designated Corral to prevent clutter.
 *   **Persistence**: Your Corral layout and icon assignments are saved and restored automatically.
 
 ### User Interface
-*   **Fully Adjustable Opacity**: Corrals range from completely transparent to fully opaque — at full opacity the Corral fill disappears entirely, letting your desktop wallpaper, live backgrounds, or animated scenes show through unobstructed while icons remain perfectly organized on top.
+*   **Fully Adjustable Opacity**: Corrals range from fully opaque to completely transparent — at full transparency the Corral fill disappears entirely, letting your desktop wallpaper, live backgrounds, or animated scenes show through unobstructed while icons remain perfectly organized on top.
 *   **Layered Transparency**: Uses Windows layered windows for smooth semi-transparent color overlays.
 *   **Icon Hover Effects**: Visual hover highlights when mousing over icons in corrals.
 *   **Drop-on-Icon**: Drop files onto icons inside corrals (e.g., drop a file onto an executable to open it).
 *   **Roll-up Interaction**: Double-click title bars to collapse Corrals and save screen real estate.
+*   **View Modes**: Small, medium, or large icon grids, or a details list with name, type, size, date, and cloud sync status.
+*   **Multi-Monitor Aware**: Corral positions are remembered per monitor and per resolution.
 *   **Tray Integration**: Manage global settings and create new Corrals from the system tray.
 
 ### Performance and Efficiency
@@ -46,14 +50,16 @@ DexCorral is available for download on the [Releases](https://github.com/guHe330
 
 ### Installer (recommended)
 
-Download and run the provided installer. Because the binaries are currently unsigned, Windows SmartScreen will likely block it on first run — click **More info** then **Run anyway** to proceed. Some antivirus software may also flag the files as suspicious; this is normal for unsigned software from small developers. Code signing will be added at a later stage.
+Download and run the provided installer. It registers the shell extension and starts DexCorral inside the running Explorer — no Explorer restart or logout needed — and sets up automatic start at login. Uninstalling asks whether to keep your configuration for a later reinstall.
+
+Because the binaries are currently unsigned, Windows SmartScreen will likely block the installer on first run — click **More info** then **Run anyway** to proceed. Some antivirus software may also flag the files as suspicious; this is normal for unsigned software from small developers. Code signing will be added at a later stage.
 
 ### Manual Installation
 
 1.  Download the latest release containing `DexCorral.exe` and `DexCorralHook.dll`.
 2.  Place both files in the same folder (e.g. `C:\Program Files\DexCorral\`).
 3.  Open a command prompt **as Administrator** and run `DexCorral.exe --register` (one-time setup).
-4.  Restart Explorer or log out/in for the shell extension to load.
+4.  Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
 
 ## Roadmap & Issues
 
@@ -64,12 +70,11 @@ Download and run the provided installer. Because the binaries are currently unsi
 
 Unit tests (config JSON round-trips, layout math, string utilities) run automatically at the end of `build.ps1`. To skip them during quick iteration: `build.ps1 -SkipTests`. To run manually: `DexCorral/build/DexCorralTests.exe`.
 
-For Win32-dependent behaviour that can't be unit tested (Explorer hook, drag-drop, DPI scaling, etc.) see [INTEGRATION_TESTS.md](INTEGRATION_TESTS.md).
+For Win32-dependent behaviour that can't be unit tested (Explorer hook, drag-drop, DPI scaling, etc.) see [INTEGRATION_TESTS.md](docs/INTEGRATION_TESTS.md).
 
 ## Documentation
 
 *   [Changelog](docs/CHANGELOG.md): Release history and notable changes.
-*   [Architecture](docs/ARCHITECTURE.md): In-depth technical architecture and design patterns.
 *   [User Manual](docs/USER_MANUAL.md): Learn how to use all features of DexCorral.
 *   [Build Guide](docs/BUILD_GUIDE.md): Instructions for compiling the project from source.
 

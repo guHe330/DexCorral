@@ -188,6 +188,10 @@ void CorralWindow::ShowContextMenu(int x, int y)
     // Show Desktop Icons with checkmark
     UINT iconFlags = MF_STRING | (DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(menu, iconFlags, 5, L"Show Desktop Icons");
+
+    // Quick-hide exclusion (corral stays visible when double-clicking the desktop)
+    UINT quickHideFlags = MF_STRING | (config.ExcludeFromQuickHide ? MF_CHECKED : MF_UNCHECKED);
+    AppendMenuW(menu, quickHideFlags, 9, L"Exclude from Quick-Hide");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 6, L"Create New Corral");
     AppendMenuW(menu, MF_STRING, 8, L"New Virtual Corral");
@@ -274,6 +278,21 @@ void CorralWindow::ShowContextMenu(int x, int y)
     case 7:
         // Change Folder (virtual corrals only)
         ChangeFolderPath();
+        break;
+    case 9:
+        config.ExcludeFromQuickHide = !config.ExcludeFromQuickHide;
+        if (App::GetInstance())
+        {
+            // If quick-hide is active right now, apply the new setting immediately
+            if (App::GetInstance()->IsQuickHideActive())
+            {
+                if (config.ExcludeFromQuickHide)
+                    StartQuickShow();
+                else
+                    StartQuickHide();
+            }
+            App::GetInstance()->SaveConfig();
+        }
         break;
     case 8:
         // New Virtual Corral
@@ -714,6 +733,74 @@ void CorralWindow::OnOpacityAnimationTimer()
         currentTintStrength = 0;
     if (currentTintStrength > 255)
         currentTintStrength = 255;
+
+    UpdateLayeredContent();
+}
+
+// ============================================================================
+// Quick-hide (double-click empty desktop hides/shows everything)
+// ============================================================================
+
+void CorralWindow::StartQuickHide()
+{
+    if (!hwnd || (isQuickHidden && !isQuickHideAnimating))
+        return;
+
+    isQuickHidden = true;
+    quickHideStartAlpha = quickHideAlpha;
+    quickHideAnimationStartTime = GetTickCount();
+    isQuickHideAnimating = true;
+    SetTimer(hwnd, QUICKHIDE_TIMER_ID, 16, nullptr); // ~60fps
+}
+
+void CorralWindow::StartQuickShow()
+{
+    if (!hwnd || (!isQuickHidden && !isQuickHideAnimating))
+        return;
+
+    isQuickHidden = false;
+    if (!IsWindowVisible(hwnd))
+    {
+        // Window already faded out completely — bring it back invisible and fade in.
+        // Plain ShowWindow (not Show()) so files are not reloaded on every toggle.
+        quickHideAlpha = 0;
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        SendToBottom();
+    }
+    quickHideStartAlpha = quickHideAlpha;
+    quickHideAnimationStartTime = GetTickCount();
+    isQuickHideAnimating = true;
+    SetTimer(hwnd, QUICKHIDE_TIMER_ID, 16, nullptr);
+    UpdateLayeredContent();
+}
+
+void CorralWindow::OnQuickHideAnimationTimer()
+{
+    DWORD elapsed = GetTickCount() - quickHideAnimationStartTime;
+    float progress = (float)elapsed / QUICKHIDE_ANIMATION_DURATION;
+    if (progress >= 1.0f)
+        progress = 1.0f;
+
+    // Ease-out quadratic (same curve as the opacity hover animation)
+    float easedProgress = 1.0f - (1.0f - progress) * (1.0f - progress);
+
+    int target = isQuickHidden ? 0 : 255;
+    quickHideAlpha = quickHideStartAlpha + (int)((target - quickHideStartAlpha) * easedProgress);
+    if (quickHideAlpha < 0)
+        quickHideAlpha = 0;
+    if (quickHideAlpha > 255)
+        quickHideAlpha = 255;
+
+    if (progress >= 1.0f)
+    {
+        isQuickHideAnimating = false;
+        KillTimer(hwnd, QUICKHIDE_TIMER_ID);
+        if (isQuickHidden)
+        {
+            Hide();
+            return; // Window hidden — no need to repaint
+        }
+    }
 
     UpdateLayeredContent();
 }

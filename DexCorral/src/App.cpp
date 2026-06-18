@@ -34,23 +34,63 @@
 #include "IconUtils.h"
 #include "DesktopMonitor.h"
 #include "HookBridge.h"
+#include "CorralHook.h"
 #include "Version.h"
+#include "UpdateChecker.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
+#include <shellapi.h>
 #include <Psapi.h>
 #include <cstdlib>
+#include <ctime>
 #include <algorithm>
 #include <stdexcept>
 
-// Always-on log defined in dllmain.cpp (same DLL) — fires regardless of DebugLogging config.
+// Debug log defined in dllmain.cpp (same DLL) — gated by the DebugLogging
+// config flag (bootstrapped from config.json before the App loads it).
 void DllLog(const wchar_t* format, ...);
 
 // Timer ID for retrying Shell_NotifyIconW(NIM_ADD) when the shell isn't ready at startup.
 static const UINT_PTR TRAY_RETRY_TIMER = 1;
 
+// Timer for deferred catch-all adoption of new desktop files. Periodic: keeps
+// firing while Explorer's inline rename edit box is open, killed once the
+// pending files have been adopted.
+static const UINT_PTR ADOPTION_TIMER = 2;
+static const UINT ADOPTION_POLL_MS = 800;
+
+// Posted by the mouse hook on a desktop double-click; handled on the app
+// thread (hit-testing the desktop ListView is too slow for a WH_MOUSE_LL
+// callback). lParam carries the click point as POINTS.
+static const UINT WM_QUICKHIDE_DBLCLK = WM_APP + 102;
+
+// Posted by the async update checker when a GitHub Releases query finishes.
+// lParam = UpdateCheckResult* (the handler takes ownership and deletes it).
+static const UINT WM_UPDATE_CHECK_DONE = WM_APP + 103;
+
 // Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
 static HANDLE g_AppStopEvent = nullptr;
+
+// Safe-mode tray notice — armed when the hook refused to install (safe mode)
+// and shown as soon as the tray icon is actually visible (the icon may only
+// get added after retries during early Explorer startup).
+static bool s_SafeModeNoticePending = false;
+
+static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
+{
+    if (!s_SafeModeNoticePending || !tray || !tray->IsVisible())
+        return;
+    if (tray->ShowBalloon(
+            L"DexCorral started in safe mode",
+            L"Explorer restarted repeatedly while the desktop hook was active, so the "
+            L"hook is disabled for this session. Desktop icons stay visible. The hook "
+            L"will be re-enabled on the next start."))
+    {
+        s_SafeModeNoticePending = false;
+        DllLog(L"App: safe mode tray notice shown");
+    }
+}
 
 // Entry point called from the DLL worker thread
 extern "C" int RunApp(HANDLE hStopEvent)
@@ -153,6 +193,14 @@ void App::Initialize()
         DllLog(L"App::Initialize: tray icon added successfully");
     }
 
+    // Hook safe mode: the hook refused to install after repeated Explorer
+    // deaths — tell the user why their icons are not being hidden
+    if (IsCorralHookSafeMode()) {
+        DllLog(L"App::Initialize: hook is in SAFE MODE — desktop icons stay visible this session");
+        s_SafeModeNoticePending = true;
+        ShowSafeModeNoticeIfPending(trayIcon.get());
+    }
+
     // Restore corrals
     RestoreCorrals();
     DllLog(L"App::Initialize: %zu corrals restored", corrals.size());
@@ -215,6 +263,10 @@ void App::Initialize()
     PositionHiddenIconsUnderCorrals();
     HookBridge::RefreshDesktop();
 
+    // Opt-in update check (no-op unless CheckForUpdates is enabled and the 24h
+    // throttle has elapsed). Async — never blocks startup.
+    StartUpdateCheck(false);
+
     DllLog(L"App::Initialize: done");
 }
 
@@ -260,8 +312,10 @@ void App::LoadConfig()
 
 void App::SaveConfig()
 {
-    // Update desktop icons state
-    config.DesktopIconsVisible = DesktopIcons::AreIconsVisible();
+    // Update desktop icons state. Quick-hide is a transient state — persist
+    // the visibility the user will get back when quick-hide ends.
+    config.DesktopIconsVisible = quickHideActive ? desktopIconsVisibleBeforeQuickHide
+                                                 : DesktopIcons::AreIconsVisible();
 
     // Sync all corral configs from their current window states
     config.Corrals.clear();
@@ -468,6 +522,76 @@ void App::ToggleDesktopIcons()
     SaveConfig();
 }
 
+void App::ToggleQuickHide()
+{
+    quickHideActive = !quickHideActive;
+
+    if (quickHideActive)
+    {
+        // Remember the native-icon state so the restore puts back exactly
+        // what the user had (icons may already be hidden via the tray toggle)
+        desktopIconsVisibleBeforeQuickHide = DesktopIcons::AreIconsVisible();
+        if (desktopIconsVisibleBeforeQuickHide)
+        {
+            DesktopIcons::SetIconsVisible(false);
+        }
+        for (auto &corral : corrals)
+        {
+            if (!corral->GetConfig().ExcludeFromQuickHide)
+            {
+                corral->StartQuickHide();
+            }
+        }
+        DllLog(L"App::ToggleQuickHide: hidden (icons were %s)",
+               desktopIconsVisibleBeforeQuickHide ? L"visible" : L"hidden");
+    }
+    else
+    {
+        if (desktopIconsVisibleBeforeQuickHide)
+        {
+            DesktopIcons::SetIconsVisible(true);
+        }
+        for (auto &corral : corrals)
+        {
+            corral->StartQuickShow(); // No-op for corrals that were not hidden
+        }
+        DllLog(L"App::ToggleQuickHide: restored");
+    }
+}
+
+bool App::IsPointOnEmptyDesktop(POINT pt, bool checkIcons)
+{
+    HWND hwnd = WindowFromPoint(pt);
+    if (!hwnd)
+        return false;
+
+    wchar_t cls[64] = {};
+    GetClassNameW(hwnd, cls, _countof(cls));
+
+    bool onDesktop = false;
+    if (wcscmp(cls, L"Progman") == 0 || wcscmp(cls, L"WorkerW") == 0)
+    {
+        // Wallpaper layer — hit directly when the icon ListView is hidden
+        onDesktop = true;
+    }
+    else if (wcscmp(cls, L"SysListView32") == 0 || wcscmp(cls, L"SHELLDLL_DefView") == 0)
+    {
+        // Must be Explorer's desktop view, not some other app's ListView.
+        // (Deliberately not a GetParent walk: GetParent returns the owner for
+        // popups, and corral windows are owned by Progman.)
+        HWND root = GetAncestor(hwnd, GA_ROOT);
+        wchar_t rootCls[64] = {};
+        GetClassNameW(root, rootCls, _countof(rootCls));
+        onDesktop = (root == GetShellWindow() ||
+                     wcscmp(rootCls, L"Progman") == 0 || wcscmp(rootCls, L"WorkerW") == 0);
+    }
+    if (!onDesktop)
+        return false;
+
+    // The hook filters LVM_HITTEST, so corral-owned (parked) icons never count
+    return !checkIcons || !DesktopIcons::IsPointOnIcon(pt.x, pt.y);
+}
+
 void App::ToggleShortcutArrows()
 {
     bool currentlyHidden = DesktopIcons::AreShortcutArrowsHidden();
@@ -496,44 +620,110 @@ void App::ToggleShortcutArrows()
     }
 }
 
-void App::UpdateHookHiddenIcons()
+// Resolve a desktop file name to its full path (user desktop first, then
+// public desktop; defaults to the user desktop path if neither exists)
+static std::wstring ResolveDesktopFilePath(const std::wstring &fileName)
 {
-    // Collect display names of all icons across all corrals and ALL tabs
-    // (not just active tab - inactive tab icons should stay hidden too)
-    std::vector<std::wstring> displayNames;
+    if (fileName.empty())
+        return L""; // never resolve to the desktop folder itself
+
+    wchar_t buf[MAX_PATH];
+    std::wstring userPath, pubPath;
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, buf)))
+        userPath = std::wstring(buf) + L"\\" + fileName;
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_DESKTOPDIRECTORY, NULL, 0, buf)))
+        pubPath = std::wstring(buf) + L"\\" + fileName;
+
+    if (!userPath.empty() && GetFileAttributesW(userPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        return userPath;
+    if (!pubPath.empty() && GetFileAttributesW(pubPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        return pubPath;
+    return userPath.empty() ? fileName : userPath;
+}
+
+std::vector<HiddenIconInfo> App::CollectCorralIconIdentities() const
+{
+    // Collect all icons across all corrals and ALL tabs (not just active tab -
+    // inactive tab icons count too). Each entry carries the display name plus
+    // the canonical parsing name (full path or ::{CLSID}) so consumers can
+    // match items unambiguously even when display names collide.
+    std::vector<HiddenIconInfo> result;
     for (const auto &corral : corrals)
     {
         for (const auto &tab : corral->GetConfig().Tabs)
         {
             if (tab.IsVirtual)
-                continue; // Virtual tabs don't hide desktop icons
+                continue; // Virtual tabs don't own desktop icons
 
             for (const auto &fileUtf8 : tab.Files)
             {
-                // Special icon: resolve CLSID to display name
+                if (fileUtf8.empty())
+                    continue;
+
+                HiddenIconInfo info;
+
+                // Special icon: resolve CLSID to display name; parsing name is ::{CLSID}
                 if (CorralWindow::IsSpecialIconEntry(fileUtf8))
                 {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
-                    std::wstring name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                    if (!name.empty())
-                    {
-                        displayNames.push_back(name);
-                    }
+                    info.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                    info.parsingName = L"::" + clsid;
+                    result.push_back(std::move(info));
                     continue;
                 }
 
-                // Convert UTF-8 filename to wide and strip .lnk extension
+                // Convert UTF-8 filename to wide
                 int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
                 std::wstring wName(size, 0);
                 MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
-                wName = IconUtils::StripLnkExtension(wName);
 
-                displayNames.push_back(wName);
+                info.parsingName = ResolveDesktopFilePath(wName);
+
+                // Shell display name matches the desktop ListView's item text
+                // (respects "Hide extensions for known file types")
+                info.displayName = DesktopIcons::GetShellDisplayName(info.parsingName);
+                result.push_back(std::move(info));
             }
         }
     }
+    return result;
+}
 
-    HookBridge::UpdateHiddenIcons(displayNames);
+// How long a renamed icon's old identity stays hidden alongside the new one.
+// Covers the shell's asynchronous processing of the rename, including slow
+// cases (OneDrive-backed desktops).
+static const DWORD TRANSIENT_HIDDEN_MS = 5000;
+
+void App::AddTransientHiddenIcon(const std::wstring &displayName, const std::wstring &parsingName)
+{
+    if (displayName.empty() && parsingName.empty())
+        return;
+
+    std::lock_guard<std::mutex> lock(transientHiddenLock);
+    transientHiddenIcons.push_back({{displayName, parsingName}, GetTickCount() + TRANSIENT_HIDDEN_MS});
+}
+
+void App::UpdateHookHiddenIcons()
+{
+    auto icons = CollectCorralIconIdentities();
+
+    // Append unexpired transition aliases (old identities of just-renamed
+    // icons) so a desktop item the shell hasn't updated yet stays hidden
+    {
+        std::lock_guard<std::mutex> lock(transientHiddenLock);
+        DWORD now = GetTickCount();
+        transientHiddenIcons.erase(
+            std::remove_if(transientHiddenIcons.begin(), transientHiddenIcons.end(),
+                           [now](const TransientHiddenIcon &t)
+                           { return (LONG)(t.expiresAtTick - now) <= 0; }),
+            transientHiddenIcons.end());
+        for (const auto &t : transientHiddenIcons)
+        {
+            icons.push_back(t.icon);
+        }
+    }
+
+    HookBridge::UpdateHiddenIcons(icons);
 }
 
 void App::PositionHiddenIconsUnderCorrals()
@@ -543,16 +733,13 @@ void App::PositionHiddenIconsUnderCorrals()
     // at their actual screen coords (under the corral window). Icons scrolled out
     // of view get positioned just outside the corral edge. If DexCorral crashes,
     // icons reappear near where the corral was.
-    std::map<std::wstring, POINT2D> positions;
+    std::vector<IconPositionRequest> requests;
 
     for (const auto &corral : corrals)
     {
         // Get per-icon positions from the active tab (already in ListView client coords)
         auto iconPositions = corral->GetIconScreenPositions();
-        for (auto &[name, pos] : iconPositions)
-        {
-            positions[name] = pos;
-        }
+        requests.insert(requests.end(), iconPositions.begin(), iconPositions.end());
 
         // For non-active tabs, position icons at corral center (they're not rendered)
         RECT r;
@@ -575,30 +762,33 @@ void App::PositionHiddenIconsUnderCorrals()
                 continue;
             for (const auto &fileUtf8 : tab.Files)
             {
-                std::wstring name;
+                IconPositionRequest req;
                 if (CorralWindow::IsSpecialIconEntry(fileUtf8))
                 {
                     std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
-                    name = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                    req.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                    req.parsingName = L"::" + clsid;
                 }
                 else
                 {
                     int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
-                    name.resize(size);
-                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
-                    name = IconUtils::StripLnkExtension(name);
+                    std::wstring wName(size, 0);
+                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
+                    req.parsingName = ResolveDesktopFilePath(wName);
+                    req.displayName = DesktopIcons::GetShellDisplayName(req.parsingName);
                 }
-                if (!name.empty())
+                if (!req.displayName.empty() || !req.parsingName.empty())
                 {
-                    positions[name] = {center.x, center.y};
+                    req.pt = {center.x, center.y};
+                    requests.push_back(std::move(req));
                 }
             }
         }
     }
 
-    if (!positions.empty())
+    if (!requests.empty())
     {
-        DesktopIcons::PositionIcons(positions);
+        DesktopIcons::PositionIconsByPath(requests);
     }
 }
 
@@ -608,21 +798,32 @@ void App::PositionHiddenIconsUnderCorrals()
 
 void App::CacheDesktopIconPositions()
 {
-    cachedDesktopIconPositions = DesktopIcons::GetAllIconPositions();
+    cachedDesktopIconPositions = DesktopIcons::GetAllIconsWithIdentity();
 
-    // Remove icons that are hidden by corrals (they're managed, not free)
-    auto it = cachedDesktopIconPositions.begin();
-    while (it != cachedDesktopIconPositions.end())
+    // Remove icons that belong to corrals (they're managed, not free).
+    // Compare canonically (parsing name) when both sides have one, so a free
+    // name-twin of a corral-owned icon is not filtered out by mistake.
+    auto corralIcons = CollectCorralIconIdentities();
+    auto isCorralOwned = [&corralIcons](const DesktopIconInfo &icon)
     {
-        if (IsIconHiddenByCorral(it->first))
+        for (const auto &owned : corralIcons)
         {
-            it = cachedDesktopIconPositions.erase(it);
+            if (!icon.parsingName.empty() && !owned.parsingName.empty())
+            {
+                if (_wcsicmp(owned.parsingName.c_str(), icon.parsingName.c_str()) == 0)
+                    return true;
+            }
+            else if (!icon.displayName.empty() && !owned.displayName.empty() &&
+                     _wcsicmp(owned.displayName.c_str(), icon.displayName.c_str()) == 0)
+            {
+                return true;
+            }
         }
-        else
-        {
-            ++it;
-        }
-    }
+        return false;
+    };
+    cachedDesktopIconPositions.erase(
+        std::remove_if(cachedDesktopIconPositions.begin(), cachedDesktopIconPositions.end(), isCorralOwned),
+        cachedDesktopIconPositions.end());
 
     desktopIconCacheValid = true;
 }
@@ -631,40 +832,6 @@ void App::InvalidateDesktopIconCache()
 {
     desktopIconCacheValid = false;
     cachedDesktopIconPositions.clear();
-}
-
-bool App::IsIconHiddenByCorral(const std::wstring &displayName) const
-{
-    for (const auto &corral : corrals)
-    {
-        for (const auto &tab : corral->GetConfig().Tabs)
-        {
-            if (tab.IsVirtual)
-                continue;
-
-            for (const auto &fileUtf8 : tab.Files)
-            {
-                std::wstring name;
-                if (CorralWindow::IsSpecialIconEntry(fileUtf8))
-                {
-                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
-                    name = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                }
-                else
-                {
-                    int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
-                    name.resize(size);
-                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &name[0], size);
-                    name = IconUtils::StripLnkExtension(name);
-                }
-                if (!name.empty() && _wcsicmp(name.c_str(), displayName.c_str()) == 0)
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
 }
 
 std::vector<RECT> App::GetAllCorralRects() const
@@ -752,7 +919,7 @@ void App::PushDesktopIconsFromCorrals()
     }
 
     // Helper: check if a position is free (no corral overlap, no icon overlap, on screen)
-    auto isPositionFree = [&](int x, int y, const std::wstring &skipName) -> bool
+    auto isPositionFree = [&](int x, int y, const DesktopIconInfo *skip) -> bool
     {
         if (x < screenLeft || y < screenTop ||
             x + ICON_W > screenRight || y + ICON_H > screenBottom)
@@ -763,13 +930,13 @@ void App::PushDesktopIconsFromCorrals()
             if (RectsOverlap(r, cr))
                 return false;
         }
-        for (const auto &[otherName, otherPos] : cachedDesktopIconPositions)
+        for (const auto &other : cachedDesktopIconPositions)
         {
-            if (otherName == skipName)
+            if (&other == skip)
                 continue;
-            if (otherPos.x < -1000 || otherPos.y < -1000)
+            if (other.pt.x < -1000 || other.pt.y < -1000)
                 continue;
-            RECT otherRect = {otherPos.x, otherPos.y, otherPos.x + ICON_W, otherPos.y + ICON_H};
+            RECT otherRect = {other.pt.x, other.pt.y, other.pt.x + ICON_W, other.pt.y + ICON_H};
             if (RectsOverlap(r, otherRect))
                 return false;
         }
@@ -777,10 +944,12 @@ void App::PushDesktopIconsFromCorrals()
     };
 
     bool anyMoved = false;
-    std::vector<std::pair<std::wstring, POINT2D>> toMove;
+    std::vector<IconPositionRequest> toMove;
 
-    for (auto &[name, pos] : cachedDesktopIconPositions)
+    for (auto &icon : cachedDesktopIconPositions)
     {
+        POINT2D &pos = icon.pt;
+
         // Skip icons far off-screen (already hidden)
         if (pos.x < -1000 || pos.y < -1000)
             continue;
@@ -837,7 +1006,7 @@ void App::PushDesktopIconsFromCorrals()
                 int candidateX = pos.x + dir.dx * STEP * step;
                 int candidateY = pos.y + dir.dy * STEP * step;
 
-                if (isPositionFree(candidateX, candidateY, name))
+                if (isPositionFree(candidateX, candidateY, &icon))
                 {
                     newX = candidateX;
                     newY = candidateY;
@@ -851,7 +1020,9 @@ void App::PushDesktopIconsFromCorrals()
 
         if (newX != pos.x || newY != pos.y)
         {
-            toMove.push_back({name, {newX, newY}});
+            // The snapshot carries each icon's identity, so the move targets
+            // exactly this icon even if another shares its display name
+            toMove.push_back({icon.displayName, icon.parsingName, {newX, newY}});
             // Update cache so subsequent icons see the new position
             pos.x = newX;
             pos.y = newY;
@@ -860,10 +1031,7 @@ void App::PushDesktopIconsFromCorrals()
     }
 
     // Apply all moves
-    for (const auto &[name, newPos] : toMove)
-    {
-        DesktopIcons::PositionIcon(name, newPos.x, newPos.y);
-    }
+    DesktopIcons::PositionIconsByPath(toMove);
     if (anyMoved)
     {
         HookBridge::RefreshDesktop();
@@ -872,8 +1040,27 @@ void App::PushDesktopIconsFromCorrals()
 
 void App::OnLeftButtonDown(POINT pt)
 {
-    // Reserved for future desktop interactions
-    // Currently no action on desktop click
+    // Runs inside the WH_MOUSE_LL callback — keep it cheap. Pair consecutive
+    // clicks into a double-click here; the expensive empty-desktop validation
+    // happens on the app thread (WM_QUICKHIDE_DBLCLK handler).
+    DWORD now = GetTickCount();
+    bool isDoubleClick =
+        lastClickTick != 0 &&
+        (now - lastClickTick) <= GetDoubleClickTime() &&
+        abs(pt.x - lastClickPt.x) <= GetSystemMetrics(SM_CXDOUBLECLK) &&
+        abs(pt.y - lastClickPt.y) <= GetSystemMetrics(SM_CYDOUBLECLK);
+
+    if (isDoubleClick)
+    {
+        lastClickTick = 0; // A triple-click must not toggle twice
+        POINTS pts = {(SHORT)pt.x, (SHORT)pt.y};
+        PostMessageW(messageWindow, WM_QUICKHIDE_DBLCLK, 0, MAKELPARAM(pts.x, pts.y));
+    }
+    else
+    {
+        lastClickTick = now;
+        lastClickPt = pt;
+    }
 }
 
 void App::OnLeftButtonUp(POINT pt)
@@ -899,9 +1086,19 @@ void App::ShowTrayMenu()
     UINT flags = DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | flags, 2, L"Show Desktop Icons");
 
+    // Quick-hide toggle (same as double-clicking an empty desktop spot)
+    UINT quickHideFlags = quickHideActive ? MF_CHECKED : MF_UNCHECKED;
+    AppendMenuW(menu, MF_STRING | quickHideFlags, 6, L"Quick-Hide Everything");
+
     // Autostart toggle
     UINT autostartFlags = IsAutostartEnabled() ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
+
+    // Update check (opt-in)
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    UINT updateFlags = config.CheckForUpdates ? MF_CHECKED : MF_UNCHECKED;
+    AppendMenuW(menu, MF_STRING | updateFlags, 7, L"Check for Updates Automatically");
+    AppendMenuW(menu, MF_STRING, 8, L"Check for Updates Now");
 
     POINT pt;
     GetCursorPos(&pt);
@@ -933,6 +1130,9 @@ void App::ShowTrayMenu()
     case 4:
         SetAutostart(!IsAutostartEnabled());
         break;
+    case 6:
+        ToggleQuickHide();
+        break;
     case 5:
     {
         int offsetX = (int)corrals.size() * 30;
@@ -943,6 +1143,15 @@ void App::ShowTrayMenu()
         CreateVirtualCorralAt(centerPt);
         break;
     }
+    case 7:
+        config.CheckForUpdates = !config.CheckForUpdates;
+        SaveConfig();
+        if (config.CheckForUpdates)
+            StartUpdateCheck(true); // immediate confirmation that checking works
+        break;
+    case 8:
+        StartUpdateCheck(true);
+        break;
     }
 }
 
@@ -973,6 +1182,24 @@ void App::ShowAbout()
     aboutText += L"GitHub: https://github.com/guHe330/DexCorral";
 
     MessageBoxW(messageWindow, aboutText.c_str(), L"About DexCorral", MB_OK | MB_ICONINFORMATION);
+}
+
+void App::StartUpdateCheck(bool userInitiated)
+{
+    if (!userInitiated)
+    {
+        // Automatic check: only when opted in, and at most once per 24h.
+        if (!config.CheckForUpdates)
+            return;
+        long long now = (long long)time(nullptr);
+        const long long kDaySeconds = 24LL * 60 * 60;
+        if (config.LastUpdateCheckEpoch != 0 && now - config.LastUpdateCheckEpoch < kDaySeconds)
+            return;
+        config.LastUpdateCheckEpoch = now;
+        SaveConfig();
+    }
+
+    UpdateChecker::StartAsyncCheck(messageWindow, WM_UPDATE_CHECK_DONE, userInitiated);
 }
 
 void App::CreateCorral(POINT pt)
@@ -1209,11 +1436,65 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             app->ToggleDesktopIcons();
             return 0;
         }
+        // User clicked the "update available" balloon — open the release page.
+        if (lParam == NIN_BALLOONUSERCLICK)
+        {
+            if (!app->pendingUpdateUrl.empty())
+            {
+                ShellExecuteW(nullptr, L"open", app->pendingUpdateUrl.c_str(),
+                              nullptr, nullptr, SW_SHOWNORMAL);
+                app->pendingUpdateUrl.clear();
+            }
+            return 0;
+        }
     }
 
     if (app && uMsg == WM_DISPLAYCHANGE)
     {
         app->OnDisplayChange();
+        return 0;
+    }
+
+    // Double-click on the desktop (posted by the mouse hook) — quick-hide if
+    // it landed on an empty spot. While quick-hide is active the icon check is
+    // skipped: the ListView is hidden, so every desktop spot counts as empty.
+    if (app && uMsg == WM_QUICKHIDE_DBLCLK)
+    {
+        POINT pt = {(SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam)};
+        if (app->IsPointOnEmptyDesktop(pt, !app->quickHideActive))
+        {
+            app->ToggleQuickHide();
+        }
+        return 0;
+    }
+
+    // Async update check finished — take ownership of the result and notify
+    if (app && uMsg == WM_UPDATE_CHECK_DONE)
+    {
+        std::unique_ptr<UpdateCheckResult> result((UpdateCheckResult *)lParam);
+        if (result && app->trayIcon)
+        {
+            if (result->Success && result->UpdateAvailable)
+            {
+                app->pendingUpdateUrl = result->ReleaseUrl;
+                app->trayIcon->ShowBalloon(
+                    L"DexCorral update available",
+                    L"Version " + result->LatestVersion +
+                        L" is available. Click here to open the download page.");
+            }
+            else if (result->UserInitiated)
+            {
+                // Only surface the no-update / failure outcome for manual checks.
+                if (result->Success)
+                    app->trayIcon->ShowBalloon(
+                        L"DexCorral is up to date",
+                        L"You are running the latest version (" DEXCORRAL_VERSION L").");
+                else
+                    app->trayIcon->ShowBalloon(
+                        L"Update check failed",
+                        L"Could not reach the update server. Please try again later.");
+            }
+        }
         return 0;
     }
 
@@ -1241,12 +1522,20 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    // Deferred catch-all adoption — waits out Explorer's inline rename
+    if (app && uMsg == WM_TIMER && wParam == ADOPTION_TIMER)
+    {
+        app->ProcessPendingAdoptions();
+        return 0;
+    }
+
     // Retry timer — fired when Shell_NotifyIconW(NIM_ADD) failed at startup
     if (uMsg == WM_TIMER && wParam == TRAY_RETRY_TIMER)
     {
         if (app && app->trayIcon && app->trayIcon->Show()) {
             KillTimer(hwnd, TRAY_RETRY_TIMER);
             DllLog(L"App: TRAY_RETRY_TIMER — tray icon added successfully");
+            ShowSafeModeNoticeIfPending(app->trayIcon.get());
         }
         return 0;
     }
@@ -1256,7 +1545,10 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     {
         DllLog(L"App: WM_TASKBARCREATED — Explorer restarted, retrying tray icon");
         if (app->trayIcon)
+        {
             app->trayIcon->Show();
+            ShowSafeModeNoticeIfPending(app->trayIcon.get());
+        }
         return 0;
     }
 
@@ -1545,30 +1837,98 @@ void App::UpdateCorralPositions()
 
 void App::OnDesktopFileAdded(const std::wstring &fileName)
 {
-    // Convert to UTF-8
-    int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string fileNameStr(size - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
+    if (fileName.empty())
+        return;
 
-    // Check if file is already in any corral
-    for (auto &corral : corrals)
+    // Don't adopt immediately: a file created via the desktop "New" context
+    // menu goes straight into Explorer's inline rename edit box, and yanking
+    // the icon into the catch-all corral would kill the rename. Queue it and
+    // let the (app-thread) adoption timer pick it up once no rename is active.
     {
-        for (auto &tab : corral->GetConfig().Tabs)
+        std::lock_guard<std::mutex> lock(pendingAdoptionsLock);
+        pendingAdoptions.push_back(fileName);
+    }
+    // SetTimer from the monitor thread is fine: the timer fires on the thread
+    // that owns messageWindow (the app thread)
+    SetTimer(messageWindow, ADOPTION_TIMER, ADOPTION_POLL_MS, nullptr);
+}
+
+void App::ProcessPendingAdoptions()
+{
+    // Still renaming? Keep the periodic timer armed and try again next tick.
+    HWND hListView = DesktopIcons::GetDesktopListView();
+    if (hListView && SendMessageW(hListView, LVM_GETEDITCONTROL, 0, 0) != 0)
+    {
+        return;
+    }
+    KillTimer(messageWindow, ADOPTION_TIMER);
+
+    std::vector<std::wstring> adoptions;
+    {
+        std::lock_guard<std::mutex> lock(pendingAdoptionsLock);
+        adoptions.swap(pendingAdoptions);
+    }
+
+    bool changed = false;
+    for (const auto &fileName : adoptions)
+    {
+        if (fileName.empty())
+            continue;
+
+        // Convert to UTF-8
+        int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        std::string fileNameStr(size - 1, 0);
+        WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
+
+        // Skip if the file vanished while pending (deleted, moved away)
+        std::wstring fullPath = ResolveDesktopFilePath(fileName);
+        DWORD attrs = GetFileAttributesW(fullPath.c_str());
+        if (attrs == INVALID_FILE_ATTRIBUTES)
         {
-            auto &files = tab.Files;
-            if (std::find(files.begin(), files.end(), fileNameStr) != files.end())
+            continue;
+        }
+        // Files Explorer doesn't show on the desktop (desktop.ini and other
+        // hidden/system files) must never be adopted into a corral
+        if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+        {
+            continue;
+        }
+
+        // Check if file is already in any corral
+        bool tracked = false;
+        for (auto &corral : corrals)
+        {
+            for (auto &tab : corral->GetConfig().Tabs)
             {
-                return; // Already tracked
+                auto &files = tab.Files;
+                if (std::find(files.begin(), files.end(), fileNameStr) != files.end())
+                {
+                    tracked = true;
+                    break;
+                }
             }
+            if (tracked)
+                break;
+        }
+        if (tracked)
+            continue;
+
+        // Add to catch-all corral
+        CorralWindow *catchAll = GetCatchAllCorral();
+        if (catchAll)
+        {
+            catchAll->AddFile(fileNameStr);
+            changed = true;
         }
     }
 
-    // Add to catch-all corral
-    CorralWindow *catchAll = GetCatchAllCorral();
-    if (catchAll)
+    if (changed)
     {
-        catchAll->AddFile(fileNameStr);
         SaveConfig();
+        // Hide the adopted icons on the desktop and park them under the corral
+        UpdateHookHiddenIcons();
+        PositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
     }
 }
 
@@ -1582,6 +1942,19 @@ void App::OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &
     int newSize = WideCharToMultiByte(CP_UTF8, 0, newName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string newNameStr(newSize - 1, 0);
     WideCharToMultiByte(CP_UTF8, 0, newName.c_str(), -1, &newNameStr[0], newSize, nullptr, nullptr);
+
+    // Follow renames in the pending adoption queue (e.g. user typing the name
+    // of a freshly created "New Text Document")
+    {
+        std::lock_guard<std::mutex> lock(pendingAdoptionsLock);
+        for (auto &pending : pendingAdoptions)
+        {
+            if (_wcsicmp(pending.c_str(), oldName.c_str()) == 0)
+            {
+                pending = newName;
+            }
+        }
+    }
 
     // Update in all corrals
     bool changed = false;
@@ -1603,11 +1976,38 @@ void App::OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &
     if (changed)
     {
         SaveConfig();
+
+        // Keep the OLD identity hidden as a transition alias: the shell
+        // updates the desktop item asynchronously, and until it does, the
+        // item still matches the pre-rename identity. Derive the old path
+        // from the renamed file's directory (the old file no longer exists,
+        // so it can't be resolved directly).
+        std::wstring newPath = ResolveDesktopFilePath(newName);
+        size_t slash = newPath.find_last_of(L'\\');
+        std::wstring oldPath = (slash != std::wstring::npos)
+                                   ? newPath.substr(0, slash + 1) + oldName
+                                   : oldName;
+        AddTransientHiddenIcon(DesktopIcons::GetShellDisplayName(oldPath), oldPath);
+
+        // Refresh the hook's hidden list (now containing both identities)
+        // and re-park, otherwise the renamed icon reappears on the desktop
+        UpdateHookHiddenIcons();
+        PositionHiddenIconsUnderCorrals();
     }
 }
 
 void App::OnDesktopFileDeleted(const std::wstring &fileName)
 {
+    // Drop the file from the pending adoption queue if it never got adopted
+    {
+        std::lock_guard<std::mutex> lock(pendingAdoptionsLock);
+        pendingAdoptions.erase(
+            std::remove_if(pendingAdoptions.begin(), pendingAdoptions.end(),
+                           [&fileName](const std::wstring &pending)
+                           { return _wcsicmp(pending.c_str(), fileName.c_str()) == 0; }),
+            pendingAdoptions.end());
+    }
+
     // Convert to UTF-8
     int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string fileNameStr(size - 1, 0);

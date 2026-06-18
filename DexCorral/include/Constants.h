@@ -42,20 +42,6 @@ constexpr DWORD DESKTOP_ICON_BUFFER_SIZE = 4096;
 constexpr DWORD DIALOG_TEMPLATE_BUFFER_SIZE = 4096;
 
 // ============================================================================
-// Off-Screen Positioning (Icon Hiding)
-// ============================================================================
-
-/// Off-screen X coordinate for hiding desktop icons (-5000)
-/// Moves icons to a valid but invisible position for drag-drop occlusion.
-/// Must be a valid screen coordinate to prevent Explorer crashes.
-constexpr int ICON_HIDE_POSITION_X = -5000;
-
-/// Off-screen Y coordinate for hiding desktop icons (-5000)
-/// Moves icons to a valid but invisible position for drag-drop occlusion.
-/// Must be a valid screen coordinate to prevent Explorer crashes.
-constexpr int ICON_HIDE_POSITION_Y = -5000;
-
-// ============================================================================
 // Rendering: Opacity and Alpha
 // ============================================================================
 

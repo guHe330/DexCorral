@@ -36,15 +36,34 @@
 
 ### What's New
 
+- Optional update check (off by default): turn on "Check for Updates Automatically" in the tray menu and DexCorral will let you know via a tray notification when a new version is available (click it to open the download page); "Check for Updates Now" checks on demand. No automatic downloads
+- Quick-hide: double-click an empty spot on the desktop to hide everything — native icons and all corrals (with a fade) — and double-click again to bring it all back. Per-corral "Exclude from Quick-Hide" keeps chosen corrals visible; also available as "Quick-Hide Everything" in the tray menu
+- Desktop sorting is now owned by DexCorral: "Sort by" never moves corral-owned icons and no longer leaves empty grid slots where hidden icons used to be
+- Corral-owned icons are immune to Explorer repositioning (auto-arrange, align-to-grid, third-party tools) — only DexCorral can move them
+- Desktop sort/compaction repaints in a single pass (no flicker of intermediate layouts)
+- Icons are now identified by their real shell identity (full path), not display name — same-named items can no longer be hidden by mistake
+- Faster desktop painting and hit-testing: hidden-icon lookups are cached per item instead of re-resolved on every paint
+- Corral labels respect "Hide extensions for known file types"; toggling the setting no longer duplicates icons
+- Creating a file via right-click > New keeps the inline rename: the catch-all corral waits until you've finished typing the name
+- DexCorral's auto-arrange keeps the desktop compacted when files are added or removed
 - Startup injection: new `--startup` flag injects DexCorralHook.dll into Explorer via WH_GETMESSAGE hook — no Explorer restart needed on install or login
 - Win+D immunity: corral windows are now owned by Progman and block SWP_HIDEWINDOW, so Show Desktop no longer hides them
 - Desktop filter window blocks mouse/drop interaction at hidden icon positions
 - Tray icon retry: handles shell notification area not being ready at early Explorer startup
 - Mouse wheel fix: WM_MOUSEWHEEL re-routing now scoped to DexCorral windows only, no longer swallowing scroll in other apps
 - Hook-to-app repark notification: hidden icons are repositioned under their corrals after sort/compaction
+- Crash containment: every hook entry point Explorer calls is exception-guarded — on an unexpected error the hook deactivates itself and releases all icons instead of taking Explorer down
+- Safe mode: if Explorer keeps dying right after the hook starts, DexCorral starts with the hook disabled and shows a tray notice; the next start tries again normally
+- Debug log files are now fully opt-in (DebugLogging config flag) — drag-and-drop no longer writes a log file on every mouse move
+- Desktop context menu commands (Sort by, Auto arrange, Align to grid) are recognized by menu caption, not just hard-coded IDs, for resilience across Windows builds
+- Uninstalling/disabling no longer breaks other desktop tools that hooked the desktop after DexCorral
 - Installer simplified: no Explorer restart during install, auto-start via Run registry key
+- Fixed: hidden corral-owned icons could silently accept drag-drops (e.g. below a rolled-up corral) — the drop blocker now reliably installs even when Explorer registers its drop target late, and re-installs itself if another tool takes over the drop target
 - Fixed About dialog URL and GitHub link
+- Documentation overhaul: user manual rewritten to cover tabs, virtual corrals, the appearance dialog, and the installer flow; uninstall guide and README brought up to date
 
 ### Known Issues
+
+- Two files with the exact same filename on the user desktop and the Public desktop can't be told apart; DexCorral assumes the one on the user desktop.
 
 See [open issues](https://github.com/guHe330/DexCorralCpp/issues?q=is%3Aissue+is%3Aopen+label%3Abug) for known bugs.

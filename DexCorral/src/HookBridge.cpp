@@ -31,13 +31,18 @@
 #include "HookBridge.h"
 #include "Constants.h"
 #include <vector>
+#include <ShlObj.h>
+#include <stdio.h>
+#include <string.h>
 
 static CRITICAL_SECTION s_Lock;
-static std::vector<std::wstring> s_HiddenNames;
+static std::vector<HiddenIconInfo> s_HiddenIcons;
 static volatile DWORD s_Version = 0;
 static bool s_Initialized = false;
 static bool s_DebugLogging = false;
+static bool s_DebugLoggingInitialized = false;
 static volatile HWND s_AppMessageWindow = nullptr;
+static volatile LONG s_AppIconMoveDepth = 0;
 
 void HookBridge::Initialize()
 {
@@ -57,18 +62,25 @@ void HookBridge::Cleanup()
     }
 }
 
-void HookBridge::UpdateHiddenIcons(const std::vector<std::wstring> &displayNames)
+void HookBridge::UpdateHiddenIcons(const std::vector<HiddenIconInfo> &icons)
 {
     EnterCriticalSection(&s_Lock);
-    s_HiddenNames = displayNames;
-    s_Version++;
+    // Only bump the version when the list actually changed. The hook's
+    // deferred revalidation posts a repark to the app, which recomputes this
+    // list — without this check that round trip would bump the version again
+    // and loop forever.
+    if (!(s_HiddenIcons == icons))
+    {
+        s_HiddenIcons = icons;
+        s_Version++;
+    }
     LeaveCriticalSection(&s_Lock);
 }
 
 void HookBridge::ClearHiddenIcons()
 {
     EnterCriticalSection(&s_Lock);
-    s_HiddenNames.clear();
+    s_HiddenIcons.clear();
     s_Version++;
     LeaveCriticalSection(&s_Lock);
 }
@@ -78,13 +90,61 @@ DWORD HookBridge::GetVersion()
     return s_Version;
 }
 
-DWORD HookBridge::GetHiddenIconNames(std::vector<std::wstring> &out)
+DWORD HookBridge::GetHiddenIcons(std::vector<HiddenIconInfo> &out)
 {
     EnterCriticalSection(&s_Lock);
-    out = s_HiddenNames;
+    out = s_HiddenIcons;
     DWORD ver = s_Version;
     LeaveCriticalSection(&s_Lock);
     return ver;
+}
+
+static std::vector<IconPositionRequest> s_PositionRequests;
+static std::vector<DesktopIconInfo> s_IconSnapshot;
+
+void HookBridge::SetIconSnapshot(const std::vector<DesktopIconInfo> &icons)
+{
+    EnterCriticalSection(&s_Lock);
+    s_IconSnapshot = icons;
+    LeaveCriticalSection(&s_Lock);
+}
+
+void HookBridge::TakeIconSnapshot(std::vector<DesktopIconInfo> &out)
+{
+    EnterCriticalSection(&s_Lock);
+    out.swap(s_IconSnapshot);
+    s_IconSnapshot.clear();
+    LeaveCriticalSection(&s_Lock);
+}
+
+void HookBridge::SetIconPositionRequests(const std::vector<IconPositionRequest> &requests)
+{
+    EnterCriticalSection(&s_Lock);
+    s_PositionRequests = requests;
+    LeaveCriticalSection(&s_Lock);
+}
+
+void HookBridge::TakeIconPositionRequests(std::vector<IconPositionRequest> &out)
+{
+    EnterCriticalSection(&s_Lock);
+    out.swap(s_PositionRequests);
+    s_PositionRequests.clear();
+    LeaveCriticalSection(&s_Lock);
+}
+
+void HookBridge::BeginAppIconMove()
+{
+    InterlockedIncrement(&s_AppIconMoveDepth);
+}
+
+void HookBridge::EndAppIconMove()
+{
+    InterlockedDecrement(&s_AppIconMoveDepth);
+}
+
+bool HookBridge::IsAppIconMoveActive()
+{
+    return s_AppIconMoveDepth > 0;
 }
 
 void HookBridge::SetAppMessageWindow(HWND hwnd)
@@ -97,13 +157,61 @@ HWND HookBridge::GetAppMessageWindow()
     return s_AppMessageWindow;
 }
 
+// Reads the DebugLogging flag straight from config.json. The first log calls
+// happen during DLL injection, before the App has loaded the config and
+// called SetDebugLogging — without this bootstrap, enabling DebugLogging
+// could never capture startup logging. Naive token scan instead of a JSON
+// parse: this can run under the loader lock, and the file is machine-written.
+static bool ReadDebugLoggingFromConfigFile()
+{
+    wchar_t path[MAX_PATH];
+    wchar_t *appData = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)))
+        return false;
+    swprintf_s(path, L"%s\\DexCorral\\config.json", appData);
+    CoTaskMemFree(appData);
+
+    HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return false;
+
+    bool enabled = false;
+    DWORD size = GetFileSize(hFile, nullptr);
+    if (size != INVALID_FILE_SIZE && size > 0 && size < 4 * 1024 * 1024)
+    {
+        std::vector<char> data(size + 1, 0);
+        DWORD read = 0;
+        if (ReadFile(hFile, data.data(), size, &read, nullptr) && read > 0)
+        {
+            data[read] = 0;
+            const char *key = strstr(data.data(), "\"DebugLogging\"");
+            if (key)
+            {
+                const char *p = key + strlen("\"DebugLogging\"");
+                while (*p == ':' || *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')
+                    p++;
+                enabled = (strncmp(p, "true", 4) == 0);
+            }
+        }
+    }
+    CloseHandle(hFile);
+    return enabled;
+}
+
 void HookBridge::SetDebugLogging(bool enable)
 {
+    s_DebugLoggingInitialized = true;
     s_DebugLogging = enable;
 }
 
 bool HookBridge::IsDebugLogging()
 {
+    if (!s_DebugLoggingInitialized)
+    {
+        s_DebugLoggingInitialized = true; // Set first: never re-read on failure
+        s_DebugLogging = ReadDebugLoggingFromConfigFile();
+    }
     return s_DebugLogging;
 }
 

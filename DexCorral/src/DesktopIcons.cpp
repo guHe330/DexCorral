@@ -30,6 +30,7 @@
 
 #include "DesktopIcons.h"
 #include "Constants.h"
+#include "HookBridge.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <ShObjIdl.h>
@@ -62,6 +63,24 @@ HWND DesktopIcons::GetDesktopListView()
     return FindWindowExW(shellDll, nullptr, L"SysListView32", nullptr);
 }
 
+std::wstring DesktopIcons::GetShellDisplayName(const std::wstring &fullPath)
+{
+    SHFILEINFOW sfi = {};
+    if (SHGetFileInfoW(fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_DISPLAYNAME) && sfi.szDisplayName[0])
+    {
+        return sfi.szDisplayName;
+    }
+
+    // Fallback: filename without .lnk
+    size_t slash = fullPath.find_last_of(L"\\/");
+    std::wstring name = (slash != std::wstring::npos) ? fullPath.substr(slash + 1) : fullPath;
+    if (name.length() > 4 && _wcsicmp(name.c_str() + name.length() - 4, L".lnk") == 0)
+    {
+        name = name.substr(0, name.length() - 4);
+    }
+    return name;
+}
+
 std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index)
 {
     LVITEMW lvItem = {};
@@ -81,41 +100,6 @@ std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID p
     buffer[MAX_PATH - 1] = L'\0';
 
     return std::wstring(buffer);
-}
-
-void DesktopIcons::HideIcon(const std::wstring &fileName)
-{
-    HWND hListView = GetDesktopListView();
-    if (hListView == nullptr)
-        return;
-
-    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
-
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr)
-        return;
-
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
-    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
-
-    for (int i = 0; i < count; i++)
-    {
-        std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
-
-        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0)
-        {
-            int x = ICON_HIDE_POSITION_X;
-            int y = ICON_HIDE_POSITION_Y;
-            LPARAM pos = MAKELPARAM(x & 0xFFFF, y);
-            SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
-            break;
-        }
-    }
-
-    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
 }
 
 bool DesktopIcons::IsPointOnIcon(int screenX, int screenY)
@@ -163,6 +147,8 @@ void DesktopIcons::RefreshDesktop()
 
 void DesktopIcons::PositionIcon(const std::wstring &fileName, int x, int y)
 {
+    AppIconMoveScope moveScope;
+
     HWND hListView = GetDesktopListView();
     if (hListView == nullptr)
         return;
@@ -199,6 +185,8 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPosi
     if (iconPositions.empty())
         return;
 
+    AppIconMoveScope moveScope;
+
     HWND hListView = GetDesktopListView();
     if (hListView == nullptr)
         return;
@@ -234,48 +222,56 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPosi
     CloseHandle(hProcess);
 }
 
-POINT2D *DesktopIcons::GetIconPosition(const std::wstring &fileName)
+void DesktopIcons::PositionIconsByPath(const std::vector<IconPositionRequest> &requests)
 {
+    if (requests.empty())
+        return;
+
     HWND hListView = GetDesktopListView();
     if (hListView == nullptr)
-        return nullptr;
+        return;
 
-    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
+    // Hand the requests to the Explorer hook, which matches items by parsing
+    // name on the UI thread (returns 1 when handled)
+    static UINT positionMsg = RegisterWindowMessageW(L"DexCorral_PositionIconsByPath");
+    HookBridge::SetIconPositionRequests(requests);
+    if (SendMessageW(hListView, positionMsg, 0, 0) == 1)
+        return;
 
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr)
-        return nullptr;
-
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
-    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
-
-    POINT2D *result = nullptr;
-
-    for (int i = 0; i < count; i++)
+    // Hook not active: drain the request store and fall back to legacy
+    // display-name positioning
+    std::vector<IconPositionRequest> drained;
+    HookBridge::TakeIconPositionRequests(drained);
+    std::map<std::wstring, POINT2D> byName;
+    for (const auto &req : requests)
     {
-        std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
+        if (!req.displayName.empty())
+            byName[req.displayName] = req.pt;
+    }
+    PositionIcons(byName);
+}
 
-        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0)
-        {
-            LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
-            SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
+std::vector<DesktopIconInfo> DesktopIcons::GetAllIconsWithIdentity()
+{
+    std::vector<DesktopIconInfo> result;
 
-            POINT pt;
-            SIZE_T bytesRead;
-            ReadProcessMemory(hProcess, pRemotePoint, &pt, 8, &bytesRead);
+    HWND hListView = GetDesktopListView();
+    if (hListView == nullptr)
+        return result;
 
-            result = new POINT2D{pt.x, pt.y};
-
-            VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
-            break;
-        }
+    // Ask the Explorer hook for an identity snapshot (returns 1 when handled)
+    static UINT snapshotMsg = RegisterWindowMessageW(L"DexCorral_GetIconSnapshot");
+    if (SendMessageW(hListView, snapshotMsg, 0, 0) == 1)
+    {
+        HookBridge::TakeIconSnapshot(result);
+        return result;
     }
 
-    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
-
+    // Hook not active: display-name-only entries (empty parsing names)
+    for (const auto &[name, pos] : GetAllIconPositions())
+    {
+        result.push_back({name, L"", pos});
+    }
     return result;
 }
 

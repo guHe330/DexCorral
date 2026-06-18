@@ -188,7 +188,16 @@ public:
     /// Icons in the viewport get their actual screen position (under the corral).
     /// Icons outside the viewport get positions just outside the corral edge.
     /// Returns a map of display name → screen position (in ListView client coords).
-    std::map<std::wstring, POINT2D> GetIconScreenPositions() const;
+    std::vector<IconPositionRequest> GetIconScreenPositions() const;
+
+    /// Quick-hide (double-click empty desktop): fades the corral out, then hides it
+    void StartQuickHide();
+
+    /// Reverses quick-hide: shows the corral and fades it back in. No-op if not quick-hidden.
+    void StartQuickShow();
+
+    /// Returns true if the corral is hidden (or fading out) due to quick-hide
+    bool IsQuickHidden() const { return isQuickHidden; }
 
 private:
     // Virtual corral support
@@ -229,6 +238,9 @@ private:
     void StartOpacityAnimation(int target);
     void StartOpacityAnimation(int target, int tintTargetVal);
     void OnOpacityAnimationTimer();
+
+    // Quick-hide fade animation
+    void OnQuickHideAnimationTimer();
 
     // Snap support
     void ApplySnap(int &newLeft, int &newTop, int width, int height);
@@ -357,6 +369,16 @@ private:
     int tintTarget = 0;
     int currentTintStrength = 0; // Current animated tint strength (used by render)
 
+    // Quick-hide state: whole-window alpha (SourceConstantAlpha) animated
+    // 255→0 before hiding the window, 0→255 after showing it again
+    static const UINT_PTR QUICKHIDE_TIMER_ID = 5;
+    static const int QUICKHIDE_ANIMATION_DURATION = 180; // ms
+    bool isQuickHidden = false;
+    bool isQuickHideAnimating = false;
+    DWORD quickHideAnimationStartTime = 0;
+    int quickHideStartAlpha = 255;
+    int quickHideAlpha = 255; // Current animated whole-window alpha (used by render)
+
     // Icon dragging for reordering
     bool isDraggingIcon = false;
     int draggedIconIndex = -1;
@@ -382,6 +404,7 @@ private:
     bool isRenamingIcon = false;
     int renamingIconIndex = -1;
     HWND hEditControl = nullptr;
+    HFONT hEditFont = nullptr;
     std::wstring originalName;
 
     // Virtual corral support
