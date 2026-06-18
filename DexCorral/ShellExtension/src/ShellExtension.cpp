@@ -100,11 +100,12 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::InvokeCommand(CMINVOKECOMMANDINFO* 
     if (HIWORD(pici->lpVerb) != 0)
         return E_INVALIDARG;
 
-    POINT pt;
-    GetCursorPos(&pt);
-
     App* app = App::GetInstance();
     if (!app) return E_FAIL;
+
+    // Place new corrals in free space (top-right corner) rather than at the
+    // cursor, so they don't overlap existing corrals.
+    POINT pt = app->FindFreeCorralPosition(300, 200);
 
     switch (LOWORD(pici->lpVerb)) {
     case IDM_NEW_CORRAL:

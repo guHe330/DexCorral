@@ -452,6 +452,11 @@ void CorralWindow::SetActiveTab(int index)
             folderWatcher->Stop();
             folderWatcher.reset();
         }
+        if (parentWatcher)
+        {
+            parentWatcher->Stop();
+            parentWatcher.reset();
+        }
 
         if (GetActiveTab().IsVirtual)
         {
@@ -502,13 +507,18 @@ void CorralWindow::DetachTab(int tabIndex)
     }
 
     // Reload this window with remaining tabs
+    if (folderWatcher)
+    {
+        folderWatcher->Stop();
+        folderWatcher.reset();
+    }
+    if (parentWatcher)
+    {
+        parentWatcher->Stop();
+        parentWatcher.reset();
+    }
     if (GetActiveTab().IsVirtual)
     {
-        if (folderWatcher)
-        {
-            folderWatcher->Stop();
-            folderWatcher.reset();
-        }
         InitializeFolderWatcher();
     }
     iconSize = GetIconSizeForViewMode();
@@ -588,16 +598,104 @@ RECT CorralWindow::GetTabRect(int index) const
 
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
-    int totalWidth = clientRect.right;
+    int contentLeft = GetTitleBarContentLeft();
+    int totalWidth = clientRect.right - contentLeft;
+    if (totalWidth < 0)
+        totalWidth = 0;
 
     int tabCount = (int)config.Tabs.size();
     int tabWidth = totalWidth / tabCount;
 
     return {
-        index * tabWidth,
+        contentLeft + index * tabWidth,
         0,
-        (index + 1) * tabWidth,
+        contentLeft + (index + 1) * tabWidth,
         GetTitleBarHeight()};
+}
+
+// ============================================================================
+// Virtual corral navigation + details-view geometry helpers
+// ============================================================================
+
+bool CorralWindow::IsNavBackVisible() const
+{
+    const CorralTabConfig &tab = GetActiveTab();
+    return tab.IsVirtual && !tab.CurrentSubPath.empty();
+}
+
+int CorralWindow::GetTitleBarContentLeft() const
+{
+    return IsNavBackVisible() ? GetTitleBarHeight() : 0;
+}
+
+RECT CorralWindow::GetNavBackButtonRect() const
+{
+    if (!IsNavBackVisible())
+        return {0, 0, 0, 0};
+    int h = GetTitleBarHeight();
+    return {0, 0, h, h};
+}
+
+int CorralWindow::GetDetailsHeaderHeight() const
+{
+    const CorralTabConfig &tab = GetActiveTab();
+    if (tab.IsVirtual && tab.GetViewMode() == ViewMode::Details)
+        return Dpi(DETAILS_HEADER_HEIGHT);
+    return 0;
+}
+
+std::wstring CorralWindow::GetVirtualCurrentPath() const
+{
+    const CorralTabConfig &tab = GetActiveTab();
+    std::wstring root = Utf8ToWide(tab.VirtualFolderPath);
+    if (tab.CurrentSubPath.empty())
+        return root;
+    std::wstring sub = Utf8ToWide(tab.CurrentSubPath);
+    if (!root.empty() && root.back() != L'\\')
+        root += L'\\';
+    return root + sub;
+}
+
+void CorralWindow::NavigateToSubfolder(const std::wstring &folder)
+{
+    if (folder.empty())
+        return;
+
+    CorralTabConfig &tab = GetActiveTab();
+    if (!tab.CurrentSubPath.empty() && tab.CurrentSubPath.back() != '\\')
+        tab.CurrentSubPath += '\\';
+    tab.CurrentSubPath += WideToUtf8(folder);
+
+    scrollPosition = 0;
+    selectedIcon = -1;
+    InitializeFolderWatcher();
+    LoadFiles();
+    SyncConfigFromWindow();
+    if (App::GetInstance())
+        App::GetInstance()->SaveConfig();
+}
+
+void CorralWindow::NavigateUp()
+{
+    CorralTabConfig &tab = GetActiveTab();
+    if (tab.CurrentSubPath.empty())
+        return;
+
+    // Strip trailing separators then the last path component
+    std::string sub = tab.CurrentSubPath;
+    while (!sub.empty() && (sub.back() == '\\' || sub.back() == '/'))
+        sub.pop_back();
+    size_t slash = sub.find_last_of("\\/");
+    sub = (slash == std::string::npos) ? std::string() : sub.substr(0, slash);
+    tab.CurrentSubPath = sub;
+
+    scrollPosition = 0;
+    selectedIcon = -1;
+    InitializeFolderWatcher();
+    LoadFiles();
+    SyncConfigFromWindow();
+    if (App::GetInstance())
+        App::GetInstance()->SaveConfig();
 }
 
 // ============================================================================
@@ -698,7 +796,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 }
             }
 
-            if (window->isResizing)
+            if (window->isResizingColumn)
+            {
+                window->DoColumnResize(x);
+            }
+            else if (window->isResizing)
             {
                 POINT pt;
                 GetCursorPos(&pt);
@@ -769,6 +871,13 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 POINT pt;
                 GetCursorPos(&pt);
                 ScreenToClient(hwnd, &pt);
+                // Column resize grips take priority inside the details header band
+                if (window->HitTestColumnGrip(pt.x, pt.y) >= 0)
+                {
+                    SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+                    return TRUE;
+                }
+
                 int hit = window->HitTestResize(pt.x, pt.y);
                 LPCWSTR cursor = IDC_ARROW;
                 switch (hit)
@@ -820,6 +929,19 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (wParam == QUICKHIDE_TIMER_ID)
             {
                 window->OnQuickHideAnimationTimer();
+                return 0;
+            }
+            if (wParam == RENAME_TIMER_ID)
+            {
+                KillTimer(hwnd, RENAME_TIMER_ID);
+                int idx = window->pendingRenameIcon;
+                window->pendingRenameIcon = -1;
+                // Only rename if the icon is still the selected one (no double-click,
+                // no reselection, no folder reload happened in the meantime).
+                if (idx >= 0 && idx == window->selectedIcon && idx < (int)window->icons.size())
+                {
+                    window->StartIconRename(idx);
+                }
                 return 0;
             }
             if (wParam == SCROLL_REPOSITION_TIMER_ID)

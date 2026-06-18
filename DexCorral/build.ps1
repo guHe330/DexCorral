@@ -191,6 +191,12 @@ if ($exitCode -eq 0) {
                 $m = Select-String -Path $versionHeader -Pattern 'DEXCORRAL_VERSION\s+L"([0-9]+\.[0-9]+\.[0-9]+)"' | Select-Object -First 1
                 if ($m) { $setupVersion = $m.Matches[0].Groups[1].Value }
             }
+            # Remove stale setup exes so old version-named files don't linger
+            # in the output folder and get mistaken for the current build.
+            $outputDir = Join-Path $sourceDir "..\installer\innosetup\output"
+            if (Test-Path $outputDir) {
+                Get-ChildItem -Path $outputDir -Filter "DexCorral_*_Setup.exe" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+            }
             if ($setupVersion) {
                 Write-Host "Installer version: $setupVersion" -ForegroundColor Cyan
                 & $iscc "/DMyAppVersion=$setupVersion" $issFile
@@ -199,7 +205,12 @@ if ($exitCode -eq 0) {
                 & $iscc $issFile
             }
             if ($LASTEXITCODE -eq 0) {
-                $setupExe = Join-Path $sourceDir "..\installer\innosetup\output" | Get-ChildItem -Filter "DexCorral_*_Setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+                # Report the exact file we just built rather than an arbitrary match.
+                if ($setupVersion) {
+                    $setupExe = Get-ChildItem -Path $outputDir -Filter "DexCorral_${setupVersion}_Setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+                } else {
+                    $setupExe = Get-ChildItem -Path $outputDir -Filter "DexCorral_*_Setup.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                }
                 if ($setupExe) {
                     Write-Host "Installer:   $($setupExe.FullName)" -ForegroundColor Green
                 }

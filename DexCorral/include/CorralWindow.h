@@ -99,6 +99,8 @@ struct CorralIcon
     bool isSpecialIcon = false; /// True if this is a virtual shell item
     std::wstring clsid;         /// CLSID string for special icons
 
+    bool isFolder = false;      /// True if this entry is a directory (virtual corral navigation)
+
     /// Details view information
     std::wstring fileType;                    /// File type description (e.g., "Text Document")
     ULONGLONG fileSize = 0;                   /// File size in bytes
@@ -153,8 +155,8 @@ public:
     /// Returns title bar height in DPI-scaled pixels
     int GetTitleBarHeight() const { return Dpi(config.TitleBarHeight); }
 
-    /// Returns top Y coordinate of icon area (title bar height + padding)
-    int GetIconAreaTop() const { return Dpi(config.TitleBarHeight + 4); }
+    /// Returns top Y coordinate of icon area (title bar + optional details header)
+    int GetIconAreaTop() const { return Dpi(config.TitleBarHeight + 4) + GetDetailsHeaderHeight(); }
 
     /// Recalculates icon layout based on window size and view mode
     void RecalculateLayout();
@@ -199,11 +201,35 @@ public:
     /// Returns true if the corral is hidden (or fading out) due to quick-hide
     bool IsQuickHidden() const { return isQuickHidden; }
 
+public:
+    /// Column geometry for the details view (absolute client x range + label)
+    struct DetailsColumn
+    {
+        int left;
+        int right;
+        const wchar_t *label;
+    };
+
 private:
     // Virtual corral support
     void LoadVirtualFolderIcons();  // Load icons from virtual folder path
     void InitializeFolderWatcher(); // Set up folder change monitoring
     void OnFolderContentsChanged(); // Called when virtual folder contents change
+
+    // Virtual corral navigation (inline sub-folder browsing)
+    std::wstring GetVirtualCurrentPath() const;          // Root path joined with CurrentSubPath
+    void NavigateToSubfolder(const std::wstring &folder); // Descend into a sub-folder
+    void NavigateUp();                                    // Go up one level (clamped to root)
+    bool IsNavBackVisible() const;                        // True when navigated below root
+    RECT GetNavBackButtonRect() const;                   // Up-button rect in title bar (empty if hidden)
+    int GetTitleBarContentLeft() const;                  // Left strip reserved for the up button
+
+    // Details-view header / columns / sort
+    int GetDetailsHeaderHeight() const;                  // Header band height (0 if not shown)
+    std::vector<DetailsColumn> GetDetailsColumns() const; // Absolute column x ranges
+    void SortVirtualIcons();                             // Sort icons per DetailsSortColumn/Ascending
+    int HitTestDetailsHeader(int x, int y) const;        // Column index under header click, or -1
+    int HitTestColumnGrip(int x, int y) const;           // Column index whose right grip is hit, or -1
 
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     void OnPaint();
@@ -294,6 +320,11 @@ private:
     void DoResize(int x, int y);
     void EndResize();
 
+    // Details-view column resize
+    void StartColumnResize(int columnIndex, int x);
+    void DoColumnResize(int x);
+    void EndColumnResize();
+
     static std::wstring GetDesktopPath();
     static std::wstring GetPublicDesktopPath();
     static int GetDesktopIconSize();                          // Read from registry (logical pixels)
@@ -337,8 +368,12 @@ private:
     static const int ICON_SIZE_SMALL = 32;
     static const int ICON_SIZE_MEDIUM = 48;
     static const int ICON_SIZE_LARGE = 64;
-    static const int ICON_SIZE_DETAILS = 16;  // Small icon for details/list view
-    static const int DETAILS_ROW_HEIGHT = 20; // Height of each row in details view
+    static const int ICON_SIZE_DETAILS = 16;     // Small icon for details/list view
+    static const int DETAILS_ROW_HEIGHT = 20;    // Height of each row in details view
+    static const int DETAILS_HEADER_HEIGHT = 22; // Height of the column header band
+    static const int DETAILS_SYNC_WIDTH = 28;    // Fixed trailing width for the sync indicator
+    static const int DETAILS_MIN_COL_WIDTH = 40; // Minimum width a column can be resized to
+    static const int COLUMN_GRIP_TOLERANCE = 4;  // Half-width (px) of a column resize grip
 
     // Roll-up state
     double savedHeight = 200; // Height before roll-up
@@ -407,10 +442,23 @@ private:
     HFONT hEditFont = nullptr;
     std::wstring originalName;
 
+    // Deferred (slow-click) rename: clicking the label of an already-selected icon
+    // schedules a rename after the double-click time; a double-click cancels it and opens.
+    int pendingRenameIcon = -1;
+    static const UINT_PTR RENAME_TIMER_ID = 6;
+
     // Virtual corral support
     std::unique_ptr<FolderWatcher> folderWatcher;
+    std::unique_ptr<FolderWatcher> parentWatcher; // Watches parent dir to catch rename/delete of current folder
+    bool virtualFolderMissing = false;            // Root folder unavailable (deleted/renamed/moved)
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
+
+    // Details-view column resize state
+    bool isResizingColumn = false;
+    int resizeColumnIndex = -1;
+    int resizeColStartX = 0;
+    int resizeColStartWidth = 0;
 
     // Scroll-triggered icon repositioning
     static const UINT_PTR SCROLL_REPOSITION_TIMER_ID = 4;

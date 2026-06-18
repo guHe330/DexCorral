@@ -130,6 +130,15 @@ public:
     /// Creates a new virtual (non-file) corral at the specified screen coordinates
     void CreateVirtualCorralAt(POINT pt);
 
+    /**
+     * Finds a center point for a new corral of the given size that does not
+     * overlap any existing corral. Tiles from the top-right corner of the
+     * primary monitor's work area, walking columns right-to-left and rows
+     * top-to-bottom. Falls back to a cascade from the top-right corner if no
+     * free tile exists.
+     */
+    POINT FindFreeCorralPosition(int width, int height);
+
     /// Returns pointer to monitor manager (tracks display configuration)
     MonitorManager *GetMonitorManager() { return monitorManager.get(); }
 

@@ -42,8 +42,8 @@ TEST(AppConfig, Defaults) {
     EXPECT_EQ(c.DefaultIconOpacity, 210);
     EXPECT_EQ(c.DefaultIconTintColor, "#0000FF");
     EXPECT_EQ(c.DefaultIconTintStrength, 28);
-    EXPECT_EQ(c.DefaultIconSpacingXPercent, 91);
-    EXPECT_EQ(c.DefaultIconSpacingYPercent, 85);
+    EXPECT_EQ(c.DefaultIconSpacingXPercent, 100);
+    EXPECT_EQ(c.DefaultIconSpacingYPercent, 100);
     EXPECT_TRUE(c.Corrals.empty());
 }
 
@@ -75,6 +75,10 @@ TEST(CorralTabConfig, Defaults) {
     EXPECT_FALSE(c.IsCatchAll);
     EXPECT_FALSE(c.IsVirtual);
     EXPECT_TRUE(c.VirtualFolderPath.empty());
+    EXPECT_TRUE(c.CurrentSubPath.empty());
+    EXPECT_TRUE(c.DetailsColumnWidths.empty());
+    EXPECT_EQ(c.DetailsSortColumn, 0);
+    EXPECT_TRUE(c.DetailsSortAscending);
     // Header font is per-tab
     EXPECT_EQ(c.HeaderFontName, "Segoe UI");
     EXPECT_EQ(c.HeaderFontSize, 10);
@@ -94,6 +98,10 @@ TEST(CorralTabConfig, RoundTrip) {
     orig.IsCatchAll = true;
     orig.IsVirtual = true;
     orig.VirtualFolderPath = "C:/Users/test/Documents";
+    orig.CurrentSubPath = "Projects\\2026";
+    orig.DetailsColumnWidths = { 180, 90, 70, 110 };
+    orig.DetailsSortColumn = 2;
+    orig.DetailsSortAscending = false;
 
     auto j = toJson(orig);
     auto back = j.get<CorralTabConfig>();
@@ -105,6 +113,20 @@ TEST(CorralTabConfig, RoundTrip) {
     EXPECT_TRUE(back.IsCatchAll);
     EXPECT_TRUE(back.IsVirtual);
     EXPECT_EQ(back.VirtualFolderPath, orig.VirtualFolderPath);
+    EXPECT_EQ(back.CurrentSubPath, orig.CurrentSubPath);
+    EXPECT_EQ(back.DetailsColumnWidths, orig.DetailsColumnWidths);
+    EXPECT_EQ(back.DetailsSortColumn, 2);
+    EXPECT_FALSE(back.DetailsSortAscending);
+}
+
+TEST(MissingField, TabSortFields_GetDefaults) {
+    // Old config predating the details sort/column feature
+    nlohmann::json j = R"({"Title":"T","IsVirtual":true})"_json;
+    auto tab = j.get<CorralTabConfig>();
+    EXPECT_TRUE(tab.CurrentSubPath.empty());
+    EXPECT_TRUE(tab.DetailsColumnWidths.empty());
+    EXPECT_EQ(tab.DetailsSortColumn, 0);
+    EXPECT_TRUE(tab.DetailsSortAscending);
 }
 
 TEST(CorralWindowConfig, RoundTrip) {

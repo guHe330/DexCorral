@@ -6,7 +6,7 @@ Corrals can also act as virtual folders — point one at a directory and its con
 
 > **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team, just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
 
-> **Privacy & Trust.** DexCorral is ad-free, collects no telemetry or user data, and never communicates with any server. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. That's it — nothing leaves your machine.
+> **Privacy & Trust.** DexCorral is ad-free and collects no telemetry or user data. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. The only network access is the **optional update check** (off by default): when you enable it, DexCorral asks GitHub for the latest published version number and nothing else — no personal data is ever sent, and it never downloads or installs anything on its own.
 
 > **Alpha** — This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorralCpp/issues).
 

@@ -185,7 +185,7 @@ begin
 
     // Copy the InnoSetup log to the DexCorral AppData folder for easy access
     Log('Step 4: Copying setup log to AppData...');
-    if FileCopy(ExpandConstant('{log}'),
+    if CopyFile(ExpandConstant('{log}'),
                 ExpandConstant('{userappdata}\DexCorral\install.log'), False) then
       Log('Step 4: Setup log copied to ' + ExpandConstant('{userappdata}\DexCorral\install.log'))
     else

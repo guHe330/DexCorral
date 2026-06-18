@@ -284,9 +284,103 @@ void CorralWindow::UpdateLayeredContent()
                         break;
                     }
                 }
-                pixels[y * w + x] = (tabIndex >= 0) ? tabPixels[tabIndex] : 0;
+                if (tabIndex >= 0)
+                    pixels[y * w + x] = tabPixels[tabIndex];
+                else if (x < GetTitleBarContentLeft())
+                    pixels[y * w + x] = bgPixel; // nav-button strip keeps the base background
+                else
+                    pixels[y * w + x] = 0;
             }
         }
+    }
+
+    // ---- Virtual corral: nav "up" button, details column header, unavailable message ----
+    if (IsNavBackVisible() || GetDetailsHeaderHeight() > 0 || virtualFolderMissing)
+    {
+        HTHEME hHdrTheme = OpenThemeData(hwnd, L"TextStyle");
+        auto drawHeaderText = [&](const wchar_t *text, int len, DWORD flags, RECT r, COLORREF color)
+        {
+            if (!hHdrTheme)
+                return;
+            DTTOPTS o = {};
+            o.dwSize = sizeof(o);
+            o.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
+            o.crText = RGB(0, 0, 0);
+            o.iGlowSize = 6;
+            RECT sr = r;
+            OffsetRect(&sr, 1, 1);
+            DrawThemeTextEx(hHdrTheme, memDC, 0, 0, text, len, flags, &sr, &o);
+            o.crText = color;
+            o.iGlowSize = 3;
+            DrawThemeTextEx(hHdrTheme, memDC, 0, 0, text, len, flags, &r, &o);
+        };
+
+        // Glyphs (declared via codepoints; the source is not compiled as UTF-8)
+        static const wchar_t kUpArrow[] = {0x2191, 0};   // up arrow (nav up)
+        static const wchar_t kSortAsc[] = {0x25B2, 0};   // black up triangle
+        static const wchar_t kSortDesc[] = {0x25BC, 0};  // black down triangle
+
+        // Nav "up" button (folder-up arrow) — only when navigated below the root
+        if (IsNavBackVisible())
+        {
+            RECT nb = GetNavBackButtonRect();
+            drawHeaderText(kUpArrow, 1, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                           nb, RGB(255, 255, 255));
+        }
+
+        // Details column header band
+        int headerH = GetDetailsHeaderHeight();
+        if (headerH > 0 && (!config.IsRolledUp || isHoverExpanded))
+        {
+            int headerTop = GetTitleBarHeight(); // flush under the title bar (no gap)
+            int headerBottom = headerTop + headerH;
+
+            // Band background (semi-opaque dark, premultiplied)
+            const BYTE hdrA = 200, hdrPm = (BYTE)((40 * 200) / 255);
+            DWORD hdrBg = (hdrA << 24) | (hdrPm << 16) | (hdrPm << 8) | hdrPm;
+            for (int y = headerTop; y < headerBottom && y < h; y++)
+                if (y >= 0)
+                    for (int x = 0; x < w; x++)
+                        pixels[y * w + x] = hdrBg;
+
+            auto cols = GetDetailsColumns();
+            int sortCol = GetActiveTab().DetailsSortColumn;
+            bool asc = GetActiveTab().DetailsSortAscending;
+            DWORD sep = (160 << 24) | (50 << 16) | (50 << 8) | 50;
+            for (int i = 0; i < (int)cols.size(); i++)
+            {
+                RECT lr = {cols[i].left, headerTop, cols[i].right - Dpi(6), headerBottom};
+                if (lr.right > lr.left)
+                    drawHeaderText(cols[i].label, -1,
+                                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
+                                   lr, RGB(230, 230, 230));
+                if (i == sortCol)
+                {
+                    RECT gr = {cols[i].left, headerTop, cols[i].right - Dpi(2), headerBottom};
+                    drawHeaderText(asc ? kSortAsc : kSortDesc, 1,
+                                   DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                                   gr, RGB(180, 200, 255));
+                }
+                // Column separator at the right edge
+                int sx = cols[i].right;
+                for (int y = headerTop + 2; y < headerBottom - 2 && y < h; y++)
+                    if (sx >= 0 && sx < w && y >= 0)
+                        pixels[y * w + sx] = sep;
+            }
+        }
+
+        // "Folder unavailable" message when the linked root is gone
+        if (virtualFolderMissing && (!config.IsRolledUp || isHoverExpanded))
+        {
+            RECT mr = {Dpi(12), GetIconAreaTop() + Dpi(8), w - Dpi(12), h - Dpi(8)};
+            if (mr.bottom > mr.top)
+                drawHeaderText(L"Folder unavailable\nRight-click to relink", -1,
+                               DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOPREFIX,
+                               mr, RGB(255, 210, 210));
+        }
+
+        if (hHdrTheme)
+            CloseThemeData(hHdrTheme);
     }
 
     // Draw icons (skip when rolled up, but show when hover-expanded)
@@ -369,6 +463,9 @@ void CorralWindow::UpdateLayeredContent()
         SelectClipRgn(memDC, clipRegion);
 
         bool isDetailsView = (GetActiveTab().GetViewMode() == ViewMode::Details);
+        std::vector<DetailsColumn> detailCols;
+        if (isDetailsView)
+            detailCols = GetDetailsColumns();
 
         // Open theme once for all text rendering (two-pass: shadow + foreground)
         HTHEME hTextTheme = OpenThemeData(hwnd, L"TextStyle");
@@ -650,14 +747,13 @@ void CorralWindow::UpdateLayeredContent()
                     }
                 }
 
-                // Column layout for details view
-                // Columns: Name (40%) | Type (20%) | Size (15%) | Date (15%) | Sync (10%)
-                int contentWidth = icon.rect.right - icon.rect.left - Dpi(ICON_SIZE_DETAILS) - Dpi(8);
-                int nameCol = icon.iconRect.left + Dpi(ICON_SIZE_DETAILS) + Dpi(4);
-                int typeCol = nameCol + (int)(contentWidth * 0.40);
-                int sizeCol = typeCol + (int)(contentWidth * 0.20);
-                int dateCol = sizeCol + (int)(contentWidth * 0.15);
-                int syncCol = dateCol + (int)(contentWidth * 0.15);
+                // Column layout for details view — single source of truth (resizable widths)
+                // Columns: Name | Type | Size | Date | Sync (fixed trailing indicator)
+                int nameCol = detailCols[0].left;
+                int typeCol = detailCols[1].left;
+                int sizeCol = detailCols[2].left;
+                int dateCol = detailCols[3].left;
+                int syncCol = detailCols[3].right;
 
                 // Draw detail columns (DrawThemeTextEx ignores clip regions, so guard visibility)
                 if (drawTop >= visibleTop && drawBottom <= visibleBottom)

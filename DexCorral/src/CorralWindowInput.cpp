@@ -390,6 +390,64 @@ void CorralWindow::EndResize()
 }
 
 // ============================================================================
+// Details-view column resize
+// ============================================================================
+
+void CorralWindow::StartColumnResize(int columnIndex, int x)
+{
+    auto cols = GetDetailsColumns();
+    if (columnIndex < 0 || columnIndex >= (int)cols.size())
+        return;
+    isResizingColumn = true;
+    resizeColumnIndex = columnIndex;
+    resizeColStartX = x;
+    resizeColStartWidth = cols[columnIndex].right - cols[columnIndex].left; // device px
+    SetCapture(hwnd);
+}
+
+void CorralWindow::DoColumnResize(int x)
+{
+    if (!isResizingColumn)
+        return;
+
+    CorralTabConfig &tab = GetActiveTab();
+
+    int dpi = (s_enableDpiScaling && hwnd) ? (int)GetDpiForWindow(hwnd) : 96;
+    if (dpi <= 0)
+        dpi = 96;
+
+    // Seed all four widths (logical px) from current geometry on first adjustment.
+    if ((int)tab.DetailsColumnWidths.size() < 4)
+    {
+        auto cols = GetDetailsColumns();
+        tab.DetailsColumnWidths.assign(4, DETAILS_MIN_COL_WIDTH);
+        for (int i = 0; i < 4 && i < (int)cols.size(); i++)
+            tab.DetailsColumnWidths[i] = MulDiv(cols[i].right - cols[i].left, 96, dpi);
+    }
+
+    int newDevWidth = resizeColStartWidth + (x - resizeColStartX);
+    int newLogical = MulDiv(newDevWidth, 96, dpi);
+    if (newLogical < DETAILS_MIN_COL_WIDTH)
+        newLogical = DETAILS_MIN_COL_WIDTH;
+
+    tab.DetailsColumnWidths[resizeColumnIndex] = newLogical;
+    CalculateIconLayout();
+    UpdateLayeredContent();
+}
+
+void CorralWindow::EndColumnResize()
+{
+    if (!isResizingColumn)
+        return;
+    isResizingColumn = false;
+    resizeColumnIndex = -1;
+    ReleaseCapture();
+    SyncConfigFromWindow();
+    if (App::GetInstance())
+        App::GetInstance()->SaveConfig();
+}
+
+// ============================================================================
 // Snap support
 // ============================================================================
 
@@ -716,6 +774,13 @@ void CorralWindow::ApplyResizeSnap(int &newLeft, int &newTop, int &newWidth, int
 
 void CorralWindow::OnLeftButtonDown(int x, int y)
 {
+    // A fresh click cancels any pending (deferred) rename.
+    if (pendingRenameIcon >= 0)
+    {
+        KillTimer(hwnd, RENAME_TIMER_ID);
+        pendingRenameIcon = -1;
+    }
+
     // Check resize area first (but not when rolled up)
     if (!config.IsRolledUp)
     {
@@ -725,6 +790,45 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
             StartResize(resizeHit, x, y);
             return;
         }
+    }
+
+    // Nav "up" button (virtual corral navigated below root)
+    if (IsNavBackVisible())
+    {
+        RECT nb = GetNavBackButtonRect();
+        POINT p = {x, y};
+        if (PtInRect(&nb, p))
+        {
+            NavigateUp();
+            return;
+        }
+    }
+
+    // Details header: column resize grip takes priority over a sort click
+    int grip = HitTestColumnGrip(x, y);
+    if (grip >= 0)
+    {
+        StartColumnResize(grip, x);
+        return;
+    }
+    int sortCol = HitTestDetailsHeader(x, y);
+    if (sortCol >= 0)
+    {
+        CorralTabConfig &tab = GetActiveTab();
+        if (tab.DetailsSortColumn == sortCol)
+            tab.DetailsSortAscending = !tab.DetailsSortAscending;
+        else
+        {
+            tab.DetailsSortColumn = sortCol;
+            tab.DetailsSortAscending = true;
+        }
+        SortVirtualIcons();
+        CalculateIconLayout();
+        UpdateLayeredContent();
+        SyncConfigFromWindow();
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+        return;
     }
 
     // Check if clicked on scrollbar
@@ -818,11 +922,13 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
     int hit = HitTestIcon(x, y);
     if (hit >= 0)
     {
-        // Check if we clicked on the label of an already-selected icon
+        // Clicked on the label of an already-selected icon: defer the rename by the
+        // system double-click time. If a double-click (open) follows, it cancels this
+        // and opens instead — so click-to-select-then-double-click won't rename.
         if (hit == selectedIcon && HitTestIconLabel(x, y, hit))
         {
-            // Clicked on label of selected icon - start rename
-            StartIconRename(hit);
+            pendingRenameIcon = hit;
+            SetTimer(hwnd, RENAME_TIMER_ID, GetDoubleClickTime(), nullptr);
             return;
         }
 
@@ -861,6 +967,13 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
 
 void CorralWindow::OnLeftButtonDblClick(int x, int y)
 {
+    // A double-click cancels any pending (deferred) rename — the user wants to open.
+    if (pendingRenameIcon >= 0)
+    {
+        KillTimer(hwnd, RENAME_TIMER_ID);
+        pendingRenameIcon = -1;
+    }
+
     // Double-click on title bar toggles roll-up
     if (y < GetTitleBarHeight())
     {
@@ -871,13 +984,30 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
     int hit = HitTestIcon(x, y);
     if (hit >= 0)
     {
+        // Virtual corral: double-clicking a sub-folder navigates into it inline.
+        if (GetActiveTab().IsVirtual && icons[hit].isFolder)
+        {
+            // Guard against a folder that was deleted/renamed since the last load.
+            DWORD attrs = GetFileAttributesW(icons[hit].fullPath.c_str());
+            if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+            {
+                LoadFiles();
+                return;
+            }
+            NavigateToSubfolder(icons[hit].wFileName);
+            return;
+        }
         OpenFile(hit);
     }
 }
 
 void CorralWindow::OnLeftButtonUp(int x, int y)
 {
-    if (isResizing)
+    if (isResizingColumn)
+    {
+        EndColumnResize();
+    }
+    else if (isResizing)
     {
         EndResize();
     }
@@ -988,6 +1118,14 @@ void CorralWindow::OpenFile(int iconIndex)
             ShellExecuteExW(&sei);
             CoTaskMemFree(pidl);
         }
+        return;
+    }
+
+    // Virtual corral entries may have been deleted/renamed since the last load —
+    // reload instead of shell-executing a stale path.
+    if (GetActiveTab().IsVirtual && GetFileAttributesW(icon.fullPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+    {
+        LoadFiles();
         return;
     }
 

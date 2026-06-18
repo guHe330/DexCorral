@@ -36,6 +36,13 @@
 
 ### What's New
 
+- The catch-all corral can now be turned off completely — right-click a catch-all tab and choose "Catch-All" again to disable it. As before, only one corral can be catch-all at a time; now you can also choose to have none, in which case new desktop files are left where they land until you re-enable a catch-all
+- Virtual corrals can now be browsed like a mini Explorer (Details view): double-click a sub-folder to open it inline, and use the "up" button in the title bar to go back (it appears only once you've gone below the linked folder). Where you navigated is remembered between restarts
+- Details view now has clickable column headers (Name, Type, Size, Date modified) — click to sort, click again to reverse; folders always come first. You can also pick the sort from the right-click "Sort By" menu, and the choice is remembered
+- Details columns are resizable — drag the lines between headers; widths are remembered per tab
+- If a virtual corral's folder (or a sub-folder you're in) gets renamed, moved, or deleted, the corral steps back up to the nearest existing folder instead of breaking — or shows "Folder unavailable, right-click to relink" if the whole folder is gone
+- New corrals (desktop context menu and tray menu, file and virtual) now open in free space starting from the top-right corner instead of overlapping existing corrals
+- New corrals now default to 100% horizontal and vertical icon spacing
 - Optional update check (off by default): turn on "Check for Updates Automatically" in the tray menu and DexCorral will let you know via a tray notification when a new version is available (click it to open the download page); "Check for Updates Now" checks on demand. No automatic downloads
 - Quick-hide: double-click an empty spot on the desktop to hide everything — native icons and all corrals (with a fade) — and double-click again to bring it all back. Per-corral "Exclude from Quick-Hide" keeps chosen corrals visible; also available as "Quick-Hide Everything" in the tray menu
 - Desktop sorting is now owned by DexCorral: "Sort by" never moves corral-owned icons and no longer leaves empty grid slots where hidden icons used to be

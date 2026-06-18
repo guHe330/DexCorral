@@ -154,6 +154,22 @@ void CorralWindow::ShowContextMenu(int x, int y)
     AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::Details ? MF_CHECKED : 0), 13, L"Details");
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)viewMenu, L"View");
 
+    // Sort By submenu — virtual corrals in Details view (Explorer-style)
+    if (GetActiveTab().IsVirtual && currentMode == ViewMode::Details)
+    {
+        int sortCol = GetActiveTab().DetailsSortColumn;
+        bool asc = GetActiveTab().DetailsSortAscending;
+        HMENU sortMenu = CreatePopupMenu();
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 0 ? MF_CHECKED : 0), 60, L"Name");
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 1 ? MF_CHECKED : 0), 61, L"Type");
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 2 ? MF_CHECKED : 0), 62, L"Size");
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 3 ? MF_CHECKED : 0), 63, L"Date modified");
+        AppendMenuW(sortMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(sortMenu, MF_STRING | (asc ? MF_CHECKED : 0), 64, L"Ascending");
+        AppendMenuW(sortMenu, MF_STRING | (!asc ? MF_CHECKED : 0), 65, L"Descending");
+        AppendMenuW(menu, MF_POPUP, (UINT_PTR)sortMenu, L"Sort By");
+    }
+
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
     // Catch-all option - only for non-virtual tabs
@@ -343,6 +359,28 @@ void CorralWindow::ShowContextMenu(int x, int y)
     case 14:
         DetachTab(config.ActiveTabIndex);
         break;
+    case 60:
+    case 61:
+    case 62:
+    case 63:
+        // Sort By column
+        GetActiveTab().DetailsSortColumn = cmd - 60;
+        SortVirtualIcons();
+        CalculateIconLayout();
+        UpdateLayeredContent();
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+        break;
+    case 64:
+    case 65:
+        // Sort direction (64 = Ascending, 65 = Descending)
+        GetActiveTab().DetailsSortAscending = (cmd == 64);
+        SortVirtualIcons();
+        CalculateIconLayout();
+        UpdateLayeredContent();
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+        break;
     default:
         // Handle special icon additions (IDs 20-39)
         if (cmd >= 20 && cmd < 40)
@@ -481,8 +519,10 @@ void CorralWindow::ToggleCatchAll()
 
     if (GetActiveTab().IsCatchAll)
     {
-        // Already catch-all - can't unset (must always have one)
-        // Just ignore or could show a message
+        // Already catch-all - toggle it off (catch-all can be disabled entirely)
+        GetActiveTab().IsCatchAll = false;
+        UpdateLayeredContent(); // Remove symbol
+        app->SaveConfig();
         return;
     }
 
@@ -530,8 +570,9 @@ void CorralWindow::ChangeFolderPath()
         folderWatcher.reset();
     }
 
-    // Update active tab config
+    // Update active tab config — new root resets any in-folder navigation
     GetActiveTab().VirtualFolderPath = WideToUtf8(newPath);
+    GetActiveTab().CurrentSubPath.clear();
 
     // Update title to folder name
     size_t lastSlash = newPath.find_last_of(L"\\/");

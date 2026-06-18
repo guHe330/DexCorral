@@ -29,6 +29,7 @@
  */
 
 #include "CorralWindow.h"
+#include "App.h"
 #include "Constants.h"
 #include "FolderWatcher.h"
 #include "IconUtils.h"
@@ -494,14 +495,52 @@ void CorralWindow::LoadIconImages()
     }
 }
 
+// True if path exists and is a directory.
+static bool IsExistingDirectory(const std::wstring &p)
+{
+    if (p.empty())
+        return false;
+    DWORD a = GetFileAttributesW(p.c_str());
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY);
+}
+
 void CorralWindow::LoadVirtualFolderIcons()
 {
     ClearIcons();
+    virtualFolderMissing = false;
 
-    if (GetActiveTab().VirtualFolderPath.empty())
+    CorralTabConfig &tab = GetActiveTab();
+    if (tab.VirtualFolderPath.empty())
         return;
 
-    std::wstring folderPath = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+    // Root folder gone (deleted/renamed/moved): show the unavailable state.
+    if (!IsExistingDirectory(Utf8ToWide(tab.VirtualFolderPath)))
+    {
+        virtualFolderMissing = true;
+        return;
+    }
+
+    // Current sub-folder gone: auto-navigate up to the nearest existing ancestor.
+    std::string origSub = tab.CurrentSubPath;
+    while (!tab.CurrentSubPath.empty() && !IsExistingDirectory(GetVirtualCurrentPath()))
+    {
+        std::string sub = tab.CurrentSubPath;
+        while (!sub.empty() && (sub.back() == '\\' || sub.back() == '/'))
+            sub.pop_back();
+        size_t slash = sub.find_last_of("\\/");
+        tab.CurrentSubPath = (slash == std::string::npos) ? std::string() : sub.substr(0, slash);
+    }
+    if (tab.CurrentSubPath != origSub)
+    {
+        // Path changed under us: re-point the folder watchers and persist.
+        InitializeFolderWatcher();
+        scrollPosition = 0;
+        selectedIcon = -1;
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+    }
+
+    std::wstring folderPath = GetVirtualCurrentPath();
 
     // Enumerate folder contents
     WIN32_FIND_DATAW findData;
@@ -533,6 +572,7 @@ void CorralWindow::LoadVirtualFolderIcons()
         ci.wFileName = findData.cFileName;
         ci.fileName = WideToUtf8(ci.wFileName);
         ci.fullPath = folderPath + L"\\" + ci.wFileName;
+        ci.isFolder = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
         // for known file types" and strips .lnk
@@ -592,6 +632,150 @@ void CorralWindow::LoadVirtualFolderIcons()
     } while (FindNextFileW(hFind, &findData));
 
     FindClose(hFind);
+
+    SortVirtualIcons();
+}
+
+// ============================================================================
+// Details-view sorting (virtual corrals)
+// ============================================================================
+
+void CorralWindow::SortVirtualIcons()
+{
+    const CorralTabConfig &tab = GetActiveTab();
+    int col = tab.DetailsSortColumn;
+    bool asc = tab.DetailsSortAscending;
+
+    std::stable_sort(icons.begin(), icons.end(),
+                     [col, asc](const CorralIcon &a, const CorralIcon &b)
+                     {
+                         // Folders always come before files, regardless of direction.
+                         if (a.isFolder != b.isFolder)
+                             return a.isFolder;
+
+                         int cmp = 0;
+                         switch (col)
+                         {
+                         case 1: // Type
+                             cmp = lstrcmpiW(a.fileType.c_str(), b.fileType.c_str());
+                             break;
+                         case 2: // Size
+                             cmp = (a.fileSize < b.fileSize) ? -1 : (a.fileSize > b.fileSize) ? 1
+                                                                                              : 0;
+                             break;
+                         case 3: // Modified date
+                             cmp = CompareFileTime(&a.modifiedTime, &b.modifiedTime);
+                             break;
+                         case 0: // Name
+                         default:
+                             cmp = 0;
+                             break;
+                         }
+
+                         // Tie-break (and primary for Name) by display name, case-insensitive.
+                         if (cmp == 0)
+                             cmp = lstrcmpiW(a.displayName.c_str(), b.displayName.c_str());
+
+                         return asc ? (cmp < 0) : (cmp > 0);
+                     });
+}
+
+// ============================================================================
+// Details-view column geometry
+// ============================================================================
+
+std::vector<CorralWindow::DetailsColumn> CorralWindow::GetDetailsColumns() const
+{
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+    int clientWidth = clientRect.right;
+
+    int leftPadding = Dpi(ICON_PADDING_LEFT);
+    int rightPadding = leftPadding;
+    if (NeedsScrollbar())
+        rightPadding = leftPadding + Dpi(SCROLLBAR_WIDTH) + Dpi(SCROLLBAR_MARGIN) * 2;
+
+    // Name column begins after the row's small icon indent (icon is at leftPadding + 2).
+    int firstLeft = leftPadding + 2 + Dpi(ICON_SIZE_DETAILS) + Dpi(4);
+    int syncWidth = Dpi(DETAILS_SYNC_WIDTH);
+    int available = clientWidth - rightPadding - firstLeft - syncWidth;
+    if (available < Dpi(DETAILS_MIN_COL_WIDTH) * 4)
+        available = Dpi(DETAILS_MIN_COL_WIDTH) * 4;
+
+    // Resolve the 4 resizable widths, seeding from default proportions when unset.
+    const CorralTabConfig &tab = GetActiveTab();
+    int widths[4];
+    if ((int)tab.DetailsColumnWidths.size() >= 4)
+    {
+        for (int i = 0; i < 4; i++)
+            widths[i] = Dpi(tab.DetailsColumnWidths[i] < DETAILS_MIN_COL_WIDTH ? DETAILS_MIN_COL_WIDTH
+                                                                               : tab.DetailsColumnWidths[i]);
+    }
+    else
+    {
+        // Defaults proportional to the prior fixed layout (Name .40, Type .20, Size .15, Date .15
+        // of content; remaining absorbed by Name so the row fills the width).
+        widths[1] = (int)(available * 0.22);
+        widths[2] = (int)(available * 0.16);
+        widths[3] = (int)(available * 0.22);
+        widths[0] = available - widths[1] - widths[2] - widths[3];
+        int minW = Dpi(DETAILS_MIN_COL_WIDTH);
+        for (int i = 0; i < 4; i++)
+            if (widths[i] < minW)
+                widths[i] = minW;
+    }
+
+    static const wchar_t *labels[4] = {L"Name", L"Type", L"Size", L"Date modified"};
+    std::vector<DetailsColumn> cols;
+    cols.reserve(4);
+    int x = firstLeft;
+    for (int i = 0; i < 4; i++)
+    {
+        DetailsColumn c;
+        c.left = x;
+        c.right = x + widths[i];
+        c.label = labels[i];
+        cols.push_back(c);
+        x = c.right;
+    }
+    return cols;
+}
+
+int CorralWindow::HitTestDetailsHeader(int x, int y) const
+{
+    if (GetDetailsHeaderHeight() == 0)
+        return -1;
+    int headerTop = GetTitleBarHeight();
+    int headerBottom = headerTop + GetDetailsHeaderHeight();
+    if (y < headerTop || y >= headerBottom)
+        return -1;
+
+    auto cols = GetDetailsColumns();
+    for (int i = 0; i < (int)cols.size(); i++)
+    {
+        if (x >= cols[i].left && x < cols[i].right)
+            return i;
+    }
+    return -1;
+}
+
+int CorralWindow::HitTestColumnGrip(int x, int y) const
+{
+    if (GetDetailsHeaderHeight() == 0)
+        return -1;
+    int headerTop = GetTitleBarHeight();
+    int headerBottom = headerTop + GetDetailsHeaderHeight();
+    if (y < headerTop || y >= headerBottom)
+        return -1;
+
+    int tol = Dpi(COLUMN_GRIP_TOLERANCE);
+    auto cols = GetDetailsColumns();
+    for (int i = 0; i < (int)cols.size(); i++)
+    {
+        if (x >= cols[i].right - tol && x <= cols[i].right + tol)
+            return i;
+    }
+    return -1;
 }
 
 // ============================================================================
@@ -600,19 +784,42 @@ void CorralWindow::LoadVirtualFolderIcons()
 
 void CorralWindow::InitializeFolderWatcher()
 {
+    folderWatcher.reset();
+    parentWatcher.reset();
+
     if (!GetActiveTab().IsVirtual || GetActiveTab().VirtualFolderPath.empty())
         return;
 
-    folderWatcher = std::make_unique<FolderWatcher>();
-    std::wstring folderPath = Utf8ToWide(GetActiveTab().VirtualFolderPath);
-    folderWatcher->SetPath(folderPath);
-    folderWatcher->SetChangeCallback([this]()
-                                     {
+    auto notify = [this]()
+    {
         // Post message to window to handle on main thread
-        if (hwnd) {
+        if (hwnd)
             PostMessageW(hwnd, WM_FOLDER_CHANGED, 0, 0);
-        } });
+    };
+
+    std::wstring folderPath = GetVirtualCurrentPath();
+
+    // Watch the current folder for content changes.
+    folderWatcher = std::make_unique<FolderWatcher>();
+    folderWatcher->SetPath(folderPath);
+    folderWatcher->SetChangeCallback(notify);
     folderWatcher->Start();
+
+    // Watch the parent folder too: a rename/delete of the current folder itself is
+    // reported to its parent, not to the folder we are viewing.
+    size_t slash = folderPath.find_last_of(L"\\/");
+    if (slash != std::wstring::npos && slash > 0)
+    {
+        std::wstring parentPath = folderPath.substr(0, slash);
+        // Skip degenerate parents like "C:" (drive root has no separate parent dir to watch).
+        if (parentPath.size() > 2)
+        {
+            parentWatcher = std::make_unique<FolderWatcher>();
+            parentWatcher->SetPath(parentPath);
+            parentWatcher->SetChangeCallback(notify);
+            parentWatcher->Start();
+        }
+    }
 }
 
 void CorralWindow::OnFolderContentsChanged()
@@ -744,20 +951,9 @@ RECT CorralWindow::GetIconLabelRect(int iconIndex) const
     // For details view, label is in the name column
     if (GetActiveTab().GetViewMode() == ViewMode::Details)
     {
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-        int clientWidth = rect.right - rect.left;
-        int rightPadding = Dpi(ICON_PADDING_LEFT);
-        if (NeedsScrollbar())
-        {
-            rightPadding = Dpi(ICON_PADDING_LEFT) + Dpi(SCROLLBAR_WIDTH) + Dpi(SCROLLBAR_MARGIN) * 2;
-        }
-        int contentWidth = clientWidth - Dpi(ICON_PADDING_LEFT) - rightPadding;
-
-        int nameCol = icon.iconRect.left + Dpi(ICON_SIZE_DETAILS) + Dpi(4);
-        int typeCol = nameCol + (int)(contentWidth * 0.40);
-
-        return {nameCol, icon.rect.top, typeCol - Dpi(4), icon.rect.bottom};
+        auto cols = GetDetailsColumns();
+        if (!cols.empty())
+            return {cols[0].left, icon.rect.top, cols[0].right - Dpi(4), icon.rect.bottom};
     }
 
     // For icon views, label is below the icon

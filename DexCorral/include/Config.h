@@ -65,6 +65,12 @@ struct CorralTabConfig
     bool IsCatchAll = false;                 /// True if this is the automatic catch-all folder tab
     bool IsVirtual = false;                  /// True if this tab mirrors a local folder
     std::string VirtualFolderPath;           /// UTF-8 path to folder (empty if not virtual)
+    std::string CurrentSubPath;              /// UTF-8 sub-path relative to VirtualFolderPath (empty = at root)
+
+    // Details-view column state (virtual corrals)
+    std::vector<int> DetailsColumnWidths;    /// Logical-px widths for [Name, Type, Size, Date]; empty = seed from defaults
+    int DetailsSortColumn = 0;               /// Sort column: 0=Name, 1=Type, 2=Size, 3=Date
+    bool DetailsSortAscending = true;        /// Sort direction
 
     // Header font appearance (per-tab)
     std::string HeaderFontName = "Segoe UI"; /// Font face for header text
@@ -76,7 +82,7 @@ struct CorralTabConfig
     /// Sets the view mode from enum
     void SetViewMode(ViewMode mode) { ViewModeInt = static_cast<int>(mode); }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, HeaderFontName, HeaderFontSize, HeaderFontColor)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor)
 };
 
 /// Configuration for a single corral window
@@ -121,8 +127,8 @@ struct AppConfig
     int DefaultIconOpacity = 210;
     std::string DefaultIconTintColor = "#0000FF";
     int DefaultIconTintStrength = 28;
-    int DefaultIconSpacingXPercent = 91;
-    int DefaultIconSpacingYPercent = 85;
+    int DefaultIconSpacingXPercent = 100;
+    int DefaultIconSpacingYPercent = 100;
     bool DebugLogging = false;             // Write debug log files (dllmain.log, CorralHook.log, CorralHook_DropTarget.log, CorralDrop.log)
 
     // Update check (opt-in, off by default). Checks the GitHub Releases API at

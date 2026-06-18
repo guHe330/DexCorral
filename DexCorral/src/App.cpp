@@ -245,7 +245,7 @@ void App::Initialize()
         SaveConfig();
     }
 
-    // Ensure exactly one catch-all corral exists
+    // Enforce at most one catch-all corral (catch-all is optional)
     EnsureCatchAllCorral();
 
     // Start desktop monitoring
@@ -1116,11 +1116,7 @@ void App::ShowTrayMenu()
         break;
     case 1:
     {
-        int offsetX = (int)corrals.size() * 30;
-        int offsetY = (int)corrals.size() * 30;
-        POINT centerPt = {
-            GetSystemMetrics(SM_CXSCREEN) / 2 + offsetX,
-            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY};
+        POINT centerPt = FindFreeCorralPosition(300, 200);
         ShowCreationMenu(centerPt);
         break;
     }
@@ -1135,11 +1131,7 @@ void App::ShowTrayMenu()
         break;
     case 5:
     {
-        int offsetX = (int)corrals.size() * 30;
-        int offsetY = (int)corrals.size() * 30;
-        POINT centerPt = {
-            GetSystemMetrics(SM_CXSCREEN) / 2 + offsetX,
-            GetSystemMetrics(SM_CYSCREEN) / 2 + offsetY};
+        POINT centerPt = FindFreeCorralPosition(300, 200);
         CreateVirtualCorralAt(centerPt);
         break;
     }
@@ -1237,6 +1229,57 @@ void App::CreateCorral(POINT pt)
 void App::CreateCorralAt(POINT pt)
 {
     CreateCorral(pt);
+}
+
+POINT App::FindFreeCorralPosition(int width, int height)
+{
+    // Work area of the primary monitor (excludes the taskbar)
+    RECT work;
+    if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0))
+    {
+        work.left = 0;
+        work.top = 0;
+        work.right = GetSystemMetrics(SM_CXSCREEN);
+        work.bottom = GetSystemMetrics(SM_CYSCREEN);
+    }
+
+    const int margin = 16; // gap from screen edges and between corrals
+
+    // Existing corral rects in screen coordinates
+    std::vector<RECT> existing;
+    for (const auto &corral : corrals)
+    {
+        RECT r;
+        if (corral && GetWindowRect(corral->GetHWND(), &r))
+            existing.push_back(r);
+    }
+
+    // Tile from the top-right corner: columns right-to-left, rows top-to-bottom
+    for (int left = work.right - margin - width; left >= work.left + margin; left -= (width + margin))
+    {
+        for (int top = work.top + margin; top + height <= work.bottom - margin; top += (height + margin))
+        {
+            RECT candidate = {left, top, left + width, top + height};
+            bool overlaps = false;
+            for (const auto &r : existing)
+            {
+                RECT tmp;
+                if (IntersectRect(&tmp, &candidate, &r))
+                {
+                    overlaps = true;
+                    break;
+                }
+            }
+            if (!overlaps)
+                return {left + width / 2, top + height / 2};
+        }
+    }
+
+    // No free tile available — cascade from the top-right corner
+    int offset = (int)corrals.size() * 30;
+    int left = work.right - margin - width - offset;
+    int top = work.top + margin + offset;
+    return {left + width / 2, top + height / 2};
 }
 
 void App::CreateVirtualCorralAt(POINT pt)
@@ -1630,26 +1673,8 @@ void App::EnsureCatchAllCorral()
         }
     }
 
-    // If no catch-all exists, make the first non-virtual corral catch-all
-    if (!foundCatchAll && !corrals.empty())
-    {
-        for (auto &corral : corrals)
-        {
-            bool found = false;
-            for (auto &tab : corral->GetConfig().Tabs)
-            {
-                if (!tab.IsVirtual)
-                {
-                    tab.IsCatchAll = true;
-                    corral->RecalculateLayout();
-                    found = true;
-                    break;
-                }
-            }
-            if (found)
-                break;
-        }
-    }
+    // Catch-all is optional: if none exists, leave it disabled. New desktop
+    // files simply won't be auto-collected until the user enables a catch-all.
 }
 
 CorralWindow *App::GetCatchAllCorral()
