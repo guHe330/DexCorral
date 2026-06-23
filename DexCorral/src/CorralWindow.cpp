@@ -148,6 +148,23 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     dropTarget = new CorralDropTarget(this);
     RegisterDragDrop(hwnd, dropTarget);
 
+    // initialHeight above was computed before the window existed, so
+    // GetTitleBarHeight() could not apply per-monitor DPI scaling (Dpi() returns
+    // the logical value when hwnd is null). Now that the window exists and is
+    // associated with its monitor, re-apply the correctly scaled rolled-up height
+    // so a freshly created minimized corral isn't clipped on high-DPI displays.
+    if (config.IsRolledUp)
+    {
+        int rolledHeight = GetTitleBarHeight();
+        RECT r;
+        GetWindowRect(hwnd, &r);
+        if ((r.bottom - r.top) != rolledHeight)
+        {
+            SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, rolledHeight,
+                         SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+
     // Sync config from actual window position/size (in case Windows adjusted it)
     SyncConfigFromWindow();
 
@@ -526,13 +543,23 @@ void CorralWindow::DetachTab(int tabIndex)
     scrollPosition = 0;
     LoadFiles();
 
-    // Create new window for the detached tab
+    // Create new window for the detached tab. Start from a +30 cascade off the
+    // source's top-left, then ask App for the nearest free spot that fits on the
+    // monitor and doesn't overlap any corral — including the source window, so
+    // the detached tab is moved fully clear of the corral it came from rather
+    // than landing on top of (or behind) it. CreateCorral treats pt as the
+    // *center* of the new window; the helper returns a center point, so it can
+    // be passed straight through.
     RECT rect;
     GetWindowRect(hwnd, &rect);
-    POINT pt = {rect.left + 30, rect.top + 30};
+    const int kNewWidth = 300;
+    const int kNewHeight = 200;
+    POINT desiredTopLeft = {rect.left + 30, rect.top + 30};
 
     if (App::GetInstance())
     {
+        POINT pt = App::GetInstance()->FindNearestFreeCorralPosition(
+            desiredTopLeft, kNewWidth, kNewHeight, nullptr);
         App::GetInstance()->CreateCorralAt(pt);
 
         // Get the new corral and replace its default tab with our detached tab
@@ -556,6 +583,29 @@ void CorralWindow::MergeWith(CorralWindow *other)
     if (!other || other == this)
         return;
 
+    // This (the dragged window) is the survivor, but the user dropped it onto
+    // `other` — the drop target. Adopt the target's position and size so merging
+    // a small corral into a larger one keeps the larger geometry instead of
+    // shrinking the result to the dragged window's size. (Skip if the target is
+    // rolled up, where its rect is only a title bar.)
+    if (!other->GetConfig().IsRolledUp)
+    {
+        RECT otherRect;
+        if (GetWindowRect(other->GetHWND(), &otherRect))
+        {
+            config.Left = otherRect.left;
+            config.Top = otherRect.top;
+            config.Width = otherRect.right - otherRect.left;
+            config.Height = otherRect.bottom - otherRect.top;
+            savedHeight = config.Height; // keep roll-up restore height in sync
+            SetWindowPos(hwnd, nullptr,
+                         (int)config.Left, (int)config.Top,
+                         (int)config.Width, (int)config.Height,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+            RecalculateLayout();
+        }
+    }
+
     // Copy all tabs from other to this
     for (const auto &tab : other->GetConfig().Tabs)
     {
@@ -570,6 +620,10 @@ void CorralWindow::MergeWith(CorralWindow *other)
     {
         App::GetInstance()->RemoveCorral(&other->GetConfig());
     }
+
+    // Repaint at the adopted geometry (SetActiveTab only reloads when the active
+    // index actually changes, so refresh explicitly).
+    UpdateLayeredContent();
 }
 
 int CorralWindow::HitTestTab(int x, int y)

@@ -10,7 +10,7 @@ DexCorral organizes your Windows desktop icons into shaded, customizable areas c
 2. Run it (Administrator rights are required for shell extension registration). Because the binaries are currently unsigned, Windows SmartScreen may warn on first run — click **More info**, then **Run anyway**.
 3. The installer registers the shell extension and starts DexCorral inside the running Explorer — no Explorer restart and no logout needed. A default Corral appears on your desktop immediately.
 
-The installer also adds a **Start with Windows** entry, so DexCorral loads automatically at every login.
+DexCorral loads automatically at every login — its shell extension is loaded by Explorer on startup, so there is nothing to configure.
 
 ### Portable package
 
@@ -111,7 +111,6 @@ The DexCorral tray icon's right-click menu offers:
 * **Create New Corral** / **New Virtual Corral**.
 * **Show Desktop Icons** — toggle all native desktop icons.
 * **Quick-Hide Everything** — hide/show icons and corrals at once (same as double-clicking the desktop).
-* **Start with Windows** — enable or disable automatic startup at login.
 
 ## Desktop Integration
 

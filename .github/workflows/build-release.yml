@@ -9,11 +9,14 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-latest rolled forward to an image with VS 2026 (no VS 2022),
+    # which breaks the "Visual Studio 17 2022" CMake generator. Pin to the
+    # image that still ships VS 2022.
+    runs-on: windows-2022
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0  # Fetch all history for tags
 

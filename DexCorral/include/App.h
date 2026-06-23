@@ -89,12 +89,6 @@ public:
     /// Toggles shortcut arrow overlay on icons (requires Explorer restart)
     void ToggleShortcutArrows();
 
-    /// Returns true if autostart on Windows login is enabled
-    bool IsAutostartEnabled();
-
-    /// Enables or disables autostart on Windows login
-    void SetAutostart(bool enable);
-
     /// Sets the default corral background color (hex format, e.g., "FF0000" for red)
     void SetDefaultColorHex(const std::string &colorHex);
 
@@ -138,6 +132,16 @@ public:
      * free tile exists.
      */
     POINT FindFreeCorralPosition(int width, int height);
+
+    /**
+     * Finds a center point for a new corral of the given size as close as
+     * possible to desiredTopLeft while staying inside the work area of the
+     * monitor under that point and not overlapping any existing corral. The
+     * corral whose HWND equals `exclude` is ignored (pass the source window so
+     * a detached tab can sit right beside its origin). Falls back to the
+     * clamped desired position if no free spot exists.
+     */
+    POINT FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height, HWND exclude = nullptr);
 
     /// Returns pointer to monitor manager (tracks display configuration)
     MonitorManager *GetMonitorManager() { return monitorManager.get(); }

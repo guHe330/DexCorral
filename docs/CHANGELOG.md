@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.19] - 2026-06-23
+
 ### Added
 - Virtual corrals are now browsable like an Explorer pane (Details view): double-clicking a sub-folder navigates into it inline, and a "folder up" button appears at the left of the title bar to go back (hidden at the root; never navigates above the linked folder). The current sub-path is remembered across restarts (`CorralTabConfig::CurrentSubPath`). New `CorralWindow` helpers: `GetVirtualCurrentPath`, `NavigateToSubfolder`, `NavigateUp`, `IsNavBackVisible`, `GetNavBackButtonRect`
 - Details view gains a real **column header row** (Name / Type / Size / Date modified) for virtual corrals. Click a header to sort by that column; click again to flip direction (a ▲/▼ glyph marks the active column). Folders always sort before files. A "Sort By" context submenu mirrors the header. Sort column/direction persist (`DetailsSortColumn`, `DetailsSortAscending`); single source of truth for column geometry is `CorralWindow::GetDetailsColumns`
@@ -24,6 +26,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Desktop context menu command IDs (auto-arrange 28785, align-to-grid 28788, sort 31492–31495) are re-resolved at `WM_INITMENUPOPUP` by scanning menu captions, with the numeric IDs as fallback — resilient to ID changes across Windows builds (English shell UI; localized systems keep the fallbacks)
 
 ### Changed
+- Detaching a tab now places the new corral in free space next to the one it came from instead of overlapping it: `App::FindNearestFreeCorralPosition` finds the closest non-overlapping center to a desired top-left within the monitor work area, ignoring the source window (passed as `exclude`)
+- Release CI: pinned the build job to the `windows-2022` runner (the `windows-latest` image rolled forward to one with VS 2026 and no VS 2022, breaking the `Visual Studio 17 2022` CMake generator) and bumped `actions/checkout` to v5
 - The catch-all corral can now be disabled entirely: toggling "Catch-All" on a tab that is already catch-all now turns it off (previously it could not be unset). At most one corral can still be catch-all at a time, but having none is now allowed — new desktop files simply aren't auto-collected until a catch-all is enabled again. Startup no longer force-assigns a catch-all when none exists
 - New corrals now open in free space instead of overlapping existing ones: `App::FindFreeCorralPosition` tiles a 300×200 corral from the top-right corner of the primary monitor's work area (columns right-to-left, rows top-to-bottom, 16 px margins) and returns the first non-overlapping center; falls back to a top-right cascade when no free tile remains. Used by the desktop context menu ("New DexCorral"/"New Virtual DexCorral", which previously placed at the cursor) and the tray menu (previously screen-center + cascade)
 - New corrals now default to 100% horizontal and vertical icon spacing (`DefaultIconSpacingXPercent`/`DefaultIconSpacingYPercent`, previously 91%/85%)
@@ -55,6 +59,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Renaming a corral-owned file no longer leaves a permanent visible duplicate on the desktop. Root cause: the desktop ListView is owner-data, so the defview updates items in place (renames) with no interceptable message, and the per-index memo kept a stale "not hidden" verdict computed against the pre-rename item. The hook now runs a deferred revalidation (600 ms + 2 s passes) after every hidden-list change — dropping the memo, repainting, and asking the app to re-park with fresh identities — and intercepts `LVM_SETITEMCOUNT` (the add/remove path owner-data views actually use; the classic insert/delete messages never fire on modern Windows). `HookBridge::UpdateHiddenIcons` bumps the version only when the list really changed, so the revalidation round trip can't loop and unchanged reparks no longer force full desktop repaints
 
 ### Removed
+- "Start with Windows" tray menu toggle and its `App::IsAutostartEnabled`/`App::SetAutostart` helpers. The toggle was redundant and misleading: DexCorral's shell extension is registered as an icon-overlay handler, so Explorer loads the hook DLL and starts the app at every login regardless of the toggle (the installer's `--startup` Run key remains as the deterministic fast path). Disabling it never actually stopped DexCorral
 - Dead code: `DesktopIcons::HideIcon`, `DesktopIcons::GetIconPosition`, the orphaned `DesktopFilter.h` (declared-only, never implemented or referenced), and the unused `ICON_HIDE_POSITION_X/Y` constants
 
 ### Known Limitations

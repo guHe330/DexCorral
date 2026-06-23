@@ -239,9 +239,6 @@ void App::Initialize()
         corral->Show();
         corrals.push_back(std::move(corral));
 
-        // First run: enable autostart by default
-        SetAutostart(true);
-
         SaveConfig();
     }
 
@@ -1090,10 +1087,6 @@ void App::ShowTrayMenu()
     UINT quickHideFlags = quickHideActive ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | quickHideFlags, 6, L"Quick-Hide Everything");
 
-    // Autostart toggle
-    UINT autostartFlags = IsAutostartEnabled() ? MF_CHECKED : MF_UNCHECKED;
-    AppendMenuW(menu, MF_STRING | autostartFlags, 4, L"Start with Windows");
-
     // Update check (opt-in)
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     UINT updateFlags = config.CheckForUpdates ? MF_CHECKED : MF_UNCHECKED;
@@ -1122,9 +1115,6 @@ void App::ShowTrayMenu()
     }
     case 2:
         ToggleDesktopIcons();
-        break;
-    case 4:
-        SetAutostart(!IsAutostartEnabled());
         break;
     case 6:
         ToggleQuickHide();
@@ -1160,16 +1150,9 @@ void App::ShowAbout()
     aboutText += DEXCORRAL_VERSION;
     aboutText += L"\n\n";
     aboutText += L"Copyright (C) 2026 Gunter Heiss\n\n";
-    aboutText += L"This program is free software: you can redistribute it and/or modify\n";
-    aboutText += L"it under the terms of the GNU General Public License as published by\n";
-    aboutText += L"the Free Software Foundation, either version 3 of the License, or\n";
-    aboutText += L"(at your option) any later version.\n\n";
-    aboutText += L"This program is distributed in the hope that it will be useful,\n";
-    aboutText += L"but WITHOUT ANY WARRANTY; without even the implied warranty of\n";
-    aboutText += L"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n";
-    aboutText += L"GNU General Public License for more details.\n\n";
-    aboutText += L"You should have received a copy of the GNU General Public License\n";
-    aboutText += L"along with this program.  If not, see https://www.gnu.org/licenses/\n\n";
+    aboutText += L"This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.\n\n";
+    aboutText += L"This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n\n";
+    aboutText += L"You should have received a copy of the GNU General Public License along with this program.  If not, see https://www.gnu.org/licenses/\n\n";
     aboutText += L"Website: https://dexcorral.com\n";
     aboutText += L"GitHub: https://github.com/guHe330/DexCorral";
 
@@ -1280,6 +1263,84 @@ POINT App::FindFreeCorralPosition(int width, int height)
     int left = work.right - margin - width - offset;
     int top = work.top + margin + offset;
     return {left + width / 2, top + height / 2};
+}
+
+POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height, HWND exclude)
+{
+    // Work area of the monitor under the desired point (falls back to primary).
+    RECT work;
+    POINT probe = {desiredTopLeft.x + width / 2, desiredTopLeft.y + height / 2};
+    HMONITOR hMon = MonitorFromPoint(probe, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi = {sizeof(mi)};
+    if (hMon && GetMonitorInfoW(hMon, &mi))
+        work = mi.rcWork;
+    else if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0))
+    {
+        work.left = 0;
+        work.top = 0;
+        work.right = GetSystemMetrics(SM_CXSCREEN);
+        work.bottom = GetSystemMetrics(SM_CYSCREEN);
+    }
+
+    // Existing corral rects (current size, so rolled-up/expanded state is honoured),
+    // excluding the source window so a detached tab may sit right beside it.
+    std::vector<RECT> existing;
+    for (const auto &corral : corrals)
+    {
+        if (!corral || corral->GetHWND() == exclude)
+            continue;
+        RECT r;
+        if (GetWindowRect(corral->GetHWND(), &r))
+            existing.push_back(r);
+    }
+
+    auto fits = [&](int left, int top) -> bool
+    {
+        if (left < work.left || top < work.top ||
+            left + width > work.right || top + height > work.bottom)
+            return false;
+        RECT cand = {left, top, left + width, top + height};
+        for (const auto &r : existing)
+        {
+            RECT tmp;
+            if (IntersectRect(&tmp, &cand, &r))
+                return false;
+        }
+        return true;
+    };
+
+    // Clamp the desired position into the work area first.
+    int dl = std::max((int)work.left, std::min((int)desiredTopLeft.x, (int)work.right - width));
+    int dt = std::max((int)work.top, std::min((int)desiredTopLeft.y, (int)work.bottom - height));
+    if (fits(dl, dt))
+        return {dl + width / 2, dt + height / 2};
+
+    // Scan the work area on a coarse grid and pick the free spot closest to the
+    // clamped desired position (nearest by squared distance of the top-left).
+    const int step = 16;
+    long long bestDist = -1;
+    int bestL = dl, bestT = dt;
+    for (int top = (int)work.top; top + height <= (int)work.bottom; top += step)
+    {
+        for (int left = (int)work.left; left + width <= (int)work.right; left += step)
+        {
+            if (!fits(left, top))
+                continue;
+            long long dx = left - dl;
+            long long dy = top - dt;
+            long long dist = dx * dx + dy * dy;
+            if (bestDist < 0 || dist < bestDist)
+            {
+                bestDist = dist;
+                bestL = left;
+                bestT = top;
+            }
+        }
+    }
+
+    // bestL/bestT is either the nearest free spot or the clamped desired
+    // position (when the work area is fully occupied).
+    return {bestL + width / 2, bestT + height / 2};
 }
 
 void App::CreateVirtualCorralAt(POINT pt)
@@ -1423,33 +1484,6 @@ bool App::IsDesktopUnderMouse(POINT pt)
     }
 
     return false;
-}
-
-bool App::IsAutostartEnabled()
-{
-    // Check SharedTaskScheduler — this is what RegisterShellExtension actually writes.
-    // (ShellServiceObjectDelayLoad is no longer honored for third-party DLLs on Win10/11.)
-    HKEY hKey;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
-                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler",
-                      0, KEY_READ, &hKey) == ERROR_SUCCESS)
-    {
-        wchar_t value[256];
-        DWORD size = sizeof(value);
-        DWORD type = REG_SZ;
-        LONG result = RegQueryValueExW(hKey, L"{7A3B9E42-D1F8-4C6A-B5E3-9F2A1D8C4E7B}",
-                                       nullptr, &type, (LPBYTE)value, &size);
-        RegCloseKey(hKey);
-        return result == ERROR_SUCCESS;
-    }
-    return false;
-}
-
-void App::SetAutostart(bool enable)
-{
-    // Shell extension mode: register/unregister via DllRegisterServer/DllUnregisterServer
-    // For now, autostart is always on when the shell extension is registered
-    // The user can unregister via "DexCorral.exe --unregister"
 }
 
 LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
