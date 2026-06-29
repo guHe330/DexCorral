@@ -1,0 +1,67 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Linker files
+*.ilk
+
+# Debugger Files
+*.pdb
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# debug information files
+*.dwo
+
+# Documentation
+*.md
+!README.md
+!MANUAL.md
+!docs/CONTRIBUTING.md
+!Distribute/RELEASE_TEMPLATE.md
+!installer/INSTALLER_NOTES.md
+!docs/CHANGELOG.md
+!docs/USER_MANUAL.md
+!docs/BUILD_GUIDE.md
+
+# Build directories
+build/
+vs2022/
+vs_build/
+
+# Installer build artifacts
+installer/msix/staging/
+installer/msix/output/
+installer/**/*.msix
+installer/**/*.appx
+installer/**/*.pfx
+
+# Claude Code
+.claude/
