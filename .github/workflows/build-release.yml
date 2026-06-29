@@ -1,0 +1,158 @@
+name: Build and Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # windows-latest rolled forward to an image with VS 2026 (no VS 2022),
+    # which breaks the "Visual Studio 17 2022" CMake generator. Pin to the
+    # image that still ships VS 2022.
+    # ToDo move to ninja
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0  # Fetch all history for tags
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Get version from tag
+      id: get_version
+      shell: pwsh
+      run: |
+        $tag = "${{ github.ref_name }}"
+        $version = $tag -replace '^v', ''
+        Write-Host "Version: $version (tag: $tag)"
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "tag=$tag" >> $env:GITHUB_OUTPUT
+
+    - name: Verify Version.h matches tag
+      shell: pwsh
+      run: |
+        # Version.h is the single source of truth (CMakeLists + .rc derive from it).
+        # The tag must match it exactly, so a release can't ship a stale version.
+        $version = "${{ steps.get_version.outputs.version }}"
+        $parts = $version -split '\.'
+        if ($parts.Count -ne 3) { throw "Tag version '$version' is not X.Y.Z" }
+        $major = $parts[0]; $minor = $parts[1]; $patch = $parts[2]
+
+        $versionH = Get-Content "DexCorral/include/Version.h" -Raw
+
+        if ($versionH -notmatch '#define DEXCORRAL_VERSION L"([^"]*)"') {
+            throw "Could not find DEXCORRAL_VERSION in Version.h"
+        }
+        $fileVersion = $Matches[1]
+        if ($fileVersion -ne $version) {
+            throw "Tag v$version does not match Version.h ($fileVersion). Bump Version.h before tagging."
+        }
+
+        $checks = @{
+            'DEXCORRAL_VERSION_MAJOR'  = $major
+            'DEXCORRAL_VERSION_MINOR'  = $minor
+            'DEXCORRAL_VERSION_PATCH'  = $patch
+        }
+        foreach ($name in $checks.Keys) {
+            if ($versionH -notmatch "#define $name (\d+)") { throw "Could not find $name in Version.h" }
+            if ($Matches[1] -ne $checks[$name]) {
+                throw "$name ($($Matches[1])) does not match tag part ($($checks[$name]))"
+            }
+        }
+
+        $expectedDotted = "$major.$minor.$patch.0"
+        if ($versionH -notmatch '#define DEXCORRAL_VERSION_DOTTED "([^"]*)"') {
+            throw "Could not find DEXCORRAL_VERSION_DOTTED in Version.h"
+        }
+        if ($Matches[1] -ne $expectedDotted) {
+            throw "DEXCORRAL_VERSION_DOTTED ($($Matches[1])) does not match expected $expectedDotted"
+        }
+
+        Write-Host "Version OK: Version.h is consistent with tag v$version"
+
+    - name: Configure CMake
+      run: cmake -S DexCorral -B DexCorral/build -G "Visual Studio 17 2022" -A x64
+
+    - name: Build Release
+      run: cmake --build DexCorral/build --config Release
+
+    - name: Prepare portable readme
+      shell: pwsh
+      run: |
+        Copy-Item "Distribute/PortableReadme.txt" -Destination "portable_readme.txt"
+        Write-Host "Copied PortableReadme.txt for portable package"
+
+    - name: Create Portable Package
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+
+        # Create staging directory
+        New-Item -ItemType Directory -Force -Path "package"
+
+        # Copy files
+        Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "package/"
+        Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "package/"
+        Copy-Item "LICENSE" -Destination "package/"
+        Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
+
+        # Create zip
+        Compress-Archive -Path "package/*" -DestinationPath "Portable_DexCorral.zip" -Force
+
+        Write-Host "Created Portable_DexCorral.zip with contents:"
+        Get-ChildItem "package"
+
+    - name: Build Inno Setup Installer
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        Write-Host "Building Inno Setup installer version $version"
+
+        # Copy build output to where the .iss expects it (DexCorral/build/)
+        # VS generator puts output in Release/ subfolder
+        Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "DexCorral/build/" -Force
+        Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "DexCorral/build/" -Force
+
+        # Inno Setup 6 is pre-installed on windows-latest runners
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$version "installer\innosetup\DexCorral.iss"
+        if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+
+        $setupFile = "installer\innosetup\output\DexCorral_${version}_Setup.exe"
+        if (Test-Path $setupFile) {
+          Copy-Item $setupFile "DexCorral_${version}_Setup.exe"
+          Write-Host "Installer created: DexCorral_${version}_Setup.exe"
+        } else {
+          Write-Error "Installer not found at $setupFile"
+          exit 1
+        }
+
+    - name: Prepare release notes
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $body = Get-Content "Distribute/RELEASE_TEMPLATE.md" -Raw
+        $body = $body -replace '\$\{VERSION\}', $version
+        Set-Content "release_notes.md" -Value $body
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.tag }}
+        name: DexCorral ${{ steps.get_version.outputs.tag }}
+        body_path: release_notes.md
+        files: |
+          Portable_DexCorral.zip
+          DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
