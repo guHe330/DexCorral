@@ -36,6 +36,8 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
+#include "HookBridge.h"
+#include "../resources/resource.h"
 #include <windowsx.h>
 #include <ShlObj.h>
 #include <string>
@@ -122,6 +124,8 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
         wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         wc.hbrBackground = nullptr;
         wc.style = CS_DBLCLKS;
+        wc.hIcon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+        wc.hIconSm = wc.hIcon;
         RegisterClassExW(&wc);
         classRegistered = true;
     }
