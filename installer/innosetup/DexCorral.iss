@@ -10,7 +10,7 @@
 
 #define MyAppName "DexCorral"
 #define MyAppPublisher "DexCorral"
-#define MyAppURL "https://github.com/guHe330/DexCorralCpp"
+#define MyAppURL "https://github.com/guHe330/DexCorral"
 
 [Setup]
 AppId={{E4A7B2C1-3D5F-4E8A-9B1C-6F2D8E0A4C7B}

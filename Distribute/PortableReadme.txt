@@ -89,9 +89,9 @@ PACKAGE CONTENTS
 MORE INFORMATION
 ================================================================================
 
-* GitHub:        https://github.com/guHe330/DexCorralCpp
-* Releases:      https://github.com/guHe330/DexCorralCpp/releases
-* Issues/Bugs:   https://github.com/guHe330/DexCorralCpp/issues
+* GitHub:        https://github.com/guHe330/DexCorral
+* Releases:      https://github.com/guHe330/DexCorral/releases
+* Issues/Bugs:   https://github.com/guHe330/DexCorral/issues
 
 ================================================================================
 LICENSE
