@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Stale virtual-corral entries whose backing files have disappeared are pruned from the corral and saved to configuration instead of rendering as blank ghost icons.
 - "Remove from Corral" remains available when a stale entry can no longer be resolved by the shell context-menu APIs.
 - Fallback display-name handling now strips `.url` extensions as well as `.lnk` extensions when the shell cannot resolve an item.
+- Corrals no longer pop back above other applications when a different window is activated. `SendToBottom()`'s `HWND_BOTTOM` placement was only ever reasserted at specific moments (creation, show, drag-end, menu-close); a new `EVENT_SYSTEM_FOREGROUND` listener (`App::WinEventProc`) now re-pins every corral to the bottom whenever another window becomes foreground.
+- Icon-drag drop-target hit-testing accounted for the corral's current scroll offset incorrectly, so dragging an icon over a scrolled corral could highlight the wrong slot.
 
 ## [1.0.20] - 2026-06-23
 
