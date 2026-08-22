@@ -386,6 +386,10 @@ void CorralWindow::LoadIconImages()
     UINT iconFlag = (iconSize <= 16) ? SHGFI_SMALLICON : SHGFI_LARGEICON;
     bool isDetailsView = (GetActiveTab().GetViewMode() == ViewMode::Details);
 
+    // Entries whose backing file no longer exists on disk — pruned after the loop so we
+    // don't show a permanently blank "ghost" icon that has no way to be removed via the UI.
+    std::vector<std::string> staleFiles;
+
     for (const auto &fileName : GetActiveTab().Files)
     {
         // Guard against empty entries — they would resolve to the desktop
@@ -422,7 +426,10 @@ void CorralWindow::LoadIconImages()
         }
         else
         {
-            ci.fullPath = userPath;
+            // Backing file is gone (renamed/deleted/moved outside our watcher's notice).
+            // Drop it instead of pushing a permanently blank icon.
+            staleFiles.push_back(fileName);
+            continue;
         }
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
@@ -492,6 +499,19 @@ void CorralWindow::LoadIconImages()
         }
 
         icons.push_back(std::move(ci));
+    }
+
+    if (!staleFiles.empty())
+    {
+        auto &files = GetActiveTab().Files;
+        for (const auto &stale : staleFiles)
+        {
+            files.erase(std::remove(files.begin(), files.end(), stale), files.end());
+        }
+        if (App::GetInstance())
+        {
+            App::GetInstance()->SaveConfig();
+        }
     }
 }
 

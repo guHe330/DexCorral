@@ -71,12 +71,19 @@ std::wstring DesktopIcons::GetShellDisplayName(const std::wstring &fullPath)
         return sfi.szDisplayName;
     }
 
-    // Fallback: filename without .lnk
+    // Fallback (SHGetFileInfoW failed — typically the file no longer exists, e.g. a
+    // stale/ghost entry): strip whatever extension the shell always hides regardless of
+    // the "show file extensions" setting. ".lnk" (shortcuts) and ".url" (Internet
+    // Shortcuts, e.g. Steam desktop launchers) are the common cases; both are 4 chars.
     size_t slash = fullPath.find_last_of(L"\\/");
     std::wstring name = (slash != std::wstring::npos) ? fullPath.substr(slash + 1) : fullPath;
-    if (name.length() > 4 && _wcsicmp(name.c_str() + name.length() - 4, L".lnk") == 0)
+    if (name.length() > 4)
     {
-        name = name.substr(0, name.length() - 4);
+        const wchar_t *ext = name.c_str() + name.length() - 4;
+        if (_wcsicmp(ext, L".lnk") == 0 || _wcsicmp(ext, L".url") == 0)
+        {
+            name = name.substr(0, name.length() - 4);
+        }
     }
     return name;
 }
