@@ -6,7 +6,7 @@ DexCorral organizes your Windows desktop icons into shaded, customizable areas c
 
 ### Installer (recommended)
 
-1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
+1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorral/releases) page.
 2. Run it (Administrator rights are required for shell extension registration). Because the binaries are currently unsigned, Windows SmartScreen may warn on first run — click **More info**, then **Run anyway**.
 3. The installer registers the shell extension and starts DexCorral inside the running Explorer — no Explorer restart and no logout needed. A default Corral appears on your desktop immediately.
 
@@ -141,4 +141,4 @@ The format is forward- and backward-compatible: fields missing from an older con
 * **SmartScreen / antivirus warnings** — the binaries are currently unsigned; this is expected for software from a small developer. Code signing is planned.
 * **Corrals don't appear after install** — right-click the desktop once to wake the shell, or log out and back in (the Start-with-Windows entry re-injects DexCorral at login).
 * **Desktop icons misbehave** — restarting Explorer resets the hook: `Stop-Process -Name explorer -Force; Start-Process explorer.exe` in PowerShell, or via Task Manager.
-* **Bug reports** — please file issues at the [GitHub issue tracker](https://github.com/guHe330/DexCorralCpp/issues).
+* **Bug reports** — please file issues at the [GitHub issue tracker](https://github.com/guHe330/DexCorral/issues).

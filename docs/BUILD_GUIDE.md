@@ -61,7 +61,7 @@ powershell -File build.ps1 -Clean -BuildType Debug -SkipTests
 DexCorral\build\DexCorralTests.exe
 ```
 
-For Win32-dependent behaviour that cannot be unit tested (Explorer hook, drag-drop, DPI scaling, multi-monitor, etc.) see [INTEGRATION_TESTS.md](INTEGRATION_TESTS.md).
+Win32-dependent behaviour (Explorer hook, drag-drop, DPI scaling, multi-monitor, etc.) is not covered by the unit tests and has to be verified by hand.
 
 ## Output binaries
 
