@@ -36,6 +36,7 @@
 #include "HookBridge.h"
 #include "CorralHook.h"
 #include "Version.h"
+#include "../resources/resource.h"
 #include "UpdateChecker.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
@@ -201,8 +202,12 @@ void App::Initialize()
     // Note: Mousewheel events are NOT hooked - they pass through naturally to windows
     mouseHook->Start();
 
-    // Create tray icon
-    HICON icon = LoadIconW(nullptr, IDI_APPLICATION);
+    // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
+    // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
+    // injected into Explorer's process.
+    HICON icon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+    if (!icon)
+        icon = LoadIconW(nullptr, IDI_APPLICATION);
     trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, L"DexCorral - Double-click desktop to hide icons");
     if (!trayIcon->IsVisible()) {
         // Shell notification area not ready yet (we're loaded very early in Explorer startup).

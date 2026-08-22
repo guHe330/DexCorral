@@ -151,6 +151,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
 
         // Initialize HookBridge (critical section) regardless of context
         HookBridge::Initialize();
+        HookBridge::SetDllModule(hModule);
 
         {
             wchar_t exePath[MAX_PATH] = {};
