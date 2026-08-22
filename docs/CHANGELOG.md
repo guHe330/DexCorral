@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.21] - 2026-08-22
+
 ### Added
 - Application icon: `DexCorral.exe`, `DexCorralHook.dll`, the tray icon, and corral windows all use the DexCorral icon instead of Windows' generic default. The Inno Setup installer shows it as the wizard's small branding image and as the uninstall entry's display icon (the `Setup.exe`/`Uninstall.exe` file icon itself is left as Inno Setup's default).
 
