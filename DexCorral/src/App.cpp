@@ -202,6 +202,15 @@ void App::Initialize()
     // Note: Mousewheel events are NOT hooked - they pass through naturally to windows
     mouseHook->Start();
 
+    // Corrals are pinned to the bottom of the z-order via SetWindowPos(HWND_BOTTOM),
+    // but that's a one-time placement, not a persistent style — ordinary activation
+    // of some other window can leave a corral sitting above other apps again. Listen
+    // for foreground changes anywhere on the desktop and re-pin. WINEVENT_SKIPOWNPROCESS
+    // filters out our own SetForegroundWindow calls (e.g. the tray menu's message window).
+    foregroundHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
+                                     nullptr, WinEventProc, 0, 0,
+                                     WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+
     // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
     // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
     // injected into Explorer's process.
@@ -309,6 +318,12 @@ void App::Shutdown()
     {
         SHChangeNotifyDeregister(shellNotifyId);
         shellNotifyId = 0;
+    }
+
+    if (foregroundHook)
+    {
+        UnhookWinEvent(foregroundHook);
+        foregroundHook = nullptr;
     }
 
     // Stop desktop monitor first
@@ -1092,6 +1107,30 @@ void App::OnLeftButtonDown(POINT pt)
     {
         lastClickTick = now;
         lastClickPt = pt;
+    }
+}
+
+void CALLBACK App::WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+                                LONG idObject, LONG idChild, DWORD idEventThread, DWORD idEventTime)
+{
+    if (event != EVENT_SYSTEM_FOREGROUND || idObject != OBJID_WINDOW || idChild != CHILDID_SELF || !hwnd)
+        return;
+
+    App *app = App::instance;
+    if (!app)
+        return;
+
+    // Corrals never legitimately become the foreground window (WM_MOUSEACTIVATE
+    // returns MA_NOACTIVATE), but guard anyway so this can't fight a stray activation.
+    wchar_t cls[64] = {};
+    GetClassNameW(hwnd, cls, _countof(cls));
+    if (wcscmp(cls, L"DexCorralWindowClass") == 0)
+        return;
+
+    for (auto &corral : app->corrals)
+    {
+        if (corral)
+            corral->SendToBottom();
     }
 }
 
