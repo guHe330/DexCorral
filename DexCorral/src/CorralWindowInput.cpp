@@ -953,6 +953,11 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         iconDragStart = {x, y}; // Store starting position
         dropTargetIndex = -1;
         SetFocus(hwnd); // Take keyboard focus so F2 works
+        // SetFocus activates the window (and can raise it in the z-order) as a side
+        // effect — WM_MOUSEACTIVATE's MA_NOACTIVATE doesn't cover this path since it's
+        // not triggered by the click itself. Re-pin immediately, same as the right-click
+        // context menu's SetForegroundWindow/SendToBottom pair.
+        SendToBottom();
         SetCapture(hwnd);
         UpdateLayeredContent(); // Show selection highlight
         return;
