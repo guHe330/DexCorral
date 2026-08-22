@@ -46,6 +46,7 @@
 #include <ctime>
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 
 // Debug log defined in dllmain.cpp (same DLL) — gated by the DebugLogging
 // config flag (bootstrapped from config.json before the App loads it).
@@ -68,6 +69,25 @@ static const UINT WM_QUICKHIDE_DBLCLK = WM_APP + 102;
 // Posted by the async update checker when a GitHub Releases query finishes.
 // lParam = UpdateCheckResult* (the handler takes ownership and deletes it).
 static const UINT WM_UPDATE_CHECK_DONE = WM_APP + 103;
+
+// DesktopMonitor's FileRenamed/FileDeleted callbacks fire on its own background
+// ReadDirectoryChangesW threads (see MonitorThread in DesktopMonitor.cpp) — unlike
+// FileAdded (deferred through the locked pendingAdoptions queue), these two still need
+// to run promptly, not wait out ADOPTION_POLL_MS. Post them here instead of mutating
+// corrals/tab.Files directly from that thread: corrals, icons, and Files vectors are
+// only ever safe to touch from the thread that owns messageWindow's message loop.
+// lParam owns a heap-allocated payload that the handler in MessageWindowProc must free.
+static const UINT WM_DESKTOP_FILE_RENAMED = WM_APP + 104;
+static const UINT WM_DESKTOP_FILE_DELETED = WM_APP + 105;
+
+// DexCorralShellExt::InvokeCommand (ShellExtension.cpp) runs on EXPLORER'S OWN UI
+// thread — Explorer calls IContextMenu::InvokeCommand directly when the user picks
+// "New DexCorral"/"New Virtual DexCorral" from the desktop's native right-click menu.
+// It must not call FindFreeCorralPosition/CreateCorralAt/CreateVirtualCorralAt itself:
+// those read/mutate App::corrals (and create a new window), which belong to this
+// thread. No payload needed — the handler computes the position itself.
+static const UINT WM_CREATE_CORRAL_AT = WM_APP + 106;
+static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
 
 // Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
 static HANDLE g_AppStopEvent = nullptr;
@@ -246,13 +266,23 @@ void App::Initialize()
     EnsureCatchAllCorral();
 
     // Start desktop monitoring
+    // NOTE: FileRenamed/FileDeleted fire on DesktopMonitor's own background threads —
+    // post across to the app thread instead of calling App::OnDesktopFile* directly (see
+    // WM_DESKTOP_FILE_RENAMED comment above). FileAdded is safe to call directly: it only
+    // pushes into the mutex-guarded pendingAdoptions queue and arms a timer.
     desktopMonitor = std::make_unique<DesktopMonitor>();
     desktopMonitor->SetFileAddedCallback([this](const std::wstring &fileName)
                                          { OnDesktopFileAdded(fileName); });
     desktopMonitor->SetFileRenamedCallback([this](const std::wstring &oldName, const std::wstring &newName)
-                                           { OnDesktopFileRenamed(oldName, newName); });
+                                           {
+                                               auto *names = new std::pair<std::wstring, std::wstring>(oldName, newName);
+                                               PostMessageW(messageWindow, WM_DESKTOP_FILE_RENAMED, 0, (LPARAM)names);
+                                           });
     desktopMonitor->SetFileDeletedCallback([this](const std::wstring &fileName)
-                                           { OnDesktopFileDeleted(fileName); });
+                                           {
+                                               auto *name = new std::wstring(fileName);
+                                               PostMessageW(messageWindow, WM_DESKTOP_FILE_DELETED, 0, (LPARAM)name);
+                                           });
     desktopMonitor->Start();
 
     // Hook is in-process (shell extension) — just update hidden icon list
@@ -1571,6 +1601,52 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                         L"Update check failed",
                         L"Could not reach the update server. Please try again later.");
             }
+        }
+        return 0;
+    }
+
+    // Desktop file renamed/deleted — posted from DesktopMonitor's background watcher
+    // threads (see WM_DESKTOP_FILE_RENAMED comment above). Always reclaim the
+    // heap-allocated payload even if app is somehow null, to avoid leaking it.
+    if (uMsg == WM_DESKTOP_FILE_RENAMED)
+    {
+        std::unique_ptr<std::pair<std::wstring, std::wstring>> names(
+            reinterpret_cast<std::pair<std::wstring, std::wstring> *>(lParam));
+        if (app && names)
+        {
+            app->OnDesktopFileRenamed(names->first, names->second);
+        }
+        return 0;
+    }
+
+    if (uMsg == WM_DESKTOP_FILE_DELETED)
+    {
+        std::unique_ptr<std::wstring> name(reinterpret_cast<std::wstring *>(lParam));
+        if (app && name)
+        {
+            app->OnDesktopFileDeleted(*name);
+        }
+        return 0;
+    }
+
+    // "New DexCorral" / "New Virtual DexCorral" picked from Explorer's own desktop
+    // context menu — posted from DexCorralShellExt::InvokeCommand, which runs on
+    // Explorer's UI thread (see WM_CREATE_CORRAL_AT comment above). No payload: the
+    // position is computed here, on the thread that owns `corrals`.
+    if (uMsg == WM_CREATE_CORRAL_AT)
+    {
+        if (app)
+        {
+            app->CreateCorralAt(app->FindFreeCorralPosition(300, 200));
+        }
+        return 0;
+    }
+
+    if (uMsg == WM_CREATE_VIRTUAL_CORRAL_AT)
+    {
+        if (app)
+        {
+            app->CreateVirtualCorralAt(app->FindFreeCorralPosition(300, 200));
         }
         return 0;
     }

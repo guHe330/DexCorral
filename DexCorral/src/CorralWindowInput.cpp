@@ -1165,82 +1165,90 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
 
     const auto &icon = icons[iconIndex];
 
+    // Resolve the shell's own context menu for this item. Any of these can legitimately
+    // fail — most commonly because the backing file no longer exists (e.g. a stale/ghost
+    // entry left behind by a desync between our tracked Files list and disk). That must
+    // NOT stop "Remove from Corral" from being offered: it's the only way to clear an
+    // entry that the shell can no longer resolve.
     LPITEMIDLIST pidlFull = nullptr;
-    HRESULT hr;
-    if (icon.isSpecialIcon)
-    {
-        std::wstring parseName = L"::" + icon.clsid;
-        hr = SHParseDisplayName(parseName.c_str(), nullptr, &pidlFull, 0, nullptr);
-    }
-    else
-    {
-        hr = SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
-    }
-    if (FAILED(hr) || !pidlFull)
-        return;
-
     IShellFolder *pParentFolder = nullptr;
     LPCITEMIDLIST pidlChild = nullptr;
-    hr = SHBindToParent(pidlFull, IID_IShellFolder, (void **)&pParentFolder, &pidlChild);
-    if (FAILED(hr) || !pParentFolder)
-    {
-        CoTaskMemFree(pidlFull);
-        return;
-    }
-
     IContextMenu *pContextMenu = nullptr;
-    hr = pParentFolder->GetUIObjectOf(hwnd, 1, &pidlChild, IID_IContextMenu, nullptr, (void **)&pContextMenu);
-    if (FAILED(hr) || !pContextMenu)
+
+    HRESULT hr = icon.isSpecialIcon
+        ? SHParseDisplayName((L"::" + icon.clsid).c_str(), nullptr, &pidlFull, 0, nullptr)
+        : SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
+
+    if (SUCCEEDED(hr) && pidlFull)
     {
-        pParentFolder->Release();
-        CoTaskMemFree(pidlFull);
-        return;
+        hr = SHBindToParent(pidlFull, IID_IShellFolder, (void **)&pParentFolder, &pidlChild);
+        if (FAILED(hr))
+        {
+            pParentFolder = nullptr;
+        }
+        else
+        {
+            hr = pParentFolder->GetUIObjectOf(hwnd, 1, &pidlChild, IID_IContextMenu, nullptr, (void **)&pContextMenu);
+            if (FAILED(hr))
+            {
+                pContextMenu = nullptr;
+            }
+        }
     }
 
+    const UINT removeCmdId = 0x7FFF + 1;
     HMENU hMenu = CreatePopupMenu();
     if (hMenu)
     {
-        hr = pContextMenu->QueryContextMenu(hMenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_EXPLORE);
-        if (SUCCEEDED(hr))
+        bool haveShellItems = false;
+        if (pContextMenu)
+        {
+            hr = pContextMenu->QueryContextMenu(hMenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_EXPLORE);
+            haveShellItems = SUCCEEDED(hr);
+        }
+        if (haveShellItems)
         {
             AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-            AppendMenuW(hMenu, MF_STRING, 0x7FFF + 1, L"Remove from Corral");
+        }
+        AppendMenuW(hMenu, MF_STRING, removeCmdId, L"Remove from Corral");
 
-            SetForegroundWindow(hwnd);
-            int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
-                                     screenX, screenY, 0, hwnd, nullptr);
-            PostMessageW(hwnd, WM_NULL, 0, 0);
-            SendToBottom();
+        SetForegroundWindow(hwnd);
+        int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
+                                 screenX, screenY, 0, hwnd, nullptr);
+        PostMessageW(hwnd, WM_NULL, 0, 0);
+        SendToBottom();
 
-            if (cmd == 0x7FFF + 1)
+        if (cmd == (int)removeCmdId)
+        {
+            auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
+            if (it != GetActiveTab().Files.end())
             {
-                auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
-                if (it != GetActiveTab().Files.end())
+                GetActiveTab().Files.erase(it);
+                LoadFiles();
+                if (App::GetInstance())
                 {
-                    GetActiveTab().Files.erase(it);
-                    LoadFiles();
-                    if (App::GetInstance())
-                    {
-                        App::GetInstance()->SaveConfig();
-                    }
+                    App::GetInstance()->SaveConfig();
                 }
             }
-            else if (cmd > 0)
-            {
-                CMINVOKECOMMANDINFO ci = {};
-                ci.cbSize = sizeof(ci);
-                ci.hwnd = hwnd;
-                ci.lpVerb = MAKEINTRESOURCEA(cmd - 1);
-                ci.nShow = SW_SHOWNORMAL;
-                pContextMenu->InvokeCommand(&ci);
-            }
+        }
+        else if (haveShellItems && cmd > 0)
+        {
+            CMINVOKECOMMANDINFO ci = {};
+            ci.cbSize = sizeof(ci);
+            ci.hwnd = hwnd;
+            ci.lpVerb = MAKEINTRESOURCEA(cmd - 1);
+            ci.nShow = SW_SHOWNORMAL;
+            pContextMenu->InvokeCommand(&ci);
         }
         DestroyMenu(hMenu);
     }
 
-    pContextMenu->Release();
-    pParentFolder->Release();
-    CoTaskMemFree(pidlFull);
+    if (pContextMenu)
+        pContextMenu->Release();
+    if (pParentFolder)
+        pParentFolder->Release();
+    if (pidlFull)
+        CoTaskMemFree(pidlFull);
 }
 
 // ============================================================================

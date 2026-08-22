@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Desktop file rename and deletion notifications, plus native desktop context-menu corral creation commands, are now marshalled to DexCorral's app thread before updating corrals or creating windows.
+
+### Fixed
+- Stale virtual-corral entries whose backing files have disappeared are pruned from the corral and saved to configuration instead of rendering as blank ghost icons.
+- "Remove from Corral" remains available when a stale entry can no longer be resolved by the shell context-menu APIs.
+- Fallback display-name handling now strips `.url` extensions as well as `.lnk` extensions when the shell cannot resolve an item.
+
 ## [1.0.20] - 2026-06-23
 
 ### Added
