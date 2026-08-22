@@ -8,7 +8,7 @@ Corrals can also act as virtual folders — point one at a directory and its con
 
 > **Privacy & Trust.** DexCorral is ad-free and collects no telemetry or user data. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. The only network access is the **optional update check** (off by default): when you enable it, DexCorral asks GitHub for the latest published version number and nothing else — no personal data is ever sent, and it never downloads or installs anything on its own.
 
-> **Alpha** — This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorralCpp/issues).
+> **Alpha** — This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorral/issues).
 
 ## Key Information
 
@@ -46,7 +46,7 @@ Corrals can also act as virtual folders — point one at a directory and its con
 
 ## Installation
 
-DexCorral is available for download on the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
+DexCorral is available for download on the [Releases](https://github.com/guHe330/DexCorral/releases) page.
 
 ### Installer (recommended)
 
@@ -63,14 +63,14 @@ Because the binaries are currently unsigned, Windows SmartScreen will likely blo
 
 ## Roadmap & Issues
 
-*   [Planned Features](https://github.com/guHe330/DexCorralCpp/issues?q=is%3Aissue+label%3Aenhancement) - Upcoming features and improvements
-*   [Known Bugs](https://github.com/guHe330/DexCorralCpp/issues?q=is%3Aissue+label%3Abug) - Open bug reports
+*   [Planned Features](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+label%3Aenhancement) - Upcoming features and improvements
+*   [Known Bugs](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+label%3Abug) - Open bug reports
 
 ## Testing
 
 Unit tests (config JSON round-trips, layout math, string utilities) run automatically at the end of `build.ps1`. To skip them during quick iteration: `build.ps1 -SkipTests`. To run manually: `DexCorral/build/DexCorralTests.exe`.
 
-For Win32-dependent behaviour that can't be unit tested (Explorer hook, drag-drop, DPI scaling, etc.) see [INTEGRATION_TESTS.md](docs/INTEGRATION_TESTS.md).
+Win32-dependent behaviour (Explorer hook, drag-drop, DPI scaling, etc.) is not covered by the unit tests and has to be verified by hand.
 
 ## Documentation
 
@@ -78,7 +78,7 @@ For Win32-dependent behaviour that can't be unit tested (Explorer hook, drag-dro
 *   [User Manual](docs/USER_MANUAL.md): Learn how to use all features of DexCorral.
 *   [Build Guide](docs/BUILD_GUIDE.md): Instructions for compiling the project from source.
 
-Per-release notes are also available on the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
+Per-release notes are also available on the [Releases](https://github.com/guHe330/DexCorral/releases) page.
 
 ## Third-Party Libraries
 

@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Docs: every GitHub link pointed at `guHe330/DexCorralCpp`, a repository that does not exist — the project is hosted at `guHe330/DexCorral`. Corrected in `README.md`, `docs/USER_MANUAL.md`, `Distribute/PortableReadme.txt`, `Distribute/RELEASE_TEMPLATE.md` (used to build the GitHub Release description) and `installer/innosetup/DexCorral.iss` (`MyAppURL`, the support link shown in Add/Remove Programs).
+- Docs: `README.md` and `docs/BUILD_GUIDE.md` linked to `docs/INTEGRATION_TESTS.md`, which was announced in 1.0.14 but never committed. The links are replaced with a plain note that Win32-dependent behaviour has to be verified by hand.
+
 ## [1.0.21] - 2026-08-22
 
 ### Added
