@@ -240,11 +240,20 @@ private:
 
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+    // Reasserts SendToBottom() on every corral whenever some other window
+    // becomes the foreground window. HWND_BOTTOM is a one-time placement, not
+    // a persistent style (unlike WS_EX_TOPMOST for the top side) — without
+    // this, ordinary window activation elsewhere can leave a corral sitting
+    // above other apps again.
+    static void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+                                      LONG idObject, LONG idChild, DWORD idEventThread, DWORD idEventTime);
+
     static App *instance;
 
     HWND messageWindow;
     UINT wmTaskbarCreated = 0; // RegisterWindowMessage("TaskbarCreated")
     ULONG shellNotifyId = 0;   // SHChangeNotifyRegister token
+    HWINEVENTHOOK foregroundHook = nullptr;
     AppConfig config;
     std::string configPath;
     std::unique_ptr<MouseHook> mouseHook;
