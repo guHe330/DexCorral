@@ -43,6 +43,7 @@ static bool s_DebugLogging = false;
 static bool s_DebugLoggingInitialized = false;
 static volatile HWND s_AppMessageWindow = nullptr;
 static volatile LONG s_AppIconMoveDepth = 0;
+static HMODULE s_DllModule = nullptr;
 
 void HookBridge::Initialize()
 {
@@ -213,6 +214,16 @@ bool HookBridge::IsDebugLogging()
         s_DebugLogging = ReadDebugLoggingFromConfigFile();
     }
     return s_DebugLogging;
+}
+
+void HookBridge::SetDllModule(HMODULE hModule)
+{
+    s_DllModule = hModule;
+}
+
+HMODULE HookBridge::GetDllModule()
+{
+    return s_DllModule;
 }
 
 void HookBridge::RefreshDesktop()
