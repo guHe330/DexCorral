@@ -517,11 +517,22 @@ std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons()
                     wchar_t displayName[MAX_PATH] = {};
                     StrRetToBufW(&strretDisplay, pidlChild, displayName, MAX_PATH);
 
-                    SpecialDesktopIcon sdi;
-                    // Strip leading "::" to store just the CLSID
-                    sdi.clsid = parseName + 2;
-                    sdi.displayName = displayName;
-                    result.push_back(std::move(sdi));
+                    // Windows exposes several namespace items under the same localized
+                    // name (e.g. Control Panel appears twice: the browsable folder
+                    // {26EE0668-...} and the Start menu/desktop command object
+                    // {5399E694-...}, both resolving to shell32.dll,-4161). They are
+                    // indistinguishable in the menu, so keep only the first occurrence.
+                    bool duplicateName = std::any_of(result.begin(), result.end(),
+                                                     [&](const SpecialDesktopIcon &existing)
+                                                     { return existing.displayName == displayName; });
+                    if (!duplicateName)
+                    {
+                        SpecialDesktopIcon sdi;
+                        // Strip leading "::" to store just the CLSID
+                        sdi.clsid = parseName + 2;
+                        sdi.displayName = displayName;
+                        result.push_back(std::move(sdi));
+                    }
                 }
             }
         }
