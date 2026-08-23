@@ -1587,10 +1587,14 @@ void CorralWindow::OnIconDrag(int x, int y)
         UpdateLayeredContent();
     }
 
-    // Track if we're outside this corral (for drag-out detection)
+    // Track if we're outside this corral (for drag-out detection). This test uses
+    // the raw client point, not the scroll-adjusted one above — clientRect is in
+    // unscrolled client coordinates, so adding scrollPosition would report a drag
+    // near the bottom of a scrolled corral as having left the window.
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
-    iconDragOutside = !PtInRect(&clientRect, pt);
+    POINT clientPt = {x, y};
+    iconDragOutside = !PtInRect(&clientRect, clientPt);
 }
 
 void CorralWindow::OnIconDragEnd()
