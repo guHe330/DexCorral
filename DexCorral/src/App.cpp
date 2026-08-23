@@ -90,6 +90,17 @@ static const UINT WM_DESKTOP_FILE_DELETED = WM_APP + 105;
 static const UINT WM_CREATE_CORRAL_AT = WM_APP + 106;
 static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
 
+// Posted by WinEventProc (the system-wide EVENT_SYSTEM_FOREGROUND hook) to re-pin
+// every corral to the bottom of the z-order. The hook callback must NOT do this
+// work itself: an out-of-context WinEvent callback is delivered like a sent message,
+// so it can arrive while this thread is blocked inside a cross-thread SendMessage
+// (e.g. DesktopIcons::PositionIconsByPath waiting on Explorer's UI thread). Calling
+// SetWindowPos on corrals from there re-enters USER32 on windows owned by Progman —
+// which belongs to Explorer's UI thread — and deadlocks both threads, hanging Explorer.
+// s_RepinPending coalesces bursts of foreground changes into a single repin.
+static const UINT WM_REPIN_CORRALS = WM_APP + 108;
+static volatile LONG s_RepinPending = 0;
+
 // Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
 static HANDLE g_AppStopEvent = nullptr;
 
@@ -1117,7 +1128,7 @@ void CALLBACK App::WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
         return;
 
     App *app = App::instance;
-    if (!app)
+    if (!app || !app->messageWindow)
         return;
 
     // Corrals never legitimately become the foreground window (WM_MOUSEACTIVATE
@@ -1127,10 +1138,13 @@ void CALLBACK App::WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
     if (wcscmp(cls, L"DexCorralWindowClass") == 0)
         return;
 
-    for (auto &corral : app->corrals)
+    // Post, never act: see WM_REPIN_CORRALS. Doing SetWindowPos here would run
+    // inside the callback's (possibly re-entrant, possibly SendMessage-blocked)
+    // context and can wedge Explorer.
+    if (InterlockedCompareExchange(&s_RepinPending, 1, 0) == 0)
     {
-        if (corral)
-            corral->SendToBottom();
+        if (!PostMessageW(app->messageWindow, WM_REPIN_CORRALS, 0, 0))
+            InterlockedExchange(&s_RepinPending, 0);
     }
 }
 
@@ -1691,6 +1705,25 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         if (app)
         {
             app->CreateVirtualCorralAt(app->FindFreeCorralPosition(300, 200));
+        }
+        return 0;
+    }
+
+    // Deferred z-order repin requested by WinEventProc, running here on the app
+    // thread's normal message loop where re-entering USER32 is safe.
+    if (app && uMsg == WM_REPIN_CORRALS)
+    {
+        InterlockedExchange(&s_RepinPending, 0);
+        // Skip while a corral drag owns the capture — this thread holds capture only
+        // for the duration of a corral interaction, and reshuffling the z-order under
+        // an in-flight drag buys nothing. The drag's own paths re-pin when it ends.
+        if (!GetCapture())
+        {
+            for (auto &corral : app->corrals)
+            {
+                if (corral)
+                    corral->SendToBottom();
+            }
         }
         return 0;
     }
