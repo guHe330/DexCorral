@@ -274,6 +274,8 @@ void App::Initialize()
 
         // Apply default appearance settings (same as CreateCorral)
         defaultConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+        defaultConfig.HeaderOpacity = config.DefaultHeaderOpacity;
+        defaultConfig.BorderOpacity = config.DefaultBorderOpacity;
         defaultConfig.IconOpacity = config.DefaultIconOpacity;
         defaultConfig.IconTintColor = config.DefaultIconTintColor;
         defaultConfig.IconTintStrength = config.DefaultIconTintStrength;
@@ -478,7 +480,8 @@ void App::SetDefaultColorHex(const std::string &colorHex)
 }
 
 void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                               int fontSize, const std::string &fontColor, int iconOpacity,
+                               int fontSize, const std::string &fontColor,
+                               int headerOpacity, int borderOpacity, int iconOpacity,
                                const std::string &tintColor, int tintStrength,
                                int spacingX, int spacingY)
 {
@@ -486,6 +489,8 @@ void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
     config.DefaultHeaderFontName = fontName;
     config.DefaultHeaderFontSize = fontSize;
     config.DefaultHeaderFontColor = fontColor;
+    config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(headerOpacity);
+    config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(borderOpacity);
     config.DefaultIconOpacity = iconOpacity;
     config.DefaultIconTintColor = tintColor;
     config.DefaultIconTintStrength = tintStrength;
@@ -507,6 +512,8 @@ void App::ApplyColorToAllCorrals(const std::string &colorHex)
 
 void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
                                       int titleBarHeight, bool applyHeight,
+                                      int headerOpacity, bool applyHeaderOpacity,
+                                      int borderOpacity, bool applyBorderOpacity,
                                       const std::string &fontName, int fontSize, bool applyFont,
                                       const std::string &fontColor, bool applyFontColor,
                                       int iconOpacity, bool applyIconOpacity,
@@ -529,6 +536,16 @@ void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyCol
         {
             cfg.TitleBarHeight = titleBarHeight;
             needsLayoutRecalc = true;
+        }
+        if (applyHeaderOpacity)
+        {
+            cfg.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(headerOpacity);
+            corral->SetCurrentHeaderOpacity(cfg.HeaderOpacity);
+        }
+        if (applyBorderOpacity)
+        {
+            cfg.BorderOpacity = ChromeAlpha::ClampBorderOpacity(borderOpacity);
+            corral->SetCurrentBorderOpacity(cfg.BorderOpacity);
         }
         if (applyFont || applyFontColor)
         {
@@ -1285,6 +1302,8 @@ void App::CreateCorral(POINT pt)
 
     // Apply default appearance settings
     newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+    newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
+    newConfig.BorderOpacity = config.DefaultBorderOpacity;
     newConfig.IconOpacity = config.DefaultIconOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
@@ -1533,6 +1552,8 @@ void App::CreateVirtualCorralAt(POINT pt)
 
     // Apply default appearance settings
     newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+    newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
+    newConfig.BorderOpacity = config.DefaultBorderOpacity;
     newConfig.IconOpacity = config.DefaultIconOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
