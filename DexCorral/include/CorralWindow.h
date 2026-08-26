@@ -37,6 +37,7 @@
 #include <memory>
 #include "Config.h"
 #include "DesktopIcons.h"
+#include "ChromeAlpha.h"
 
 class FolderWatcher;
 class CorralWindow;
@@ -166,6 +167,11 @@ public:
     void SetCurrentTintStrength(int tint) { currentTintStrength = (tint < 0) ? 0 : (tint > 255) ? 255
                                                                                                 : tint; }
 
+    /// Sets current header opacity (clamped to HEADER_OPACITY_MIN, see ChromeAlpha.h)
+    void SetCurrentHeaderOpacity(int opacity) { currentHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(opacity); }
+    /// Sets current border opacity (0-255; 0 means no visible frame)
+    void SetCurrentBorderOpacity(int opacity) { currentBorderOpacity = ChromeAlpha::ClampBorderOpacity(opacity); }
+
     /// Returns reference to the currently active tab
     CorralTabConfig &GetActiveTab();
     /// Returns const reference to the currently active tab
@@ -260,9 +266,10 @@ private:
     void OnAnimationTimer();
     void OnHoverCheckTimer();
 
-    // Opacity/tint hover animation
-    void StartOpacityAnimation(int target);
-    void StartOpacityAnimation(int target, int tintTargetVal);
+    // Opacity/tint/chrome hover animation
+    void StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget, int durationMs);
+    /// Fades icons, header and border towards their hovered (full) or configured values
+    void StartHoverFade(bool hoverIn);
     void OnOpacityAnimationTimer();
 
     // Quick-hide fade animation
@@ -405,15 +412,27 @@ private:
 
     // Opacity/tint hover animation state
     static const UINT_PTR OPACITY_TIMER_ID = 3;
-    static const int OPACITY_ANIMATION_DURATION = 200; // ms
+    // Fading in has to keep up with the cursor, so it stays snappy. Fading out is
+    // deliberately slower: at the old 200 ms, crossing between adjacent corrals (or
+    // briefly leaving the header while still working in the corral) made the chrome
+    // flash out and back in. The longer exit absorbs that and reads as settling.
+    static const int OPACITY_FADE_IN_DURATION = 200;  // ms
+    static const int OPACITY_FADE_OUT_DURATION = 400; // ms
     bool isOpacityAnimating = false;
     DWORD opacityAnimationStartTime = 0;
+    int opacityAnimationDuration = OPACITY_FADE_IN_DURATION;
     int opacityStart = 255;
     int opacityTarget = 255;
     int currentOpacity = 255; // Current animated opacity (used by render)
     int tintStart = 0;
     int tintTarget = 0;
     int currentTintStrength = 0; // Current animated tint strength (used by render)
+    int headerOpacityStart = HEADER_OPACITY_DEFAULT;
+    int headerOpacityTarget = HEADER_OPACITY_DEFAULT;
+    int currentHeaderOpacity = HEADER_OPACITY_DEFAULT; // Current animated header alpha (used by render)
+    int borderOpacityStart = BORDER_OPACITY_DEFAULT;
+    int borderOpacityTarget = BORDER_OPACITY_DEFAULT;
+    int currentBorderOpacity = BORDER_OPACITY_DEFAULT; // Current animated border alpha (used by render)
 
     // Quick-hide state: whole-window alpha (SourceConstantAlpha) animated
     // 255→0 before hiding the window, 0→255 after showing it again

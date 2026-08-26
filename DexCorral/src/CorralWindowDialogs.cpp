@@ -476,9 +476,15 @@ struct AppearanceDlgData
     std::string *colorHex;
     bool colorChanged;
 
+    // Border opacity (background group)
+    int borderOpacity;
+    bool borderOpacityChanged;
+
     // Header settings
     int titleBarHeight;
     bool titleBarHeightChanged;
+    int headerOpacity;
+    bool headerOpacityChanged;
     std::wstring fontName;
     int fontSize;
     bool fontChanged;
@@ -544,12 +550,27 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         swprintf_s(label, L"%d%%", (data->alpha * 100) / 255);
         SetDlgItemTextW(hDlg, 103, label);
 
+        // Setup border opacity slider (ID 122)
+        HWND hBorderSlider = GetDlgItem(hDlg, 122);
+        SendMessageW(hBorderSlider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 255));
+        SendMessageW(hBorderSlider, TBM_SETPOS, TRUE, data->borderOpacity);
+        swprintf_s(label, L"%d%%", (data->borderOpacity * 100) / 255);
+        SetDlgItemTextW(hDlg, 123, label);
+
         // Setup header height slider (ID 110)
         HWND hHeightSlider = GetDlgItem(hDlg, 110);
         SendMessageW(hHeightSlider, TBM_SETRANGE, TRUE, MAKELPARAM(20, 64));
         SendMessageW(hHeightSlider, TBM_SETPOS, TRUE, data->titleBarHeight);
         swprintf_s(label, L"%dpx", data->titleBarHeight);
         SetDlgItemTextW(hDlg, 111, label);
+
+        // Setup header opacity slider (ID 124). Floored at HEADER_OPACITY_MIN:
+        // the header is the corral's grab handle and must stay findable.
+        HWND hHeaderOpacitySlider = GetDlgItem(hDlg, 124);
+        SendMessageW(hHeaderOpacitySlider, TBM_SETRANGE, TRUE, MAKELPARAM(HEADER_OPACITY_MIN, 255));
+        SendMessageW(hHeaderOpacitySlider, TBM_SETPOS, TRUE, data->headerOpacity);
+        swprintf_s(label, L"%d%%", (data->headerOpacity * 100) / 255);
+        SetDlgItemTextW(hDlg, 125, label);
 
         // Set font name display (ID 112)
         SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
@@ -806,6 +827,36 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             *data->colorHex = hexBuf;
             AppearanceUpdateLivePreview(data);
         }
+        else if (hCtrl == GetDlgItem(hDlg, 122))
+        { // Border opacity
+            data->borderOpacity = pos;
+            data->borderOpacityChanged = true;
+            swprintf_s(label, L"%d%%", (pos * 100) / 255);
+            SetDlgItemTextW(hDlg, 123, label);
+
+            if (data->corralConfig)
+            {
+                data->corralConfig->BorderOpacity = pos;
+                if (data->corralWindow)
+                    data->corralWindow->SetCurrentBorderOpacity(pos);
+                AppearanceUpdateLivePreview(data);
+            }
+        }
+        else if (hCtrl == GetDlgItem(hDlg, 124))
+        { // Header opacity
+            data->headerOpacity = pos;
+            data->headerOpacityChanged = true;
+            swprintf_s(label, L"%d%%", (pos * 100) / 255);
+            SetDlgItemTextW(hDlg, 125, label);
+
+            if (data->corralConfig)
+            {
+                data->corralConfig->HeaderOpacity = pos;
+                if (data->corralWindow)
+                    data->corralWindow->SetCurrentHeaderOpacity(pos);
+                AppearanceUpdateLivePreview(data);
+            }
+        }
         else if (hCtrl == GetDlgItem(hDlg, 110))
         { // Header height
             data->titleBarHeight = pos;
@@ -969,15 +1020,15 @@ void CorralWindow::ShowAppearanceDialog()
 
     // Layout Y positions (in dialog units)
     // Background Color group: y=5, h=35
-    // Opacity group: y=45, h=30
-    // Header group: y=80, h=55
-    // Icons group: y=140, h=30
-    // Checkboxes: y=176, y=190
-    // Buttons: y=208
-    // Total height: ~225
+    // Opacity group (background + border): y=45, h=47
+    // Header group (height + opacity + font + colour): y=97, h=80
+    // Icons group: y=182, h=55
+    // Icon Spacing group: y=242, h=40
+    // Checkboxes: y=288, y=302, y=316
+    // Buttons: y=333
 
     const int DLG_WIDTH = 220;
-    const int DLG_HEIGHT = 308;
+    const int DLG_HEIGHT = 350;
     const int ITEM_COUNT = 20;
 
     WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
@@ -1011,86 +1062,101 @@ void CorralWindow::ShowAppearanceDialog()
     // 3. Change button (ID 106)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 55, 18, 60, 14, 106, 0xFFFF, 0x0080, L"Change...");
 
-    // === Opacity group ===
+    // === Opacity group (background fill + border) ===
     // 4. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 30, (WORD)-1, 0xFFFF, 0x0080, L"Opacity");
-    // 5. Slider (ID 102)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 15, 56, 160, 15, 102);
-    // 6. Label (ID 103)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 47, (WORD)-1, 0xFFFF, 0x0080, L"Opacity");
+    // 5. "Background" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 58, 40, 10, (WORD)-1, 0xFFFF, 0x0082, L"Background");
+    // 6. Background opacity slider (ID 102)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 57, 56, 118, 15, 102);
+    // 7. Background opacity label (ID 103)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 58, 25, 12, 103, 0xFFFF, 0x0082, L"100%");
+    // 8. "Border" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 75, 40, 10, (WORD)-1, 0xFFFF, 0x0082, L"Border");
+    // 9. Border opacity slider (ID 122)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 57, 73, 118, 15, 122);
+    // 10. Border opacity label (ID 123)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 75, 25, 12, 123, 0xFFFF, 0x0082, L"100%");
 
     // === Header group ===
-    // 7. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 80, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Header");
-    // 8. "Height" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 93, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Height");
-    // 9. Height slider (ID 110)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 91, 130, 15, 110);
-    // 10. Height label (ID 111)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 93, 25, 10, 111, 0xFFFF, 0x0082, L"32px");
-    // 11. "Font" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 110, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Font");
-    // 12. Font name display (ID 112)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_SUNKEN, 45, 109, 100, 12, 112, 0xFFFF, 0x0082, L"Segoe UI");
-    // 13. Choose Font button (ID 113)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 108, 55, 14, 113, 0xFFFF, 0x0080, L"Choose...");
-    // 14. "Color" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 126, 24, 10, (WORD)-1, 0xFFFF, 0x0082, L"Color");
-    // 15. Font color swatch (ID 114)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 45, 124, 30, 14, 114, 0xFFFF, 0x0082, nullptr);
-    // 16. Font color Change button (ID 115)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 124, 60, 14, 115, 0xFFFF, 0x0080, L"Change...");
+    // 11. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 97, 210, 80, (WORD)-1, 0xFFFF, 0x0080, L"Header");
+    // 12. "Height" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 110, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Height");
+    // 13. Height slider (ID 110)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 108, 130, 15, 110);
+    // 14. Height label (ID 111)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 110, 25, 10, 111, 0xFFFF, 0x0082, L"32px");
+    // 15. "Opacity" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 127, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
+    // 16. Header opacity slider (ID 124)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 125, 130, 15, 124);
+    // 17. Header opacity label (ID 125)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 127, 25, 12, 125, 0xFFFF, 0x0082, L"94%");
+    // 18. "Font" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 144, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Font");
+    // 19. Font name display (ID 112)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_SUNKEN, 45, 143, 100, 12, 112, 0xFFFF, 0x0082, L"Segoe UI");
+    // 20. Choose Font button (ID 113)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 142, 55, 14, 113, 0xFFFF, 0x0080, L"Choose...");
+    // 21. "Color" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 161, 24, 10, (WORD)-1, 0xFFFF, 0x0082, L"Color");
+    // 22. Font color swatch (ID 114)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 45, 159, 30, 14, 114, 0xFFFF, 0x0082, nullptr);
+    // 23. Font color Change button (ID 115)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 159, 60, 14, 115, 0xFFFF, 0x0080, L"Change...");
 
     // === Icons group ===
-    // 17. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 140, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Icons");
-    // 18. "Opacity" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 153, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
-    // 19. Icon opacity slider (ID 116)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 151, 130, 15, 116);
-    // 20. Icon opacity label (ID 117)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 153, 25, 12, 117, 0xFFFF, 0x0082, L"100%");
-    // 21. "Tint" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 170, 16, 10, (WORD)-1, 0xFFFF, 0x0082, L"Tint");
-    // 22. Tint color swatch (ID 118)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 35, 168, 20, 14, 118, 0xFFFF, 0x0082, nullptr);
-    // 23. Tint color Change button (ID 119)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 168, 40, 14, 119, 0xFFFF, 0x0080, L"Color...");
-    // 24. Tint strength slider (ID 120)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 105, 168, 70, 15, 120);
-    // 25. Tint strength label (ID 121)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 170, 25, 12, 121, 0xFFFF, 0x0082, L"0%");
+    // 24. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 182, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Icons");
+    // 25. "Opacity" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 195, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
+    // 26. Icon opacity slider (ID 116)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 193, 130, 15, 116);
+    // 27. Icon opacity label (ID 117)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 195, 25, 12, 117, 0xFFFF, 0x0082, L"100%");
+    // 28. "Tint" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 212, 16, 10, (WORD)-1, 0xFFFF, 0x0082, L"Tint");
+    // 29. Tint color swatch (ID 118)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 35, 210, 20, 14, 118, 0xFFFF, 0x0082, nullptr);
+    // 30. Tint color Change button (ID 119)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 210, 40, 14, 119, 0xFFFF, 0x0080, L"Color...");
+    // 31. Tint strength slider (ID 120)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 105, 210, 70, 15, 120);
+    // 32. Tint strength label (ID 121)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 212, 25, 12, 121, 0xFFFF, 0x0082, L"0%");
 
     // === Icon Spacing group ===
-    // Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 200, 210, 40, (WORD)-1, 0xFFFF, 0x0080, L"Icon Spacing");
-    // "Horiz" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 213, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Horiz");
-    // Horizontal spacing slider (ID 130)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 211, 135, 15, 130);
-    // Horizontal spacing label (ID 131)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 213, 25, 10, 131, 0xFFFF, 0x0082, L"100%");
-    // "Vert" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 227, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Vert");
-    // Vertical spacing slider (ID 132)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 225, 135, 15, 132);
-    // Vertical spacing label (ID 133)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 227, 25, 10, 133, 0xFFFF, 0x0082, L"100%");
+    // 33. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 242, 210, 40, (WORD)-1, 0xFFFF, 0x0080, L"Icon Spacing");
+    // 34. "Horiz" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 255, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Horiz");
+    // 35. Horizontal spacing slider (ID 130)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 253, 135, 15, 130);
+    // 36. Horizontal spacing label (ID 131)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 255, 25, 10, 131, 0xFFFF, 0x0082, L"100%");
+    // 37. "Vert" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 269, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Vert");
+    // 38. Vertical spacing slider (ID 132)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 267, 135, 15, 132);
+    // 39. Vertical spacing label (ID 133)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 269, 25, 10, 133, 0xFFFF, 0x0082, L"100%");
 
     // === Checkboxes ===
-    // Checkbox "Use as default" (ID 107)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 246, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
-    // Checkbox "Apply changed settings to all corrals" (ID 108)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 260, 200, 12, 108, 0xFFFF, 0x0080, L"Apply changes to all corrals");
-    // Checkbox "Apply full appearance to all corrals" (ID 109)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 274, 200, 12, 109, 0xFFFF, 0x0080, L"Copy full style to all corrals");
+    // 40. Checkbox "Use as default" (ID 107)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 288, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
+    // 41. Checkbox "Apply changed settings to all corrals" (ID 108)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 302, 200, 12, 108, 0xFFFF, 0x0080, L"Apply changes to all corrals");
+    // 42. Checkbox "Apply full appearance to all corrals" (ID 109)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 316, 200, 12, 109, 0xFFFF, 0x0080, L"Copy full style to all corrals");
 
     // === Buttons ===
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 291, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 291, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
+    // 43-44.
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 333, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 333, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
 
     // Fix item count in the template header
-    ((DLGTEMPLATE *)dlgTemplate)->cdit = 37;
+    ((DLGTEMPLATE *)dlgTemplate)->cdit = 44;
 
     // Data prep
     AppearanceDlgData dlgData = {};
@@ -1115,8 +1181,11 @@ void CorralWindow::ShowAppearanceDialog()
         dlgData.color = RGB(r, g, b);
     }
 
-    // Header settings — height is per-corral, font is per-tab (active tab)
+    dlgData.borderOpacity = ChromeAlpha::ClampBorderOpacity(config.BorderOpacity);
+
+    // Header settings — height and opacity are per-corral, font is per-tab (active tab)
     dlgData.titleBarHeight = config.TitleBarHeight;
+    dlgData.headerOpacity = ChromeAlpha::ClampHeaderOpacity(config.HeaderOpacity);
     dlgData.fontName = Utf8ToWide(GetActiveTab().HeaderFontName);
     dlgData.fontSize = GetActiveTab().HeaderFontSize;
 
@@ -1148,6 +1217,8 @@ void CorralWindow::ShowAppearanceDialog()
     // Save originals for cancel
     std::string originalColor = GetActiveTab().ColorHex;
     int originalTitleBarHeight = config.TitleBarHeight;
+    int originalHeaderOpacity = config.HeaderOpacity;
+    int originalBorderOpacity = config.BorderOpacity;
     std::string originalFontName = GetActiveTab().HeaderFontName;
     int originalFontSize = GetActiveTab().HeaderFontSize;
     std::string originalFontColor = GetActiveTab().HeaderFontColor;
@@ -1170,6 +1241,10 @@ void CorralWindow::ShowAppearanceDialog()
         // Restore all settings on cancel
         GetActiveTab().ColorHex = originalColor;
         config.TitleBarHeight = originalTitleBarHeight;
+        config.HeaderOpacity = originalHeaderOpacity;
+        config.BorderOpacity = originalBorderOpacity;
+        SetCurrentHeaderOpacity(originalHeaderOpacity);
+        SetCurrentBorderOpacity(originalBorderOpacity);
         GetActiveTab().HeaderFontName = originalFontName;
         GetActiveTab().HeaderFontSize = originalFontSize;
         GetActiveTab().HeaderFontColor = originalFontColor;
@@ -1184,8 +1259,12 @@ void CorralWindow::ShowAppearanceDialog()
     }
     else
     {
-        // Apply final values — height to corral, font to active tab only
+        // Apply final values — height/opacity to corral, font to active tab only
         config.TitleBarHeight = dlgData.titleBarHeight;
+        config.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(dlgData.headerOpacity);
+        config.BorderOpacity = ChromeAlpha::ClampBorderOpacity(dlgData.borderOpacity);
+        SetCurrentHeaderOpacity(config.HeaderOpacity);
+        SetCurrentBorderOpacity(config.BorderOpacity);
         GetActiveTab().HeaderFontName = WideToUtf8(dlgData.fontName);
         GetActiveTab().HeaderFontSize = dlgData.fontSize;
         char fcBuf[16];
@@ -1211,7 +1290,8 @@ void CorralWindow::ShowAppearanceDialog()
             {
                 app->SetDefaultColorHex(GetActiveTab().ColorHex);
                 app->SetDefaultAppearance(config.TitleBarHeight, GetActiveTab().HeaderFontName,
-                                          GetActiveTab().HeaderFontSize, GetActiveTab().HeaderFontColor, config.IconOpacity,
+                                          GetActiveTab().HeaderFontSize, GetActiveTab().HeaderFontColor,
+                                          config.HeaderOpacity, config.BorderOpacity, config.IconOpacity,
                                           config.IconTintColor, config.IconTintStrength,
                                           config.IconSpacingXPercent, config.IconSpacingYPercent);
             }
@@ -1222,6 +1302,8 @@ void CorralWindow::ShowAppearanceDialog()
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
                                                  dlgData.colorChanged,
                                                  config.TitleBarHeight, dlgData.titleBarHeightChanged,
+                                                 config.HeaderOpacity, dlgData.headerOpacityChanged,
+                                                 config.BorderOpacity, dlgData.borderOpacityChanged,
                                                  GetActiveTab().HeaderFontName, GetActiveTab().HeaderFontSize, dlgData.fontChanged,
                                                  GetActiveTab().HeaderFontColor, dlgData.fontColorChanged,
                                                  config.IconOpacity, dlgData.iconOpacityChanged,
@@ -1234,6 +1316,8 @@ void CorralWindow::ShowAppearanceDialog()
                 // Copy full appearance to all corrals
                 app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
                                                  true, config.TitleBarHeight, true,
+                                                 config.HeaderOpacity, true,
+                                                 config.BorderOpacity, true,
                                                  GetActiveTab().HeaderFontName, GetActiveTab().HeaderFontSize, true,
                                                  GetActiveTab().HeaderFontColor, true,
                                                  config.IconOpacity, true,

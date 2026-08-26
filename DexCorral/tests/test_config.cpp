@@ -39,6 +39,8 @@ TEST(AppConfig, Defaults) {
     EXPECT_EQ(c.DefaultHeaderFontName, "Segoe UI Semibold");
     EXPECT_EQ(c.DefaultHeaderFontSize, 10);
     EXPECT_EQ(c.DefaultHeaderFontColor, "#FFFFFF");
+    EXPECT_EQ(c.DefaultHeaderOpacity, 240);
+    EXPECT_EQ(c.DefaultBorderOpacity, 255);
     EXPECT_EQ(c.DefaultIconOpacity, 210);
     EXPECT_EQ(c.DefaultIconTintColor, "#0000FF");
     EXPECT_EQ(c.DefaultIconTintStrength, 28);
@@ -56,6 +58,8 @@ TEST(CorralWindowConfig, Defaults) {
     EXPECT_FALSE(c.IsRolledUp);
     EXPECT_EQ(c.ActiveTabIndex, 0);
     EXPECT_EQ(c.TitleBarHeight, 32);  // Header height is per-corral
+    EXPECT_EQ(c.HeaderOpacity, 240);  // Matches the previously hard-coded active tab alpha
+    EXPECT_EQ(c.BorderOpacity, 255);  // Matches the previously hard-coded opaque border
     EXPECT_EQ(c.IconOpacity, 255);
     EXPECT_EQ(c.IconTintColor, "#000000");
     EXPECT_EQ(c.IconTintStrength, 0);
@@ -335,4 +339,58 @@ TEST(AppConfig, MultipleCoralsRoundTrip) {
     auto back = toJson(cfg).get<AppConfig>();
     ASSERT_EQ(back.Corrals.size(), 3u);
     EXPECT_DOUBLE_EQ(back.Corrals[2].Left, 200.0);
+}
+
+// ---------------------------------------------------------------------------
+// Chrome opacity: backward compatibility and load-time clamping
+// ---------------------------------------------------------------------------
+
+TEST(MissingField, ChromeOpacity_GetsDefaults) {
+    // Config written before header/border opacity existed: the corral must look
+    // exactly as it did, i.e. the previously hard-coded values.
+    nlohmann::json j = R"({"Left":10,"Top":20,"TitleBarHeight":26})"_json;
+    auto cfg = j.get<CorralWindowConfig>();
+    EXPECT_EQ(cfg.HeaderOpacity, 240);
+    EXPECT_EQ(cfg.BorderOpacity, 255);
+}
+
+TEST(ChromeOpacity, RoundTrip) {
+    CorralWindowConfig orig;
+    orig.HeaderOpacity = 96;
+    orig.BorderOpacity = 0;
+    auto back = toJson(orig).get<CorralWindowConfig>();
+    EXPECT_EQ(back.HeaderOpacity, 96);
+    EXPECT_EQ(back.BorderOpacity, 0);
+}
+
+TEST(Normalize, ClampsHandEditedHeaderOpacity) {
+    // A hand-edited config must not be able to produce a corral that is both
+    // invisible and undraggable.
+    AppConfig cfg;
+    CorralWindowConfig corral;
+    corral.HeaderOpacity = 0;
+    corral.BorderOpacity = 900;
+    cfg.Corrals.push_back(corral);
+    cfg.DefaultHeaderOpacity = -5;
+    cfg.DefaultBorderOpacity = -5;
+
+    Config::Normalize(cfg);
+
+    EXPECT_EQ(cfg.Corrals[0].HeaderOpacity, 20);
+    EXPECT_EQ(cfg.Corrals[0].BorderOpacity, 255);
+    EXPECT_EQ(cfg.DefaultHeaderOpacity, 20);
+    EXPECT_EQ(cfg.DefaultBorderOpacity, 0);
+}
+
+TEST(Normalize, LeavesValidValuesAlone) {
+    AppConfig cfg;
+    CorralWindowConfig corral;
+    corral.HeaderOpacity = 128;
+    corral.BorderOpacity = 0;
+    cfg.Corrals.push_back(corral);
+
+    Config::Normalize(cfg);
+
+    EXPECT_EQ(cfg.Corrals[0].HeaderOpacity, 128);
+    EXPECT_EQ(cfg.Corrals[0].BorderOpacity, 0);
 }
