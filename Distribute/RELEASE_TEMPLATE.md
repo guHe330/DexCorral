@@ -36,6 +36,14 @@
 
 ### What's New
 
+- The Corral header (title bar and tabs) now has its own opacity slider in the Appearance dialog, separate from the background. Fade a Corral into your wallpaper and the header fades with it, instead of staying solid on top of an invisible Corral
+- Inactive tabs adjust themselves: whatever header opacity you pick, they stay dimmer and darker than the active tab, so you can always tell which tab you're on. Nothing extra to set
+- The header slider stops just short of invisible on purpose — the header is what you grab to move a Corral, roll it up, or open its menu, so a faint edge always remains. A rolled-up Corral is kept a little more visible still, and unrolling brings back exactly the setting you chose
+- The Corral border has its own opacity slider too, all the way down to none — a Corral can now sit on the desktop as a completely frameless shape
+- Hovering a Corral now brings its header and border back to full strength along with the icons, so a faded Corral is fully readable while you work in it and settles back when you move away. The fade-out is a little slower than before, so moving between two Corrals no longer makes them flash
+
+<!-- Older changes (v1.0.20) -->
+
 - Tabs can now be reordered by dragging: hover a tab to reveal a small grip handle on its left edge, then drag it left or right to move the tab. The new order is saved automatically
 
 <!-- Older changes (v1.0.19) -->
