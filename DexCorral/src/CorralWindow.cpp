@@ -877,6 +877,15 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_MOUSEMOVE:
         {
+            // Recover from a lost button-up: a corral is a background window, so a
+            // release that happens while the cursor is off the corral never reaches
+            // us and the drag or resize would otherwise run forever. The button state
+            // in wParam is the authority — if it says the button is up, we are done.
+            if (!(wParam & MK_LBUTTON) && window->HasCapturedOperation())
+            {
+                window->EndCapturedOperationWithoutDrop();
+            }
+
             // Track mouse for hover-expand
             if (!window->mouseInsideWindow)
             {
@@ -1152,6 +1161,15 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             return 0;
         }
+        case WM_CAPTURECHANGED:
+            // DexCorral's UI lives inside Explorer's process, where any other component
+            // can take the capture out from under us. Losing it means our button-up is
+            // never coming, so finish whatever was in progress instead of staying armed.
+            if ((HWND)lParam != hwnd)
+            {
+                window->EndCapturedOperationWithoutDrop();
+            }
+            return 0;
         case WM_MOUSEACTIVATE:
             // Prevent corral from being brought to front when clicked
             return MA_NOACTIVATE;

@@ -1021,6 +1021,78 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
     }
 }
 
+bool CorralWindow::HasCapturedOperation() const
+{
+    return isDragging || isResizing || isResizingColumn || isDraggingScrollbar ||
+           isDraggingIcon || isDraggingTab || draggedIconIndex >= 0;
+}
+
+void CorralWindow::EndCapturedOperationWithoutDrop()
+{
+    if (isEndingCapturedOperation || !HasCapturedOperation())
+        return;
+
+    isEndingCapturedOperation = true;
+
+    if (isDraggingTab)
+    {
+        // The reorder is applied live during the drag, so the order on screen is
+        // what the user built — keep it.
+        isDraggingTab = false;
+        draggedTabIndex = -1;
+        ReleaseCapture();
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+        UpdateLayeredContent();
+    }
+    else if (isResizingColumn)
+    {
+        EndColumnResize();
+    }
+    else if (isResizing)
+    {
+        EndResize();
+    }
+    else if (isDraggingScrollbar)
+    {
+        EndScrollbarDrag();
+    }
+    else if (isDraggingIcon)
+    {
+        // Abandon the drag rather than dropping: the release point is unknown, and
+        // guessing one could move the icon to another corral or out to the desktop.
+        isDraggingIcon = false;
+        draggedIconIndex = -1;
+        dropTargetIndex = -1;
+        iconDragOutside = false;
+        ReleaseCapture();
+        UpdateLayeredContent();
+    }
+    else if (draggedIconIndex >= 0)
+    {
+        // Selection click that never got its button-up
+        draggedIconIndex = -1;
+        ReleaseCapture();
+    }
+    else if (isDragging)
+    {
+        // Commit the position the corral is already sitting at, but skip the
+        // merge-into-another-corral check — that needs the real release point.
+        isDragging = false;
+        ReleaseCapture();
+        SyncConfigFromWindow();
+        if (App::GetInstance())
+        {
+            App::GetInstance()->CacheDesktopIconPositions();
+            App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->InvalidateDesktopIconCache();
+            App::GetInstance()->SaveConfig();
+        }
+    }
+
+    isEndingCapturedOperation = false;
+}
+
 void CorralWindow::OnLeftButtonUp(int x, int y)
 {
     if (isDraggingTab)
