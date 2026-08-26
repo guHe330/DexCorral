@@ -683,14 +683,16 @@ int CorralWindow::HitTestTabGrip(int x, int y) const
     if (config.Tabs.size() < 2 || y < 0 || y >= GetTitleBarHeight())
         return -1;
 
-    for (int i = 0; i < (int)config.Tabs.size(); i++)
-    {
-        RECT g = GetTabGripRect(i);
-        POINT pt = {x, y};
-        if (PtInRect(&g, pt))
-            return i;
-    }
-    return -1;
+    // Only the tab that is actually showing its grip can be grabbed by it. The grip
+    // is drawn on the hovered (or dragged) tab alone, so testing every tab made the
+    // left edge of each one grab-able with nothing there to see — turning a plain
+    // tab click into an accidental reorder.
+    if (hoveredTab < 0 || hoveredTab >= (int)config.Tabs.size())
+        return -1;
+
+    RECT g = GetTabGripRect(hoveredTab);
+    POINT pt = {x, y};
+    return PtInRect(&g, pt) ? hoveredTab : -1;
 }
 
 void CorralWindow::MoveTab(int from, int to)
@@ -1024,7 +1026,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                     return TRUE;
                 }
 
-                int hit = window->HitTestResize(pt.x, pt.y);
+                // Same rule as the click path: don't advertise a resize where a
+                // click will activate a tab.
+                int hit = window->HitTestResizeAllowingTabs(pt.x, pt.y);
                 LPCWSTR cursor = IDC_ARROW;
                 switch (hit)
                 {

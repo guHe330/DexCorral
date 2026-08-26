@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Clicking a tab often did nothing. `OnLeftButtonDown` tested the resize border before tabs, and `HitTestResize` treats the top of the client area as a resize edge — but the title bar starts at y=0, so the top `RESIZE_BORDER` (6) logical px of every tab started an invisible resize instead of activating the tab. On a typical 26–28px header that was the top ~21–23% of the tab strip. New `HitTestResizeAllowingTabs` yields a plain `HTTOP` hit wherever a tab actually is, and is used by both the click path and `WM_SETCURSOR` so the cursor no longer advertises a resize where a click will switch tabs. Corners (`HTTOPLEFT`/`HTTOPRIGHT`) are untouched and still resize from the top.
+- A tab's reorder grip could be grabbed where no grip was drawn: the grip is only rendered on the hovered (or dragged) tab, but `HitTestTabGrip` tested the left `TAB_GRIP_WIDTH` px of *every* tab whenever a corral had 2+ tabs, so a click near any tab's left edge silently entered reorder mode. The hit test is now limited to the tab showing the grip.
 - Docs: every GitHub link pointed at `guHe330/DexCorralCpp`, a repository that does not exist — the project is hosted at `guHe330/DexCorral`. Corrected in `README.md`, `docs/USER_MANUAL.md`, `Distribute/PortableReadme.txt`, `Distribute/RELEASE_TEMPLATE.md` (used to build the GitHub Release description) and `installer/innosetup/DexCorral.iss` (`MyAppURL`, the support link shown in Add/Remove Programs).
 
 ## [1.0.21] - 2026-08-22
