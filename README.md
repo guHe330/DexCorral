@@ -1,20 +1,25 @@
 # DexCorral
 
-DexCorral is a native C++ desktop organization tool for Windows.
-It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals".
-Corrals can also act as virtual folders — point one at a directory and its contents appear directly on your desktop, neatly contained within the Corral.
+DexCorral is a native C++ desktop organization tool for Windows. It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals". 
 
-> **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team, just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
+Opacity runs from fully opaque to completely invisible, so wallpapers, live backgrounds, and animated scenes keep showing through.
 
-> **Privacy & Trust.** DexCorral is ad-free and collects no telemetry or user data. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. The only network access is the **optional update check** (off by default): when you enable it, DexCorral asks GitHub for the latest published version number and nothing else — no personal data is ever sent, and it never downloads or installs anything on its own.
+Corrals can also act as virtual folders, point one at a directory and its contents appear directly on your desktop, contained within the Corral.
 
-> **Alpha** — This project is in early development. Expect breaking changes, missing features, and rough edges. See [Known Issues & Planned Features](https://github.com/guHe330/DexCorral/issues).
+<img src="docs/assets/screenshots/desktop-after.png" alt="A Windows desktop organised into five corrals: System, Projects, Games, Programs, and a tabbed Work/Other corral" width="640">
+
+
+> **DexCorral is a personal project** built for my own desktop, shared in case it is useful to yours. Development follows my own priorities and pace; see [Project Scope](#project-scope). Bug reports are genuinely appreciated.
+
+> **Privacy and Trust.** DexCorral is ad-free and collects no telemetry or user data. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. The only network access is the **optional update check** (off by default).
+
+> **Alpha quality.** DexCorral still has rough edges, expect bugs, missing features, and the occasional breaking change. See [Known Issues](https://github.com/guHe330/DexCorral/issues).
 
 ## Key Information
 
-*   **Status**: Alpha (read-only repo until beta)
+*   **Status**: Alpha, in active development
 *   **Version**: C++ Native (Win32)
-*   **Executable Size**: ~750KB (exe + dll)
+*   **Executable Size**: < 1MB (exe + dll)
 *   **Platform**: Windows 11
 *   **License**: GPLv3
 
@@ -44,6 +49,28 @@ Corrals can also act as virtual folders — point one at a directory and its con
 *   **Small Footprint**: Extremely small binary size (approx. 750KB) with no external dependencies required.
 *   **Fast Startup**: Instant application launch without JIT compilation or managed runtime delays.
 
+## Screenshots
+
+Corrals are shaded, resizable areas that hold your icons. Drag a file in and it stays put.
+
+### Tabs
+
+Each corral holds multiple tabs, so one area on the desktop can carry several groups of icons.
+
+<img src="docs/assets/screenshots/tabs.gif" alt="Switching between tabs in a corral" width="500">
+
+### Opacity on hover
+
+Corrals can fade out until you need them, so they stay out of the way of the wallpaper.
+
+<img src="docs/assets/screenshots/opacity-on-hover.gif" alt="A corral fading in as the mouse moves over it" width="500">
+
+### Live appearance preview
+
+Background colour, opacity, header height and font, icon tint and spacing — every change previews on the real corral while you drag the slider.
+
+<img src="docs/assets/screenshots/appearance-live-preview.gif" alt="Adjusting sliders in the Appearance dialog while the corral updates live" width="250">
+
 ## Installation
 
 DexCorral is available for download on the [Releases](https://github.com/guHe330/DexCorral/releases) page.
@@ -61,10 +88,10 @@ Because the binaries are currently unsigned, Windows SmartScreen will likely blo
 3.  Open a command prompt **as Administrator** and run `DexCorral.exe --register` (one-time setup).
 4.  Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
 
-## Roadmap & Issues
+## Issues
 
-*   [Planned Features](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+label%3Aenhancement) - Upcoming features and improvements
-*   [Known Bugs](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+label%3Abug) - Open bug reports
+*   [Open Bugs](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+label%3Abug) - Known problems
+*   [Feature Requests](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+label%3Aenhancement) - Ideas under consideration, subject to [Project Scope](#project-scope)
 
 ## Testing
 
@@ -85,6 +112,27 @@ Per-release notes are also available on the [Releases](https://github.com/guHe33
 | Library | Version | License | Usage |
 |---------|---------|---------|-------|
 | [nlohmann/json](https://github.com/nlohmann/json) | 3.11.3 | [MIT](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT) | JSON config serialization/deserialization |
+
+## Project Scope
+
+DexCorral is a tool I built for my own desktop, and I develop it to fit my own workflow. That is
+the entire design brief.
+
+Anything that does not serve that vision gets declined - theming, animations, per-corral
+backgrounds, and the like - no matter how well it is written. That is not a judgement of the idea
+or of your code; it simply is not what this project is. Please open an issue before you start
+writing, so neither of us spends an evening on something that was never going to be merged.
+
+If you want a DexCorral that works differently, fork it. That is what the GPL is for, and the
+invitation is sincere.
+
+## Contributing
+
+Bug reports, feature suggestions, and pull requests are welcome - see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
+Expect a review within a week or so; this is a side project.
+
+Contributors sign a one-time [Contributor License Agreement](docs/CLA.md) confirming their work is
+licensed under the GPLv3. A bot handles it automatically on your first pull request.
 
 ## License
 
