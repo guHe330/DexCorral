@@ -327,9 +327,38 @@ private:
 
     // Resize support
     int HitTestResize(int x, int y); // Returns HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT, or 0
+
+    /**
+     * HitTestResize with the tab strip taking precedence over the top edge.
+     *
+     * The title bar starts at y=0, so the top resize band and the tabs share the same
+     * pixels — and resize used to win, making the top of every tab a dead zone where
+     * clicks started an invisible resize instead of switching tabs. A plain HTTOP hit
+     * therefore yields wherever a tab actually is. Corners are left alone: they sit at
+     * the far left/right of the header and are how a corral gets resized from the top.
+     */
+    int HitTestResizeAllowingTabs(int x, int y);
     void StartResize(int hitTest, int x, int y);
     void DoResize(int x, int y);
     void EndResize();
+
+    // Captured-operation recovery (drag / resize / reorder)
+    /// True while any mouse-captured operation is in progress
+    bool HasCapturedOperation() const;
+    /**
+     * Ends a captured operation whose WM_LBUTTONUP never arrived.
+     *
+     * Corrals are background windows (MA_NOACTIVATE, pinned to HWND_BOTTOM, owned by
+     * Progman), and Win32 only delivers captured mouse messages to a background window
+     * while the cursor is over it — so a button released outside the corral can go
+     * missing entirely, leaving a drag or resize running forever.
+     *
+     * Geometry changes are committed (the window is already there on screen), but the
+     * position-dependent side effects of a real drop are skipped: the release point is
+     * unknown by the time this runs, so merging into another corral or dropping an
+     * icon on a guessed target would act on a position the user never chose.
+     */
+    void EndCapturedOperationWithoutDrop();
 
     // Details-view column resize
     void StartColumnResize(int columnIndex, int x);
@@ -361,6 +390,10 @@ private:
     int resizeMode = 0; // HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT
     POINT resizeStart = {};
     RECT resizeStartRect = {};
+
+    // Guards EndCapturedOperationWithoutDrop against re-entering through the
+    // WM_CAPTURECHANGED its own ReleaseCapture() call sends.
+    bool isEndingCapturedOperation = false;
 
     std::vector<CorralIcon> icons;
     int selectedIcon = -1;
