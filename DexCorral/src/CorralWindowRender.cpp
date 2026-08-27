@@ -99,6 +99,14 @@ void CorralWindow::UpdateLayeredContent()
         pixels[i] = bgPixel;
     }
 
+    // Header alpha: the user's setting, hover-animated, floored while rolled up
+    // (rolled up the header is the whole corral — see ChromeAlpha.h).
+    const int headerAlpha = ChromeAlpha::EffectiveHeaderAlpha(currentHeaderOpacity, config.IsRolledUp);
+    // Inactive tabs are derived from it, never configured separately, so the
+    // active tab stays distinguishable wherever the slider sits.
+    const int inactiveAlpha = ChromeAlpha::InactiveTabAlpha(headerAlpha);
+    const int inactiveRgbPercent = ChromeAlpha::InactiveTabRgbScalePercent(headerAlpha);
+
     // Compute per-tab pixel colors (each tab uses its own ColorHex)
     std::vector<DWORD> tabPixels(config.Tabs.size());
     for (int i = 0; i < (int)config.Tabs.size(); i++)
@@ -116,21 +124,18 @@ void CorralWindow::UpdateLayeredContent()
 
         if (i == config.ActiveTabIndex)
         {
-            // Active tab: bright, near-opaque
-            BYTE activeAlpha = 240;
-            BYTE pmR = (BYTE)((tabR * activeAlpha) / 255);
-            BYTE pmG = (BYTE)((tabG * activeAlpha) / 255);
-            BYTE pmB = (BYTE)((tabB * activeAlpha) / 255);
-            tabPixels[i] = (activeAlpha << 24) | (pmR << 16) | (pmG << 8) | pmB;
+            // Active tab: the configured header opacity, full colour
+            tabPixels[i] = ChromeAlpha::MakePremultiplied((BYTE)headerAlpha, tabR, tabG, tabB);
         }
         else
         {
-            // Inactive tab: darker, more transparent
-            BYTE inactiveAlpha = TITLE_TEXT_ALPHA;
-            BYTE pmR = (BYTE)((tabR * inactiveAlpha) / 255 / 2);
-            BYTE pmG = (BYTE)((tabG * inactiveAlpha) / 255 / 2);
-            BYTE pmB = (BYTE)((tabB * inactiveAlpha) / 255 / 2);
-            tabPixels[i] = (inactiveAlpha << 24) | (pmR << 16) | (pmG << 8) | pmB;
+            // Inactive tab: derived alpha plus a colour darkening that deepens as
+            // the header fades, so the two stay apart even near the opacity floor
+            tabPixels[i] = ChromeAlpha::MakePremultiplied(
+                (BYTE)inactiveAlpha,
+                ChromeAlpha::ScaleChannel(tabR, inactiveRgbPercent),
+                ChromeAlpha::ScaleChannel(tabG, inactiveRgbPercent),
+                ChromeAlpha::ScaleChannel(tabB, inactiveRgbPercent));
         }
     }
 
@@ -165,20 +170,28 @@ void CorralWindow::UpdateLayeredContent()
         }
     }
 
-    // Draw border (1px solid line at full opacity)
-    DWORD borderPixel = CORRAL_BORDER_COLOR;
-    // Top edge
-    for (int x = 0; x < w; x++)
-        pixels[x] = borderPixel;
-    // Bottom edge
-    for (int x = 0; x < w; x++)
-        pixels[(h - 1) * w + x] = borderPixel;
-    // Left edge
-    for (int y = 0; y < h; y++)
-        pixels[y * w] = borderPixel;
-    // Right edge
-    for (int y = 0; y < h; y++)
-        pixels[y * w + (w - 1)] = borderPixel;
+    // Draw border (1px line at the configured, hover-animated opacity).
+    // Composited over what is already there rather than overwriting it, so a
+    // partly transparent border blends with the corral fill instead of punching
+    // a hole in it, and a border at 0 leaves no trace at all.
+    const int borderAlpha = ChromeAlpha::ClampBorderOpacity(currentBorderOpacity);
+    if (borderAlpha > 0)
+    {
+        DWORD borderPixel = ChromeAlpha::MakePremultiplied((BYTE)borderAlpha,
+                                                           CORRAL_BORDER_R, CORRAL_BORDER_G, CORRAL_BORDER_B);
+        // Top edge
+        for (int x = 0; x < w; x++)
+            pixels[x] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[x]);
+        // Bottom edge
+        for (int x = 0; x < w; x++)
+            pixels[(h - 1) * w + x] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[(h - 1) * w + x]);
+        // Left edge
+        for (int y = 0; y < h; y++)
+            pixels[y * w] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[y * w]);
+        // Right edge
+        for (int y = 0; y < h; y++)
+            pixels[y * w + (w - 1)] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[y * w + (w - 1)]);
+    }
 
     // Now use GDI to draw content (text, icons) on top
     // GDI doesn't handle alpha properly, so we draw and then fix alpha
@@ -1204,7 +1217,11 @@ void CorralWindow::UpdateLayeredContent()
         }
     }
 
-    // Resize grip (bottom-right corner, skip when rolled up)
+    // Resize grip (bottom-right corner, skip when rolled up).
+    // Deliberately unaffected by BorderOpacity: the grip is the corral's resize
+    // affordance, not part of the frame. A frameless corral (border at 0) still
+    // needs somewhere visible to grab, so the grip stays at full strength while
+    // the frame around it fades away. Confirmed as wanted in UAT of #1.
     if (!config.IsRolledUp)
     {
         DWORD gripPixel = (255 << 24) | (150 << 16) | (150 << 8) | 150;

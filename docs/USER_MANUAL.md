@@ -80,11 +80,20 @@ Right-click a Corral's title bar or background:
 <img src="assets/screenshots/appearance-dialog.png" alt="The Appearance dialog with background colour, opacity, header, icon and spacing controls" width="380">
 
 * **Background color** and **opacity** — from fully opaque down to fully transparent, where the Corral fill disappears entirely and only the organized icons remain over your wallpaper.
-* **Header** — title bar height, font face/size, and font color (font settings are per tab).
+* **Border opacity** — from a solid frame down to none at all, leaving the Corral as a frameless shape on your wallpaper. The resize grip in the bottom-right corner stays visible either way, so a frameless Corral can still be grabbed and resized.
+* **Header** — title bar height, opacity, font face/size, and font color (font settings are per tab).
 * **Icons** — opacity, tint color, and tint strength.
 * **Icon spacing** — horizontal and vertical spacing (50–200%).
 
 Checkboxes at the bottom let you save the current style as the **default for new corrals**, **apply the changes** you just made to all corrals, or **copy the full style** to all corrals.
+
+#### Header opacity and tabs
+Header opacity fades the title bar and tab strip independently of the Corral fill, so a Corral can sit almost invisibly on the wallpaper and still be there when you need it.
+
+* **Inactive tabs adjust automatically.** They are always rendered dimmer and darker than the active tab, derived from whatever header opacity you set — there is no separate slider to keep in sync, and the active tab stays recognizable at every setting.
+* **The slider stops short of fully transparent.** The header is what you drag to move a Corral, double-click to roll it up, and right-click for the menu; at zero it would be an invisible window that still catches the mouse. The minimum leaves a faint edge you can find.
+* **Rolled-up Corrals stay visible.** Rolled up, the header *is* the whole Corral, so it is kept a little more visible than your setting while in that state. Unrolling restores exactly what you chose.
+* **Hovering brings everything back.** Moving the mouse over a Corral fades its header, border and icons up to full strength, then fades them back when you leave — so a faded Corral is always fully readable while you are working in it.
 
 ## Working with Icons
 

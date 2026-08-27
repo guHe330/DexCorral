@@ -113,12 +113,14 @@ add_executable(DexCorralTests
     tests/test_config.cpp
     tests/test_layout.cpp
     tests/test_icon_utils.cpp
+    tests/test_chrome_alpha.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
+    src/Config.cpp
 )
 
 target_include_directories(DexCorralTests PRIVATE include)
-target_link_libraries(DexCorralTests PRIVATE GTest::gtest_main)
+target_link_libraries(DexCorralTests PRIVATE GTest::gtest_main shell32)
 target_compile_definitions(DexCorralTests PRIVATE UNICODE _UNICODE NOMINMAX)
 set_property(TARGET DexCorralTests PROPERTY MSVC_RUNTIME_LIBRARY
     "MultiThreaded$<$<CONFIG:Debug>:Debug>")
