@@ -877,6 +877,21 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_MOUSEMOVE:
         {
+            // Recover from a lost button-up: a corral is a background window, so a
+            // release that happens while the cursor is off the corral never reaches
+            // us and the drag or resize would otherwise run forever.
+            //
+            // Both the message's button flags and the live button state have to agree
+            // before an operation is ended. wParam alone is not enough: a synthesized
+            // or re-routed move can arrive with no MK_LBUTTON while the user is very
+            // much still holding the button, and ending on that cancels the drag out
+            // from under them.
+            if (!(wParam & MK_LBUTTON) && !(GetKeyState(VK_LBUTTON) & 0x8000) &&
+                window->HasCapturedOperation())
+            {
+                window->EndCapturedOperationWithoutDrop();
+            }
+
             // Track mouse for hover-expand
             if (!window->mouseInsideWindow)
             {
@@ -1152,6 +1167,20 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             return 0;
         }
+        case WM_CAPTURECHANGED:
+            // DexCorral's UI lives inside Explorer's process, where any other component
+            // can take the capture out from under us.
+            //
+            // Losing capture is not on its own a reason to stop: corrals are never the
+            // foreground window (MA_NOACTIVATE), and Windows hands background windows a
+            // weaker capture that it can cancel mid-drag. Ending the operation there
+            // would abort a resize the user is still performing. Only a capture loss
+            // with the button already released means the button-up is never coming.
+            if ((HWND)lParam != hwnd && !(GetKeyState(VK_LBUTTON) & 0x8000))
+            {
+                window->EndCapturedOperationWithoutDrop();
+            }
+            return 0;
         case WM_MOUSEACTIVATE:
             // Prevent corral from being brought to front when clicked
             return MA_NOACTIVATE;
