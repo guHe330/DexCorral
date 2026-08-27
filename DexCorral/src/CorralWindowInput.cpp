@@ -297,6 +297,14 @@ int CorralWindow::HitTestResize(int x, int y)
     return 0;
 }
 
+int CorralWindow::HitTestResizeAllowingTabs(int x, int y)
+{
+    int hit = HitTestResize(x, y);
+    if (hit == HTTOP && HitTestTab(x, y) >= 0)
+        return 0; // The tab owns these pixels
+    return hit;
+}
+
 void CorralWindow::StartResize(int hitTest, int x, int y)
 {
     isResizing = true;
@@ -781,10 +789,11 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         pendingRenameIcon = -1;
     }
 
-    // Check resize area first (but not when rolled up)
+    // Check resize area first (but not when rolled up) — except where the top edge
+    // would steal a click meant for a tab; see HitTestResizeAllowingTabs.
     if (!config.IsRolledUp)
     {
-        int resizeHit = HitTestResize(x, y);
+        int resizeHit = HitTestResizeAllowingTabs(x, y);
         if (resizeHit)
         {
             StartResize(resizeHit, x, y);
@@ -1019,6 +1028,78 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
         }
         OpenFile(hit);
     }
+}
+
+bool CorralWindow::HasCapturedOperation() const
+{
+    return isDragging || isResizing || isResizingColumn || isDraggingScrollbar ||
+           isDraggingIcon || isDraggingTab || draggedIconIndex >= 0;
+}
+
+void CorralWindow::EndCapturedOperationWithoutDrop()
+{
+    if (isEndingCapturedOperation || !HasCapturedOperation())
+        return;
+
+    isEndingCapturedOperation = true;
+
+    if (isDraggingTab)
+    {
+        // The reorder is applied live during the drag, so the order on screen is
+        // what the user built — keep it.
+        isDraggingTab = false;
+        draggedTabIndex = -1;
+        ReleaseCapture();
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+        UpdateLayeredContent();
+    }
+    else if (isResizingColumn)
+    {
+        EndColumnResize();
+    }
+    else if (isResizing)
+    {
+        EndResize();
+    }
+    else if (isDraggingScrollbar)
+    {
+        EndScrollbarDrag();
+    }
+    else if (isDraggingIcon)
+    {
+        // Abandon the drag rather than dropping: the release point is unknown, and
+        // guessing one could move the icon to another corral or out to the desktop.
+        isDraggingIcon = false;
+        draggedIconIndex = -1;
+        dropTargetIndex = -1;
+        iconDragOutside = false;
+        ReleaseCapture();
+        UpdateLayeredContent();
+    }
+    else if (draggedIconIndex >= 0)
+    {
+        // Selection click that never got its button-up
+        draggedIconIndex = -1;
+        ReleaseCapture();
+    }
+    else if (isDragging)
+    {
+        // Commit the position the corral is already sitting at, but skip the
+        // merge-into-another-corral check — that needs the real release point.
+        isDragging = false;
+        ReleaseCapture();
+        SyncConfigFromWindow();
+        if (App::GetInstance())
+        {
+            App::GetInstance()->CacheDesktopIconPositions();
+            App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->InvalidateDesktopIconCache();
+            App::GetInstance()->SaveConfig();
+        }
+    }
+
+    isEndingCapturedOperation = false;
 }
 
 void CorralWindow::OnLeftButtonUp(int x, int y)
