@@ -297,6 +297,14 @@ int CorralWindow::HitTestResize(int x, int y)
     return 0;
 }
 
+int CorralWindow::HitTestResizeAllowingTabs(int x, int y)
+{
+    int hit = HitTestResize(x, y);
+    if (hit == HTTOP && HitTestTab(x, y) >= 0)
+        return 0; // The tab owns these pixels
+    return hit;
+}
+
 void CorralWindow::StartResize(int hitTest, int x, int y)
 {
     isResizing = true;
@@ -781,10 +789,11 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         pendingRenameIcon = -1;
     }
 
-    // Check resize area first (but not when rolled up)
+    // Check resize area first (but not when rolled up) — except where the top edge
+    // would steal a click meant for a tab; see HitTestResizeAllowingTabs.
     if (!config.IsRolledUp)
     {
-        int resizeHit = HitTestResize(x, y);
+        int resizeHit = HitTestResizeAllowingTabs(x, y);
         if (resizeHit)
         {
             StartResize(resizeHit, x, y);
