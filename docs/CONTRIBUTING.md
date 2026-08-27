@@ -63,7 +63,24 @@ produces the installer.
 - Run `./build.ps1` before submitting — the unit tests must pass.
 - Describe what the change does and how you tested it. If it changes something visible,
   a before/after screenshot helps.
-- User-visible changes should get a line in [CHANGELOG.md](CHANGELOG.md).
+- User-visible changes should get a line in the changelog (see below).
+
+## Changelog and release notes
+
+**Your part:** if the change is visible to a user, add one line under the `## [Unreleased]`
+heading at the top of [docs/CHANGELOG.md](./CHANGELOG.md), in the matching `### Added` /
+`### Changed` / `### Fixed` group (create the group if it is missing). Write it the way the rest
+of the file is written: what changed and why, naming the symbols or files involved. Do not add a
+version heading, do not edit already-released sections, and do not touch anything under
+`Distribute/`.
+
+**Maintainer's part:** versioning and everything downstream of it — bumping
+`DexCorral/include/Version.h`, moving `[Unreleased]` into a dated `## [X.Y.Z]` section, writing
+the plain-language *What's New* release notes in `Distribute/RELEASE_TEMPLATE.md`, tagging, and
+publishing the GitHub Release.
+
+If you are not sure a change is user-visible, add the line anyway — it is easier to drop one than
+to reconstruct it at release time.
 
 ## Questions
 
