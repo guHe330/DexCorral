@@ -105,10 +105,12 @@ jobs:
         Copy-Item "LICENSE" -Destination "package/"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
 
-        # Create zip
-        Compress-Archive -Path "package/*" -DestinationPath "Portable_DexCorral.zip" -Force
+        # Create zip. The version goes in the filename so downloaded
+        # portable packages stay distinguishable from one another.
+        $zipName = "Portable_DexCorral_${version}.zip"
+        Compress-Archive -Path "package/*" -DestinationPath $zipName -Force
 
-        Write-Host "Created Portable_DexCorral.zip with contents:"
+        Write-Host "Created $zipName with contents:"
         Get-ChildItem "package"
 
     - name: Build Inno Setup Installer
@@ -139,8 +141,23 @@ jobs:
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.version }}"
+
+        # Fill the download table with the sizes of the artifacts we just
+        # built, so the table can never drift from what the release ships.
+        function Format-Size([string]$path) {
+            if (-not (Test-Path $path)) { throw "Cannot size missing artifact: $path" }
+            $bytes = (Get-Item $path).Length
+            # Invariant culture: the release notes always use "2.3 MB",
+            # never the runner locale's decimal comma.
+            $inv = [cultureinfo]::InvariantCulture
+            if ($bytes -ge 1MB) { return ($bytes / 1MB).ToString("N1", $inv) + " MB" }
+            return ($bytes / 1KB).ToString("N0", $inv) + " KB"
+        }
+
         $body = Get-Content "Distribute/RELEASE_TEMPLATE.md" -Raw
         $body = $body -replace '\$\{VERSION\}', $version
+        $body = $body -replace '\$\{SETUP_SIZE\}', (Format-Size "DexCorral_${version}_Setup.exe")
+        $body = $body -replace '\$\{PORTABLE_SIZE\}', (Format-Size "Portable_DexCorral_${version}.zip")
         Set-Content "release_notes.md" -Value $body
 
     - name: Create GitHub Release
@@ -150,7 +167,7 @@ jobs:
         name: DexCorral ${{ steps.get_version.outputs.tag }}
         body_path: release_notes.md
         files: |
-          Portable_DexCorral.zip
+          Portable_DexCorral_${{ steps.get_version.outputs.version }}.zip
           DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
         draft: false
         prerelease: false

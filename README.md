@@ -19,8 +19,8 @@ Corrals can also act as virtual folders, point one at a directory and its conten
 
 *   **Status**: Alpha, in active development
 *   **Version**: C++ Native (Win32)
-*   **Executable Size**: < 1MB (exe + dll)
-*   **Platform**: Windows 11
+*   **Executable Size**: ~1 MB (exe + dll)
+*   **Platform**: Windows 11 only (Windows 10 is end of life and unsupported)
 *   **License**: GPLv3
 
 ## Features
@@ -48,7 +48,7 @@ Corrals can also act as virtual folders, point one at a directory and its conten
 
 ### Performance and Efficiency
 *   **Native Code**: Written in C++ using Win32 API for minimal resource usage and zero runtime overhead.
-*   **Small Footprint**: Extremely small binary size (approx. 750KB) with no external dependencies required.
+*   **Small Footprint**: Extremely small binary size (approx. 1 MB) with no external dependencies required.
 *   **Fast Startup**: Instant application launch without JIT compilation or managed runtime delays.
 
 ## Screenshots
@@ -77,6 +77,8 @@ Background colour, opacity, header height and font, icon tint and spacing — ev
 
 DexCorral is available for download on the [Releases](https://github.com/guHe330/DexCorral/releases) page.
 
+> **Windows 11 required.** Windows 10 reached end of life and DexCorral is neither tested nor supported on it. The installer refuses to run below Windows 11 (build 22000), and so does `DexCorral.exe --register` in the portable package.
+
 ### Installer (recommended)
 
 Download and run the provided installer. It registers the shell extension and starts DexCorral inside the running Explorer — no Explorer restart or logout needed — and sets up automatic start at login. Uninstalling asks whether to keep your configuration for a later reinstall.
@@ -87,7 +89,7 @@ Because the binaries are currently unsigned, Windows SmartScreen will likely blo
 
 1.  Download the latest release containing `DexCorral.exe` and `DexCorralHook.dll`.
 2.  Place both files in the same folder (e.g. `C:\Program Files\DexCorral\`).
-3.  Open a command prompt **as Administrator** and run `DexCorral.exe --register` (one-time setup).
+3.  Open a command prompt **as Administrator** and run `DexCorral.exe --register` (one-time setup). On an unsupported Windows version this refuses with a message; `--register --force` registers anyway, at your own risk and without support.
 4.  Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
 
 ## Issues

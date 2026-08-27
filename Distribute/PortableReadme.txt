@@ -17,8 +17,8 @@ KEY INFORMATION
 
 Status:         Alpha
 Version:        C++ Native (Win32)
-Binary Size:    ~750KB (exe + dll)
-Platform:       Windows 10 / 11
+Binary Size:    ~1 MB (exe + dll)
+Platform:       Windows 11
 License:        GPL-3.0
 
 ================================================================================
@@ -67,7 +67,7 @@ Performance and Efficiency
 --------------------------
 * Native Code: Written in C++ using Win32 API for minimal resource usage and
   zero runtime overhead.
-* Small Footprint: Total binary size approx. 750KB with no external
+* Small Footprint: Total binary size approx. 1 MB with no external
   dependencies required.
 * Fast Startup: Instant application launch without JIT compilation or managed
   runtime delays.
@@ -79,6 +79,9 @@ INSTALLATION (PORTABLE)
 1. Extract all files from this archive to any folder.
 
 2. Run DexCorral.exe --register (as Administrator, one-time setup).
+   Requires Windows 11 (build 22000 or newer); on an older version this
+   refuses with a message. Add --force to register anyway -- unsupported,
+   untested, and not eligible for bug reports.
 
 3. Restart Explorer or log out/in for the shell extension to load.
 

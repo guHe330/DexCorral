@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- GitHub issue forms in `.github/ISSUE_TEMPLATE/`: **Bug report** (asks for version, Windows build, install type, display setup and an optional `config.json`), **Feature request** (states the project-scope rule up front and asks for the problem before the proposed solution), and **Multi-monitor test report** — a checklist-driven form for testers with two or more screens, since multi-monitor placement, per-resolution scaling and monitor unplug/replug handling have never been run on a real multi-display setup. `config.yml` keeps blank issues enabled and links the User Manual and contributing guide
+- `docs/CONTRIBUTING.md` gains a **Testing is a contribution** section naming the untested territory (multiple monitors, mixed DPI, unusual display hardware, large desktops) and pointing at the multi-monitor form; the bug-reporting section now points at the template chooser and explains what `config.json` contains before asking anyone to attach it
+
+### Changed
+- The portable download is now named `Portable_DexCorral_<version>.zip` instead of `Portable_DexCorral.zip`, so packages from different releases stay distinguishable once downloaded (`.github/workflows/build-release.yml`). `build.ps1` names its local release archive `DexCorral_<version>.zip` for the same reason and deletes stale zips from `DexCorral/build/` first
+- DexCorral now targets Windows 11 only. Windows 10 is end of life and the maintainer has no way to test on it, so every reference to it is gone from the docs, the portable readme and the release notes, and the Inno Setup installer's `MinVersion` moves from `10.0.17763` (Windows 10 1809) to `10.0.22000` (Windows 11 21H2) — the installer now refuses to run on Windows 10 instead of installing a build nobody tests there. The portable package is covered too: `DexCorral.exe --register` reads the real build number via `RtlGetVersion` (`GetVersionEx` and the `VersionHelpers` macros are manifest-capped and lie) and refuses below build 22000. A new `--force` flag overrides the check for anyone who wants to try regardless — `--unregister` and `--startup` are deliberately never gated, so a forced install stays removable and startable, and a failed version probe is treated as supported rather than blocking. The Windows 11 requirement and the `--force` escape hatch are documented in `README.md`, `docs/USER_MANUAL.md`, `docs/BUILD_GUIDE.md`, `docs/CONTRIBUTING.md`, `Distribute/PortableReadme.txt` and the release template; the bug-report form and contributing guide state that Windows 10 reports are out of scope
+- The download-size column in the GitHub Release notes is now filled in from the artifacts the workflow just built, via `${SETUP_SIZE}` / `${PORTABLE_SIZE}` placeholders in `Distribute/RELEASE_TEMPLATE.md`, instead of a hand-maintained `~750KB` that had drifted from reality (the installer is ~2.3 MB). The stale ~750KB binary-size claims in `README.md` and `Distribute/PortableReadme.txt` are corrected to ~1 MB
+
 ## [1.0.22] - 2026-08-27
 
 ### Added

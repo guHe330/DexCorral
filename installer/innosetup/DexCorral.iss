@@ -41,8 +41,8 @@ WizardSmallImageFile=resources\DexCorral-64.png,resources\DexCorral-128.png,reso
 ; Uninstall
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\DexCorral.exe
-; Minimum Windows version (Windows 10 1809)
-MinVersion=10.0.17763
+; Minimum Windows version (Windows 11 21H2) -- DexCorral targets Windows 11 only
+MinVersion=10.0.22000
 ; Allow upgrading over existing install without asking
 UsePreviousAppDir=yes
 CloseApplications=no
