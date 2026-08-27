@@ -320,6 +320,17 @@ private:
 
     // Resize support
     int HitTestResize(int x, int y); // Returns HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT, or 0
+
+    /**
+     * HitTestResize with the tab strip taking precedence over the top edge.
+     *
+     * The title bar starts at y=0, so the top resize band and the tabs share the same
+     * pixels — and resize used to win, making the top of every tab a dead zone where
+     * clicks started an invisible resize instead of switching tabs. A plain HTTOP hit
+     * therefore yields wherever a tab actually is. Corners are left alone: they sit at
+     * the far left/right of the header and are how a corral gets resized from the top.
+     */
+    int HitTestResizeAllowingTabs(int x, int y);
     void StartResize(int hitTest, int x, int y);
     void DoResize(int x, int y);
     void EndResize();
