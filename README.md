@@ -35,7 +35,9 @@ Corrals can also act as virtual folders, point one at a directory and its conten
 *   **Persistence**: Your Corral layout and icon assignments are saved and restored automatically.
 
 ### User Interface
-*   **Fully Adjustable Opacity**: Corrals range from fully opaque to completely transparent — at full transparency the Corral fill disappears entirely, letting your desktop wallpaper, live backgrounds, or animated scenes show through unobstructed while icons remain perfectly organized on top.
+*   **Fully Adjustable Opacity**: Corrals range from fully opaque to completely transparent — fill, header and border each have their own slider, so at the low end a Corral all but disappears and only the organized icons remain over your wallpaper, live background, or animated scene.
+*   **Self-Adjusting Tabs**: Inactive tabs are derived from the header opacity automatically, staying dimmer than the active tab at every setting — one slider, no pairs to keep in sync.
+*   **Hover Reveal**: Mousing over a Corral fades its header, border and icons up to full strength and gently fades them back when you leave.
 *   **Layered Transparency**: Uses Windows layered windows for smooth semi-transparent color overlays.
 *   **Icon Hover Effects**: Visual hover highlights when mousing over icons in corrals.
 *   **Drop-on-Icon**: Drop files onto icons inside corrals (e.g., drop a file onto an executable to open it).

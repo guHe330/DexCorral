@@ -95,10 +95,12 @@ public:
     /**
      * Sets default appearance for all new corrals.
      * Parameters: titleBarHeight, fontName, fontSize, fontColor (hex),
-     * iconOpacity (0-100), tintColor (hex), tintStrength (0-100), spacingX, spacingY (pixels)
+     * headerOpacity (20-255), borderOpacity (0-255), iconOpacity (0-100),
+     * tintColor (hex), tintStrength (0-100), spacingX, spacingY (pixels)
      */
     void SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                              int fontSize, const std::string &fontColor, int iconOpacity,
+                              int fontSize, const std::string &fontColor,
+                              int headerOpacity, int borderOpacity, int iconOpacity,
                               const std::string &tintColor, int tintStrength,
                               int spacingX, int spacingY);
 
@@ -112,6 +114,8 @@ public:
      */
     void ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
                                      int titleBarHeight, bool applyHeight,
+                                     int headerOpacity, bool applyHeaderOpacity,
+                                     int borderOpacity, bool applyBorderOpacity,
                                      const std::string &fontName, int fontSize, bool applyFont,
                                      const std::string &fontColor, bool applyFontColor,
                                      int iconOpacity, bool applyIconOpacity,
