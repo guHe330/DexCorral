@@ -103,13 +103,15 @@ struct CorralWindowConfig
 
     // Appearance settings (per-corral)
     int TitleBarHeight = 32;               // Header height in pixels (20-64), applies to all tabs
+    int HeaderOpacity = 240;               // Header/tab-strip opacity (20-255); inactive tabs are derived from it
+    int BorderOpacity = 255;               // Corral border opacity (0=frameless, 255=opaque)
     int IconOpacity = 255;                 // Icon transparency (0=invisible, 255=opaque)
     std::string IconTintColor = "#000000"; // Tint color for icons (RGB hex)
     int IconTintStrength = 0;              // Tint strength (0=none, 255=full overlay)
     int IconSpacingXPercent = 100;         // Horizontal icon spacing (50-200%)
     int IconSpacingYPercent = 100;         // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig
@@ -124,6 +126,8 @@ struct AppConfig
     std::string DefaultHeaderFontName = "Segoe UI Semibold"; // Applied to each new tab's header font
     int DefaultHeaderFontSize = 10;
     std::string DefaultHeaderFontColor = "#FFFFFF";
+    int DefaultHeaderOpacity = 240;
+    int DefaultBorderOpacity = 255;
     int DefaultIconOpacity = 210;
     std::string DefaultIconTintColor = "#0000FF";
     int DefaultIconTintStrength = 28;
@@ -136,7 +140,7 @@ struct AppConfig
     bool CheckForUpdates = false;
     long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch)
 };
 
 class Config
@@ -145,4 +149,13 @@ public:
     static std::string GetConfigPath();
     static AppConfig Load();
     static void Save(const AppConfig &config);
+
+    /**
+     * Clamps loaded values into their usable ranges.
+     *
+     * Called by Load() on every config read. Guards against hand-edited files:
+     * a HeaderOpacity below the floor would produce a corral that is invisible
+     * *and* undraggable, with no way back through the UI.
+     */
+    static void Normalize(AppConfig &config);
 };

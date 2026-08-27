@@ -105,6 +105,10 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     dragStartRect = {0, 0, 0, 0};
     currentOpacity = (config.IconOpacity < 5) ? 5 : config.IconOpacity;
     currentTintStrength = config.IconTintStrength;
+    config.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(config.HeaderOpacity);
+    config.BorderOpacity = ChromeAlpha::ClampBorderOpacity(config.BorderOpacity);
+    currentHeaderOpacity = config.HeaderOpacity;
+    currentBorderOpacity = config.BorderOpacity;
 
     // Save the full height for roll-up restore
     savedHeight = config.Height;
@@ -907,11 +911,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                     window->StartHoverExpand();
                 }
 
-                // Fade to full opacity and remove tint on hover
-                if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0)
-                {
-                    window->StartOpacityAnimation(255, 0);
-                }
+                // Fade icons, header and border to full and remove tint on hover
+                window->StartHoverFade(true);
             }
 
             // Check scrollbar hover state (PowerShell-style expand on hover)
@@ -1153,11 +1154,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             {
                 window->StartHoverCollapse();
             }
-            // Fade back to configured opacity and tint
-            if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0)
-            {
-                window->StartOpacityAnimation(window->config.IconOpacity, window->config.IconTintStrength);
-            }
+            // Fade back to the configured icon, header and border opacity
+            window->StartHoverFade(false);
             return 0;
         case WM_WINDOWPOSCHANGING:
         {
