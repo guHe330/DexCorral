@@ -1,0 +1,94 @@
+name: Bug report
+description: Something in DexCorral does not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. DexCorral is alpha software — bug reports are genuinely useful.
+
+        A short report is fine. If you only fill in "what happened", that is still worth posting.
+
+  - type: input
+    id: version
+    attributes:
+      label: DexCorral version
+      description: Shown at the top of the tray menu.
+      placeholder: "1.0.22"
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Run `winver`, or copy it from Settings → System → About.
+      placeholder: "Windows 11 Pro 24H2 (build 26100.2314)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Installer
+        - Portable ZIP
+        - Built from source
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: If you can trigger it on purpose, list the steps. If it only happens sometimes, say roughly how often.
+      placeholder: |
+        1. Create a corral on the left half of the desktop
+        2. Drag three icons into it
+        3. Restart DexCorral from the tray
+        4. The corral comes back empty
+
+  - type: checkboxes
+    id: multimonitor
+    attributes:
+      label: Displays
+      options:
+        - label: I have more than one monitor
+        - label: My monitors use different scaling factors (e.g. 100% and 150%)
+        - label: A monitor was plugged in, unplugged, or the display layout changed when this happened
+
+  - type: textarea
+    id: display-setup
+    attributes:
+      label: Display setup
+      description: >
+        Only if you ticked a box above, or if the bug is visual. Resolution and scaling per monitor,
+        which one is primary, and how they are arranged in Settings → System → Display.
+      placeholder: |
+        Monitor 1 (primary): 2560x1440 @ 100%, left
+        Monitor 2: 1920x1080 @ 125%, right, slightly lower
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or video
+      description: Drag an image straight into this box. For anything visual this usually says more than a paragraph.
+
+  - type: textarea
+    id: config
+    attributes:
+      label: config.json
+      description: >
+        Optional, but the fastest way to diagnose layout, tab and persistence bugs.
+        Attach `%AppData%\DexCorral\config.json` (rename to `.txt` if GitHub refuses the upload).
+        It lists your corral names, positions, and the paths of the files you have organized —
+        please look it over and redact anything you would rather not publish.

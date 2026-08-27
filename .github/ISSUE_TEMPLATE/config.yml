@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: User Manual
+    url: https://github.com/guHe330/DexCorral/blob/main/docs/USER_MANUAL.md
+    about: How a feature is meant to work — worth a look before filing a bug.
+  - name: Contributing guide
+    url: https://github.com/guHe330/DexCorral/blob/main/docs/CONTRIBUTING.md
+    about: Project scope, build instructions, and what to do before writing code.
