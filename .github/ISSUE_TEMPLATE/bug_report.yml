@@ -22,7 +22,7 @@ body:
     id: windows
     attributes:
       label: Windows version
-      description: Run `winver`, or copy it from Settings → System → About.
+      description: Run `winver`, or copy it from Settings → System → About. DexCorral supports Windows 11 only — reports from Windows 10 are closed as out of scope.
       placeholder: "Windows 11 Pro 24H2 (build 26100.2314)"
     validations:
       required: true

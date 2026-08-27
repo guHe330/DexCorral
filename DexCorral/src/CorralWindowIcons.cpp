@@ -39,7 +39,7 @@
 #include <commoncontrols.h>
 #include <algorithm>
 
-// Cloud file attributes (defined in Windows 10 SDK 1709+, provide fallbacks)
+// Cloud file attributes (missing from older Windows SDK headers, provide fallbacks)
 #ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
 #define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
 #endif

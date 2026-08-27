@@ -16,6 +16,11 @@ forms ask for what is actually needed to reproduce a problem:
 
 A partial report beats no report. If a field does not apply, leave it empty and post anyway.
 
+**Windows 11 only.** Windows 10 is end of life and I have no machine to test it on, so bugs
+reported from Windows 10 are closed as out of scope — including ones hit after bypassing the
+version check with `DexCorral.exe --register --force`. Registration refuses on Windows 10 by
+design; the override exists so you can experiment, not so you can file reports from there.
+
 For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest
 route to a fix. It lists your corral names, positions and the paths of the files you have organized,
 so look it over and redact anything you would rather not publish.
