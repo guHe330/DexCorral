@@ -5,12 +5,40 @@ are all welcome.
 
 ## Reporting bugs and requesting features
 
-Open an [issue](https://github.com/guHe330/DexCorral/issues). For bugs, please include:
+Open an [issue](https://github.com/guHe330/DexCorral/issues/new/choose) and pick a template. The
+forms ask for what is actually needed to reproduce a problem:
 
 - Your Windows version (e.g. Windows 11 Pro 24H2)
 - The DexCorral version (visible in the tray menu)
 - What you did, what you expected, and what happened instead
 - A screenshot, if the problem is visual
+- Your display setup, if more than one monitor is involved
+
+A partial report beats no report. If a field does not apply, leave it empty and post anyway.
+
+For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest
+route to a fix. It lists your corral names, positions and the paths of the files you have organized,
+so look it over and redact anything you would rather not publish.
+
+## Testing is a contribution
+
+You do not need to write code to help, and right now testing is worth more than code.
+
+DexCorral is alpha software developed on **one machine, with one monitor**, against the maintainer's
+own way of using a desktop. Every setup that differs from that is untested territory. The gaps that
+most need someone else's hardware:
+
+- **Multiple monitors.** Corral positions are stored per monitor and per resolution, corrals move to
+  the primary display when their monitor is disconnected and return when it comes back — none of it
+  has ever run on a real multi-display setup. There is a
+  [Multi-monitor test report](https://github.com/guHe330/DexCorral/issues/new?template=multi_monitor_report.yml)
+  template with a checklist; one completed section is a useful report.
+- **Mixed DPI**, such as a 150% laptop panel next to a 100% external screen.
+- **Unusual display hardware** — ultrawides, portrait orientation, TVs, wireless displays, docks.
+- **Large or unusual desktops** — hundreds of icons, OneDrive-synced folders, network paths.
+
+Reports that everything worked are worth posting too. Knowing that restart persistence survives on a
+three-monitor setup is as useful as knowing that it does not.
 
 ## Scope, before you write code
 

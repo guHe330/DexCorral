@@ -1,0 +1,95 @@
+name: Multi-monitor test report
+description: You have two or more screens and tried DexCorral on them. Tell me what happened.
+labels: ["testing", "multi-monitor"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The maintainer develops on a **single-monitor machine**. Corral positions are stored per monitor
+        and per resolution, corrals move to the primary display when their monitor disappears and return
+        when it comes back — all of it written without ever being run on a real multi-display setup.
+
+        You do not have to test everything. **One section is a useful report.** Good news is worth
+        posting too: "restart persistence works on 3 screens" tells me as much as a bug does.
+
+  - type: input
+    id: version
+    attributes:
+      label: DexCorral version
+      description: Shown at the top of the tray menu.
+      placeholder: "1.0.22"
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 Pro 24H2 (build 26100.2314)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: Your display setup
+      description: >
+        Resolution and scaling per monitor, which one is primary, and how they are arranged in
+        Settings → System → Display. Mention a laptop, dock, TV or wireless display if one is involved.
+      placeholder: |
+        Monitor 1 (primary): 3840x2160 @ 150%, centre
+        Monitor 2: 1920x1080 @ 100%, left, rotated portrait
+        Monitor 3: 2560x1440 @ 100%, right
+        Laptop in a Thunderbolt dock, lid closed.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: covered
+    attributes:
+      label: What did you try?
+      options:
+        - label: "A — Placement: created, dragged and resized corrals on each monitor; dragged one across a scaling boundary"
+        - label: "B — Persistence: exited and restarted DexCorral, and rebooted"
+        - label: "C — Layout changes: changed a resolution, changed the primary monitor, rearranged the displays"
+        - label: "D — Unplug/replug: disconnected a monitor and reconnected it, or used Win+P, or undocked and re-docked"
+        - label: "E — Icons: captured icons on a secondary monitor, dragged icons between monitors, tried quick-hide"
+        - label: "F — Something else"
+
+  - type: textarea
+    id: results
+    attributes:
+      label: What happened?
+      description: >
+        Per section if you can. What you expected, what you got, and whether it happens every time
+        or only sometimes. Do not spend time bisecting or debugging — "I did X, this happened" is the whole job.
+      placeholder: |
+        A — fine on all three, no offset even on the portrait screen to the left.
+        D — unplugging monitor 2 moved its two corrals to the primary as expected, but plugging it
+            back in left them on the primary. Reproduced 3 times out of 3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: config.json
+      description: >
+        The most valuable attachment for this kind of report — `TargetMonitorId` and `MonitorPositions`
+        are the ground truth for what got stored per monitor. Attach `%AppData%\DexCorral\config.json`
+        (rename to `.txt` if GitHub refuses the upload). It lists your corral names, positions and the
+        paths of the files you have organized — please look it over and redact anything you would
+        rather not publish.
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshots or video
+      description: Drag them into this box. A phone photo of both screens is fine, and often clearer than words.
+
+  - type: checkboxes
+    id: credit
+    attributes:
+      label: Credit
+      options:
+        - label: Credit me by GitHub handle in the changelog for anything this fixes
