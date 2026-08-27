@@ -335,6 +335,24 @@ private:
     void DoResize(int x, int y);
     void EndResize();
 
+    // Captured-operation recovery (drag / resize / reorder)
+    /// True while any mouse-captured operation is in progress
+    bool HasCapturedOperation() const;
+    /**
+     * Ends a captured operation whose WM_LBUTTONUP never arrived.
+     *
+     * Corrals are background windows (MA_NOACTIVATE, pinned to HWND_BOTTOM, owned by
+     * Progman), and Win32 only delivers captured mouse messages to a background window
+     * while the cursor is over it — so a button released outside the corral can go
+     * missing entirely, leaving a drag or resize running forever.
+     *
+     * Geometry changes are committed (the window is already there on screen), but the
+     * position-dependent side effects of a real drop are skipped: the release point is
+     * unknown by the time this runs, so merging into another corral or dropping an
+     * icon on a guessed target would act on a position the user never chose.
+     */
+    void EndCapturedOperationWithoutDrop();
+
     // Details-view column resize
     void StartColumnResize(int columnIndex, int x);
     void DoColumnResize(int x);
@@ -365,6 +383,10 @@ private:
     int resizeMode = 0; // HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT
     POINT resizeStart = {};
     RECT resizeStartRect = {};
+
+    // Guards EndCapturedOperationWithoutDrop against re-entering through the
+    // WM_CAPTURECHANGED its own ReleaseCapture() call sends.
+    bool isEndingCapturedOperation = false;
 
     std::vector<CorralIcon> icons;
     int selectedIcon = -1;
