@@ -80,7 +80,7 @@ Right-click a Corral's title bar or background:
 <img src="assets/screenshots/appearance-dialog.png" alt="The Appearance dialog with background colour, opacity, header, icon and spacing controls" width="380">
 
 * **Background color** and **opacity** — from fully opaque down to fully transparent, where the Corral fill disappears entirely and only the organized icons remain over your wallpaper.
-* **Border opacity** — from a solid frame down to none at all, leaving the Corral as a frameless shape on your wallpaper.
+* **Border opacity** — from a solid frame down to none at all, leaving the Corral as a frameless shape on your wallpaper. The resize grip in the bottom-right corner stays visible either way, so a frameless Corral can still be grabbed and resized.
 * **Header** — title bar height, opacity, font face/size, and font color (font settings are per tab).
 * **Icons** — opacity, tint color, and tint strength.
 * **Icon spacing** — horizontal and vertical spacing (50–200%).
