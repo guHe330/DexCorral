@@ -63,7 +63,7 @@ HRESULT RegisterShellExtension(const wchar_t* dllPath) {
     DeleteRegistryKey(HKEY_LOCAL_MACHINE, keyPath);
     // Explorer calls CoCreateInstance on every CLSID listed here during startup,
     // loading the DLL in-process. ShellServiceObjectDelayLoad is no longer honored
-    // for third-party DLLs on Windows 10/11.
+    // for third-party DLLs on Windows 11.
     // Structure: value name = CLSID, value data = display name (same as Fences).
     hr = SetRegistryValue(HKEY_LOCAL_MACHINE,
         L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler",

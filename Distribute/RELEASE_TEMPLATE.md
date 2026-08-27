@@ -6,15 +6,17 @@
 
 | File | Description | Size |
 |------|-------------|------|
-| `DexCorral_${VERSION}_Setup.exe` | Installer (recommended) | ~750KB |
-| `Portable_DexCorral.zip` | Portable package (no installer) | ~750KB |
+| `DexCorral_${VERSION}_Setup.exe` | Installer (recommended) | ${SETUP_SIZE} |
+| `Portable_DexCorral_${VERSION}.zip` | Portable package (no installer) | ${PORTABLE_SIZE} |
+
+> **Requires Windows 11** (build 22000 or newer). Windows 10 is end of life and is not supported.
 
 > **Note:** Both packages are currently unsigned. Windows SmartScreen may show a warning on first run. Click "More info" then "Run anyway" to proceed.
 
 ### Installation Options
 
 #### Option 1: Installer (Recommended)
-**For Windows 10/11 users**
+**For Windows 11 users**
 
 1. Download `DexCorral_${VERSION}_Setup.exe`
 2. Run the installer (requires Administrator)
@@ -23,7 +25,7 @@
 #### Option 2: Portable Package
 **For advanced users or non-administrator installs**
 
-1. Download `Portable_DexCorral.zip`
+1. Download `Portable_DexCorral_${VERSION}.zip`
 2. Extract to any folder
 3. Run `DexCorral.exe --register` (as Administrator)
 4. Restart Explorer or log out/in

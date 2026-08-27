@@ -4,6 +4,8 @@ DexCorral organizes your Windows desktop icons into shaded, customizable areas c
 
 ## Installation
 
+DexCorral requires **Windows 11** (build 22000 or newer). Windows 10 is end of life and is neither tested nor supported; both the installer and `DexCorral.exe --register` refuse to run on it.
+
 ### Installer (recommended)
 
 1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorral/releases) page.
@@ -14,8 +16,8 @@ DexCorral loads automatically at every login — its shell extension is loaded b
 
 ### Portable package
 
-1. Download `Portable_DexCorral.zip` and extract it to any folder.
-2. Open a command prompt **as Administrator** in that folder and run `DexCorral.exe --register` (one-time setup).
+1. Download `Portable_DexCorral_<version>.zip` and extract it to any folder.
+2. Open a command prompt **as Administrator** in that folder and run `DexCorral.exe --register` (one-time setup). On an unsupported Windows version this stops with a message instead of registering — adding `--force` (`DexCorral.exe --register --force`) registers anyway, unsupported and untested.
 3. Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
 
 ### Uninstalling
