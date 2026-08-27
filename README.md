@@ -1,3 +1,8 @@
+[![Build and Release](https://github.com/guHe330/DexCorral/actions/workflows/build-release.yml/badge.svg)](https://github.com/guHe330/DexCorral/actions/workflows/build-release.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/guHe330/DexCorral?include_prereleases)](https://github.com/guHe330/DexCorral/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%2011-0078d4.svg)](#key-information)
+
 # DexCorral
 
 DexCorral is a native C++ desktop organization tool for Windows. It helps you keep your desktop clean by grouping icons into shaded, customizable areas called "Corrals". 
