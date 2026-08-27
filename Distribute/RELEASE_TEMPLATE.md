@@ -41,6 +41,19 @@
 - The header slider stops just short of invisible on purpose — the header is what you grab to move a Corral, roll it up, or open its menu, so a faint edge always remains. A rolled-up Corral is kept a little more visible still, and unrolling brings back exactly the setting you chose
 - The Corral border has its own opacity slider too, all the way down to none — a Corral can now sit on the desktop as a completely frameless shape
 - Hovering a Corral now brings its header and border back to full strength along with the icons, so a faded Corral is fully readable while you work in it and settles back when you move away. The fade-out is a little slower than before, so moving between two Corrals no longer makes them flash
+- Every opacity setting now sits together in one place: the Appearance dialog's Opacity group holds background, border, header and icon opacity as one set of sliders
+- Fixed: clicking a tab near its top edge did nothing. The top few pixels of every tab were reserved for resizing the Corral, so clicks that landed there were swallowed instead of switching tabs. The whole tab now responds, and the corners still resize
+- Fixed: a tab's reorder grip could be grabbed where no grip was shown, so a click near the left edge of a tab could start moving it unintentionally. Only the tab actually showing its grip can be dragged by it
+- Fixed: a Corral could stay in resize mode after you let go of the mouse button — moving the mouse afterwards kept resizing it. Releasing the button now always ends the resize, wherever the pointer happens to be, and the size you released at is saved
+
+<!-- Older changes (v1.0.21) -->
+
+- DexCorral has its own icon now — on the application, the tray, the Corral windows, and in the installer and Add/Remove Programs, instead of Windows' generic default
+- Fixed: Corrals no longer jump in front of other applications when you switch windows or click an icon inside a Corral
+- Fixed: files that had disappeared from a virtual Corral's folder left blank placeholder icons behind; they are now cleared out automatically
+- Fixed: "Remove from Corral" stayed available for entries whose file can no longer be found, so a stuck icon can always be cleared
+- Fixed: internet shortcuts showed their .url extension in the Corral when Windows could not resolve the item
+- Fixed: dragging an icon over a scrolled Corral highlighted the wrong drop position
 
 <!-- Older changes (v1.0.20) -->
 
