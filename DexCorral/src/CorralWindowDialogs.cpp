@@ -1020,15 +1020,15 @@ void CorralWindow::ShowAppearanceDialog()
 
     // Layout Y positions (in dialog units)
     // Background Color group: y=5, h=35
-    // Opacity group (background + border): y=45, h=47
-    // Header group (height + opacity + font + colour): y=97, h=80
-    // Icons group: y=182, h=55
-    // Icon Spacing group: y=242, h=40
-    // Checkboxes: y=288, y=302, y=316
-    // Buttons: y=333
+    // Opacity group (background + border + header + icons): y=45, h=81
+    // Header group (height + font + colour): y=131, h=58
+    // Icons group (tint): y=194, h=30
+    // Icon Spacing group: y=229, h=40
+    // Checkboxes: y=275, y=289, y=303
+    // Buttons: y=320
 
     const int DLG_WIDTH = 220;
-    const int DLG_HEIGHT = 350;
+    const int DLG_HEIGHT = 337;
     const int ITEM_COUNT = 20;
 
     WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
@@ -1062,9 +1062,9 @@ void CorralWindow::ShowAppearanceDialog()
     // 3. Change button (ID 106)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 55, 18, 60, 14, 106, 0xFFFF, 0x0080, L"Change...");
 
-    // === Opacity group (background fill + border) ===
+    // === Opacity group (background fill + border + header + icons) ===
     // 4. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 47, (WORD)-1, 0xFFFF, 0x0080, L"Opacity");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 81, (WORD)-1, 0xFFFF, 0x0080, L"Opacity");
     // 5. "Background" label
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 58, 40, 10, (WORD)-1, 0xFFFF, 0x0082, L"Background");
     // 6. Background opacity slider (ID 102)
@@ -1077,83 +1077,83 @@ void CorralWindow::ShowAppearanceDialog()
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 57, 73, 118, 15, 122);
     // 10. Border opacity label (ID 123)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 75, 25, 12, 123, 0xFFFF, 0x0082, L"100%");
+    // 11. "Header" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 92, 40, 10, (WORD)-1, 0xFFFF, 0x0082, L"Header");
+    // 12. Header opacity slider (ID 124)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 57, 90, 118, 15, 124);
+    // 13. Header opacity label (ID 125)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 92, 25, 12, 125, 0xFFFF, 0x0082, L"94%");
+    // 14. "Icons" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 109, 40, 10, (WORD)-1, 0xFFFF, 0x0082, L"Icons");
+    // 15. Icon opacity slider (ID 116)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 57, 107, 118, 15, 116);
+    // 16. Icon opacity label (ID 117)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 109, 25, 12, 117, 0xFFFF, 0x0082, L"100%");
 
     // === Header group ===
-    // 11. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 97, 210, 80, (WORD)-1, 0xFFFF, 0x0080, L"Header");
-    // 12. "Height" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 110, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Height");
-    // 13. Height slider (ID 110)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 108, 130, 15, 110);
-    // 14. Height label (ID 111)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 110, 25, 10, 111, 0xFFFF, 0x0082, L"32px");
-    // 15. "Opacity" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 127, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
-    // 16. Header opacity slider (ID 124)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 125, 130, 15, 124);
-    // 17. Header opacity label (ID 125)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 127, 25, 12, 125, 0xFFFF, 0x0082, L"94%");
-    // 18. "Font" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 144, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Font");
-    // 19. Font name display (ID 112)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_SUNKEN, 45, 143, 100, 12, 112, 0xFFFF, 0x0082, L"Segoe UI");
-    // 20. Choose Font button (ID 113)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 142, 55, 14, 113, 0xFFFF, 0x0080, L"Choose...");
-    // 21. "Color" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 161, 24, 10, (WORD)-1, 0xFFFF, 0x0082, L"Color");
-    // 22. Font color swatch (ID 114)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 45, 159, 30, 14, 114, 0xFFFF, 0x0082, nullptr);
-    // 23. Font color Change button (ID 115)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 159, 60, 14, 115, 0xFFFF, 0x0080, L"Change...");
+    // 17. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 131, 210, 58, (WORD)-1, 0xFFFF, 0x0080, L"Header");
+    // 18. "Height" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 144, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Height");
+    // 19. Height slider (ID 110)
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 142, 130, 15, 110);
+    // 20. Height label (ID 111)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 144, 25, 10, 111, 0xFFFF, 0x0082, L"32px");
+    // 21. "Font" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 161, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Font");
+    // 22. Font name display (ID 112)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_SUNKEN, 45, 160, 100, 12, 112, 0xFFFF, 0x0082, L"Segoe UI");
+    // 23. Choose Font button (ID 113)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 159, 55, 14, 113, 0xFFFF, 0x0080, L"Choose...");
+    // 24. "Color" label
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 178, 24, 10, (WORD)-1, 0xFFFF, 0x0082, L"Color");
+    // 25. Font color swatch (ID 114)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 45, 176, 30, 14, 114, 0xFFFF, 0x0082, nullptr);
+    // 26. Font color Change button (ID 115)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 176, 60, 14, 115, 0xFFFF, 0x0080, L"Change...");
 
-    // === Icons group ===
-    // 24. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 182, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Icons");
-    // 25. "Opacity" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 195, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
-    // 26. Icon opacity slider (ID 116)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 193, 130, 15, 116);
-    // 27. Icon opacity label (ID 117)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 195, 25, 12, 117, 0xFFFF, 0x0082, L"100%");
+    // === Icons group (tint; icon opacity lives in the Opacity group) ===
+    // 27. Group box
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 194, 210, 30, (WORD)-1, 0xFFFF, 0x0080, L"Icons");
     // 28. "Tint" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 212, 16, 10, (WORD)-1, 0xFFFF, 0x0082, L"Tint");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 207, 16, 10, (WORD)-1, 0xFFFF, 0x0082, L"Tint");
     // 29. Tint color swatch (ID 118)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 35, 210, 20, 14, 118, 0xFFFF, 0x0082, nullptr);
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 35, 205, 20, 14, 118, 0xFFFF, 0x0082, nullptr);
     // 30. Tint color Change button (ID 119)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 210, 40, 14, 119, 0xFFFF, 0x0080, L"Color...");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 205, 40, 14, 119, 0xFFFF, 0x0080, L"Color...");
     // 31. Tint strength slider (ID 120)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 105, 210, 70, 15, 120);
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 105, 205, 70, 15, 120);
     // 32. Tint strength label (ID 121)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 212, 25, 12, 121, 0xFFFF, 0x0082, L"0%");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 207, 25, 12, 121, 0xFFFF, 0x0082, L"0%");
 
     // === Icon Spacing group ===
     // 33. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 242, 210, 40, (WORD)-1, 0xFFFF, 0x0080, L"Icon Spacing");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 229, 210, 40, (WORD)-1, 0xFFFF, 0x0080, L"Icon Spacing");
     // 34. "Horiz" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 255, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Horiz");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 242, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Horiz");
     // 35. Horizontal spacing slider (ID 130)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 253, 135, 15, 130);
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 240, 135, 15, 130);
     // 36. Horizontal spacing label (ID 131)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 255, 25, 10, 131, 0xFFFF, 0x0082, L"100%");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 242, 25, 10, 131, 0xFFFF, 0x0082, L"100%");
     // 37. "Vert" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 269, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Vert");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 256, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Vert");
     // 38. Vertical spacing slider (ID 132)
-    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 267, 135, 15, 132);
+    p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 254, 135, 15, 132);
     // 39. Vertical spacing label (ID 133)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 269, 25, 10, 133, 0xFFFF, 0x0082, L"100%");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 256, 25, 10, 133, 0xFFFF, 0x0082, L"100%");
 
     // === Checkboxes ===
     // 40. Checkbox "Use as default" (ID 107)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 288, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 275, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
     // 41. Checkbox "Apply changed settings to all corrals" (ID 108)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 302, 200, 12, 108, 0xFFFF, 0x0080, L"Apply changes to all corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 289, 200, 12, 108, 0xFFFF, 0x0080, L"Apply changes to all corrals");
     // 42. Checkbox "Apply full appearance to all corrals" (ID 109)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 316, 200, 12, 109, 0xFFFF, 0x0080, L"Copy full style to all corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 303, 200, 12, 109, 0xFFFF, 0x0080, L"Copy full style to all corrals");
 
     // === Buttons ===
     // 43-44.
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 333, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 333, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 320, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 320, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
 
     // Fix item count in the template header
     ((DLGTEMPLATE *)dlgTemplate)->cdit = 44;
