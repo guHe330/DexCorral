@@ -272,3 +272,56 @@ TEST(ScalePremultiplied, ZeroOpacityTextLeavesTheBackgroundUntouched) {
     DWORD glyph = ScalePremultiplied(MakePremultiplied(255, 255, 255, 255), 0);
     EXPECT_EQ(PremultipliedOver(glyph, background), background);
 }
+
+// ---------------------------------------------------------------------------
+// Text opacity during the hover fade
+// ---------------------------------------------------------------------------
+
+TEST(HoverBlendTextOpacity, UnhoveredLeavesTheConfiguredValue) {
+    // Progress 0 is the resting state: whatever the slider says, unchanged.
+    EXPECT_EQ(HoverBlendTextOpacity(0, 0), 0);
+    EXPECT_EQ(HoverBlendTextOpacity(90, 0), 90);
+    EXPECT_EQ(HoverBlendTextOpacity(255, 0), 255);
+}
+
+TEST(HoverBlendTextOpacity, FullHoverReachesFullyOpaque) {
+    // However faint the text is configured to be, hovering brings it all the
+    // way up - including text the user set to invisible.
+    EXPECT_EQ(HoverBlendTextOpacity(0, 255), 255);
+    EXPECT_EQ(HoverBlendTextOpacity(90, 255), 255);
+    EXPECT_EQ(HoverBlendTextOpacity(255, 255), 255);
+}
+
+TEST(HoverBlendTextOpacity, MovesMonotonicallyTowardsFull) {
+    int previous = HoverBlendTextOpacity(40, 0);
+    for (int progress = 1; progress <= 255; progress++) {
+        int current = HoverBlendTextOpacity(40, progress);
+        EXPECT_GE(current, previous);
+        EXPECT_LE(current, 255);
+        previous = current;
+    }
+    EXPECT_EQ(previous, 255);
+}
+
+TEST(HoverBlendTextOpacity, NeverDropsBelowTheConfiguredValue) {
+    // A hover must not make text fainter than it is at rest, at any point in
+    // the fade - that would read as a flicker on mouse-over.
+    for (int configured = 0; configured <= 255; configured += 15) {
+        for (int progress = 0; progress <= 255; progress += 15) {
+            EXPECT_GE(HoverBlendTextOpacity(configured, progress), configured);
+        }
+    }
+}
+
+TEST(HoverBlendTextOpacity, HalfwayLandsBetweenConfiguredAndFull) {
+    int mid = HoverBlendTextOpacity(51, 128);
+    EXPECT_GT(mid, 51);
+    EXPECT_LT(mid, 255);
+}
+
+TEST(HoverBlendTextOpacity, ClampsOutOfRangeInputs) {
+    EXPECT_EQ(HoverBlendTextOpacity(-10, 0), 0);
+    EXPECT_EQ(HoverBlendTextOpacity(400, 0), 255);
+    EXPECT_EQ(HoverBlendTextOpacity(100, -10), 100);
+    EXPECT_EQ(HoverBlendTextOpacity(100, 400), 255);
+}

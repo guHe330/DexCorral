@@ -241,6 +241,13 @@ void CorralWindow::UpdateLayeredContent()
     const int titleLayerH = (GetTitleBarHeight() < h) ? GetTitleBarHeight() : h;
     if (titleLayerH > 0 && !config.Tabs.empty())
     {
+        // Each tab's own opacity, brought towards full by however far the hover
+        // fade has run (0 while unhovered, so this is the configured value).
+        std::vector<int> tabTextAlpha(config.Tabs.size());
+        for (int i = 0; i < (int)config.Tabs.size(); i++)
+            tabTextAlpha[i] = ChromeAlpha::HoverBlendTextOpacity(config.Tabs[i].HeaderFontOpacity,
+                                                                 currentTextHover);
+
         // Which tab owns each column, so the composite knows the text's colour
         // and opacity. Titles are drawn with DT_END_ELLIPSIS inside their own
         // tab rect, so they never cross into a neighbour's columns.
@@ -267,7 +274,7 @@ void CorralWindow::UpdateLayeredContent()
 
                 // Skip a fully transparent title: no point spending a font and a
                 // DrawTextW on something that composites to nothing.
-                if (ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity) == 0)
+                if (tabTextAlpha[i] == 0)
                     continue;
 
                 std::wstring fontNameW = Utf8ToWide(tab.HeaderFontName);
@@ -326,7 +333,7 @@ void CorralWindow::UpdateLayeredContent()
                     if (ti < 0)
                         continue;
 
-                    BYTE a = ChromeAlpha::TextCoverageAlpha(coverage, config.Tabs[ti].HeaderFontOpacity);
+                    BYTE a = ChromeAlpha::TextCoverageAlpha(coverage, tabTextAlpha[ti]);
                     if (a == 0)
                         continue;
 
@@ -522,7 +529,9 @@ void CorralWindow::UpdateLayeredContent()
          * The layer also contains DrawThemeTextEx's habit of ignoring GDI clip
          * regions: the composite bounds do the clipping instead.
          */
-        const int labelOpacity = ChromeAlpha::ClampTextOpacity(config.IconLabelOpacity);
+        // Brought towards full by the hover fade, in step with the icons.
+        const int labelOpacity = ChromeAlpha::HoverBlendTextOpacity(config.IconLabelOpacity,
+                                                                    currentTextHover);
         const int labelLayerH = (visibleBottom > visibleTop) ? (visibleBottom - visibleTop) : 0;
         TextLayer labels(screenDC, w, (labelOpacity > 0) ? labelLayerH : 0, TEXT_ALPHA_LAYER_FILL);
         // If the layer could not be allocated, labels fall back to being drawn
