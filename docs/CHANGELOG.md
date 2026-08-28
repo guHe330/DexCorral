@@ -11,11 +11,12 @@ Implementation detail belongs in the commit history.
 ## [Unreleased]
 
 ### Added
-- Two text opacity sliders in the Appearance dialog: **Header → Text** fades the tab title (per tab), **Opacity → Labels** fades the icon captions. Both reach fully invisible — a Corral with no title still drags and right-clicks, and icons with no captions stay clickable. Both also fade in on hover with the icons and chrome, so text set to 0% appears when you point at the Corral and fades away again when you leave.
+- Two text opacity sliders in the Appearance dialog: **Header label** fades the tab title (per tab), **Icon label** fades the icon captions. Both reach fully invisible — a Corral with no title still drags and right-clicks, and icons with no captions stay clickable. Both also fade in on hover with the icons and chrome, so text set to 0% appears when you point at the Corral and fades away again when you leave.
 - GitHub issue forms for bug reports, feature requests, and multi-monitor test reports.
 - Contributing guide gains a "Testing is a contribution" section naming the untested territory: multiple monitors, mixed DPI, unusual display hardware, and large desktops.
 
 ### Changed
+- Every opacity slider now sits together in the Appearance dialog's **Opacity** section, each one directly under what it affects. The Header and Icons sections keep only what is not an opacity.
 - DexCorral now requires Windows 11 (build 22000 or newer). Windows 10 is end of life and there is no machine to test it on, so the installer and `--register` refuse to run below that build. `--register --force` overrides the check, unsupported and untested.
 - Downloads are named after their version (`Portable_DexCorral_<version>.zip`), so packages from different releases stay distinguishable once downloaded.
 - Release notes show the real download sizes instead of a hand-maintained figure that had drifted from reality.
