@@ -1,10 +1,11 @@
 /**
  * test_chrome_alpha.cpp - Unit tests for the corral chrome alpha arithmetic.
  *
- * Covers the two rules the header/border opacity feature has to hold no matter
- * where the sliders sit: the header never fades below the point where it can
- * still be found and grabbed, and an inactive tab is always dimmer than the
- * active one (but never invisible).
+ * Covers the rules the opacity settings have to hold no matter where the
+ * sliders sit: the header never fades below the point where it can still be
+ * found and grabbed, an inactive tab is always dimmer than the active one (but
+ * never invisible), and text at full opacity composites to exactly what drawing
+ * it straight into the back buffer produced.
  */
 
 #include <gtest/gtest.h>
@@ -179,4 +180,95 @@ TEST(PremultipliedOver, NeverOverflowsAChannel) {
     EXPECT_LE((out >> 16) & 0xFF, 255u);
     EXPECT_LE((out >> 8) & 0xFF, 255u);
     EXPECT_LE(out & 0xFF, 255u);
+}
+
+// ---------------------------------------------------------------------------
+// Text opacity (header titles / icon labels)
+// ---------------------------------------------------------------------------
+
+TEST(TextOpacity, AllowsFullyTransparent) {
+    // Text is not a hit target: a corral with no visible tab title is still
+    // draggable by its header, and icons with no labels are still clickable.
+    EXPECT_EQ(ClampTextOpacity(0), 0);
+    EXPECT_EQ(ClampTextOpacity(-20), 0);
+    EXPECT_EQ(ClampTextOpacity(128), 128);
+    EXPECT_EQ(ClampTextOpacity(255), 255);
+    EXPECT_EQ(ClampTextOpacity(400), 255);
+}
+
+TEST(TextCoverageAlpha, FullOpacityKeepsCoverageIntact) {
+    // The whole point of the default: at 255 the glyph's antialiasing survives
+    // untouched, so turning the setting on changes nothing until it is moved.
+    EXPECT_EQ(TextCoverageAlpha(0, 255), 0);
+    EXPECT_EQ(TextCoverageAlpha(128, 255), 128);
+    EXPECT_EQ(TextCoverageAlpha(255, 255), 255);
+}
+
+TEST(TextCoverageAlpha, ScalesCoverageDown) {
+    EXPECT_EQ(TextCoverageAlpha(255, 128), 128);
+    EXPECT_EQ(TextCoverageAlpha(128, 128), 64);
+}
+
+TEST(TextCoverageAlpha, ZeroOpacityErasesEvenFullCoverage) {
+    EXPECT_EQ(TextCoverageAlpha(255, 0), 0);
+    EXPECT_EQ(TextCoverageAlpha(128, 0), 0);
+}
+
+TEST(TextCoverageAlpha, ClampsOutOfRangeOpacity) {
+    EXPECT_EQ(TextCoverageAlpha(255, 999), 255);
+    EXPECT_EQ(TextCoverageAlpha(255, -1), 0);
+}
+
+TEST(ScalePremultiplied, FullOpacityIsIdentity) {
+    // Same guarantee for the icon labels, which arrive already premultiplied
+    // from DrawThemeTextEx: at 255 the composite must be bit-identical to
+    // drawing them straight into the back buffer.
+    DWORD px = MakePremultiplied(200, 255, 128, 64);
+    EXPECT_EQ(ScalePremultiplied(px, 255), px);
+    EXPECT_EQ(ScalePremultiplied(px, 300), px);
+}
+
+TEST(ScalePremultiplied, ZeroOpacityErasesThePixel) {
+    DWORD px = MakePremultiplied(255, 255, 255, 255);
+    EXPECT_EQ(ScalePremultiplied(px, 0), 0u);
+    EXPECT_EQ(ScalePremultiplied(px, -5), 0u);
+}
+
+TEST(ScalePremultiplied, HalvingScalesEveryChannel) {
+    DWORD px = MakePremultiplied(200, 255, 128, 64);
+    DWORD out = ScalePremultiplied(px, 128);
+
+    EXPECT_EQ((out >> 24) & 0xFF, (((px >> 24) & 0xFF) * 128) / 255);
+    EXPECT_EQ((out >> 16) & 0xFF, (((px >> 16) & 0xFF) * 128) / 255);
+    EXPECT_EQ((out >> 8) & 0xFF, (((px >> 8) & 0xFF) * 128) / 255);
+    EXPECT_EQ(out & 0xFF, ((px & 0xFF) * 128) / 255);
+}
+
+TEST(ScalePremultiplied, StaysPremultipliedAfterScaling) {
+    // No colour channel may exceed the alpha, or the pixel is no longer a valid
+    // premultiplied value and UpdateLayeredWindow renders it as a bright halo.
+    for (int opacity = 0; opacity <= 255; opacity += 17) {
+        DWORD out = ScalePremultiplied(MakePremultiplied(255, 255, 255, 255), opacity);
+        BYTE a = (BYTE)((out >> 24) & 0xFF);
+        EXPECT_LE((out >> 16) & 0xFF, a);
+        EXPECT_LE((out >> 8) & 0xFF, a);
+        EXPECT_LE(out & 0xFF, a);
+    }
+}
+
+TEST(ScalePremultiplied, FadedTextOverABackgroundLandsBetweenTheTwo) {
+    // What the render actually does: scale the glyph, then composite it over
+    // the corral fill. Half-faded white text over black must read as grey.
+    DWORD glyph = ScalePremultiplied(MakePremultiplied(255, 255, 255, 255), 128);
+    DWORD out = PremultipliedOver(glyph, MakePremultiplied(255, 0, 0, 0));
+
+    EXPECT_EQ((out >> 24) & 0xFF, 255u);
+    EXPECT_GT((out >> 16) & 0xFF, 0u);
+    EXPECT_LT((out >> 16) & 0xFF, 255u);
+}
+
+TEST(ScalePremultiplied, ZeroOpacityTextLeavesTheBackgroundUntouched) {
+    DWORD background = MakePremultiplied(240, 30, 60, 90);
+    DWORD glyph = ScalePremultiplied(MakePremultiplied(255, 255, 255, 255), 0);
+    EXPECT_EQ(PremultipliedOver(glyph, background), background);
 }

@@ -270,6 +270,7 @@ void App::Initialize()
         tab.HeaderFontName = config.DefaultHeaderFontName;
         tab.HeaderFontSize = config.DefaultHeaderFontSize;
         tab.HeaderFontColor = config.DefaultHeaderFontColor;
+        tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
         defaultConfig.Tabs.push_back(tab);
 
         // Apply default appearance settings (same as CreateCorral)
@@ -277,6 +278,7 @@ void App::Initialize()
         defaultConfig.HeaderOpacity = config.DefaultHeaderOpacity;
         defaultConfig.BorderOpacity = config.DefaultBorderOpacity;
         defaultConfig.IconOpacity = config.DefaultIconOpacity;
+        defaultConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
         defaultConfig.IconTintColor = config.DefaultIconTintColor;
         defaultConfig.IconTintStrength = config.DefaultIconTintStrength;
         defaultConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
@@ -480,8 +482,9 @@ void App::SetDefaultColorHex(const std::string &colorHex)
 }
 
 void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                               int fontSize, const std::string &fontColor,
-                               int headerOpacity, int borderOpacity, int iconOpacity,
+                               int fontSize, const std::string &fontColor, int fontOpacity,
+                               int headerOpacity, int borderOpacity,
+                               int iconOpacity, int labelOpacity,
                                const std::string &tintColor, int tintStrength,
                                int spacingX, int spacingY)
 {
@@ -489,9 +492,11 @@ void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
     config.DefaultHeaderFontName = fontName;
     config.DefaultHeaderFontSize = fontSize;
     config.DefaultHeaderFontColor = fontColor;
+    config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(fontOpacity);
     config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(headerOpacity);
     config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(borderOpacity);
     config.DefaultIconOpacity = iconOpacity;
+    config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(labelOpacity);
     config.DefaultIconTintColor = tintColor;
     config.DefaultIconTintStrength = tintStrength;
     config.DefaultIconSpacingXPercent = spacingX;
@@ -516,7 +521,9 @@ void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyCol
                                       int borderOpacity, bool applyBorderOpacity,
                                       const std::string &fontName, int fontSize, bool applyFont,
                                       const std::string &fontColor, bool applyFontColor,
+                                      int fontOpacity, bool applyFontOpacity,
                                       int iconOpacity, bool applyIconOpacity,
+                                      int labelOpacity, bool applyLabelOpacity,
                                       const std::string &tintColor, int tintStrength, bool applyTint,
                                       int spacingX, int spacingY, bool applySpacing)
 {
@@ -547,7 +554,7 @@ void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyCol
             cfg.BorderOpacity = ChromeAlpha::ClampBorderOpacity(borderOpacity);
             corral->SetCurrentBorderOpacity(cfg.BorderOpacity);
         }
-        if (applyFont || applyFontColor)
+        if (applyFont || applyFontColor || applyFontOpacity)
         {
             int activeIdx = cfg.ActiveTabIndex;
             if (activeIdx >= 0 && activeIdx < (int)cfg.Tabs.size())
@@ -559,12 +566,18 @@ void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyCol
                 }
                 if (applyFontColor)
                     cfg.Tabs[activeIdx].HeaderFontColor = fontColor;
+                if (applyFontOpacity)
+                    cfg.Tabs[activeIdx].HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(fontOpacity);
             }
         }
         if (applyIconOpacity)
         {
             cfg.IconOpacity = iconOpacity;
             corral->SetCurrentOpacity(iconOpacity);
+        }
+        if (applyLabelOpacity)
+        {
+            cfg.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(labelOpacity);
         }
         if (applyTint)
         {
@@ -1298,6 +1311,7 @@ void App::CreateCorral(POINT pt)
     tab.HeaderFontName = config.DefaultHeaderFontName;
     tab.HeaderFontSize = config.DefaultHeaderFontSize;
     tab.HeaderFontColor = config.DefaultHeaderFontColor;
+    tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
@@ -1305,6 +1319,7 @@ void App::CreateCorral(POINT pt)
     newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
     newConfig.BorderOpacity = config.DefaultBorderOpacity;
     newConfig.IconOpacity = config.DefaultIconOpacity;
+    newConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
     newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
@@ -1548,6 +1563,7 @@ void App::CreateVirtualCorralAt(POINT pt)
     tab.HeaderFontName = config.DefaultHeaderFontName;
     tab.HeaderFontSize = config.DefaultHeaderFontSize;
     tab.HeaderFontColor = config.DefaultHeaderFontColor;
+    tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
@@ -1555,6 +1571,7 @@ void App::CreateVirtualCorralAt(POINT pt)
     newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
     newConfig.BorderOpacity = config.DefaultBorderOpacity;
     newConfig.IconOpacity = config.DefaultIconOpacity;
+    newConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
     newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;

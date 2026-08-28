@@ -24,11 +24,14 @@
 #include "Constants.h"
 
 ///
-/// ChromeAlpha.h - Pure alpha arithmetic for corral chrome (header, tabs, border).
+/// ChromeAlpha.h - Pure alpha arithmetic for corral chrome (header, tabs, border, text).
 ///
 /// The header opacity and the border opacity are user settings; the inactive tab
 /// appearance is *derived* from the header opacity rather than configured, so the
 /// active tab always stays distinguishable no matter where the slider sits.
+///
+/// The header title and icon label opacities are separate user settings, applied
+/// to a scratch text layer at composite time (see CorralWindowRender.cpp).
 ///
 /// These are free functions performing only arithmetic, so they are unit-testable
 /// without a live HWND (see tests/test_chrome_alpha.cpp). The tunable values they
@@ -57,6 +60,56 @@ namespace ChromeAlpha
         if (configured > 255)
             return 255;
         return configured;
+    }
+
+    /**
+     * Clamps a configured text opacity (header title or icon label).
+     *
+     * Like the border and unlike the header itself, 0 is allowed: text is not a
+     * hit target. Invisible tab titles still leave a draggable header, and
+     * faded-out labels still leave clickable icons.
+     */
+    inline int ClampTextOpacity(int configured)
+    {
+        if (configured < 0)
+            return 0;
+        if (configured > 255)
+            return 255;
+        return configured;
+    }
+
+    /**
+     * Turns an antialiasing coverage value into a pixel alpha.
+     *
+     * The header title is drawn black-on-white into a scratch layer, which
+     * yields per-pixel coverage rather than a colour (see CorralWindowRender).
+     * Scaling that coverage by the configured text opacity gives the alpha the
+     * glyph pixel should end up with.
+     */
+    inline BYTE TextCoverageAlpha(BYTE coverage, int textOpacity)
+    {
+        return (BYTE)((coverage * ClampTextOpacity(textOpacity)) / 255);
+    }
+
+    /**
+     * Scales a premultiplied pixel's opacity.
+     *
+     * Premultiplied alpha scales by plain multiplication on all four channels,
+     * so this is exact — no round-trip through straight alpha. Used to fade the
+     * icon label layer, whose pixels come out of DrawThemeTextEx already
+     * premultiplied.
+     */
+    inline DWORD ScalePremultiplied(DWORD px, int opacity)
+    {
+        const int f = ClampTextOpacity(opacity);
+        if (f >= 255)
+            return px;
+        if (f == 0)
+            return 0;
+        return ((DWORD)((((px >> 24) & 0xFF) * f) / 255) << 24) |
+               ((DWORD)((((px >> 16) & 0xFF) * f) / 255) << 16) |
+               ((DWORD)((((px >> 8) & 0xFF) * f) / 255) << 8) |
+               (DWORD)(((px & 0xFF) * f) / 255);
     }
 
     /**
