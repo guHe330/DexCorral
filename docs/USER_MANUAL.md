@@ -81,11 +81,10 @@ Right-click a Corral's title bar or background:
 
 <img src="assets/screenshots/appearance-dialog.png" alt="The Appearance dialog with background colour, opacity, header, icon and spacing controls" width="380">
 
-* **Background color** and **opacity** — fully opaque down to fully transparent.
-* **Border opacity** — solid frame down to none. The bottom-right resize grip stays visible either way.
-* **Header** — title bar height, opacity, font face/size, font color, and text opacity (font settings are per tab).
-* **Labels** — opacity of the icon captions, independent of the icons themselves.
-* **Icons** — opacity, tint color, and tint strength.
+* **Background color** — the Corral fill.
+* **Opacity** — one slider each for the background fill, border, header, header label, icons and icon labels. The border's resize grip stays visible however far down you take it.
+* **Header** — title bar height, font face/size, and font color (font settings are per tab).
+* **Icons** — tint color and tint strength.
 * **Icon spacing** — horizontal and vertical spacing (50–200%).
 
 Checkboxes at the bottom let you save the current style as the **default for new corrals**, **apply the changes** you just made to all corrals, or **copy the full style** to all corrals.
@@ -101,8 +100,8 @@ Header opacity fades the title bar and tab strip independently of the Corral fil
 The tab title and the icon labels fade on their own sliders, so text can be dialled back
 without touching what is behind it — or turned off entirely for a Corral that is just icons.
 
-* **Header → Text** fades the active tab's title. It is a per-tab setting, like the font face and color.
-* **Opacity → Labels** fades every icon caption in the Corral.
+* **Header label** fades the active tab's title. It is a per-tab setting, like the font face and color, even though the slider sits with the per-Corral ones.
+* **Icon label** fades every icon caption in the Corral.
 * Both go all the way to invisible. Nothing is lost: the header still drags, rolls up and
   right-clicks with no title on it, and icons stay visible and clickable with no captions.
 * Both fade in on hover along with the icons, border and header, on the same timing. Text set
