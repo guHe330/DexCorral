@@ -16,10 +16,9 @@ forms ask for what is actually needed to reproduce a problem:
 
 A partial report beats no report. If a field does not apply, leave it empty and post anyway.
 
-**Windows 11 only.** Windows 10 is end of life and I have no machine to test it on, so bugs
-reported from Windows 10 are closed as out of scope — including ones hit after bypassing the
-version check with `DexCorral.exe --register --force`. Registration refuses on Windows 10 by
-design; the override exists so you can experiment, not so you can file reports from there.
+**Windows 11 only.** Bugs reported from Windows 10 are closed as out of scope, including ones hit
+after bypassing the version check with `--force`. The override exists so you can experiment, not so
+you can file reports from there.
 
 For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest
 route to a fix. It lists your corral names, positions and the paths of the files you have organized,
@@ -33,11 +32,10 @@ DexCorral is alpha software developed on **one machine, with one monitor**, agai
 own way of using a desktop. Every setup that differs from that is untested territory. The gaps that
 most need someone else's hardware:
 
-- **Multiple monitors.** Corral positions are stored per monitor and per resolution, corrals move to
-  the primary display when their monitor is disconnected and return when it comes back — none of it
-  has ever run on a real multi-display setup. There is a
+- **Multiple monitors.** Per-monitor positions, per-resolution layouts, and monitor unplug/replug
+  handling have never run on a real multi-display setup. The
   [Multi-monitor test report](https://github.com/guHe330/DexCorral/issues/new?template=multi_monitor_report.yml)
-  template with a checklist; one completed section is a useful report.
+  form has a checklist; one completed section is a useful report.
 - **Mixed DPI**, such as a 150% laptop panel next to a 100% external screen.
 - **Unusual display hardware** — ultrawides, portrait orientation, TVs, wireless displays, docks.
 - **Large or unusual desktops** — hundreds of icons, OneDrive-synced folders, network paths.
@@ -59,11 +57,10 @@ Reviews happen roughly once a week.
 ## Contributor License Agreement
 
 Before a pull request can be merged, you need to sign the
-[Contributor License Agreement](CLA.md). It is three lines long: your contribution is licensed
-under the GPLv3, you have the right to submit it, and you keep your copyright.
+[Contributor License Agreement](CLA.md) — three lines, and you keep your copyright.
 
-This is a one-time step and it is automated. When you open your first pull request, a bot comments
-with a link. To sign, reply on the pull request with exactly:
+This is a one-time, automated step. When you open your first pull request, a bot comments with a
+link. To sign, reply on the pull request with exactly:
 
 ```
 I have read the CLA Document and I hereby sign the CLA
@@ -76,16 +73,12 @@ If you contribute as part of your job, make sure your employer permits it.
 
 ## Building
 
-See the [Build Guide](BUILD_GUIDE.md). In short, you need Visual Studio 2022 with the
-C++ desktop workload and CMake, then:
+See the [Build Guide](BUILD_GUIDE.md) for prerequisites and what the build script does.
 
 ```powershell
 cd DexCorral
 ./build.ps1
 ```
-
-The build script kills running DexCorral instances, compiles, runs the unit tests, and
-produces the installer.
 
 ## Pull requests
 
@@ -102,20 +95,14 @@ produces the installer.
 
 **Your part:** if the change is visible to a user, add one line under the `## [Unreleased]`
 heading at the top of [docs/CHANGELOG.md](./CHANGELOG.md), in the matching `### Added` /
-`### Changed` / `### Fixed` group (create the group if it is missing). Write it the way the rest
-of the file is written: what changed and why, naming the symbols or files involved. Do not add a
-version heading, do not edit already-released sections, and do not touch anything under
-`Distribute/`.
+`### Changed` / `### Fixed` group (create the group if it is missing).
 
-**Maintainer's part:** versioning and everything downstream of it — bumping
-`DexCorral/include/Version.h`, moving `[Unreleased]` into a dated `## [X.Y.Z]` section, writing
-the plain-language *What's New* release notes in `Distribute/RELEASE_TEMPLATE.md`, tagging, and
+Keep it to one or two sentences: what changed, and why if that is not obvious. No symbol names, no
+file paths, no implementation detail — that belongs in the commit message. Do not add a version
+heading, do not edit already-released sections, and do not touch anything under `Distribute/`.
+
+**Maintainer's part:** versioning, the dated release section, the *What's New* notes, tagging, and
 publishing the GitHub Release.
 
 If you are not sure a change is user-visible, add the line anyway — it is easier to drop one than
 to reconstruct it at release time.
-
-## Questions
-
-If you are unsure whether a change would be welcome, open an issue first and ask. That is
-usually faster than building something that turns out not to fit.

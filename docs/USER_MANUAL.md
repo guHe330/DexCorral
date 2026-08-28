@@ -9,7 +9,7 @@ DexCorral requires **Windows 11** (build 22000 or newer). Windows 10 is end of l
 ### Installer (recommended)
 
 1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorral/releases) page.
-2. Run it (Administrator rights are required for shell extension registration). Because the binaries are currently unsigned, Windows SmartScreen may warn on first run — click **More info**, then **Run anyway**.
+2. Run it — Administrator rights are required to register the shell extension. (SmartScreen may warn; see [Troubleshooting](#troubleshooting).)
 3. The installer registers the shell extension and starts DexCorral inside the running Explorer — no Explorer restart and no logout needed. A default Corral appears on your desktop immediately.
 
 DexCorral loads automatically at every login — its shell extension is loaded by Explorer on startup, so there is nothing to configure.
@@ -29,18 +29,18 @@ After uninstalling, icons that were inside Corrals reappear as normal desktop ic
 ## Core Concepts
 
 ### Corrals
-A Corral is a shaded, semi-transparent window that lives on your desktop and contains a group of icons. Icons assigned to a Corral are hidden from the regular desktop and drawn inside the Corral window instead. They remain real desktop items — opening, renaming, deleting, and dragging all work as usual.
+A Corral is a shaded, semi-transparent window holding a group of icons. Icons assigned to it are hidden from the regular desktop and drawn inside the Corral instead.
 
 ### Tabs
-Each Corral can hold multiple **tabs**, each with its own title, icon list, background color, view mode, and header font. Click a tab to switch to it. Tabs let one Corral hold several groups (e.g. "Work", "Games", "Downloads") without taking more screen space.
+Each Corral can hold multiple **tabs**, each with its own title, icon list, background color, view mode, and header font — several groups (e.g. "Work", "Games", "Downloads") in one place on the desktop.
 
-**Reordering tabs:** hover over a tab to reveal a small grip handle (a dotted "⠿" mark) on its left edge, then drag the grip left or right to move the tab to a new position. The new order is saved automatically.
+**Reordering tabs:** hover a tab to reveal a grip handle ("⠿") on its left edge, then drag it left or right.
 
 ### Catch-All
-One tab can be designated the **Catch-All**: any new file or shortcut that lands on your desktop is automatically captured into it, keeping the rest of your desktop clean.
+One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
 
 ### Virtual Corrals
-A virtual tab mirrors the contents of any folder on your PC — point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync automatically as the folder changes. Virtual tabs are a live view: you manage the files in the folder itself (drops onto a virtual tab are not accepted).
+A virtual tab mirrors any folder on your PC — point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes. It is a live view: manage the files in the folder itself (drops onto a virtual tab are not accepted).
 
 ## Managing Corrals
 
@@ -81,8 +81,8 @@ Right-click a Corral's title bar or background:
 
 <img src="assets/screenshots/appearance-dialog.png" alt="The Appearance dialog with background colour, opacity, header, icon and spacing controls" width="380">
 
-* **Background color** and **opacity** — from fully opaque down to fully transparent, where the Corral fill disappears entirely and only the organized icons remain over your wallpaper.
-* **Border opacity** — from a solid frame down to none at all, leaving the Corral as a frameless shape on your wallpaper. The resize grip in the bottom-right corner stays visible either way, so a frameless Corral can still be grabbed and resized.
+* **Background color** and **opacity** — fully opaque down to fully transparent.
+* **Border opacity** — solid frame down to none. The bottom-right resize grip stays visible either way.
 * **Header** — title bar height, opacity, font face/size, and font color (font settings are per tab).
 * **Icons** — opacity, tint color, and tint strength.
 * **Icon spacing** — horizontal and vertical spacing (50–200%).
@@ -90,12 +90,11 @@ Right-click a Corral's title bar or background:
 Checkboxes at the bottom let you save the current style as the **default for new corrals**, **apply the changes** you just made to all corrals, or **copy the full style** to all corrals.
 
 #### Header opacity and tabs
-Header opacity fades the title bar and tab strip independently of the Corral fill, so a Corral can sit almost invisibly on the wallpaper and still be there when you need it.
+Header opacity fades the title bar and tab strip independently of the Corral fill.
 
-* **Inactive tabs adjust automatically.** They are always rendered dimmer and darker than the active tab, derived from whatever header opacity you set — there is no separate slider to keep in sync, and the active tab stays recognizable at every setting.
-* **The slider stops short of fully transparent.** The header is what you drag to move a Corral, double-click to roll it up, and right-click for the menu; at zero it would be an invisible window that still catches the mouse. The minimum leaves a faint edge you can find.
-* **Rolled-up Corrals stay visible.** Rolled up, the header *is* the whole Corral, so it is kept a little more visible than your setting while in that state. Unrolling restores exactly what you chose.
-* **Hovering brings everything back.** Moving the mouse over a Corral fades its header, border and icons up to full strength, then fades them back when you leave — so a faded Corral is always fully readable while you are working in it.
+* Inactive tabs are derived from the header opacity automatically — always dimmer than the active tab, no second slider to keep in sync.
+* The slider stops short of fully transparent, because the header is the Corral's grab handle. Rolled-up Corrals are kept a little more visible than the setting; unrolling restores it exactly.
+* Hovering a Corral fades its header, border and icons up to full strength, and back when you leave.
 
 ## Working with Icons
 
@@ -149,7 +148,7 @@ The format is forward- and backward-compatible: fields missing from an older con
 
 ## Known Limitations
 
-* **Identical filenames on the user and Public desktop** — corral membership is stored as a bare filename, so two files with the exact same name on `%USERPROFILE%\Desktop` and `C:\Users\Public\Desktop` can't be told apart; DexCorral assumes the one on the user desktop. (Items with the same *display* name but different filenames — e.g. a folder `test` next to `test.txt` with hidden extensions — are fully distinguished.)
+* **Identical filenames on the user and Public desktop** — corral membership is stored as a bare filename, so DexCorral assumes the one on the user desktop. The same *display* name with different filenames (a folder `test` next to `test.txt`) is handled correctly.
 
 ## Troubleshooting
 
