@@ -11,6 +11,7 @@ Implementation detail belongs in the commit history.
 ## [Unreleased]
 
 ### Added
+- Two text opacity sliders in the Appearance dialog: **Header → Text** fades the tab title (per tab), **Opacity → Labels** fades the icon captions. Both reach fully invisible — a Corral with no title still drags and right-clicks, and icons with no captions stay clickable.
 - GitHub issue forms for bug reports, feature requests, and multi-monitor test reports.
 - Contributing guide gains a "Testing is a contribution" section naming the untested territory: multiple monitors, mixed DPI, unusual display hardware, and large desktops.
 
@@ -19,6 +20,9 @@ Implementation detail belongs in the commit history.
 - Downloads are named after their version (`Portable_DexCorral_<version>.zip`), so packages from different releases stay distinguishable once downloaded.
 - Release notes show the real download sizes instead of a hand-maintained figure that had drifted from reality.
 - Documentation trimmed: the README is a short overview that points at the manual instead of repeating it, and changelog entries are now brief user-facing lines rather than symbol-level detail.
+
+### Fixed
+- A black header font is no longer invisible. Tab titles are now drawn through the same path as the icon labels, which also drops subpixel antialiasing from the header — text on a Corral is very slightly softer, and correct over any wallpaper.
 
 ## [1.0.22] - 2026-08-27
 

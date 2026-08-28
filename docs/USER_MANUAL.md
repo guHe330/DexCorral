@@ -83,7 +83,8 @@ Right-click a Corral's title bar or background:
 
 * **Background color** and **opacity** — fully opaque down to fully transparent.
 * **Border opacity** — solid frame down to none. The bottom-right resize grip stays visible either way.
-* **Header** — title bar height, opacity, font face/size, and font color (font settings are per tab).
+* **Header** — title bar height, opacity, font face/size, font color, and text opacity (font settings are per tab).
+* **Labels** — opacity of the icon captions, independent of the icons themselves.
 * **Icons** — opacity, tint color, and tint strength.
 * **Icon spacing** — horizontal and vertical spacing (50–200%).
 
@@ -95,6 +96,15 @@ Header opacity fades the title bar and tab strip independently of the Corral fil
 * Inactive tabs are derived from the header opacity automatically — always dimmer than the active tab, no second slider to keep in sync.
 * The slider stops short of fully transparent, because the header is the Corral's grab handle. Rolled-up Corrals are kept a little more visible than the setting; unrolling restores it exactly.
 * Hovering a Corral fades its header, border and icons up to full strength, and back when you leave.
+
+#### Text opacity
+The tab title and the icon labels fade on their own sliders, so text can be dialled back
+without touching what is behind it — or turned off entirely for a Corral that is just icons.
+
+* **Header → Text** fades the active tab's title. It is a per-tab setting, like the font face and color.
+* **Opacity → Labels** fades every icon caption in the Corral.
+* Both go all the way to invisible. Nothing is lost: the header still drags, rolls up and
+  right-clicks with no title on it, and icons stay visible and clickable with no captions.
 
 ## Working with Icons
 

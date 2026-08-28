@@ -61,11 +61,19 @@ void Config::Normalize(AppConfig &config)
 {
     config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(config.DefaultHeaderOpacity);
     config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(config.DefaultBorderOpacity);
+    config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultHeaderFontOpacity);
+    config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultIconLabelOpacity);
 
     for (auto &corral : config.Corrals)
     {
         corral.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(corral.HeaderOpacity);
         corral.BorderOpacity = ChromeAlpha::ClampBorderOpacity(corral.BorderOpacity);
+        corral.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(corral.IconLabelOpacity);
+
+        for (auto &tab : corral.Tabs)
+        {
+            tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity);
+        }
     }
 }
 

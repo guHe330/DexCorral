@@ -411,6 +411,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
         newTab.HeaderFontName = GetActiveTab().HeaderFontName;  // Inherit font from current tab
         newTab.HeaderFontSize = GetActiveTab().HeaderFontSize;
         newTab.HeaderFontColor = GetActiveTab().HeaderFontColor;
+        newTab.HeaderFontOpacity = GetActiveTab().HeaderFontOpacity;
         AddTab(newTab);
         if (App::GetInstance())
         {
