@@ -171,6 +171,9 @@ public:
     void SetCurrentHeaderOpacity(int opacity) { currentHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(opacity); }
     /// Sets current border opacity (0-255; 0 means no visible frame)
     void SetCurrentBorderOpacity(int opacity) { currentBorderOpacity = ChromeAlpha::ClampBorderOpacity(opacity); }
+    /// Sets how far the text hover fade has run (0 = configured opacities, 255 = all text full).
+    /// The Appearance dialog snaps this to 0 so its live preview shows the value on the slider.
+    void SetCurrentTextHover(int progress) { currentTextHover = ChromeAlpha::ClampTextOpacity(progress); }
 
     /// Returns reference to the currently active tab
     CorralTabConfig &GetActiveTab();
@@ -267,8 +270,9 @@ private:
     void OnHoverCheckTimer();
 
     // Opacity/tint/chrome hover animation
-    void StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget, int durationMs);
-    /// Fades icons, header and border towards their hovered (full) or configured values
+    void StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget,
+                               int textHoverTargetVal, int durationMs);
+    /// Fades icons, header, border and text towards their hovered (full) or configured values
     void StartHoverFade(bool hoverIn);
     void OnOpacityAnimationTimer();
 
@@ -466,6 +470,13 @@ private:
     int borderOpacityStart = BORDER_OPACITY_DEFAULT;
     int borderOpacityTarget = BORDER_OPACITY_DEFAULT;
     int currentBorderOpacity = BORDER_OPACITY_DEFAULT; // Current animated border alpha (used by render)
+    // Text (tab titles, icon labels) rides the same fade, but as a progress
+    // rather than a value: the header title opacity is per tab, so a single
+    // animated value could not represent it. 0 = every text at its configured
+    // opacity, 255 = all of it fully opaque. See ChromeAlpha::HoverBlendTextOpacity.
+    int textHoverStart = 0;
+    int textHoverTarget = 0;
+    int currentTextHover = 0;
 
     // Quick-hide state: whole-window alpha (SourceConstantAlpha) animated
     // 255→0 before hiding the window, 0→255 after showing it again

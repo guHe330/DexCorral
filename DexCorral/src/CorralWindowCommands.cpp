@@ -736,18 +736,23 @@ void CorralWindow::StartHoverFade(bool hoverIn)
     int tintTargetVal = hoverIn ? 0 : config.IconTintStrength;
     int headerTarget = hoverIn ? 255 : ChromeAlpha::ClampHeaderOpacity(config.HeaderOpacity);
     int borderTarget = hoverIn ? 255 : ChromeAlpha::ClampBorderOpacity(config.BorderOpacity);
+    // Text rides the same fade as a 0..255 progress rather than a value, so the
+    // per-tab title opacities can all be carried by one animation.
+    int textHoverTargetVal = hoverIn ? 255 : 0;
 
-    StartOpacityAnimation(iconTarget, tintTargetVal, headerTarget, borderTarget,
+    StartOpacityAnimation(iconTarget, tintTargetVal, headerTarget, borderTarget, textHoverTargetVal,
                           hoverIn ? OPACITY_FADE_IN_DURATION : OPACITY_FADE_OUT_DURATION);
 }
 
-void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget, int durationMs)
+void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget,
+                                         int textHoverTargetVal, int durationMs)
 {
     bool opacityChanged = (currentOpacity != target);
     bool tintChanged = (currentTintStrength != tintTargetVal);
     bool headerChanged = (currentHeaderOpacity != headerTarget);
     bool borderChanged = (currentBorderOpacity != borderTarget);
-    if (!opacityChanged && !tintChanged && !headerChanged && !borderChanged)
+    bool textChanged = (currentTextHover != textHoverTargetVal);
+    if (!opacityChanged && !tintChanged && !headerChanged && !borderChanged && !textChanged)
         return; // Already at target
     opacityStart = currentOpacity;
     opacityTarget = target;
@@ -757,6 +762,8 @@ void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal, int head
     headerOpacityTarget = headerTarget;
     borderOpacityStart = currentBorderOpacity;
     borderOpacityTarget = borderTarget;
+    textHoverStart = currentTextHover;
+    textHoverTarget = textHoverTargetVal;
     opacityAnimationDuration = (durationMs > 0) ? durationMs : OPACITY_FADE_IN_DURATION;
     opacityAnimationStartTime = GetTickCount();
     isOpacityAnimating = true;
@@ -801,6 +808,12 @@ void CorralWindow::OnOpacityAnimationTimer()
         currentBorderOpacity = 0;
     if (currentBorderOpacity > 255)
         currentBorderOpacity = 255;
+
+    currentTextHover = textHoverStart + (int)((textHoverTarget - textHoverStart) * easedProgress);
+    if (currentTextHover < 0)
+        currentTextHover = 0;
+    if (currentTextHover > 255)
+        currentTextHover = 255;
 
     UpdateLayeredContent();
 }

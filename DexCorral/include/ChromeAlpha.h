@@ -113,6 +113,23 @@ namespace ChromeAlpha
     }
 
     /**
+     * Blends a configured text opacity towards fully opaque as a hover fade runs.
+     *
+     * The icon, header and border opacities animate their value directly, but
+     * the header title opacity is per *tab* while the animation state is per
+     * window, so what animates for text is the progress itself: 0 leaves every
+     * tab at its configured opacity, 255 brings all of them to full. Feeding
+     * the same eased progress through this produces exactly the value a direct
+     * animation would have reached, so text fades in step with the icons.
+     */
+    inline int HoverBlendTextOpacity(int configured, int hoverProgress)
+    {
+        const int base = ClampTextOpacity(configured);
+        const int p = ClampTextOpacity(hoverProgress);
+        return base + ((255 - base) * p) / 255;
+    }
+
+    /**
      * Returns the header alpha to actually render with.
      *
      * @param animatedHeaderAlpha Current (hover-animated) header alpha.
