@@ -481,26 +481,21 @@ void App::SetDefaultColorHex(const std::string &colorHex)
     config.DefaultColorHex = colorHex;
 }
 
-void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                               int fontSize, const std::string &fontColor, int fontOpacity,
-                               int headerOpacity, int borderOpacity,
-                               int iconOpacity, int labelOpacity,
-                               const std::string &tintColor, int tintStrength,
-                               int spacingX, int spacingY)
+void App::SetDefaultAppearance(const AppearanceSettings &settings)
 {
-    config.DefaultTitleBarHeight = titleBarHeight;
-    config.DefaultHeaderFontName = fontName;
-    config.DefaultHeaderFontSize = fontSize;
-    config.DefaultHeaderFontColor = fontColor;
-    config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(fontOpacity);
-    config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(headerOpacity);
-    config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(borderOpacity);
-    config.DefaultIconOpacity = iconOpacity;
-    config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(labelOpacity);
-    config.DefaultIconTintColor = tintColor;
-    config.DefaultIconTintStrength = tintStrength;
-    config.DefaultIconSpacingXPercent = spacingX;
-    config.DefaultIconSpacingYPercent = spacingY;
+    config.DefaultTitleBarHeight = settings.TitleBarHeight;
+    config.DefaultHeaderFontName = settings.HeaderFontName;
+    config.DefaultHeaderFontSize = settings.HeaderFontSize;
+    config.DefaultHeaderFontColor = settings.HeaderFontColor;
+    config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(settings.HeaderFontOpacity);
+    config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(settings.HeaderOpacity);
+    config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(settings.BorderOpacity);
+    config.DefaultIconOpacity = settings.IconOpacity;
+    config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(settings.IconLabelOpacity);
+    config.DefaultIconTintColor = settings.IconTintColor;
+    config.DefaultIconTintStrength = settings.IconTintStrength;
+    config.DefaultIconSpacingXPercent = settings.IconSpacingXPercent;
+    config.DefaultIconSpacingYPercent = settings.IconSpacingYPercent;
 }
 
 void App::ApplyColorToAllCorrals(const std::string &colorHex)
@@ -515,91 +510,77 @@ void App::ApplyColorToAllCorrals(const std::string &colorHex)
     }
 }
 
-void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
-                                      int titleBarHeight, bool applyHeight,
-                                      int headerOpacity, bool applyHeaderOpacity,
-                                      int borderOpacity, bool applyBorderOpacity,
-                                      const std::string &fontName, int fontSize, bool applyFont,
-                                      const std::string &fontColor, bool applyFontColor,
-                                      int fontOpacity, bool applyFontOpacity,
-                                      int iconOpacity, bool applyIconOpacity,
-                                      int labelOpacity, bool applyLabelOpacity,
-                                      const std::string &tintColor, int tintStrength, bool applyTint,
-                                      int spacingX, int spacingY, bool applySpacing)
+void App::ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
+                                      const AppearanceApplyFlags &apply)
 {
     for (auto &corral : corrals)
     {
         auto &cfg = corral->GetConfig();
-        bool needsLayoutRecalc = false;
 
-        if (applyColor)
+        if (apply.Color)
         {
             for (auto &tab : cfg.Tabs)
             {
-                tab.ColorHex = colorHex;
+                tab.ColorHex = settings.ColorHex;
             }
         }
-        if (applyHeight)
+        if (apply.TitleBarHeight)
         {
-            cfg.TitleBarHeight = titleBarHeight;
-            needsLayoutRecalc = true;
+            cfg.TitleBarHeight = settings.TitleBarHeight;
         }
-        if (applyHeaderOpacity)
+        if (apply.HeaderOpacity)
         {
-            cfg.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(headerOpacity);
+            cfg.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(settings.HeaderOpacity);
             corral->SetCurrentHeaderOpacity(cfg.HeaderOpacity);
         }
-        if (applyBorderOpacity)
+        if (apply.BorderOpacity)
         {
-            cfg.BorderOpacity = ChromeAlpha::ClampBorderOpacity(borderOpacity);
+            cfg.BorderOpacity = ChromeAlpha::ClampBorderOpacity(settings.BorderOpacity);
             corral->SetCurrentBorderOpacity(cfg.BorderOpacity);
         }
-        if (applyFont || applyFontColor || applyFontOpacity)
+        if (apply.Font || apply.FontColor || apply.FontOpacity)
         {
+            // Font settings are per-tab; the dialog edits the active tab, so
+            // that is where they land here too.
             int activeIdx = cfg.ActiveTabIndex;
             if (activeIdx >= 0 && activeIdx < (int)cfg.Tabs.size())
             {
-                if (applyFont)
+                auto &tab = cfg.Tabs[activeIdx];
+                if (apply.Font)
                 {
-                    cfg.Tabs[activeIdx].HeaderFontName = fontName;
-                    cfg.Tabs[activeIdx].HeaderFontSize = fontSize;
+                    tab.HeaderFontName = settings.HeaderFontName;
+                    tab.HeaderFontSize = settings.HeaderFontSize;
                 }
-                if (applyFontColor)
-                    cfg.Tabs[activeIdx].HeaderFontColor = fontColor;
-                if (applyFontOpacity)
-                    cfg.Tabs[activeIdx].HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(fontOpacity);
+                if (apply.FontColor)
+                    tab.HeaderFontColor = settings.HeaderFontColor;
+                if (apply.FontOpacity)
+                    tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(settings.HeaderFontOpacity);
             }
         }
-        if (applyIconOpacity)
+        if (apply.IconOpacity)
         {
-            cfg.IconOpacity = iconOpacity;
-            corral->SetCurrentOpacity(iconOpacity);
+            cfg.IconOpacity = settings.IconOpacity;
+            corral->SetCurrentOpacity(settings.IconOpacity);
         }
-        if (applyLabelOpacity)
+        if (apply.IconLabelOpacity)
         {
-            cfg.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(labelOpacity);
+            cfg.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(settings.IconLabelOpacity);
         }
-        if (applyTint)
+        if (apply.Tint)
         {
-            cfg.IconTintColor = tintColor;
-            cfg.IconTintStrength = tintStrength;
-            corral->SetCurrentTintStrength(tintStrength);
+            cfg.IconTintColor = settings.IconTintColor;
+            cfg.IconTintStrength = settings.IconTintStrength;
+            corral->SetCurrentTintStrength(settings.IconTintStrength);
         }
-        if (applySpacing)
+        if (apply.Spacing)
         {
-            cfg.IconSpacingXPercent = spacingX;
-            cfg.IconSpacingYPercent = spacingY;
-            needsLayoutRecalc = true;
+            cfg.IconSpacingXPercent = settings.IconSpacingXPercent;
+            cfg.IconSpacingYPercent = settings.IconSpacingYPercent;
         }
 
-        if (needsLayoutRecalc)
-        {
-            corral->RecalculateLayout();
-        }
-        else
-        {
-            corral->RecalculateLayout();
-        }
+        // Every branch above changes something the layout or the paint depends
+        // on, so this is unconditional.
+        corral->RecalculateLayout();
     }
 }
 

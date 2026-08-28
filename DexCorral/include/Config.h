@@ -147,6 +147,64 @@ struct AppConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch)
 };
 
+/**
+ * A corral's complete appearance, as the Appearance dialog understands it.
+ *
+ * Flattens the split between per-corral settings (CorralWindowConfig) and the
+ * per-tab font settings (CorralTabConfig) into the one thing the user is
+ * actually editing, so applying a look elsewhere is a single value to pass
+ * around rather than a dozen loose parameters in a fixed order.
+ */
+struct AppearanceSettings
+{
+    std::string ColorHex;            /// Tab background (ARGB hex) — per tab, applied to every tab
+    int TitleBarHeight = 32;
+    int HeaderOpacity = 240;
+    int BorderOpacity = 255;
+    std::string HeaderFontName = "Segoe UI";
+    int HeaderFontSize = 10;
+    std::string HeaderFontColor = "#FFFFFF";
+    int HeaderFontOpacity = 255;
+    int IconOpacity = 255;
+    int IconLabelOpacity = 255;
+    std::string IconTintColor = "#000000";
+    int IconTintStrength = 0;
+    int IconSpacingXPercent = 100;
+    int IconSpacingYPercent = 100;
+};
+
+/**
+ * Which parts of an AppearanceSettings to apply.
+ *
+ * Everything is off by default: the dialog turns on only what the user actually
+ * touched ("apply changes to all corrals"), or calls All() to copy the whole
+ * look ("copy full style to all corrals").
+ */
+struct AppearanceApplyFlags
+{
+    bool Color = false;
+    bool TitleBarHeight = false;
+    bool HeaderOpacity = false;
+    bool BorderOpacity = false;
+    bool Font = false;        /// Face and size together — the font picker sets both
+    bool FontColor = false;
+    bool FontOpacity = false;
+    bool IconOpacity = false;
+    bool IconLabelOpacity = false;
+    bool Tint = false;        /// Colour and strength together
+    bool Spacing = false;     /// Horizontal and vertical together
+
+    /// Every setting, for "copy full style to all corrals"
+    static AppearanceApplyFlags All()
+    {
+        AppearanceApplyFlags f;
+        f.Color = f.TitleBarHeight = f.HeaderOpacity = f.BorderOpacity = true;
+        f.Font = f.FontColor = f.FontOpacity = true;
+        f.IconOpacity = f.IconLabelOpacity = f.Tint = f.Spacing = true;
+        return f;
+    }
+};
+
 class Config
 {
 public:

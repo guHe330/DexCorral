@@ -1351,49 +1351,51 @@ void CorralWindow::ShowAppearanceDialog()
         App *app = App::GetInstance();
         if (app)
         {
+            // One snapshot of the look the user just approved; what happens to
+            // it depends on the checkboxes.
+            AppearanceSettings look;
+            look.ColorHex = GetActiveTab().ColorHex;
+            look.TitleBarHeight = config.TitleBarHeight;
+            look.HeaderOpacity = config.HeaderOpacity;
+            look.BorderOpacity = config.BorderOpacity;
+            look.HeaderFontName = GetActiveTab().HeaderFontName;
+            look.HeaderFontSize = GetActiveTab().HeaderFontSize;
+            look.HeaderFontColor = GetActiveTab().HeaderFontColor;
+            look.HeaderFontOpacity = GetActiveTab().HeaderFontOpacity;
+            look.IconOpacity = config.IconOpacity;
+            look.IconLabelOpacity = config.IconLabelOpacity;
+            look.IconTintColor = config.IconTintColor;
+            look.IconTintStrength = config.IconTintStrength;
+            look.IconSpacingXPercent = config.IconSpacingXPercent;
+            look.IconSpacingYPercent = config.IconSpacingYPercent;
+
             if (dlgData.useAsDefault)
             {
-                app->SetDefaultColorHex(GetActiveTab().ColorHex);
-                app->SetDefaultAppearance(config.TitleBarHeight, GetActiveTab().HeaderFontName,
-                                          GetActiveTab().HeaderFontSize, GetActiveTab().HeaderFontColor,
-                                          GetActiveTab().HeaderFontOpacity,
-                                          config.HeaderOpacity, config.BorderOpacity,
-                                          config.IconOpacity, config.IconLabelOpacity,
-                                          config.IconTintColor, config.IconTintStrength,
-                                          config.IconSpacingXPercent, config.IconSpacingYPercent);
+                app->SetDefaultColorHex(look.ColorHex);
+                app->SetDefaultAppearance(look);
             }
 
             if (dlgData.applyChangesToAll)
             {
                 // Apply only the settings the user actually changed
-                app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
-                                                 dlgData.colorChanged,
-                                                 config.TitleBarHeight, dlgData.titleBarHeightChanged,
-                                                 config.HeaderOpacity, dlgData.headerOpacityChanged,
-                                                 config.BorderOpacity, dlgData.borderOpacityChanged,
-                                                 GetActiveTab().HeaderFontName, GetActiveTab().HeaderFontSize, dlgData.fontChanged,
-                                                 GetActiveTab().HeaderFontColor, dlgData.fontColorChanged,
-                                                 GetActiveTab().HeaderFontOpacity, dlgData.fontOpacityChanged,
-                                                 config.IconOpacity, dlgData.iconOpacityChanged,
-                                                 config.IconLabelOpacity, dlgData.labelOpacityChanged,
-                                                 config.IconTintColor, config.IconTintStrength, dlgData.tintChanged,
-                                                 config.IconSpacingXPercent, config.IconSpacingYPercent,
-                                                 dlgData.iconSpacingXChanged || dlgData.iconSpacingYChanged);
+                AppearanceApplyFlags changed;
+                changed.Color = dlgData.colorChanged;
+                changed.TitleBarHeight = dlgData.titleBarHeightChanged;
+                changed.HeaderOpacity = dlgData.headerOpacityChanged;
+                changed.BorderOpacity = dlgData.borderOpacityChanged;
+                changed.Font = dlgData.fontChanged;
+                changed.FontColor = dlgData.fontColorChanged;
+                changed.FontOpacity = dlgData.fontOpacityChanged;
+                changed.IconOpacity = dlgData.iconOpacityChanged;
+                changed.IconLabelOpacity = dlgData.labelOpacityChanged;
+                changed.Tint = dlgData.tintChanged;
+                changed.Spacing = dlgData.iconSpacingXChanged || dlgData.iconSpacingYChanged;
+                app->ApplyAppearanceToAllCorrals(look, changed);
             }
             else if (dlgData.applyEverythingToAll)
             {
                 // Copy full appearance to all corrals
-                app->ApplyAppearanceToAllCorrals(GetActiveTab().ColorHex,
-                                                 true, config.TitleBarHeight, true,
-                                                 config.HeaderOpacity, true,
-                                                 config.BorderOpacity, true,
-                                                 GetActiveTab().HeaderFontName, GetActiveTab().HeaderFontSize, true,
-                                                 GetActiveTab().HeaderFontColor, true,
-                                                 GetActiveTab().HeaderFontOpacity, true,
-                                                 config.IconOpacity, true,
-                                                 config.IconLabelOpacity, true,
-                                                 config.IconTintColor, config.IconTintStrength, true,
-                                                 config.IconSpacingXPercent, config.IconSpacingYPercent, true);
+                app->ApplyAppearanceToAllCorrals(look, AppearanceApplyFlags::All());
             }
 
             app->SaveConfig();
