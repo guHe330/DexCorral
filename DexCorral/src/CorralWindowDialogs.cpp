@@ -886,6 +886,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             if (data->activeTabConfig)
             {
                 data->activeTabConfig->HeaderFontOpacity = pos;
+                if (data->corralWindow)
+                    data->corralWindow->SetCurrentTextHover(0); // preview the slider, not the hover fade
                 AppearanceUpdateLivePreview(data);
             }
         }
@@ -899,6 +901,8 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             if (data->corralConfig)
             {
                 data->corralConfig->IconLabelOpacity = pos;
+                if (data->corralWindow)
+                    data->corralWindow->SetCurrentTextHover(0); // preview the slider, not the hover fade
                 AppearanceUpdateLivePreview(data);
             }
         }

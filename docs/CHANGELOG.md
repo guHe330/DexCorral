@@ -11,7 +11,7 @@ Implementation detail belongs in the commit history.
 ## [Unreleased]
 
 ### Added
-- Two text opacity sliders in the Appearance dialog: **Header → Text** fades the tab title (per tab), **Opacity → Labels** fades the icon captions. Both reach fully invisible — a Corral with no title still drags and right-clicks, and icons with no captions stay clickable.
+- Two text opacity sliders in the Appearance dialog: **Header → Text** fades the tab title (per tab), **Opacity → Labels** fades the icon captions. Both reach fully invisible — a Corral with no title still drags and right-clicks, and icons with no captions stay clickable. Both also fade in on hover with the icons and chrome, so text set to 0% appears when you point at the Corral and fades away again when you leave.
 - GitHub issue forms for bug reports, feature requests, and multi-monitor test reports.
 - Contributing guide gains a "Testing is a contribution" section naming the untested territory: multiple monitors, mixed DPI, unusual display hardware, and large desktops.
 
