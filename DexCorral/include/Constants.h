@@ -45,10 +45,6 @@ constexpr DWORD DIALOG_TEMPLATE_BUFFER_SIZE = 4096;
 // Rendering: Opacity and Alpha
 // ============================================================================
 
-/// Title bar text alpha (86% opacity, 220/255)
-/// Reduces title bar visibility while maintaining readability
-constexpr BYTE TITLE_TEXT_ALPHA = 220;
-
 /// Icon selection overlay alpha (70% opacity, 180/255)
 /// Provides visual feedback for selected icons without blocking them
 constexpr BYTE SELECTION_ALPHA = 180;
@@ -100,6 +96,23 @@ constexpr int INACTIVE_TAB_RGB_SCALE_MIN_PERCENT = 25;
 
 /// Default border opacity (255, fully opaque) — the previous hard-coded value
 constexpr int BORDER_OPACITY_DEFAULT = 255;
+
+// ----------------------------------------------------------------------------
+// Text opacity (header titles / icon labels)
+//
+// Both default to fully opaque, so a config written before these settings
+// existed renders exactly as it did before. Unlike the header opacity neither
+// has a floor: text is not a hit target. A corral with invisible tab titles is
+// still draggable by its header, and icons with faded-out labels are still
+// visible and clickable, so 0 is a legitimate "minimal chrome" look rather
+// than a way to lose the corral.
+// ----------------------------------------------------------------------------
+
+/// Default header title text opacity (255, fully opaque)
+constexpr int HEADER_FONT_OPACITY_DEFAULT = 255;
+
+/// Default icon label text opacity (255, fully opaque)
+constexpr int ICON_LABEL_OPACITY_DEFAULT = 255;
 
 // ============================================================================
 // Rendering: Colors (ARGB format)

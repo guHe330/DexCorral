@@ -76,13 +76,14 @@ struct CorralTabConfig
     std::string HeaderFontName = "Segoe UI"; /// Font face for header text
     int HeaderFontSize = 10;                 /// Font size in points (matches font picker)
     std::string HeaderFontColor = "#FFFFFF"; /// RGB hex color for header text
+    int HeaderFontOpacity = 255;             /// Header text opacity (0-255); 0 hides the title, header stays draggable
 
     /// Returns the current view mode as enum
     ViewMode GetViewMode() const { return static_cast<ViewMode>(ViewModeInt); }
     /// Sets the view mode from enum
     void SetViewMode(ViewMode mode) { ViewModeInt = static_cast<int>(mode); }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity)
 };
 
 /// Configuration for a single corral window
@@ -106,12 +107,13 @@ struct CorralWindowConfig
     int HeaderOpacity = 240;               // Header/tab-strip opacity (20-255); inactive tabs are derived from it
     int BorderOpacity = 255;               // Corral border opacity (0=frameless, 255=opaque)
     int IconOpacity = 255;                 // Icon transparency (0=invisible, 255=opaque)
+    int IconLabelOpacity = 255;            // Icon label text opacity (0=labels hidden, 255=opaque)
     std::string IconTintColor = "#000000"; // Tint color for icons (RGB hex)
     int IconTintStrength = 0;              // Tint strength (0=none, 255=full overlay)
     int IconSpacingXPercent = 100;         // Horizontal icon spacing (50-200%)
     int IconSpacingYPercent = 100;         // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig
@@ -126,9 +128,11 @@ struct AppConfig
     std::string DefaultHeaderFontName = "Segoe UI Semibold"; // Applied to each new tab's header font
     int DefaultHeaderFontSize = 10;
     std::string DefaultHeaderFontColor = "#FFFFFF";
+    int DefaultHeaderFontOpacity = 255;
     int DefaultHeaderOpacity = 240;
     int DefaultBorderOpacity = 255;
     int DefaultIconOpacity = 210;
+    int DefaultIconLabelOpacity = 255;
     std::string DefaultIconTintColor = "#0000FF";
     int DefaultIconTintStrength = 28;
     int DefaultIconSpacingXPercent = 100;
@@ -140,7 +144,7 @@ struct AppConfig
     bool CheckForUpdates = false;
     long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch)
 };
 
 class Config
