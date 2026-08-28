@@ -92,39 +92,21 @@ public:
     /// Sets the default corral background color (hex format, e.g., "FF0000" for red)
     void SetDefaultColorHex(const std::string &colorHex);
 
-    /**
-     * Sets default appearance for all new corrals.
-     * Parameters: titleBarHeight, fontName, fontSize, fontColor (hex),
-     * fontOpacity (0-255), headerOpacity (20-255), borderOpacity (0-255),
-     * iconOpacity (0-100), labelOpacity (0-255), tintColor (hex),
-     * tintStrength (0-100), spacingX, spacingY (pixels)
-     */
-    void SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                              int fontSize, const std::string &fontColor, int fontOpacity,
-                              int headerOpacity, int borderOpacity,
-                              int iconOpacity, int labelOpacity,
-                              const std::string &tintColor, int tintStrength,
-                              int spacingX, int spacingY);
+    /// Sets the appearance new corrals and tabs are created with.
+    /// ColorHex is handled separately by SetDefaultColorHex and is ignored here.
+    void SetDefaultAppearance(const AppearanceSettings &settings);
 
     /// Applies the specified background color to all existing corrals
     void ApplyColorToAllCorrals(const std::string &colorHex);
 
     /**
-     * Applies appearance settings to all existing corrals with selective updating.
-     * Boolean flags determine which settings are applied (changed flags pattern).
-     * Only settings with corresponding flags set to true are updated.
+     * Applies appearance settings to all existing corrals.
+     * Only the parts marked in `apply` are written; the rest are left alone.
+     * Font settings land on each corral's active tab, matching where the
+     * Appearance dialog edits them.
      */
-    void ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
-                                     int titleBarHeight, bool applyHeight,
-                                     int headerOpacity, bool applyHeaderOpacity,
-                                     int borderOpacity, bool applyBorderOpacity,
-                                     const std::string &fontName, int fontSize, bool applyFont,
-                                     const std::string &fontColor, bool applyFontColor,
-                                     int fontOpacity, bool applyFontOpacity,
-                                     int iconOpacity, bool applyIconOpacity,
-                                     int labelOpacity, bool applyLabelOpacity,
-                                     const std::string &tintColor, int tintStrength, bool applyTint,
-                                     int spacingX, int spacingY, bool applySpacing);
+    void ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
+                                     const AppearanceApplyFlags &apply);
 
     /// Creates a new corral at the specified screen coordinates
     void CreateCorralAt(POINT pt);
