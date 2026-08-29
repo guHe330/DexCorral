@@ -96,6 +96,13 @@ public:
     // Debug logging flag — set from config after load, read by dllmain/CorralHook Log()
     static void SetDebugLogging(bool enable);
     static bool IsDebugLogging();
+
+    // This DLL's own module handle, set once from DllMain(DLL_PROCESS_ATTACH).
+    // App.cpp/CorralWindow.cpp run injected into Explorer, so GetModuleHandleW(nullptr)
+    // there resolves to explorer.exe, not this DLL — use this instead to load the
+    // icon resources embedded in DexCorralHook.rc.
+    static void SetDllModule(HMODULE hModule);
+    static HMODULE GetDllModule();
 };
 
 // RAII scope for HookBridge::BeginAppIconMove/EndAppIconMove

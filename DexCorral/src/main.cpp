@@ -21,12 +21,37 @@
 
 #include <Windows.h>
 #include <shellapi.h>
+#include <strsafe.h>
 #include <string>
 #include "Strings.h"
 
 // DexCorral Registration Tool
 // The actual application runs as a shell extension (DexCorralHook.dll) loaded by Explorer.
 // This EXE registers/unregisters the shell extension, and injects it at login via --startup.
+
+// DexCorral targets Windows 11 only. Windows 10 is end of life and none of the
+// Explorer integration here is tested on it, so registration refuses to run
+// below this build unless --force is passed.
+static const DWORD kMinWindowsBuild = 22000;  // Windows 11 21H2
+
+// GetVersionEx and the VersionHelpers macros are capped by the application
+// manifest and report an old version on newer Windows, so ask the kernel.
+// A failed probe returns 0 and is treated as supported: an unknown version is
+// never a reason to block someone who is probably on Windows 11 anyway.
+static DWORD GetWindowsBuildNumber()
+{
+    typedef LONG(WINAPI *RtlGetVersionFunc)(PRTL_OSVERSIONINFOW);
+
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (!hNtdll) return 0;
+
+    auto fn = (RtlGetVersionFunc)GetProcAddress(hNtdll, "RtlGetVersion");
+    if (!fn) return 0;
+
+    RTL_OSVERSIONINFOW info = { sizeof(info) };
+    if (fn(&info) != 0) return 0;  // != STATUS_SUCCESS
+    return info.dwBuildNumber;
+}
 
 typedef HRESULT(__stdcall *DllRegisterServerFunc)();
 typedef HRESULT(__stdcall *DllUnregisterServerFunc)();
@@ -117,6 +142,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     bool doUnregister = false;
     bool doStartup    = false;
     bool silent       = false;
+    bool force        = false;
 
     for (int i = 1; i < argc; i++)
     {
@@ -124,6 +150,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         else if (_wcsicmp(argv[i], L"--unregister") == 0 || _wcsicmp(argv[i], L"-unregister") == 0) doUnregister = true;
         else if (_wcsicmp(argv[i], L"--startup")    == 0 || _wcsicmp(argv[i], L"-startup")    == 0) doStartup    = true;
         else if (_wcsicmp(argv[i], L"--silent")     == 0 || _wcsicmp(argv[i], L"-silent")     == 0) silent       = true;
+        else if (_wcsicmp(argv[i], L"--force")      == 0 || _wcsicmp(argv[i], L"-force")      == 0) force        = true;
     }
     LocalFree(argv);
 
@@ -137,6 +164,25 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     // ── --startup: inject into Explorer and exit ──────────────────────────────
     if (doStartup)
         return DoStartup(dllPath, silent);
+
+    // ── Windows 11 check (registration only) ──────────────────────────────────
+    // --unregister and --startup are deliberately not gated: a forced install
+    // must stay removable and startable.
+    if (doRegister && !force)
+    {
+        DWORD build = GetWindowsBuildNumber();
+        if (build != 0 && build < kMinWindowsBuild)
+        {
+            if (!silent)
+            {
+                const std::wstring msg = TrFmt(Str::Reg_NeedsWin11,
+                                               std::to_wstring(kMinWindowsBuild),
+                                               std::to_wstring(build));
+                MessageBoxW(nullptr, msg.c_str(), Tr(Str::App_Name), MB_ICONERROR);
+            }
+            return 1;
+        }
+    }
 
     // ── --register / --unregister ─────────────────────────────────────────────
     if (doRegister || doUnregister)

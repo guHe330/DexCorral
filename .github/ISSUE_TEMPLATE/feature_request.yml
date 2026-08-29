@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest something DexCorral should do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        DexCorral is a personal tool, developed to fit the maintainer's own workflow. Suggestions that
+        do not serve that purpose are declined regardless of how well they are argued or implemented —
+        see [Project Scope](https://github.com/guHe330/DexCorral#project-scope).
+
+        That is not a reason to stay quiet. It is a reason to ask **before** you build anything.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation you run into, not the feature you have in mind. The problem is the useful part.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like DexCorral to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today instead?
+      description: Workarounds, other tools, or "nothing, I live with it".
+
+  - type: checkboxes
+    id: offer
+    attributes:
+      label: Would you write it?
+      options:
+        - label: I would be willing to open a pull request for this, if the maintainer says it fits

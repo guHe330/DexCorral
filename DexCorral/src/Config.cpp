@@ -23,6 +23,7 @@
 #include <ShlObj.h>
 #include <fstream>
 #include <filesystem>
+#include "ChromeAlpha.h"
 
 static std::wstring Utf8ToWide(const std::string &s)
 {
@@ -56,6 +57,26 @@ std::string Config::GetConfigPath()
     return "config.json";
 }
 
+void Config::Normalize(AppConfig &config)
+{
+    config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(config.DefaultHeaderOpacity);
+    config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(config.DefaultBorderOpacity);
+    config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultHeaderFontOpacity);
+    config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultIconLabelOpacity);
+
+    for (auto &corral : config.Corrals)
+    {
+        corral.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(corral.HeaderOpacity);
+        corral.BorderOpacity = ChromeAlpha::ClampBorderOpacity(corral.BorderOpacity);
+        corral.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(corral.IconLabelOpacity);
+
+        for (auto &tab : corral.Tabs)
+        {
+            tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity);
+        }
+    }
+}
+
 AppConfig Config::Load()
 {
     std::string path = GetConfigPath();
@@ -70,7 +91,9 @@ AppConfig Config::Load()
     {
         nlohmann::json j;
         file >> j;
-        return j.get<AppConfig>();
+        AppConfig loaded = j.get<AppConfig>();
+        Normalize(loaded);
+        return loaded;
     }
     catch (...)
     {

@@ -412,6 +412,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
         newTab.HeaderFontName = GetActiveTab().HeaderFontName;  // Inherit font from current tab
         newTab.HeaderFontSize = GetActiveTab().HeaderFontSize;
         newTab.HeaderFontColor = GetActiveTab().HeaderFontColor;
+        newTab.HeaderFontOpacity = GetActiveTab().HeaderFontOpacity;
         AddTab(newTab);
         if (App::GetInstance())
         {
@@ -729,21 +730,42 @@ void CorralWindow::OnHoverCheckTimer()
     }
 }
 
-void CorralWindow::StartOpacityAnimation(int target)
+void CorralWindow::StartHoverFade(bool hoverIn)
 {
-    StartOpacityAnimation(target, (target == 255) ? 0 : config.IconTintStrength);
+    // Hovering brings everything to full; leaving returns to the configured look.
+    int iconTarget = hoverIn ? 255 : ((config.IconOpacity < 5) ? 5 : config.IconOpacity);
+    int tintTargetVal = hoverIn ? 0 : config.IconTintStrength;
+    int headerTarget = hoverIn ? 255 : ChromeAlpha::ClampHeaderOpacity(config.HeaderOpacity);
+    int borderTarget = hoverIn ? 255 : ChromeAlpha::ClampBorderOpacity(config.BorderOpacity);
+    // Text rides the same fade as a 0..255 progress rather than a value, so the
+    // per-tab title opacities can all be carried by one animation.
+    int textHoverTargetVal = hoverIn ? 255 : 0;
+
+    StartOpacityAnimation(iconTarget, tintTargetVal, headerTarget, borderTarget, textHoverTargetVal,
+                          hoverIn ? OPACITY_FADE_IN_DURATION : OPACITY_FADE_OUT_DURATION);
 }
 
-void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal)
+void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget,
+                                         int textHoverTargetVal, int durationMs)
 {
     bool opacityChanged = (currentOpacity != target);
     bool tintChanged = (currentTintStrength != tintTargetVal);
-    if (!opacityChanged && !tintChanged)
+    bool headerChanged = (currentHeaderOpacity != headerTarget);
+    bool borderChanged = (currentBorderOpacity != borderTarget);
+    bool textChanged = (currentTextHover != textHoverTargetVal);
+    if (!opacityChanged && !tintChanged && !headerChanged && !borderChanged && !textChanged)
         return; // Already at target
     opacityStart = currentOpacity;
     opacityTarget = target;
     tintStart = currentTintStrength;
     tintTarget = tintTargetVal;
+    headerOpacityStart = currentHeaderOpacity;
+    headerOpacityTarget = headerTarget;
+    borderOpacityStart = currentBorderOpacity;
+    borderOpacityTarget = borderTarget;
+    textHoverStart = currentTextHover;
+    textHoverTarget = textHoverTargetVal;
+    opacityAnimationDuration = (durationMs > 0) ? durationMs : OPACITY_FADE_IN_DURATION;
     opacityAnimationStartTime = GetTickCount();
     isOpacityAnimating = true;
     SetTimer(hwnd, OPACITY_TIMER_ID, 16, nullptr); // ~60fps
@@ -752,7 +774,7 @@ void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal)
 void CorralWindow::OnOpacityAnimationTimer()
 {
     DWORD elapsed = GetTickCount() - opacityAnimationStartTime;
-    float progress = (float)elapsed / OPACITY_ANIMATION_DURATION;
+    float progress = (float)elapsed / opacityAnimationDuration;
 
     if (progress >= 1.0f)
     {
@@ -775,6 +797,24 @@ void CorralWindow::OnOpacityAnimationTimer()
         currentTintStrength = 0;
     if (currentTintStrength > 255)
         currentTintStrength = 255;
+
+    currentHeaderOpacity = headerOpacityStart + (int)((headerOpacityTarget - headerOpacityStart) * easedProgress);
+    if (currentHeaderOpacity < 0)
+        currentHeaderOpacity = 0;
+    if (currentHeaderOpacity > 255)
+        currentHeaderOpacity = 255;
+
+    currentBorderOpacity = borderOpacityStart + (int)((borderOpacityTarget - borderOpacityStart) * easedProgress);
+    if (currentBorderOpacity < 0)
+        currentBorderOpacity = 0;
+    if (currentBorderOpacity > 255)
+        currentBorderOpacity = 255;
+
+    currentTextHover = textHoverStart + (int)((textHoverTarget - textHoverStart) * easedProgress);
+    if (currentTextHover < 0)
+        currentTextHover = 0;
+    if (currentTextHover > 255)
+        currentTextHover = 255;
 
     UpdateLayeredContent();
 }

@@ -1,5 +1,8 @@
 #include <windows.h>
 #include "include/Version.h"
+#include "resources/resource.h"
+
+IDI_APPICON ICON "resources\\DexCorral.ico"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION     DEXCORRAL_VERSION_COMMA

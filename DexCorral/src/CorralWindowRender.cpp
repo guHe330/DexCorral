@@ -23,12 +23,17 @@
  * CorralWindowRender.cpp - Per-pixel alpha rendering
  *
  * Implements layered window rendering using DIB sections with per-pixel alpha blending.
- * Manages color compositing, icon rendering, hover/selection highlights, and the alpha
- * fix-up mechanism necessary because GDI draws with alpha=0.
+ * Manages color compositing, icon rendering, and hover/selection highlights.
+ *
+ * All text goes through a scratch TextLayer rather than being drawn into the back
+ * buffer directly: neither text engine can be asked for an alpha (GDI writes none
+ * at all, DrawThemeTextEx has no opacity option), so the header titles and icon
+ * labels are drawn separately and faded as they are composited.
  */
 
 #include "CorralWindow.h"
 #include "Constants.h"
+#include "TextLayer.h"
 #include "App.h"
 #include "Strings.h"
 #include <windowsx.h>
@@ -100,6 +105,14 @@ void CorralWindow::UpdateLayeredContent()
         pixels[i] = bgPixel;
     }
 
+    // Header alpha: the user's setting, hover-animated, floored while rolled up
+    // (rolled up the header is the whole corral — see ChromeAlpha.h).
+    const int headerAlpha = ChromeAlpha::EffectiveHeaderAlpha(currentHeaderOpacity, config.IsRolledUp);
+    // Inactive tabs are derived from it, never configured separately, so the
+    // active tab stays distinguishable wherever the slider sits.
+    const int inactiveAlpha = ChromeAlpha::InactiveTabAlpha(headerAlpha);
+    const int inactiveRgbPercent = ChromeAlpha::InactiveTabRgbScalePercent(headerAlpha);
+
     // Compute per-tab pixel colors (each tab uses its own ColorHex)
     std::vector<DWORD> tabPixels(config.Tabs.size());
     for (int i = 0; i < (int)config.Tabs.size(); i++)
@@ -117,21 +130,18 @@ void CorralWindow::UpdateLayeredContent()
 
         if (i == config.ActiveTabIndex)
         {
-            // Active tab: bright, near-opaque
-            BYTE activeAlpha = 240;
-            BYTE pmR = (BYTE)((tabR * activeAlpha) / 255);
-            BYTE pmG = (BYTE)((tabG * activeAlpha) / 255);
-            BYTE pmB = (BYTE)((tabB * activeAlpha) / 255);
-            tabPixels[i] = (activeAlpha << 24) | (pmR << 16) | (pmG << 8) | pmB;
+            // Active tab: the configured header opacity, full colour
+            tabPixels[i] = ChromeAlpha::MakePremultiplied((BYTE)headerAlpha, tabR, tabG, tabB);
         }
         else
         {
-            // Inactive tab: darker, more transparent
-            BYTE inactiveAlpha = TITLE_TEXT_ALPHA;
-            BYTE pmR = (BYTE)((tabR * inactiveAlpha) / 255 / 2);
-            BYTE pmG = (BYTE)((tabG * inactiveAlpha) / 255 / 2);
-            BYTE pmB = (BYTE)((tabB * inactiveAlpha) / 255 / 2);
-            tabPixels[i] = (inactiveAlpha << 24) | (pmR << 16) | (pmG << 8) | pmB;
+            // Inactive tab: derived alpha plus a colour darkening that deepens as
+            // the header fades, so the two stay apart even near the opacity floor
+            tabPixels[i] = ChromeAlpha::MakePremultiplied(
+                (BYTE)inactiveAlpha,
+                ChromeAlpha::ScaleChannel(tabR, inactiveRgbPercent),
+                ChromeAlpha::ScaleChannel(tabG, inactiveRgbPercent),
+                ChromeAlpha::ScaleChannel(tabB, inactiveRgbPercent));
         }
     }
 
@@ -166,138 +176,179 @@ void CorralWindow::UpdateLayeredContent()
         }
     }
 
-    // Draw border (1px solid line at full opacity)
-    DWORD borderPixel = CORRAL_BORDER_COLOR;
-    // Top edge
-    for (int x = 0; x < w; x++)
-        pixels[x] = borderPixel;
-    // Bottom edge
-    for (int x = 0; x < w; x++)
-        pixels[(h - 1) * w + x] = borderPixel;
-    // Left edge
-    for (int y = 0; y < h; y++)
-        pixels[y * w] = borderPixel;
-    // Right edge
-    for (int y = 0; y < h; y++)
-        pixels[y * w + (w - 1)] = borderPixel;
+    // Draw border (1px line at the configured, hover-animated opacity).
+    // Composited over what is already there rather than overwriting it, so a
+    // partly transparent border blends with the corral fill instead of punching
+    // a hole in it, and a border at 0 leaves no trace at all.
+    const int borderAlpha = ChromeAlpha::ClampBorderOpacity(currentBorderOpacity);
+    if (borderAlpha > 0)
+    {
+        DWORD borderPixel = ChromeAlpha::MakePremultiplied((BYTE)borderAlpha,
+                                                           CORRAL_BORDER_R, CORRAL_BORDER_G, CORRAL_BORDER_B);
+        // Top edge
+        for (int x = 0; x < w; x++)
+            pixels[x] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[x]);
+        // Bottom edge
+        for (int x = 0; x < w; x++)
+            pixels[(h - 1) * w + x] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[(h - 1) * w + x]);
+        // Left edge
+        for (int y = 0; y < h; y++)
+            pixels[y * w] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[y * w]);
+        // Right edge
+        for (int y = 0; y < h; y++)
+            pixels[y * w + (w - 1)] = ChromeAlpha::PremultipliedOver(borderPixel, pixels[y * w + (w - 1)]);
+    }
 
     // Now use GDI to draw content (text, icons) on top
-    // GDI doesn't handle alpha properly, so we draw and then fix alpha
 
     SetBkMode(memDC, TRANSPARENT);
 
-    // Draw tab titles — each tab uses its own font settings
-    HFONT oldFont = nullptr;
-    HFONT lastFont = nullptr;
-
+    // Per-tab header font colours, parsed once — the title composite and the
+    // reorder grip below both need them.
+    std::vector<BYTE> tabFontR(config.Tabs.size(), 255);
+    std::vector<BYTE> tabFontG(config.Tabs.size(), 255);
+    std::vector<BYTE> tabFontB(config.Tabs.size(), 255);
     for (int i = 0; i < (int)config.Tabs.size(); i++)
     {
-        const CorralTabConfig &tab = config.Tabs[i];
-
-        // Parse this tab's header font color
-        BYTE fontR = 255, fontG = 255, fontB = 255;
-        const std::string &fontColorHex = tab.HeaderFontColor;
+        const std::string &fontColorHex = config.Tabs[i].HeaderFontColor;
         if (!fontColorHex.empty() && fontColorHex[0] == '#' && fontColorHex.length() >= 7)
         {
             unsigned int fontColorVal;
             sscanf_s(fontColorHex.c_str() + 1, "%x", &fontColorVal);
-            fontR = (fontColorVal >> 16) & 0xFF;
-            fontG = (fontColorVal >> 8) & 0xFF;
-            fontB = fontColorVal & 0xFF;
+            tabFontR[i] = (fontColorVal >> 16) & 0xFF;
+            tabFontG[i] = (fontColorVal >> 8) & 0xFF;
+            tabFontB[i] = fontColorVal & 0xFF;
         }
-        SetTextColor(memDC, RGB(fontR, fontG, fontB));
-
-        // Create this tab's font
-        std::wstring fontNameW = Utf8ToWide(tab.HeaderFontName);
-        int fontHeight = -MulDiv(tab.HeaderFontSize, GetDpiForWindow(hwnd), 72);
-        HFONT titleFont = CreateFontW(fontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, fontNameW.c_str());
-        HFONT prevFont = (HFONT)SelectObject(memDC, titleFont);
-        if (oldFont == nullptr)
-            oldFont = prevFont; // Save the very first original font to restore later
-
-        std::wstring wtitle = Utf8ToWide(tab.Title);
-
-        // Add symbol prefix
-        if (tab.IsVirtual)
-        {
-            wtitle = L"\U0001F4C1 " + wtitle; // Folder emoji
-        }
-        else if (tab.IsCatchAll)
-        {
-            wtitle = L"\u2B07 " + wtitle; // Down arrow
-        }
-
-        RECT tabRect = GetTabRect(i);
-        tabRect.left += 6;
-        tabRect.right -= 6;
-        tabRect.top += 2;
-
-        DrawTextW(memDC, wtitle.c_str(), (int)wtitle.length(), &tabRect,
-                  DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-
-        if (lastFont)
-            DeleteObject(lastFont);
-        lastFont = titleFont;
     }
 
-    if (oldFont)
-        SelectObject(memDC, oldFont);
-    if (lastFont)
-        DeleteObject(lastFont);
-
     /**
-     * Alpha channel fix-up for GDI-drawn title/tab area.
+     * Tab titles.
      *
-     * Problem: GDI (DrawTextW) renders with alpha=0, which makes the text invisible
-     * in our 32-bit DIB with per-pixel alpha blending. This fix-up loop restores the
-     * alpha channel for all pixels that GDI modified:
-     *   - If GDI drew colored text (alpha=0 but RGB non-zero): set alpha to 255 (opaque)
-     *   - If GDI cleared a pixel (alpha=0 and RGB=0): restore the background tab color
-     * This allows layered window compositing to show the text correctly while maintaining
-     * per-pixel transparency for the rest of the window.
+     * GDI writes no alpha at all, so the titles cannot go straight into the
+     * back buffer: they are drawn black-on-white into a coverage layer, and
+     * that coverage becomes the alpha they are composited back with. Two things
+     * fall out of this that drawing in place could not do — the per-tab text
+     * opacity is just a factor on the coverage, and a black header font finally
+     * renders (in place, "no alpha and no colour" is indistinguishable from a
+     * pixel GDI merely cleared, so black titles were swallowed by the fix-up
+     * that restored the tab background underneath them).
+     *
+     * The font is created with ANTIALIASED_QUALITY rather than ClearType:
+     * subpixel antialiasing encodes coverage per colour channel, which a single
+     * alpha channel cannot carry, and it was never meaningful on a layered
+     * window composited over an unknown wallpaper anyway. This matches how the
+     * icon labels have always been drawn.
      */
-    for (int y = 0; y < GetTitleBarHeight() && y < h; y++)
+    const int titleLayerH = (GetTitleBarHeight() < h) ? GetTitleBarHeight() : h;
+    if (titleLayerH > 0 && !config.Tabs.empty())
     {
-        for (int x = 0; x < w; x++)
+        // Each tab's own opacity, brought towards full by however far the hover
+        // fade has run (0 while unhovered, so this is the configured value).
+        std::vector<int> tabTextAlpha(config.Tabs.size());
+        for (int i = 0; i < (int)config.Tabs.size(); i++)
+            tabTextAlpha[i] = ChromeAlpha::HoverBlendTextOpacity(config.Tabs[i].HeaderFontOpacity,
+                                                                 currentTextHover);
+
+        // Which tab owns each column, so the composite knows the text's colour
+        // and opacity. Titles are drawn with DT_END_ELLIPSIS inside their own
+        // tab rect, so they never cross into a neighbour's columns.
+        std::vector<int> tabAtX(w, -1);
+        for (int i = 0; i < (int)config.Tabs.size(); i++)
         {
-            DWORD pixel = pixels[y * w + x];
-            BYTE a = (pixel >> 24) & 0xFF;
-            BYTE r = (pixel >> 16) & 0xFF;
-            BYTE g = (pixel >> 8) & 0xFF;
-            BYTE b = pixel & 0xFF;
-            // If GDI drew here (alpha is 0 but has color), make it fully opaque
-            if (a == 0 && (r > 0 || g > 0 || b > 0))
+            RECT tr = GetTabRect(i);
+            for (int x = tr.left; x < tr.right && x < w; x++)
+                if (x >= 0)
+                    tabAtX[x] = i;
+        }
+
+        TextLayer titles(screenDC, w, titleLayerH, TEXT_COVERAGE_LAYER_FILL);
+        if (titles.IsValid())
+        {
+            SetTextColor(titles.DC(), RGB(0, 0, 0));
+
+            HFONT oldFont = nullptr;
+            HFONT lastFont = nullptr;
+
+            for (int i = 0; i < (int)config.Tabs.size(); i++)
             {
-                pixels[y * w + x] = (255 << 24) | (r << 16) | (g << 8) | b;
-            }
-            else if (a == 0)
-            {
-                // Restore tab background for pixels GDI cleared
-                int tabIndex = -1;
-                for (int ti = 0; ti < (int)config.Tabs.size(); ti++)
+                const CorralTabConfig &tab = config.Tabs[i];
+
+                // Skip a fully transparent title: no point spending a font and a
+                // DrawTextW on something that composites to nothing.
+                if (tabTextAlpha[i] == 0)
+                    continue;
+
+                std::wstring fontNameW = Utf8ToWide(tab.HeaderFontName);
+                int fontHeight = -MulDiv(tab.HeaderFontSize, GetDpiForWindow(hwnd), 72);
+                HFONT titleFont = CreateFontW(fontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                                              DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                              ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_SWISS, fontNameW.c_str());
+                HFONT prevFont = (HFONT)SelectObject(titles.DC(), titleFont);
+                if (oldFont == nullptr)
+                    oldFont = prevFont; // Save the very first original font to restore later
+
+                std::wstring wtitle = Utf8ToWide(tab.Title);
+
+                // Add symbol prefix
+                if (tab.IsVirtual)
                 {
-                    RECT tr = GetTabRect(ti);
-                    if (x >= tr.left && x < tr.right)
-                    {
-                        tabIndex = ti;
-                        break;
-                    }
+                    wtitle = L"\U0001F4C1 " + wtitle; // Folder emoji
                 }
-                if (tabIndex >= 0)
-                    pixels[y * w + x] = tabPixels[tabIndex];
-                else if (x < GetTitleBarContentLeft())
-                    pixels[y * w + x] = bgPixel; // nav-button strip keeps the base background
-                else
-                    pixels[y * w + x] = 0;
+                else if (tab.IsCatchAll)
+                {
+                    wtitle = L"\u2B07 " + wtitle; // Down arrow (escaped: this source is not compiled as UTF-8)
+                }
+
+                RECT tabRect = GetTabRect(i);
+                tabRect.left += 6;
+                tabRect.right -= 6;
+                tabRect.top += 2;
+
+                DrawTextW(titles.DC(), wtitle.c_str(), (int)wtitle.length(), &tabRect,
+                          DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+
+                if (lastFont)
+                    DeleteObject(lastFont);
+                lastFont = titleFont;
+            }
+
+            if (oldFont)
+                SelectObject(titles.DC(), oldFont);
+            if (lastFont)
+                DeleteObject(lastFont);
+
+            // Composite the coverage back over the tab backgrounds, each tab in
+            // its own colour and at its own opacity.
+            const DWORD *cov = titles.Pixels();
+            for (int y = 0; y < titleLayerH; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    // Greyscale coverage: the layer started white and the glyphs
+                    // were drawn black, so darkness is coverage.
+                    BYTE coverage = (BYTE)(255 - ((cov[y * w + x] >> 8) & 0xFF));
+                    if (coverage == 0)
+                        continue;
+
+                    int ti = tabAtX[x];
+                    if (ti < 0)
+                        continue;
+
+                    BYTE a = ChromeAlpha::TextCoverageAlpha(coverage, tabTextAlpha[ti]);
+                    if (a == 0)
+                        continue;
+
+                    DWORD glyph = ChromeAlpha::MakePremultiplied(a, tabFontR[ti], tabFontG[ti], tabFontB[ti]);
+                    pixels[y * w + x] = ChromeAlpha::PremultipliedOver(glyph, pixels[y * w + x]);
+                }
             }
         }
     }
 
     // ---- Tab reorder grip ("Griff") — shown only on the hovered/dragged tab ----
-    // Drawn after the alpha fix-up so the dots survive at full opacity. Two columns
-    // of three dots, the classic drag-handle, in the tab's header font colour.
+    // Two columns of three dots, the classic drag-handle, in the tab's header
+    // font colour. Deliberately not subject to the header text opacity: the grip
+    // is an affordance, not decoration, and only appears on hover anyway.
     if (config.Tabs.size() > 1)
     {
         for (int i = 0; i < (int)config.Tabs.size(); i++)
@@ -306,16 +357,7 @@ void CorralWindow::UpdateLayeredContent()
             if (!show)
                 continue;
 
-            BYTE gr = 255, gg = 255, gb = 255;
-            const std::string &fc = config.Tabs[i].HeaderFontColor;
-            if (!fc.empty() && fc[0] == '#' && fc.length() >= 7)
-            {
-                unsigned int v;
-                sscanf_s(fc.c_str() + 1, "%x", &v);
-                gr = (v >> 16) & 0xFF;
-                gg = (v >> 8) & 0xFF;
-                gb = v & 0xFF;
-            }
+            BYTE gr = tabFontR[i], gg = tabFontG[i], gb = tabFontB[i];
             BYTE ga = (isDraggingTab && i == draggedTabIndex) ? 255 : 200;
             DWORD dot = (ga << 24) | ((BYTE)(gr * ga / 255) << 16) |
                         ((BYTE)(gg * ga / 255) << 8) | (BYTE)(gb * ga / 255);
@@ -474,6 +516,32 @@ void CorralWindow::UpdateLayeredContent()
         int visibleTop = GetIconAreaTop();
         int visibleBottom = h;
 
+        /**
+         * Icon labels are drawn into their own layer.
+         *
+         * DrawThemeTextEx writes correct premultiplied alpha but offers no way
+         * to ask for less than full opacity — DTTOPTS carries a colour and a
+         * glow size, no alpha — so the labels go into a transparent scratch
+         * layer that is faded as it is composited. Premultiplied pixels scale by
+         * plain multiplication, so at full opacity this reproduces exactly what
+         * drawing in place produced, shadow pass included (source-over is
+         * associative: fg over shadow over buffer either way).
+         *
+         * The layer also contains DrawThemeTextEx's habit of ignoring GDI clip
+         * regions: the composite bounds do the clipping instead.
+         */
+        // Brought towards full by the hover fade, in step with the icons.
+        const int labelOpacity = ChromeAlpha::HoverBlendTextOpacity(config.IconLabelOpacity,
+                                                                    currentTextHover);
+        const int labelLayerH = (visibleBottom > visibleTop) ? (visibleBottom - visibleTop) : 0;
+        TextLayer labels(screenDC, w, (labelOpacity > 0) ? labelLayerH : 0, TEXT_ALPHA_LAYER_FILL);
+        // If the layer could not be allocated, labels fall back to being drawn
+        // straight into the back buffer — fully opaque, but visible.
+        const bool useLabelLayer = labels.IsValid();
+        HDC labelDC = useLabelLayer ? labels.DC() : memDC;
+        const int labelOriginY = useLabelLayer ? visibleTop : 0;
+        HFONT oldLayerFont = useLabelLayer ? (HFONT)SelectObject(labelDC, iconFont) : nullptr;
+
         // Create temp DIB for icon rendering (allows proper tint/opacity on modern icons)
         // Modern icons have proper alpha channels - DrawIconEx composites them correctly,
         // but then we can't post-process them. Drawing to a temp buffer first lets us
@@ -522,8 +590,9 @@ void CorralWindow::UpdateLayeredContent()
         HTHEME hTextTheme = OpenThemeData(hwnd, L"TextStyle");
         auto drawShadowedText = [&](const wchar_t *text, int len, DWORD flags, RECT rect, COLORREF color)
         {
-            if (!hTextTheme)
+            if (!hTextTheme || labelOpacity == 0)
                 return;
+            OffsetRect(&rect, 0, -labelOriginY); // window coords -> layer coords
             DTTOPTS dtOpts = {};
             dtOpts.dwSize = sizeof(dtOpts);
             dtOpts.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
@@ -532,11 +601,11 @@ void CorralWindow::UpdateLayeredContent()
             dtOpts.iGlowSize = 8;
             RECT shadowRect = rect;
             OffsetRect(&shadowRect, 1, 1);
-            DrawThemeTextEx(hTextTheme, memDC, 0, 0, text, len, flags, &shadowRect, &dtOpts);
+            DrawThemeTextEx(hTextTheme, labelDC, 0, 0, text, len, flags, &shadowRect, &dtOpts);
             // Foreground pass: actual color with tight glow
             dtOpts.crText = color;
             dtOpts.iGlowSize = 4;
-            DrawThemeTextEx(hTextTheme, memDC, 0, 0, text, len, flags, &rect, &dtOpts);
+            DrawThemeTextEx(hTextTheme, labelDC, 0, 0, text, len, flags, &rect, &dtOpts);
         };
 
         for (int i = 0; i < (int)icons.size(); i++)
@@ -1021,6 +1090,29 @@ void CorralWindow::UpdateLayeredContent()
             }
         }
 
+        // Fade the finished label layer onto the back buffer.
+        if (useLabelLayer && labelOpacity > 0)
+        {
+            const DWORD *lay = labels.Pixels();
+            for (int y = 0; y < labels.Height(); y++)
+            {
+                const int destY = y + visibleTop;
+                if (destY < 0 || destY >= h)
+                    continue;
+                for (int x = 0; x < w; x++)
+                {
+                    DWORD glyph = lay[y * w + x];
+                    if (((glyph >> 24) & 0xFF) == 0)
+                        continue;
+                    pixels[destY * w + x] = ChromeAlpha::PremultipliedOver(
+                        ChromeAlpha::ScalePremultiplied(glyph, labelOpacity),
+                        pixels[destY * w + x]);
+                }
+            }
+        }
+        if (oldLayerFont)
+            SelectObject(labelDC, oldLayerFont);
+
         // Clean up temp icon DIB
         if (iconTempDC)
         {
@@ -1205,7 +1297,11 @@ void CorralWindow::UpdateLayeredContent()
         }
     }
 
-    // Resize grip (bottom-right corner, skip when rolled up)
+    // Resize grip (bottom-right corner, skip when rolled up).
+    // Deliberately unaffected by BorderOpacity: the grip is the corral's resize
+    // affordance, not part of the frame. A frameless corral (border at 0) still
+    // needs somewhere visible to grab, so the grip stays at full strength while
+    // the frame around it fades away. Confirmed as wanted in UAT of #1.
     if (!config.IsRolledUp)
     {
         DWORD gripPixel = (255 << 24) | (150 << 16) | (150 << 8) | 150;

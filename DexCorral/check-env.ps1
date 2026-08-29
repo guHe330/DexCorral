@@ -105,7 +105,7 @@ if (Test-Path $sdkPath) {
                    Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } |
                    Select-Object -Last 1
     if ($sdkVersions) {
-        Write-Host "      ✓ Windows 10 SDK $($sdkVersions.Name)" -ForegroundColor Green
+        Write-Host "      ✓ Windows SDK $($sdkVersions.Name)" -ForegroundColor Green
     } else {
         Write-Host "      ⚠ Windows SDK found but version unclear" -ForegroundColor DarkYellow
     }

@@ -128,6 +128,10 @@ enum class Str
     Grp_Icons,                   // "Icons"
     Lbl_Opacity,                 // "Opacity"
     Lbl_Tint,                    // "Tint"
+    Lbl_Background,              // "Background" (opacity row)
+    Lbl_Border,                  // "Border" (opacity row)
+    Lbl_HeaderLabel,             // "Header Label" (opacity row)
+    Lbl_IconLabel,               // "Icon Label" (opacity row)
     Btn_Color,                   // "Color..."
     Grp_IconSpacing,             // "Icon Spacing"
     Lbl_Horiz,                   // "Horiz"
@@ -168,6 +172,7 @@ enum class Str
     Reg_UnregisterSuccess,       // unregistered + restart Explorer
     Reg_UnregisterFailed,        // "Failed to unregister shell extension."
     Reg_Usage,                   // command-line usage text
+    Reg_NeedsWin11,              // {0} = required build, {1} = this build
 
     _Count // sentinel — keep last
 };
@@ -179,6 +184,9 @@ const wchar_t *Tr(Str id);
 // Returns Tr(id) with every "{0}" token replaced by arg0. Literal replacement
 // only — never printf-family formatting on translated text (TRANSLATION_PLAN §5.2).
 std::wstring TrFmt(Str id, const std::wstring &arg0);
+
+// As above, replacing "{0}" with arg0 and "{1}" with arg1.
+std::wstring TrFmt(Str id, const std::wstring &arg0, const std::wstring &arg1);
 
 // Switches the active language. Supported codes: "en" (default), "de".
 // Unknown/empty codes select English. All shipped languages are compiled in,

@@ -92,31 +92,21 @@ public:
     /// Sets the default corral background color (hex format, e.g., "FF0000" for red)
     void SetDefaultColorHex(const std::string &colorHex);
 
-    /**
-     * Sets default appearance for all new corrals.
-     * Parameters: titleBarHeight, fontName, fontSize, fontColor (hex),
-     * iconOpacity (0-100), tintColor (hex), tintStrength (0-100), spacingX, spacingY (pixels)
-     */
-    void SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                              int fontSize, const std::string &fontColor, int iconOpacity,
-                              const std::string &tintColor, int tintStrength,
-                              int spacingX, int spacingY);
+    /// Sets the appearance new corrals and tabs are created with.
+    /// ColorHex is handled separately by SetDefaultColorHex and is ignored here.
+    void SetDefaultAppearance(const AppearanceSettings &settings);
 
     /// Applies the specified background color to all existing corrals
     void ApplyColorToAllCorrals(const std::string &colorHex);
 
     /**
-     * Applies appearance settings to all existing corrals with selective updating.
-     * Boolean flags determine which settings are applied (changed flags pattern).
-     * Only settings with corresponding flags set to true are updated.
+     * Applies appearance settings to all existing corrals.
+     * Only the parts marked in `apply` are written; the rest are left alone.
+     * Font settings land on each corral's active tab, matching where the
+     * Appearance dialog edits them.
      */
-    void ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
-                                     int titleBarHeight, bool applyHeight,
-                                     const std::string &fontName, int fontSize, bool applyFont,
-                                     const std::string &fontColor, bool applyFontColor,
-                                     int iconOpacity, bool applyIconOpacity,
-                                     const std::string &tintColor, int tintStrength, bool applyTint,
-                                     int spacingX, int spacingY, bool applySpacing);
+    void ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
+                                     const AppearanceApplyFlags &apply);
 
     /// Creates a new corral at the specified screen coordinates
     void CreateCorralAt(POINT pt);
@@ -240,11 +230,22 @@ private:
 
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+    // Fires whenever some other window becomes the foreground window, and posts
+    // WM_REPIN_CORRALS so the app thread reasserts SendToBottom() on every corral.
+    // HWND_BOTTOM is a one-time placement, not a persistent style (unlike
+    // WS_EX_TOPMOST for the top side) — without this, ordinary window activation
+    // elsewhere can leave a corral sitting above other apps again. The callback
+    // only posts: see WM_REPIN_CORRALS in App.cpp for why touching windows here
+    // deadlocks Explorer.
+    static void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+                                      LONG idObject, LONG idChild, DWORD idEventThread, DWORD idEventTime);
+
     static App *instance;
 
     HWND messageWindow;
     UINT wmTaskbarCreated = 0; // RegisterWindowMessage("TaskbarCreated")
     ULONG shellNotifyId = 0;   // SHChangeNotifyRegister token
+    HWINEVENTHOOK foregroundHook = nullptr;
     AppConfig config;
     std::string configPath;
     std::unique_ptr<MouseHook> mouseHook;
