@@ -1,4 +1,4 @@
-; DexCorral Inno Setup Installer Script
+﻿; DexCorral Inno Setup Installer Script
 ; Requires Inno Setup 6+ (https://jrsoftware.org/isinfo.php)
 ;
 ; Version can be overridden from the command line:
@@ -40,12 +40,16 @@ UninstallDisplayName={#MyAppName}
 MinVersion=10.0.17763
 ; Allow upgrading over existing install without asking
 UsePreviousAppDir=yes
+; Ask for the language up front (also selects the app's UI language, see [Registry])
+ShowLanguageDialog=yes
+UsePreviousLanguage=no
 CloseApplications=no
 ; Suppress the per-user areas warning (user config may be deleted on uninstall if user chooses)
 UsedUserAreasWarning=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Files]
 ; Main binaries
@@ -65,6 +69,12 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   ValueType: string; ValueName: "DexCorral"; \
   ValueData: """{app}\DexCorral.exe"" --startup --silent"; \
   Flags: uninsdeletevalue
+; UI language chosen in the installer's language dialog. The app uses this as
+; the default; config.json's "Language" (in-app setting) overrides it.
+Root: HKCU; Subkey: "Software\DexCorral"; \
+  ValueType: string; ValueName: "Language"; \
+  ValueData: "{code:GetLangCode}"; \
+  Flags: uninsdeletevalue
 
 [UninstallRun]
 ; Unregister the shell extension (silent)
@@ -80,6 +90,15 @@ Filename: "{cmd}"; Parameters: "/c taskkill /F /IM explorer.exe & timeout /t 3 /
 // Whether the user chose to keep their config during uninstall
 var
   g_KeepConfig: Boolean;
+
+// Maps the installer language to the app's language code (see [Registry])
+function GetLangCode(Param: String): String;
+begin
+  if ActiveLanguage = 'german' then
+    Result := 'de'
+  else
+    Result := 'en';
+end;
 
 // Helper: convert Boolean to string (InnoSetup Pascal lacks a built-in BoolToStr)
 function BoolToStr(Value: Boolean): String;
@@ -204,12 +223,21 @@ begin
     Sleep(500);
 
     // Ask whether to keep the user's configuration files
-    g_KeepConfig := MsgBox(
-      'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
-      'Your corral layouts and appearance settings are stored in:' + #13#10 +
-      '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
-      'Click Yes to keep them for future use, or No to delete everything.',
-      mbConfirmation, MB_YESNO) = IDYES;
+    // (ActiveLanguage returns the language chosen at install time)
+    if ActiveLanguage = 'german' then
+      g_KeepConfig := MsgBox(
+        'Möchten Sie Ihre DexCorral-Konfiguration behalten?' + #13#10 + #13#10 +
+        'Ihre Corral-Layouts und Darstellungseinstellungen sind gespeichert unter:' + #13#10 +
+        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
+        'Klicken Sie auf Ja, um sie zu behalten, oder auf Nein, um alles zu löschen.',
+        mbConfirmation, MB_YESNO) = IDYES
+    else
+      g_KeepConfig := MsgBox(
+        'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
+        'Your corral layouts and appearance settings are stored in:' + #13#10 +
+        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
+        'Click Yes to keep them for future use, or No to delete everything.',
+        mbConfirmation, MB_YESNO) = IDYES;
   end;
 
   if CurUninstallStep = usPostUninstall then begin

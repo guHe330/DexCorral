@@ -36,6 +36,8 @@
 
 ### What's New
 
+- German translation: the installer now asks for your language (English/German) and the whole UI follows it. Portable users can set `"Language": "de"` in `%APPDATA%\DexCorral\config.json`
+- Groundwork for translations: all user-facing text now goes through a central string catalog
 - Tabs can now be reordered by dragging: hover a tab to reveal a small grip handle on its left edge, then drag it left or right to move the tab. The new order is saved automatically
 
 <!-- Older changes (v1.0.19) -->

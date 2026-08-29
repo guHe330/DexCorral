@@ -30,6 +30,7 @@
 #include "CorralWindow.h"
 #include "Constants.h"
 #include "App.h"
+#include "Strings.h"
 #include <windowsx.h>
 #include <uxtheme.h>
 #include <vssym32.h>
@@ -424,7 +425,7 @@ void CorralWindow::UpdateLayeredContent()
         {
             RECT mr = {Dpi(12), GetIconAreaTop() + Dpi(8), w - Dpi(12), h - Dpi(8)};
             if (mr.bottom > mr.top)
-                drawHeaderText(L"Folder unavailable\nRight-click to relink", -1,
+                drawHeaderText(Tr(Str::Hdr_FolderUnavailable), -1,
                                DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOPREFIX,
                                mr, RGB(255, 210, 210));
         }
@@ -824,19 +825,19 @@ void CorralWindow::UpdateLayeredContent()
                     std::wstring sizeStr;
                     if (icon.fileSize < 1024)
                     {
-                        sizeStr = std::to_wstring(icon.fileSize) + L" B";
+                        sizeStr = std::to_wstring(icon.fileSize) + Tr(Str::Unit_Bytes);
                     }
                     else if (icon.fileSize < 1024 * 1024)
                     {
-                        sizeStr = std::to_wstring(icon.fileSize / 1024) + L" KB";
+                        sizeStr = std::to_wstring(icon.fileSize / 1024) + Tr(Str::Unit_KB);
                     }
                     else if (icon.fileSize < 1024 * 1024 * 1024)
                     {
-                        sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024)) + L" MB";
+                        sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024)) + Tr(Str::Unit_MB);
                     }
                     else
                     {
-                        sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024 * 1024)) + L" GB";
+                        sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024 * 1024)) + Tr(Str::Unit_GB);
                     }
                     RECT sizeRect = {sizeCol, drawTop, dateCol - 4, drawBottom};
                     drawShadowedText(sizeStr.c_str(), (int)sizeStr.length(),

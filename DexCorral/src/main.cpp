@@ -22,6 +22,7 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <string>
+#include "Strings.h"
 
 // DexCorral Registration Tool
 // The actual application runs as a shell extension (DexCorralHook.dll) loaded by Explorer.
@@ -50,8 +51,8 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
     if (!hProgman)
     {
         if (!silent)
-            MessageBoxW(nullptr, L"Could not find Explorer's desktop window.\nMake sure Explorer is running.",
-                        L"DexCorral", MB_ICONWARNING);
+            MessageBoxW(nullptr, Tr(Str::Reg_NoDesktopWindow),
+                        Tr(Str::App_Name), MB_ICONWARNING);
         return 1;
     }
 
@@ -64,7 +65,7 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
     if (!hDll)
     {
         if (!silent)
-            MessageBoxW(nullptr, L"Failed to load DexCorralHook.dll.", L"DexCorral", MB_ICONERROR);
+            MessageBoxW(nullptr, Tr(Str::Reg_HookLoadFailed), Tr(Str::App_Name), MB_ICONERROR);
         return 1;
     }
 
@@ -72,7 +73,7 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
     if (!hookProc)
     {
         if (!silent)
-            MessageBoxW(nullptr, L"WakeHookProc not found in DexCorralHook.dll.", L"DexCorral", MB_ICONERROR);
+            MessageBoxW(nullptr, Tr(Str::Reg_WakeProcMissing), Tr(Str::App_Name), MB_ICONERROR);
         FreeLibrary(hDll);
         return 1;
     }
@@ -102,6 +103,10 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
+    // Use the language chosen during installation for this tool's dialogs
+    // (the app itself prefers config.json's "Language"; see App::Initialize).
+    SetLanguage(GetInstallerLanguage());
+
     // Parse command line
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -140,8 +145,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         if (!hDll)
         {
             if (!silent)
-                MessageBoxW(nullptr, L"Failed to load DexCorralHook.dll.\nMake sure it's in the same folder as this EXE.",
-                            L"DexCorral", MB_ICONERROR);
+                MessageBoxW(nullptr, Tr(Str::Reg_HookLoadFailedHint),
+                            Tr(Str::App_Name), MB_ICONERROR);
             return 1;
         }
 
@@ -152,7 +157,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             if (!fn)
             {
                 if (!silent)
-                    MessageBoxW(nullptr, L"DllRegisterServer not found in DexCorralHook.dll.", L"DexCorral", MB_ICONERROR);
+                    MessageBoxW(nullptr, Tr(Str::Reg_RegisterProcMissing), Tr(Str::App_Name), MB_ICONERROR);
                 FreeLibrary(hDll);
                 return 1;
             }
@@ -161,19 +166,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             {
                 if (!silent)
                     MessageBoxW(nullptr,
-                                L"DexCorral shell extension registered successfully.\n\n"
-                                L"Restart Explorer for changes to take effect:\n"
-                                L"  1. Open Task Manager\n"
-                                L"  2. Find 'Windows Explorer'\n"
-                                L"  3. Right-click > Restart",
-                                L"DexCorral", MB_ICONINFORMATION);
+                                Tr(Str::Reg_RegisterSuccess),
+                                Tr(Str::App_Name), MB_ICONINFORMATION);
             }
             else
             {
                 if (!silent)
                     MessageBoxW(nullptr,
-                                L"Failed to register shell extension.\n\nTry running as Administrator.",
-                                L"DexCorral", MB_ICONERROR);
+                                Tr(Str::Reg_RegisterFailed),
+                                Tr(Str::App_Name), MB_ICONERROR);
                 FreeLibrary(hDll);
                 return 1;
             }
@@ -185,7 +186,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             if (!fn)
             {
                 if (!silent)
-                    MessageBoxW(nullptr, L"DllUnregisterServer not found in DexCorralHook.dll.", L"DexCorral", MB_ICONERROR);
+                    MessageBoxW(nullptr, Tr(Str::Reg_UnregisterProcMissing), Tr(Str::App_Name), MB_ICONERROR);
                 FreeLibrary(hDll);
                 return 1;
             }
@@ -194,14 +195,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             {
                 if (!silent)
                     MessageBoxW(nullptr,
-                                L"DexCorral shell extension unregistered successfully.\n\n"
-                                L"Restart Explorer for changes to take effect.",
-                                L"DexCorral", MB_ICONINFORMATION);
+                                Tr(Str::Reg_UnregisterSuccess),
+                                Tr(Str::App_Name), MB_ICONINFORMATION);
             }
             else
             {
                 if (!silent)
-                    MessageBoxW(nullptr, L"Failed to unregister shell extension.", L"DexCorral", MB_ICONERROR);
+                    MessageBoxW(nullptr, Tr(Str::Reg_UnregisterFailed), Tr(Str::App_Name), MB_ICONERROR);
                 FreeLibrary(hDll);
                 return 1;
             }
@@ -215,14 +215,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     if (!silent)
     {
         MessageBoxW(nullptr,
-                    L"DexCorral - Desktop Icon Organizer\n\n"
-                    L"Usage:\n"
-                    L"  DexCorral.exe --register     Register shell extension\n"
-                    L"  DexCorral.exe --unregister   Unregister shell extension\n"
-                    L"  DexCorral.exe --startup      Inject into Explorer and start (used by Run key)\n"
-                    L"  DexCorral.exe --silent       Suppress message dialogs\n\n"
-                    L"After registration, restart Explorer or use --startup to activate.",
-                    L"DexCorral", MB_ICONINFORMATION);
+                    Tr(Str::Reg_Usage),
+                    Tr(Str::App_Name), MB_ICONINFORMATION);
     }
     return 0;
 }
