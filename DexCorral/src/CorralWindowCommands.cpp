@@ -31,6 +31,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
+#include "Strings.h"
 #include <shobjidl.h>
 #include <algorithm>
 
@@ -87,20 +88,20 @@ static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg
     DWORD attrs = GetFileAttributesW(path.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES)
     {
-        errorMsg = L"The specified folder does not exist.";
+        errorMsg = Tr(Str::Err_FolderNotExist);
         return false;
     }
 
     if (!(attrs & FILE_ATTRIBUTE_DIRECTORY))
     {
-        errorMsg = L"The specified path is not a folder.";
+        errorMsg = Tr(Str::Err_PathNotFolder);
         return false;
     }
 
     // Check for network path (starts with \\)
     if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\')
     {
-        errorMsg = L"Network paths are not supported. Please select a local folder.";
+        errorMsg = Tr(Str::Err_NetworkPathsLocal);
         return false;
     }
 
@@ -111,7 +112,7 @@ static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg
         UINT driveType = GetDriveTypeW(rootPath);
         if (driveType == DRIVE_REMOTE)
         {
-            errorMsg = L"Network drives are not supported. Please select a local folder.";
+            errorMsg = Tr(Str::Err_NetworkDrivesLocal);
             return false;
         }
     }
@@ -128,31 +129,31 @@ void CorralWindow::ShowContextMenu(int x, int y)
     HMENU menu = CreatePopupMenu();
 
     // Tab operations
-    AppendMenuW(menu, MF_STRING, 15, L"Add Tab");
+    AppendMenuW(menu, MF_STRING, 15, Tr(Str::Menu_AddTab));
     if (config.Tabs.size() > 1)
     {
-        AppendMenuW(menu, MF_STRING, 14, L"Detach Tab");
+        AppendMenuW(menu, MF_STRING, 14, Tr(Str::Menu_DetachTab));
     }
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
-    AppendMenuW(menu, MF_STRING, 1, L"Rename Tab");
-    AppendMenuW(menu, MF_STRING, 2, L"Appearance...");
+    AppendMenuW(menu, MF_STRING, 1, Tr(Str::Menu_RenameTab));
+    AppendMenuW(menu, MF_STRING, 2, Tr(Str::Menu_Appearance));
 
     // Change Folder option for virtual tabs
     if (GetActiveTab().IsVirtual)
     {
-        AppendMenuW(menu, MF_STRING, 7, L"Change Folder...");
+        AppendMenuW(menu, MF_STRING, 7, Tr(Str::Menu_ChangeFolder));
     }
 
     // View submenu
     HMENU viewMenu = CreatePopupMenu();
     ViewMode currentMode = GetActiveTab().GetViewMode();
-    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::SmallIcons ? MF_CHECKED : 0), 10, L"Small Icons");
-    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::MediumIcons ? MF_CHECKED : 0), 11, L"Medium Icons");
-    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::LargeIcons ? MF_CHECKED : 0), 12, L"Large Icons");
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::SmallIcons ? MF_CHECKED : 0), 10, Tr(Str::Menu_SmallIcons));
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::MediumIcons ? MF_CHECKED : 0), 11, Tr(Str::Menu_MediumIcons));
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::LargeIcons ? MF_CHECKED : 0), 12, Tr(Str::Menu_LargeIcons));
     AppendMenuW(viewMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::Details ? MF_CHECKED : 0), 13, L"Details");
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)viewMenu, L"View");
+    AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::Details ? MF_CHECKED : 0), 13, Tr(Str::Menu_Details));
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)viewMenu, Tr(Str::Menu_View));
 
     // Sort By submenu — virtual corrals in Details view (Explorer-style)
     if (GetActiveTab().IsVirtual && currentMode == ViewMode::Details)
@@ -160,14 +161,14 @@ void CorralWindow::ShowContextMenu(int x, int y)
         int sortCol = GetActiveTab().DetailsSortColumn;
         bool asc = GetActiveTab().DetailsSortAscending;
         HMENU sortMenu = CreatePopupMenu();
-        AppendMenuW(sortMenu, MF_STRING | (sortCol == 0 ? MF_CHECKED : 0), 60, L"Name");
-        AppendMenuW(sortMenu, MF_STRING | (sortCol == 1 ? MF_CHECKED : 0), 61, L"Type");
-        AppendMenuW(sortMenu, MF_STRING | (sortCol == 2 ? MF_CHECKED : 0), 62, L"Size");
-        AppendMenuW(sortMenu, MF_STRING | (sortCol == 3 ? MF_CHECKED : 0), 63, L"Date modified");
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 0 ? MF_CHECKED : 0), 60, Tr(Str::Col_Name));
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 1 ? MF_CHECKED : 0), 61, Tr(Str::Col_Type));
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 2 ? MF_CHECKED : 0), 62, Tr(Str::Col_Size));
+        AppendMenuW(sortMenu, MF_STRING | (sortCol == 3 ? MF_CHECKED : 0), 63, Tr(Str::Col_DateModified));
         AppendMenuW(sortMenu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(sortMenu, MF_STRING | (asc ? MF_CHECKED : 0), 64, L"Ascending");
-        AppendMenuW(sortMenu, MF_STRING | (!asc ? MF_CHECKED : 0), 65, L"Descending");
-        AppendMenuW(menu, MF_POPUP, (UINT_PTR)sortMenu, L"Sort By");
+        AppendMenuW(sortMenu, MF_STRING | (asc ? MF_CHECKED : 0), 64, Tr(Str::Menu_SortAscending));
+        AppendMenuW(sortMenu, MF_STRING | (!asc ? MF_CHECKED : 0), 65, Tr(Str::Menu_SortDescending));
+        AppendMenuW(menu, MF_POPUP, (UINT_PTR)sortMenu, Tr(Str::Menu_SortBy));
     }
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -176,7 +177,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
     if (!GetActiveTab().IsVirtual)
     {
         UINT catchAllFlags = MF_STRING | (GetActiveTab().IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
-        AppendMenuW(menu, catchAllFlags, 3, L"Catch-All (receives new files)");
+        AppendMenuW(menu, catchAllFlags, 3, Tr(Str::Menu_CatchAll));
     }
 
     // Add Special Icons submenu - only for non-virtual tabs
@@ -195,7 +196,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
                 UINT flags = MF_STRING | (alreadyAdded ? (MF_CHECKED | MF_GRAYED) : 0);
                 AppendMenuW(specialMenu, flags, 20 + i, specialIcons[i].displayName.c_str());
             }
-            AppendMenuW(menu, MF_POPUP, (UINT_PTR)specialMenu, L"Add Special Icon");
+            AppendMenuW(menu, MF_POPUP, (UINT_PTR)specialMenu, Tr(Str::Menu_AddSpecialIcon));
         }
     }
 
@@ -203,24 +204,24 @@ void CorralWindow::ShowContextMenu(int x, int y)
 
     // Show Desktop Icons with checkmark
     UINT iconFlags = MF_STRING | (DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED);
-    AppendMenuW(menu, iconFlags, 5, L"Show Desktop Icons");
+    AppendMenuW(menu, iconFlags, 5, Tr(Str::Menu_ShowDesktopIcons));
 
     // Quick-hide exclusion (corral stays visible when double-clicking the desktop)
     UINT quickHideFlags = MF_STRING | (config.ExcludeFromQuickHide ? MF_CHECKED : MF_UNCHECKED);
-    AppendMenuW(menu, quickHideFlags, 9, L"Exclude from Quick-Hide");
+    AppendMenuW(menu, quickHideFlags, 9, Tr(Str::Menu_ExcludeFromQuickHide));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, 6, L"Create New Corral");
-    AppendMenuW(menu, MF_STRING, 8, L"New Virtual Corral");
+    AppendMenuW(menu, MF_STRING, 6, Tr(Str::Menu_CreateNewCorral));
+    AppendMenuW(menu, MF_STRING, 8, Tr(Str::Menu_NewVirtualCorral));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
     // Delete Corral or Close Tab depending on tab count
     if (config.Tabs.size() > 1)
     {
-        AppendMenuW(menu, MF_STRING, 4, L"Close Tab");
+        AppendMenuW(menu, MF_STRING, 4, Tr(Str::Menu_CloseTab));
     }
     else
     {
-        AppendMenuW(menu, MF_STRING, 4, L"Delete Corral");
+        AppendMenuW(menu, MF_STRING, 4, Tr(Str::Menu_DeleteCorral));
     }
 
     POINT pt = {x, y};
@@ -406,7 +407,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
     {
         // Add new empty tab
         CorralTabConfig newTab;
-        newTab.Title = "New Tab";
+        newTab.Title = WideToUtf8(Tr(Str::Name_NewTab));
         newTab.ColorHex = GetActiveTab().ColorHex;             // Inherit color from current tab
         newTab.HeaderFontName = GetActiveTab().HeaderFontName;  // Inherit font from current tab
         newTab.HeaderFontSize = GetActiveTab().HeaderFontSize;
@@ -449,7 +450,7 @@ void CorralWindow::DeleteCorral()
     // If there are multiple tabs, just close the active tab
     if (config.Tabs.size() > 1)
     {
-        if (MessageBoxW(hwnd, L"Close this tab?", L"Confirm Close", MB_YESNO | MB_ICONQUESTION) == IDYES)
+        if (MessageBoxW(hwnd, Tr(Str::Confirm_CloseTabBody), Tr(Str::Confirm_CloseTabTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             config.Tabs.erase(config.Tabs.begin() + config.ActiveTabIndex);
             if (config.ActiveTabIndex >= (int)config.Tabs.size())
@@ -466,7 +467,7 @@ void CorralWindow::DeleteCorral()
     else
     {
         // Only one tab - delete the entire window
-        if (MessageBoxW(hwnd, L"Delete this corral?", L"Confirm Delete", MB_YESNO | MB_ICONQUESTION) == IDYES)
+        if (MessageBoxW(hwnd, Tr(Str::Confirm_DeleteCorralBody), Tr(Str::Confirm_DeleteCorralTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             if (App::GetInstance())
             {
@@ -552,14 +553,14 @@ void CorralWindow::ChangeFolderPath()
     if (!GetActiveTab().IsVirtual)
         return;
 
-    std::wstring newPath = BrowseForLocalFolder(hwnd, L"Select Folder for Virtual Corral");
+    std::wstring newPath = BrowseForLocalFolder(hwnd, Tr(Str::Dlg_SelectVirtualFolder));
     if (newPath.empty())
         return;
 
     std::wstring errorMsg;
     if (!ValidateLocalFolder(newPath, errorMsg))
     {
-        MessageBoxW(hwnd, errorMsg.c_str(), L"Invalid Folder", MB_OK | MB_ICONWARNING);
+        MessageBoxW(hwnd, errorMsg.c_str(), Tr(Str::Title_InvalidFolder), MB_OK | MB_ICONWARNING);
         return;
     }
 

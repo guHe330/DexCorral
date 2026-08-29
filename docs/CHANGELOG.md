@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- German translation: the full UI string catalog now ships with a compiled-in German table alongside English (`kGerman` in `src/Strings.cpp`). Language resolution order: `"Language"` in config.json (`"en"`/`"de"`) → installer choice in `HKCU\Software\DexCorral\Language` → English. The installer (Inno Setup) now shows a language dialog (English/German), runs its own wizard in that language, and writes the choice to the registry; the registration tool (`DexCorral.exe`) also honors it. MSVC targets now compile with `/utf-8`. New tests: German catalog completeness, `{0}` placeholder parity between languages, language switch/fallback
+
+### Changed
+- i18n Phase 1 (per `docs/TRANSLATION_PLAN.md`): all user-facing UI strings are now centralized in a compiled-in English string catalog (`include/Strings.h` / `src/Strings.cpp`, `Tr()`/`TrFmt()` lookup). Menus, dialogs, message boxes, tray balloons, default corral/tab names, and the registration tool's messages all resolve through the catalog; sentence building uses `{0}` placeholder substitution instead of concatenation (e.g. the Appearance dialog title and update balloons). No behavior change — English remains the only shipped language; adding a language later becomes a data task. New unit tests (`tests/test_strings.cpp`) verify every catalog entry resolves and that `TrFmt` does literal token replacement (no printf on translated text)
+
 ## [1.0.20] - 2026-06-23
 
 ### Added

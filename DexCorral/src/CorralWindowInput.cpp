@@ -31,6 +31,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "IconUtils.h"
+#include "Strings.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <ShlObj.h>
@@ -1204,7 +1205,7 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
         if (SUCCEEDED(hr))
         {
             AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-            AppendMenuW(hMenu, MF_STRING, 0x7FFF + 1, L"Remove from Corral");
+            AppendMenuW(hMenu, MF_STRING, 0x7FFF + 1, Tr(Str::Menu_RemoveFromCorral));
 
             SetForegroundWindow(hwnd);
             int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,

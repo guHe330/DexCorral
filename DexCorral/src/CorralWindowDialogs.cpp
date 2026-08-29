@@ -31,6 +31,7 @@
 #include "CorralWindow.h"
 #include "App.h"
 #include "Constants.h"
+#include "Strings.h"
 #include <windowsx.h>
 #include <commdlg.h>
 #include <commctrl.h>
@@ -210,8 +211,8 @@ void CorralWindow::EndIconRename(bool save)
                 else
                 {
                     // Rename failed - could show error message
-                    MessageBoxW(hwnd, L"Failed to rename file. The file may be in use or you may not have permission.",
-                                L"Rename Error", MB_OK | MB_ICONERROR);
+                    MessageBoxW(hwnd, Tr(Str::Err_RenameFailedBody),
+                                Tr(Str::Err_RenameFailedTitle), MB_OK | MB_ICONERROR);
                 }
             }
         }
@@ -370,7 +371,7 @@ void CorralWindow::ShowRenameDialog()
     *p++ = 0;
     *p++ = 0;
 
-    const wchar_t *dlgTitle = L"Rename Corral";
+    const wchar_t *dlgTitle = Tr(Str::Dlg_RenameCorral);
     size_t titleLen = wcslen(dlgTitle) + 1;
     memcpy(p, dlgTitle, titleLen * sizeof(wchar_t));
     p += titleLen;
@@ -410,9 +411,10 @@ void CorralWindow::ShowRenameDialog()
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
     *p++ = 0xFFFF;
     *p++ = 0x0080;
-    const wchar_t *okText = L"OK";
-    memcpy(p, okText, 3 * sizeof(wchar_t));
-    p += 3;
+    const wchar_t *okText = Tr(Str::Btn_OK);
+    size_t okLen = wcslen(okText) + 1;
+    memcpy(p, okText, okLen * sizeof(wchar_t));
+    p += okLen;
     *p++ = 0;
 
     if ((ULONG_PTR)p % 4)
@@ -428,9 +430,10 @@ void CorralWindow::ShowRenameDialog()
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
     *p++ = 0xFFFF;
     *p++ = 0x0080;
-    const wchar_t *cancelText = L"Cancel";
-    memcpy(p, cancelText, 7 * sizeof(wchar_t));
-    p += 7;
+    const wchar_t *cancelText = Tr(Str::Btn_Cancel);
+    size_t cancelLen = wcslen(cancelText) + 1;
+    memcpy(p, cancelText, cancelLen * sizeof(wchar_t));
+    p += cancelLen;
     *p++ = 0;
 
     wchar_t nameBuffer[256] = {};
@@ -965,7 +968,7 @@ void CorralWindow::ShowAppearanceDialog()
 {
     // Build dynamic title
     std::wstring wTitle = Utf8ToWide(GetActiveTab().Title);
-    std::wstring dlgTitleStr = L"Appearance: " + wTitle;
+    std::wstring dlgTitleStr = TrFmt(Str::Title_Appearance, wTitle);
 
     // Layout Y positions (in dialog units)
     // Background Color group: y=5, h=35
@@ -1005,15 +1008,15 @@ void CorralWindow::ShowAppearanceDialog()
 
     // === Background Color group ===
     // 1. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 5, 210, 35, (WORD)-1, 0xFFFF, 0x0080, L"Background Color");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 5, 210, 35, (WORD)-1, 0xFFFF, 0x0080, Tr(Str::Grp_BackgroundColor));
     // 2. Color swatch (ID 105)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 15, 18, 30, 14, 105, 0xFFFF, 0x0082, nullptr);
     // 3. Change button (ID 106)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 55, 18, 60, 14, 106, 0xFFFF, 0x0080, L"Change...");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 55, 18, 60, 14, 106, 0xFFFF, 0x0080, Tr(Str::Btn_Change));
 
     // === Opacity group ===
     // 4. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 30, (WORD)-1, 0xFFFF, 0x0080, L"Opacity");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 45, 210, 30, (WORD)-1, 0xFFFF, 0x0080, Tr(Str::Grp_Opacity));
     // 5. Slider (ID 102)
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 15, 56, 160, 15, 102);
     // 6. Label (ID 103)
@@ -1021,41 +1024,41 @@ void CorralWindow::ShowAppearanceDialog()
 
     // === Header group ===
     // 7. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 80, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Header");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 80, 210, 55, (WORD)-1, 0xFFFF, 0x0080, Tr(Str::Grp_Header));
     // 8. "Height" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 93, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Height");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 93, 28, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Height));
     // 9. Height slider (ID 110)
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 91, 130, 15, 110);
     // 10. Height label (ID 111)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 93, 25, 10, 111, 0xFFFF, 0x0082, L"32px");
     // 11. "Font" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 110, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Font");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 110, 22, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Font));
     // 12. Font name display (ID 112)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_SUNKEN, 45, 109, 100, 12, 112, 0xFFFF, 0x0082, L"Segoe UI");
     // 13. Choose Font button (ID 113)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 108, 55, 14, 113, 0xFFFF, 0x0080, L"Choose...");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 150, 108, 55, 14, 113, 0xFFFF, 0x0080, Tr(Str::Btn_Choose));
     // 14. "Color" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 126, 24, 10, (WORD)-1, 0xFFFF, 0x0082, L"Color");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 126, 24, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Color));
     // 15. Font color swatch (ID 114)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 45, 124, 30, 14, 114, 0xFFFF, 0x0082, nullptr);
     // 16. Font color Change button (ID 115)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 124, 60, 14, 115, 0xFFFF, 0x0080, L"Change...");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 85, 124, 60, 14, 115, 0xFFFF, 0x0080, Tr(Str::Btn_Change));
 
     // === Icons group ===
     // 17. Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 140, 210, 55, (WORD)-1, 0xFFFF, 0x0080, L"Icons");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 140, 210, 55, (WORD)-1, 0xFFFF, 0x0080, Tr(Str::Grp_Icons));
     // 18. "Opacity" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 153, 28, 10, (WORD)-1, 0xFFFF, 0x0082, L"Opacity");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 153, 28, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Opacity));
     // 19. Icon opacity slider (ID 116)
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 45, 151, 130, 15, 116);
     // 20. Icon opacity label (ID 117)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 153, 25, 12, 117, 0xFFFF, 0x0082, L"100%");
     // 21. "Tint" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 170, 16, 10, (WORD)-1, 0xFFFF, 0x0082, L"Tint");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 170, 16, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Tint));
     // 22. Tint color swatch (ID 118)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 35, 168, 20, 14, 118, 0xFFFF, 0x0082, nullptr);
     // 23. Tint color Change button (ID 119)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 168, 40, 14, 119, 0xFFFF, 0x0080, L"Color...");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 60, 168, 40, 14, 119, 0xFFFF, 0x0080, Tr(Str::Btn_Color));
     // 24. Tint strength slider (ID 120)
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 105, 168, 70, 15, 120);
     // 25. Tint strength label (ID 121)
@@ -1063,15 +1066,15 @@ void CorralWindow::ShowAppearanceDialog()
 
     // === Icon Spacing group ===
     // Group box
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 200, 210, 40, (WORD)-1, 0xFFFF, 0x0080, L"Icon Spacing");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 200, 210, 40, (WORD)-1, 0xFFFF, 0x0080, Tr(Str::Grp_IconSpacing));
     // "Horiz" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 213, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Horiz");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 213, 22, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Horiz));
     // Horizontal spacing slider (ID 130)
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 211, 135, 15, 130);
     // Horizontal spacing label (ID 131)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_RIGHT, 180, 213, 25, 10, 131, 0xFFFF, 0x0082, L"100%");
     // "Vert" label
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 227, 22, 10, (WORD)-1, 0xFFFF, 0x0082, L"Vert");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 227, 22, 10, (WORD)-1, 0xFFFF, 0x0082, Tr(Str::Lbl_Vert));
     // Vertical spacing slider (ID 132)
     p = AddTrackbar(p, WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 40, 225, 135, 15, 132);
     // Vertical spacing label (ID 133)
@@ -1079,15 +1082,15 @@ void CorralWindow::ShowAppearanceDialog()
 
     // === Checkboxes ===
     // Checkbox "Use as default" (ID 107)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 246, 200, 12, 107, 0xFFFF, 0x0080, L"Use as default for new corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 246, 200, 12, 107, 0xFFFF, 0x0080, Tr(Str::Chk_UseAsDefault));
     // Checkbox "Apply changed settings to all corrals" (ID 108)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 260, 200, 12, 108, 0xFFFF, 0x0080, L"Apply changes to all corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 260, 200, 12, 108, 0xFFFF, 0x0080, Tr(Str::Chk_ApplyToAll));
     // Checkbox "Apply full appearance to all corrals" (ID 109)
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 274, 200, 12, 109, 0xFFFF, 0x0080, L"Copy full style to all corrals");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 274, 200, 12, 109, 0xFFFF, 0x0080, Tr(Str::Chk_CopyStyleToAll));
 
     // === Buttons ===
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 291, 50, 14, IDOK, 0xFFFF, 0x0080, L"OK");
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 291, 50, 14, IDCANCEL, 0xFFFF, 0x0080, L"Cancel");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 291, 50, 14, IDOK, 0xFFFF, 0x0080, Tr(Str::Btn_OK));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 291, 50, 14, IDCANCEL, 0xFFFF, 0x0080, Tr(Str::Btn_Cancel));
 
     // Fix item count in the template header
     ((DLGTEMPLATE *)dlgTemplate)->cdit = 37;

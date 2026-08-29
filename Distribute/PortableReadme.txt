@@ -69,6 +69,10 @@ INSTALLATION (PORTABLE)
 
 To uninstall, run: DexCorral.exe --unregister
 
+LANGUAGE: The UI is available in English (default) and German. The installer
+asks for the language; for the portable package, set "Language": "de" (or
+"en") in %APPDATA%\DexCorral\config.json.
+
 NOTE: The binaries are currently unsigned. Windows SmartScreen may show a
 warning when you first run the application. Click "More info" then "Run
 anyway" to proceed.
