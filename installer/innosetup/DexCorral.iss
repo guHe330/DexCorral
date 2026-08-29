@@ -10,7 +10,7 @@
 
 #define MyAppName "DexCorral"
 #define MyAppPublisher "DexCorral"
-#define MyAppURL "https://github.com/guHe330/DexCorralCpp"
+#define MyAppURL "https://github.com/guHe330/DexCorral"
 
 [Setup]
 AppId={{E4A7B2C1-3D5F-4E8A-9B1C-6F2D8E0A4C7B}
@@ -34,10 +34,15 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Installer appearance
 WizardStyle=modern
+; Small branding icon shown in the top-right corner of every wizard page.
+; (SetupIconFile is intentionally left unset so Setup.exe/Uninstall.exe keep
+; Inno Setup's default icon.)
+WizardSmallImageFile=resources\DexCorral-64.png,resources\DexCorral-128.png,resources\DexCorral-256.png
 ; Uninstall
 UninstallDisplayName={#MyAppName}
-; Minimum Windows version (Windows 10 1809)
-MinVersion=10.0.17763
+UninstallDisplayIcon={app}\DexCorral.exe
+; Minimum Windows version (Windows 11 21H2) -- DexCorral targets Windows 11 only
+MinVersion=10.0.22000
 ; Allow upgrading over existing install without asking
 UsePreviousAppDir=yes
 ; Ask for the language up front (also selects the app's UI language, see [Registry])

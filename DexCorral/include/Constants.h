@@ -45,10 +45,6 @@ constexpr DWORD DIALOG_TEMPLATE_BUFFER_SIZE = 4096;
 // Rendering: Opacity and Alpha
 // ============================================================================
 
-/// Title bar text alpha (86% opacity, 220/255)
-/// Reduces title bar visibility while maintaining readability
-constexpr BYTE TITLE_TEXT_ALPHA = 220;
-
 /// Icon selection overlay alpha (70% opacity, 180/255)
 /// Provides visual feedback for selected icons without blocking them
 constexpr BYTE SELECTION_ALPHA = 180;
@@ -56,6 +52,67 @@ constexpr BYTE SELECTION_ALPHA = 180;
 /// Icon hover overlay alpha (30% opacity, 77/255)
 /// Subtle highlight on mouse-over
 constexpr BYTE HOVER_ALPHA = 77;
+
+// ----------------------------------------------------------------------------
+// Corral chrome (header / tab strip / border) opacity
+//
+// The values below are the tunables behind the configurable header and border
+// opacity. They are gathered here so tuning is a one-line change per value.
+// See ChromeAlpha.h for the arithmetic that uses them.
+// ----------------------------------------------------------------------------
+
+/// Default header opacity (240/255, ~94%)
+/// The value the active tab header was hard-coded to before it became
+/// configurable, so existing corrals look unchanged.
+constexpr int HEADER_OPACITY_DEFAULT = 240;
+
+/// Minimum configurable header opacity (20/255, ~8%)
+/// The header is a corral's only grab handle: it is what you drag to move the
+/// corral, double-click to roll up, and right-click for the context menu. At 0
+/// a corral with a transparent background would be an invisible window that
+/// still swallows mouse input — unfindable and unrecoverable through the UI.
+/// 20 reads as "invisible" against a busy wallpaper but leaves a faint edge to
+/// aim at. Same reasoning as the icon opacity floor (CorralWindow::SetCurrentOpacity).
+constexpr int HEADER_OPACITY_MIN = 20;
+
+/// Minimum header opacity while a corral is rolled up (60/255, ~24%)
+/// Rolled up, the header *is* the whole corral, and a ~26px strip at the 20
+/// floor is a very thin target to hunt for. Applied at render time only: the
+/// configured value is never rewritten, so unrolling restores it exactly.
+constexpr int ROLLED_UP_HEADER_ALPHA_MIN = 60;
+
+/// Inactive tab alpha as a fraction of the header opacity
+constexpr float INACTIVE_TAB_ALPHA_FACTOR = 0.55f;
+
+/// Absolute floor for the derived inactive tab alpha (10/255)
+constexpr int INACTIVE_TAB_ALPHA_MIN = 10;
+
+/// Inactive tab colour darkening, in percent of the tab's own colour.
+/// Near the opacity floor the alpha difference alone collapses (20 vs 11 is
+/// barely perceptible over a busy wallpaper), so the darkening deepens as the
+/// header fades: 50% at full opacity, 25% at HEADER_OPACITY_MIN.
+constexpr int INACTIVE_TAB_RGB_SCALE_MAX_PERCENT = 50;
+constexpr int INACTIVE_TAB_RGB_SCALE_MIN_PERCENT = 25;
+
+/// Default border opacity (255, fully opaque) — the previous hard-coded value
+constexpr int BORDER_OPACITY_DEFAULT = 255;
+
+// ----------------------------------------------------------------------------
+// Text opacity (header titles / icon labels)
+//
+// Both default to fully opaque, so a config written before these settings
+// existed renders exactly as it did before. Unlike the header opacity neither
+// has a floor: text is not a hit target. A corral with invisible tab titles is
+// still draggable by its header, and icons with faded-out labels are still
+// visible and clickable, so 0 is a legitimate "minimal chrome" look rather
+// than a way to lose the corral.
+// ----------------------------------------------------------------------------
+
+/// Default header title text opacity (255, fully opaque)
+constexpr int HEADER_FONT_OPACITY_DEFAULT = 255;
+
+/// Default icon label text opacity (255, fully opaque)
+constexpr int ICON_LABEL_OPACITY_DEFAULT = 255;
 
 // ============================================================================
 // Rendering: Colors (ARGB format)
@@ -65,9 +122,11 @@ constexpr BYTE HOVER_ALPHA = 77;
 /// Divides tabs visually while blending with wallpaper
 constexpr COLORREF TAB_SEPARATOR_COLOR = (200 << 24) | (80 << 16) | (80 << 8) | 80;
 
-/// Corral border color (fully opaque dark gray, ARGB: 255,100,100,100)
-/// Defines corral window edge
-constexpr COLORREF CORRAL_BORDER_COLOR = (255 << 24) | (100 << 16) | (100 << 8) | 100;
+/// Corral border color RGB components (dark gray: 100, 100, 100)
+/// Defines the corral window edge; the alpha comes from CorralWindowConfig::BorderOpacity
+constexpr BYTE CORRAL_BORDER_R = 100;
+constexpr BYTE CORRAL_BORDER_G = 100;
+constexpr BYTE CORRAL_BORDER_B = 100;
 
 /// Icon selection color RGB components (sky blue: 60, 120, 200)
 /// Provides visual highlight for selected icons

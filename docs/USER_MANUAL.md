@@ -4,18 +4,20 @@ DexCorral organizes your Windows desktop icons into shaded, customizable areas c
 
 ## Installation
 
+DexCorral requires **Windows 11** (build 22000 or newer). Windows 10 is end of life and is neither tested nor supported; both the installer and `DexCorral.exe --register` refuse to run on it.
+
 ### Installer (recommended)
 
-1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorralCpp/releases) page.
-2. Run it (Administrator rights are required for shell extension registration). Because the binaries are currently unsigned, Windows SmartScreen may warn on first run — click **More info**, then **Run anyway**.
+1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorral/releases) page.
+2. Run it — Administrator rights are required to register the shell extension. (SmartScreen may warn; see [Troubleshooting](#troubleshooting).)
 3. The installer registers the shell extension and starts DexCorral inside the running Explorer — no Explorer restart and no logout needed. A default Corral appears on your desktop immediately.
 
 DexCorral loads automatically at every login — its shell extension is loaded by Explorer on startup, so there is nothing to configure.
 
 ### Portable package
 
-1. Download `Portable_DexCorral.zip` and extract it to any folder.
-2. Open a command prompt **as Administrator** in that folder and run `DexCorral.exe --register` (one-time setup).
+1. Download `Portable_DexCorral_<version>.zip` and extract it to any folder.
+2. Open a command prompt **as Administrator** in that folder and run `DexCorral.exe --register` (one-time setup). On an unsupported Windows version this stops with a message instead of registering — adding `--force` (`DexCorral.exe --register --force`) registers anyway, unsupported and untested.
 3. Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
 
 ### Uninstalling
@@ -27,18 +29,18 @@ After uninstalling, icons that were inside Corrals reappear as normal desktop ic
 ## Core Concepts
 
 ### Corrals
-A Corral is a shaded, semi-transparent window that lives on your desktop and contains a group of icons. Icons assigned to a Corral are hidden from the regular desktop and drawn inside the Corral window instead. They remain real desktop items — opening, renaming, deleting, and dragging all work as usual.
+A Corral is a shaded, semi-transparent window holding a group of icons. Icons assigned to it are hidden from the regular desktop and drawn inside the Corral instead.
 
 ### Tabs
-Each Corral can hold multiple **tabs**, each with its own title, icon list, background color, view mode, and header font. Click a tab to switch to it. Tabs let one Corral hold several groups (e.g. "Work", "Games", "Downloads") without taking more screen space.
+Each Corral can hold multiple **tabs**, each with its own title, icon list, background color, view mode, and header font — several groups (e.g. "Work", "Games", "Downloads") in one place on the desktop.
 
-**Reordering tabs:** hover over a tab to reveal a small grip handle (a dotted "⠿" mark) on its left edge, then drag the grip left or right to move the tab to a new position. The new order is saved automatically.
+**Reordering tabs:** hover a tab to reveal a grip handle ("⠿") on its left edge, then drag it left or right.
 
 ### Catch-All
-One tab can be designated the **Catch-All**: any new file or shortcut that lands on your desktop is automatically captured into it, keeping the rest of your desktop clean.
+One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
 
 ### Virtual Corrals
-A virtual tab mirrors the contents of any folder on your PC — point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync automatically as the folder changes. Virtual tabs are a live view: you manage the files in the folder itself (drops onto a virtual tab are not accepted).
+A virtual tab mirrors any folder on your PC — point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes. It is a live view: manage the files in the folder itself (drops onto a virtual tab are not accepted).
 
 ## Managing Corrals
 
@@ -60,6 +62,8 @@ Corral positions are remembered **per monitor and per resolution**. Moving a Cor
 ### Customizing
 Right-click a Corral's title bar or background:
 
+<img src="assets/screenshots/corral-context-menu.png" alt="The corral context menu, showing Add Tab, Rename Tab, Appearance, View, Sort By, and corral commands" width="380">
+
 * **Add Tab** — add a new tab to this Corral.
 * **Detach Tab** — move the current tab out into its own Corral window (shown when the Corral has more than one tab).
 * **Rename Tab** — change the current tab's title.
@@ -75,12 +79,34 @@ Right-click a Corral's title bar or background:
 ### Appearance Dialog
 **Appearance...** gives live-preview control over:
 
-* **Background color** and **opacity** — from fully opaque down to fully transparent, where the Corral fill disappears entirely and only the organized icons remain over your wallpaper.
+<img src="assets/screenshots/appearance-dialog.png" alt="The Appearance dialog with background colour, opacity, header, icon and spacing controls" width="380">
+
+* **Background color** — the Corral fill.
+* **Opacity** — one slider each for the background fill, border, header, header label, icons and icon labels. The border's resize grip stays visible however far down you take it.
 * **Header** — title bar height, font face/size, and font color (font settings are per tab).
-* **Icons** — opacity, tint color, and tint strength.
+* **Icons** — tint color and tint strength.
 * **Icon spacing** — horizontal and vertical spacing (50–200%).
 
 Checkboxes at the bottom let you save the current style as the **default for new corrals**, **apply the changes** you just made to all corrals, or **copy the full style** to all corrals.
+
+#### Header opacity and tabs
+Header opacity fades the title bar and tab strip independently of the Corral fill.
+
+* Inactive tabs are derived from the header opacity automatically — always dimmer than the active tab, no second slider to keep in sync.
+* The slider stops short of fully transparent, because the header is the Corral's grab handle. Rolled-up Corrals are kept a little more visible than the setting; unrolling restores it exactly.
+* Hovering a Corral fades its header, border, icons and text up to full strength, and back when you leave.
+
+#### Text opacity
+The tab title and the icon labels fade on their own sliders, so text can be dialled back
+without touching what is behind it — or turned off entirely for a Corral that is just icons.
+
+* **Header label** fades the active tab's title. It is a per-tab setting, like the font face and color, even though the slider sits with the per-Corral ones.
+* **Icon label** fades every icon caption in the Corral.
+* Both go all the way to invisible. Nothing is lost: the header still drags, rolls up and
+  right-clicks with no title on it, and icons stay visible and clickable with no captions.
+* Both fade in on hover along with the icons, border and header, on the same timing. Text set
+  to 0% is therefore not gone — it appears when you move the mouse over the Corral and fades
+  back out when you leave.
 
 ## Working with Icons
 
@@ -134,11 +160,11 @@ The format is forward- and backward-compatible: fields missing from an older con
 
 ## Known Limitations
 
-* **Identical filenames on the user and Public desktop** — corral membership is stored as a bare filename, so two files with the exact same name on `%USERPROFILE%\Desktop` and `C:\Users\Public\Desktop` can't be told apart; DexCorral assumes the one on the user desktop. (Items with the same *display* name but different filenames — e.g. a folder `test` next to `test.txt` with hidden extensions — are fully distinguished.)
+* **Identical filenames on the user and Public desktop** — corral membership is stored as a bare filename, so DexCorral assumes the one on the user desktop. The same *display* name with different filenames (a folder `test` next to `test.txt`) is handled correctly.
 
 ## Troubleshooting
 
 * **SmartScreen / antivirus warnings** — the binaries are currently unsigned; this is expected for software from a small developer. Code signing is planned.
 * **Corrals don't appear after install** — right-click the desktop once to wake the shell, or log out and back in (the Start-with-Windows entry re-injects DexCorral at login).
 * **Desktop icons misbehave** — restarting Explorer resets the hook: `Stop-Process -Name explorer -Force; Start-Process explorer.exe` in PowerShell, or via Task Manager.
-* **Bug reports** — please file issues at the [GitHub issue tracker](https://github.com/guHe330/DexCorralCpp/issues).
+* **Bug reports** — please file issues at the [GitHub issue tracker](https://github.com/guHe330/DexCorral/issues).

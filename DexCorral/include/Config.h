@@ -76,13 +76,14 @@ struct CorralTabConfig
     std::string HeaderFontName = "Segoe UI"; /// Font face for header text
     int HeaderFontSize = 10;                 /// Font size in points (matches font picker)
     std::string HeaderFontColor = "#FFFFFF"; /// RGB hex color for header text
+    int HeaderFontOpacity = 255;             /// Header text opacity (0-255); 0 hides the title, header stays draggable
 
     /// Returns the current view mode as enum
     ViewMode GetViewMode() const { return static_cast<ViewMode>(ViewModeInt); }
     /// Sets the view mode from enum
     void SetViewMode(ViewMode mode) { ViewModeInt = static_cast<int>(mode); }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity)
 };
 
 /// Configuration for a single corral window
@@ -103,13 +104,16 @@ struct CorralWindowConfig
 
     // Appearance settings (per-corral)
     int TitleBarHeight = 32;               // Header height in pixels (20-64), applies to all tabs
+    int HeaderOpacity = 240;               // Header/tab-strip opacity (20-255); inactive tabs are derived from it
+    int BorderOpacity = 255;               // Corral border opacity (0=frameless, 255=opaque)
     int IconOpacity = 255;                 // Icon transparency (0=invisible, 255=opaque)
+    int IconLabelOpacity = 255;            // Icon label text opacity (0=labels hidden, 255=opaque)
     std::string IconTintColor = "#000000"; // Tint color for icons (RGB hex)
     int IconTintStrength = 0;              // Tint strength (0=none, 255=full overlay)
     int IconSpacingXPercent = 100;         // Horizontal icon spacing (50-200%)
     int IconSpacingYPercent = 100;         // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, IconOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig
@@ -124,7 +128,11 @@ struct AppConfig
     std::string DefaultHeaderFontName = "Segoe UI Semibold"; // Applied to each new tab's header font
     int DefaultHeaderFontSize = 10;
     std::string DefaultHeaderFontColor = "#FFFFFF";
+    int DefaultHeaderFontOpacity = 255;
+    int DefaultHeaderOpacity = 240;
+    int DefaultBorderOpacity = 255;
     int DefaultIconOpacity = 210;
+    int DefaultIconLabelOpacity = 255;
     std::string DefaultIconTintColor = "#0000FF";
     int DefaultIconTintStrength = 28;
     int DefaultIconSpacingXPercent = 100;
@@ -140,7 +148,65 @@ struct AppConfig
     // (HKCU\Software\DexCorral\Language), falling back to English.
     std::string Language = "";
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultIconOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language)
+};
+
+/**
+ * A corral's complete appearance, as the Appearance dialog understands it.
+ *
+ * Flattens the split between per-corral settings (CorralWindowConfig) and the
+ * per-tab font settings (CorralTabConfig) into the one thing the user is
+ * actually editing, so applying a look elsewhere is a single value to pass
+ * around rather than a dozen loose parameters in a fixed order.
+ */
+struct AppearanceSettings
+{
+    std::string ColorHex;            /// Tab background (ARGB hex) — per tab, applied to every tab
+    int TitleBarHeight = 32;
+    int HeaderOpacity = 240;
+    int BorderOpacity = 255;
+    std::string HeaderFontName = "Segoe UI";
+    int HeaderFontSize = 10;
+    std::string HeaderFontColor = "#FFFFFF";
+    int HeaderFontOpacity = 255;
+    int IconOpacity = 255;
+    int IconLabelOpacity = 255;
+    std::string IconTintColor = "#000000";
+    int IconTintStrength = 0;
+    int IconSpacingXPercent = 100;
+    int IconSpacingYPercent = 100;
+};
+
+/**
+ * Which parts of an AppearanceSettings to apply.
+ *
+ * Everything is off by default: the dialog turns on only what the user actually
+ * touched ("apply changes to all corrals"), or calls All() to copy the whole
+ * look ("copy full style to all corrals").
+ */
+struct AppearanceApplyFlags
+{
+    bool Color = false;
+    bool TitleBarHeight = false;
+    bool HeaderOpacity = false;
+    bool BorderOpacity = false;
+    bool Font = false;        /// Face and size together — the font picker sets both
+    bool FontColor = false;
+    bool FontOpacity = false;
+    bool IconOpacity = false;
+    bool IconLabelOpacity = false;
+    bool Tint = false;        /// Colour and strength together
+    bool Spacing = false;     /// Horizontal and vertical together
+
+    /// Every setting, for "copy full style to all corrals"
+    static AppearanceApplyFlags All()
+    {
+        AppearanceApplyFlags f;
+        f.Color = f.TitleBarHeight = f.HeaderOpacity = f.BorderOpacity = true;
+        f.Font = f.FontColor = f.FontOpacity = true;
+        f.IconOpacity = f.IconLabelOpacity = f.Tint = f.Spacing = true;
+        return f;
+    }
 };
 
 class Config
@@ -149,4 +215,13 @@ public:
     static std::string GetConfigPath();
     static AppConfig Load();
     static void Save(const AppConfig &config);
+
+    /**
+     * Clamps loaded values into their usable ranges.
+     *
+     * Called by Load() on every config read. Guards against hand-edited files:
+     * a HeaderOpacity below the floor would produce a corral that is invisible
+     * *and* undraggable, with no way back through the UI.
+     */
+    static void Normalize(AppConfig &config);
 };

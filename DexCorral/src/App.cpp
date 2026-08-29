@@ -36,6 +36,7 @@
 #include "HookBridge.h"
 #include "CorralHook.h"
 #include "Version.h"
+#include "../resources/resource.h"
 #include "UpdateChecker.h"
 #include "Strings.h"
 #include <CommCtrl.h>
@@ -47,6 +48,7 @@
 #include <ctime>
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 
 // Debug log defined in dllmain.cpp (same DLL) — gated by the DebugLogging
 // config flag (bootstrapped from config.json before the App loads it).
@@ -69,6 +71,36 @@ static const UINT WM_QUICKHIDE_DBLCLK = WM_APP + 102;
 // Posted by the async update checker when a GitHub Releases query finishes.
 // lParam = UpdateCheckResult* (the handler takes ownership and deletes it).
 static const UINT WM_UPDATE_CHECK_DONE = WM_APP + 103;
+
+// DesktopMonitor's FileRenamed/FileDeleted callbacks fire on its own background
+// ReadDirectoryChangesW threads (see MonitorThread in DesktopMonitor.cpp) — unlike
+// FileAdded (deferred through the locked pendingAdoptions queue), these two still need
+// to run promptly, not wait out ADOPTION_POLL_MS. Post them here instead of mutating
+// corrals/tab.Files directly from that thread: corrals, icons, and Files vectors are
+// only ever safe to touch from the thread that owns messageWindow's message loop.
+// lParam owns a heap-allocated payload that the handler in MessageWindowProc must free.
+static const UINT WM_DESKTOP_FILE_RENAMED = WM_APP + 104;
+static const UINT WM_DESKTOP_FILE_DELETED = WM_APP + 105;
+
+// DexCorralShellExt::InvokeCommand (ShellExtension.cpp) runs on EXPLORER'S OWN UI
+// thread — Explorer calls IContextMenu::InvokeCommand directly when the user picks
+// "New DexCorral"/"New Virtual DexCorral" from the desktop's native right-click menu.
+// It must not call FindFreeCorralPosition/CreateCorralAt/CreateVirtualCorralAt itself:
+// those read/mutate App::corrals (and create a new window), which belong to this
+// thread. No payload needed — the handler computes the position itself.
+static const UINT WM_CREATE_CORRAL_AT = WM_APP + 106;
+static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
+
+// Posted by WinEventProc (the system-wide EVENT_SYSTEM_FOREGROUND hook) to re-pin
+// every corral to the bottom of the z-order. The hook callback must NOT do this
+// work itself: an out-of-context WinEvent callback is delivered like a sent message,
+// so it can arrive while this thread is blocked inside a cross-thread SendMessage
+// (e.g. DesktopIcons::PositionIconsByPath waiting on Explorer's UI thread). Calling
+// SetWindowPos on corrals from there re-enters USER32 on windows owned by Progman —
+// which belongs to Explorer's UI thread — and deadlocks both threads, hanging Explorer.
+// s_RepinPending coalesces bursts of foreground changes into a single repin.
+static const UINT WM_REPIN_CORRALS = WM_APP + 108;
+static volatile LONG s_RepinPending = 0;
 
 // Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
 static HANDLE g_AppStopEvent = nullptr;
@@ -186,8 +218,21 @@ void App::Initialize()
     // Note: Mousewheel events are NOT hooked - they pass through naturally to windows
     mouseHook->Start();
 
-    // Create tray icon
-    HICON icon = LoadIconW(nullptr, IDI_APPLICATION);
+    // Corrals are pinned to the bottom of the z-order via SetWindowPos(HWND_BOTTOM),
+    // but that's a one-time placement, not a persistent style — ordinary activation
+    // of some other window can leave a corral sitting above other apps again. Listen
+    // for foreground changes anywhere on the desktop and re-pin. WINEVENT_SKIPOWNPROCESS
+    // filters out our own SetForegroundWindow calls (e.g. the tray menu's message window).
+    foregroundHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
+                                     nullptr, WinEventProc, 0, 0,
+                                     WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+
+    // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
+    // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
+    // injected into Explorer's process.
+    HICON icon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+    if (!icon)
+        icon = LoadIconW(nullptr, IDI_APPLICATION);
     trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, Tr(Str::Tray_Tooltip));
     if (!trayIcon->IsVisible()) {
         // Shell notification area not ready yet (we're loaded very early in Explorer startup).
@@ -230,11 +275,15 @@ void App::Initialize()
         tab.HeaderFontName = config.DefaultHeaderFontName;
         tab.HeaderFontSize = config.DefaultHeaderFontSize;
         tab.HeaderFontColor = config.DefaultHeaderFontColor;
+        tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
         defaultConfig.Tabs.push_back(tab);
 
         // Apply default appearance settings (same as CreateCorral)
         defaultConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+        defaultConfig.HeaderOpacity = config.DefaultHeaderOpacity;
+        defaultConfig.BorderOpacity = config.DefaultBorderOpacity;
         defaultConfig.IconOpacity = config.DefaultIconOpacity;
+        defaultConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
         defaultConfig.IconTintColor = config.DefaultIconTintColor;
         defaultConfig.IconTintStrength = config.DefaultIconTintStrength;
         defaultConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
@@ -251,13 +300,23 @@ void App::Initialize()
     EnsureCatchAllCorral();
 
     // Start desktop monitoring
+    // NOTE: FileRenamed/FileDeleted fire on DesktopMonitor's own background threads —
+    // post across to the app thread instead of calling App::OnDesktopFile* directly (see
+    // WM_DESKTOP_FILE_RENAMED comment above). FileAdded is safe to call directly: it only
+    // pushes into the mutex-guarded pendingAdoptions queue and arms a timer.
     desktopMonitor = std::make_unique<DesktopMonitor>();
     desktopMonitor->SetFileAddedCallback([this](const std::wstring &fileName)
                                          { OnDesktopFileAdded(fileName); });
     desktopMonitor->SetFileRenamedCallback([this](const std::wstring &oldName, const std::wstring &newName)
-                                           { OnDesktopFileRenamed(oldName, newName); });
+                                           {
+                                               auto *names = new std::pair<std::wstring, std::wstring>(oldName, newName);
+                                               PostMessageW(messageWindow, WM_DESKTOP_FILE_RENAMED, 0, (LPARAM)names);
+                                           });
     desktopMonitor->SetFileDeletedCallback([this](const std::wstring &fileName)
-                                           { OnDesktopFileDeleted(fileName); });
+                                           {
+                                               auto *name = new std::wstring(fileName);
+                                               PostMessageW(messageWindow, WM_DESKTOP_FILE_DELETED, 0, (LPARAM)name);
+                                           });
     desktopMonitor->Start();
 
     // Hook is in-process (shell extension) — just update hidden icon list
@@ -279,6 +338,12 @@ void App::Shutdown()
     {
         SHChangeNotifyDeregister(shellNotifyId);
         shellNotifyId = 0;
+    }
+
+    if (foregroundHook)
+    {
+        UnhookWinEvent(foregroundHook);
+        foregroundHook = nullptr;
     }
 
     // Stop desktop monitor first
@@ -421,20 +486,21 @@ void App::SetDefaultColorHex(const std::string &colorHex)
     config.DefaultColorHex = colorHex;
 }
 
-void App::SetDefaultAppearance(int titleBarHeight, const std::string &fontName,
-                               int fontSize, const std::string &fontColor, int iconOpacity,
-                               const std::string &tintColor, int tintStrength,
-                               int spacingX, int spacingY)
+void App::SetDefaultAppearance(const AppearanceSettings &settings)
 {
-    config.DefaultTitleBarHeight = titleBarHeight;
-    config.DefaultHeaderFontName = fontName;
-    config.DefaultHeaderFontSize = fontSize;
-    config.DefaultHeaderFontColor = fontColor;
-    config.DefaultIconOpacity = iconOpacity;
-    config.DefaultIconTintColor = tintColor;
-    config.DefaultIconTintStrength = tintStrength;
-    config.DefaultIconSpacingXPercent = spacingX;
-    config.DefaultIconSpacingYPercent = spacingY;
+    config.DefaultTitleBarHeight = settings.TitleBarHeight;
+    config.DefaultHeaderFontName = settings.HeaderFontName;
+    config.DefaultHeaderFontSize = settings.HeaderFontSize;
+    config.DefaultHeaderFontColor = settings.HeaderFontColor;
+    config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(settings.HeaderFontOpacity);
+    config.DefaultHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(settings.HeaderOpacity);
+    config.DefaultBorderOpacity = ChromeAlpha::ClampBorderOpacity(settings.BorderOpacity);
+    config.DefaultIconOpacity = settings.IconOpacity;
+    config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(settings.IconLabelOpacity);
+    config.DefaultIconTintColor = settings.IconTintColor;
+    config.DefaultIconTintStrength = settings.IconTintStrength;
+    config.DefaultIconSpacingXPercent = settings.IconSpacingXPercent;
+    config.DefaultIconSpacingYPercent = settings.IconSpacingYPercent;
 }
 
 void App::ApplyColorToAllCorrals(const std::string &colorHex)
@@ -449,71 +515,77 @@ void App::ApplyColorToAllCorrals(const std::string &colorHex)
     }
 }
 
-void App::ApplyAppearanceToAllCorrals(const std::string &colorHex, bool applyColor,
-                                      int titleBarHeight, bool applyHeight,
-                                      const std::string &fontName, int fontSize, bool applyFont,
-                                      const std::string &fontColor, bool applyFontColor,
-                                      int iconOpacity, bool applyIconOpacity,
-                                      const std::string &tintColor, int tintStrength, bool applyTint,
-                                      int spacingX, int spacingY, bool applySpacing)
+void App::ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
+                                      const AppearanceApplyFlags &apply)
 {
     for (auto &corral : corrals)
     {
         auto &cfg = corral->GetConfig();
-        bool needsLayoutRecalc = false;
 
-        if (applyColor)
+        if (apply.Color)
         {
             for (auto &tab : cfg.Tabs)
             {
-                tab.ColorHex = colorHex;
+                tab.ColorHex = settings.ColorHex;
             }
         }
-        if (applyHeight)
+        if (apply.TitleBarHeight)
         {
-            cfg.TitleBarHeight = titleBarHeight;
-            needsLayoutRecalc = true;
+            cfg.TitleBarHeight = settings.TitleBarHeight;
         }
-        if (applyFont || applyFontColor)
+        if (apply.HeaderOpacity)
         {
+            cfg.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(settings.HeaderOpacity);
+            corral->SetCurrentHeaderOpacity(cfg.HeaderOpacity);
+        }
+        if (apply.BorderOpacity)
+        {
+            cfg.BorderOpacity = ChromeAlpha::ClampBorderOpacity(settings.BorderOpacity);
+            corral->SetCurrentBorderOpacity(cfg.BorderOpacity);
+        }
+        if (apply.Font || apply.FontColor || apply.FontOpacity)
+        {
+            // Font settings are per-tab; the dialog edits the active tab, so
+            // that is where they land here too.
             int activeIdx = cfg.ActiveTabIndex;
             if (activeIdx >= 0 && activeIdx < (int)cfg.Tabs.size())
             {
-                if (applyFont)
+                auto &tab = cfg.Tabs[activeIdx];
+                if (apply.Font)
                 {
-                    cfg.Tabs[activeIdx].HeaderFontName = fontName;
-                    cfg.Tabs[activeIdx].HeaderFontSize = fontSize;
+                    tab.HeaderFontName = settings.HeaderFontName;
+                    tab.HeaderFontSize = settings.HeaderFontSize;
                 }
-                if (applyFontColor)
-                    cfg.Tabs[activeIdx].HeaderFontColor = fontColor;
+                if (apply.FontColor)
+                    tab.HeaderFontColor = settings.HeaderFontColor;
+                if (apply.FontOpacity)
+                    tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(settings.HeaderFontOpacity);
             }
         }
-        if (applyIconOpacity)
+        if (apply.IconOpacity)
         {
-            cfg.IconOpacity = iconOpacity;
-            corral->SetCurrentOpacity(iconOpacity);
+            cfg.IconOpacity = settings.IconOpacity;
+            corral->SetCurrentOpacity(settings.IconOpacity);
         }
-        if (applyTint)
+        if (apply.IconLabelOpacity)
         {
-            cfg.IconTintColor = tintColor;
-            cfg.IconTintStrength = tintStrength;
-            corral->SetCurrentTintStrength(tintStrength);
+            cfg.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(settings.IconLabelOpacity);
         }
-        if (applySpacing)
+        if (apply.Tint)
         {
-            cfg.IconSpacingXPercent = spacingX;
-            cfg.IconSpacingYPercent = spacingY;
-            needsLayoutRecalc = true;
+            cfg.IconTintColor = settings.IconTintColor;
+            cfg.IconTintStrength = settings.IconTintStrength;
+            corral->SetCurrentTintStrength(settings.IconTintStrength);
+        }
+        if (apply.Spacing)
+        {
+            cfg.IconSpacingXPercent = settings.IconSpacingXPercent;
+            cfg.IconSpacingYPercent = settings.IconSpacingYPercent;
         }
 
-        if (needsLayoutRecalc)
-        {
-            corral->RecalculateLayout();
-        }
-        else
-        {
-            corral->RecalculateLayout();
-        }
+        // Every branch above changes something the layout or the paint depends
+        // on, so this is unconditional.
+        corral->RecalculateLayout();
     }
 }
 
@@ -1065,6 +1137,33 @@ void App::OnLeftButtonDown(POINT pt)
     }
 }
 
+void CALLBACK App::WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+                                LONG idObject, LONG idChild, DWORD idEventThread, DWORD idEventTime)
+{
+    if (event != EVENT_SYSTEM_FOREGROUND || idObject != OBJID_WINDOW || idChild != CHILDID_SELF || !hwnd)
+        return;
+
+    App *app = App::instance;
+    if (!app || !app->messageWindow)
+        return;
+
+    // Corrals never legitimately become the foreground window (WM_MOUSEACTIVATE
+    // returns MA_NOACTIVATE), but guard anyway so this can't fight a stray activation.
+    wchar_t cls[64] = {};
+    GetClassNameW(hwnd, cls, _countof(cls));
+    if (wcscmp(cls, L"DexCorralWindowClass") == 0)
+        return;
+
+    // Post, never act: see WM_REPIN_CORRALS. Doing SetWindowPos here would run
+    // inside the callback's (possibly re-entrant, possibly SendMessage-blocked)
+    // context and can wedge Explorer.
+    if (InterlockedCompareExchange(&s_RepinPending, 1, 0) == 0)
+    {
+        if (!PostMessageW(app->messageWindow, WM_REPIN_CORRALS, 0, 0))
+            InterlockedExchange(&s_RepinPending, 0);
+    }
+}
+
 void App::OnLeftButtonUp(POINT pt)
 {
     // Global mouse up - could be used for drag-end if needed
@@ -1189,11 +1288,15 @@ void App::CreateCorral(POINT pt)
     tab.HeaderFontName = config.DefaultHeaderFontName;
     tab.HeaderFontSize = config.DefaultHeaderFontSize;
     tab.HeaderFontColor = config.DefaultHeaderFontColor;
+    tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
     newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+    newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
+    newConfig.BorderOpacity = config.DefaultBorderOpacity;
     newConfig.IconOpacity = config.DefaultIconOpacity;
+    newConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
     newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
@@ -1437,11 +1540,15 @@ void App::CreateVirtualCorralAt(POINT pt)
     tab.HeaderFontName = config.DefaultHeaderFontName;
     tab.HeaderFontSize = config.DefaultHeaderFontSize;
     tab.HeaderFontColor = config.DefaultHeaderFontColor;
+    tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
     newConfig.Tabs.push_back(tab);
 
     // Apply default appearance settings
     newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
+    newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
+    newConfig.BorderOpacity = config.DefaultBorderOpacity;
     newConfig.IconOpacity = config.DefaultIconOpacity;
+    newConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
     newConfig.IconTintColor = config.DefaultIconTintColor;
     newConfig.IconTintStrength = config.DefaultIconTintStrength;
     newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
@@ -1565,6 +1672,71 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                     app->trayIcon->ShowBalloon(
                         Tr(Str::Update_FailedTitle),
                         Tr(Str::Update_FailedBody));
+            }
+        }
+        return 0;
+    }
+
+    // Desktop file renamed/deleted — posted from DesktopMonitor's background watcher
+    // threads (see WM_DESKTOP_FILE_RENAMED comment above). Always reclaim the
+    // heap-allocated payload even if app is somehow null, to avoid leaking it.
+    if (uMsg == WM_DESKTOP_FILE_RENAMED)
+    {
+        std::unique_ptr<std::pair<std::wstring, std::wstring>> names(
+            reinterpret_cast<std::pair<std::wstring, std::wstring> *>(lParam));
+        if (app && names)
+        {
+            app->OnDesktopFileRenamed(names->first, names->second);
+        }
+        return 0;
+    }
+
+    if (uMsg == WM_DESKTOP_FILE_DELETED)
+    {
+        std::unique_ptr<std::wstring> name(reinterpret_cast<std::wstring *>(lParam));
+        if (app && name)
+        {
+            app->OnDesktopFileDeleted(*name);
+        }
+        return 0;
+    }
+
+    // "New DexCorral" / "New Virtual DexCorral" picked from Explorer's own desktop
+    // context menu — posted from DexCorralShellExt::InvokeCommand, which runs on
+    // Explorer's UI thread (see WM_CREATE_CORRAL_AT comment above). No payload: the
+    // position is computed here, on the thread that owns `corrals`.
+    if (uMsg == WM_CREATE_CORRAL_AT)
+    {
+        if (app)
+        {
+            app->CreateCorralAt(app->FindFreeCorralPosition(300, 200));
+        }
+        return 0;
+    }
+
+    if (uMsg == WM_CREATE_VIRTUAL_CORRAL_AT)
+    {
+        if (app)
+        {
+            app->CreateVirtualCorralAt(app->FindFreeCorralPosition(300, 200));
+        }
+        return 0;
+    }
+
+    // Deferred z-order repin requested by WinEventProc, running here on the app
+    // thread's normal message loop where re-entering USER32 is safe.
+    if (app && uMsg == WM_REPIN_CORRALS)
+    {
+        InterlockedExchange(&s_RepinPending, 0);
+        // Skip while a corral drag owns the capture — this thread holds capture only
+        // for the duration of a corral interaction, and reshuffling the z-order under
+        // an in-flight drag buys nothing. The drag's own paths re-pin when it ends.
+        if (!GetCapture())
+        {
+            for (auto &corral : app->corrals)
+            {
+                if (corral)
+                    corral->SendToBottom();
             }
         }
         return 0;

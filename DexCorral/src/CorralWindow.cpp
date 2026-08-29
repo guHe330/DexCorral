@@ -36,7 +36,9 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
+#include "HookBridge.h"
 #include "Strings.h"
+#include "../resources/resource.h"
 #include <windowsx.h>
 #include <ShlObj.h>
 #include <string>
@@ -104,6 +106,10 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     dragStartRect = {0, 0, 0, 0};
     currentOpacity = (config.IconOpacity < 5) ? 5 : config.IconOpacity;
     currentTintStrength = config.IconTintStrength;
+    config.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(config.HeaderOpacity);
+    config.BorderOpacity = ChromeAlpha::ClampBorderOpacity(config.BorderOpacity);
+    currentHeaderOpacity = config.HeaderOpacity;
+    currentBorderOpacity = config.BorderOpacity;
 
     // Save the full height for roll-up restore
     savedHeight = config.Height;
@@ -123,6 +129,8 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
         wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         wc.hbrBackground = nullptr;
         wc.style = CS_DBLCLKS;
+        wc.hIcon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+        wc.hIconSm = wc.hIcon;
         RegisterClassExW(&wc);
         classRegistered = true;
     }
@@ -680,14 +688,16 @@ int CorralWindow::HitTestTabGrip(int x, int y) const
     if (config.Tabs.size() < 2 || y < 0 || y >= GetTitleBarHeight())
         return -1;
 
-    for (int i = 0; i < (int)config.Tabs.size(); i++)
-    {
-        RECT g = GetTabGripRect(i);
-        POINT pt = {x, y};
-        if (PtInRect(&g, pt))
-            return i;
-    }
-    return -1;
+    // Only the tab that is actually showing its grip can be grabbed by it. The grip
+    // is drawn on the hovered (or dragged) tab alone, so testing every tab made the
+    // left edge of each one grab-able with nothing there to see — turning a plain
+    // tab click into an accidental reorder.
+    if (hoveredTab < 0 || hoveredTab >= (int)config.Tabs.size())
+        return -1;
+
+    RECT g = GetTabGripRect(hoveredTab);
+    POINT pt = {x, y};
+    return PtInRect(&g, pt) ? hoveredTab : -1;
 }
 
 void CorralWindow::MoveTab(int from, int to)
@@ -874,6 +884,21 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_MOUSEMOVE:
         {
+            // Recover from a lost button-up: a corral is a background window, so a
+            // release that happens while the cursor is off the corral never reaches
+            // us and the drag or resize would otherwise run forever.
+            //
+            // Both the message's button flags and the live button state have to agree
+            // before an operation is ended. wParam alone is not enough: a synthesized
+            // or re-routed move can arrive with no MK_LBUTTON while the user is very
+            // much still holding the button, and ending on that cancels the drag out
+            // from under them.
+            if (!(wParam & MK_LBUTTON) && !(GetKeyState(VK_LBUTTON) & 0x8000) &&
+                window->HasCapturedOperation())
+            {
+                window->EndCapturedOperationWithoutDrop();
+            }
+
             // Track mouse for hover-expand
             if (!window->mouseInsideWindow)
             {
@@ -887,11 +912,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                     window->StartHoverExpand();
                 }
 
-                // Fade to full opacity and remove tint on hover
-                if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0)
-                {
-                    window->StartOpacityAnimation(255, 0);
-                }
+                // Fade icons, header and border to full and remove tint on hover
+                window->StartHoverFade(true);
             }
 
             // Check scrollbar hover state (PowerShell-style expand on hover)
@@ -1021,7 +1043,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                     return TRUE;
                 }
 
-                int hit = window->HitTestResize(pt.x, pt.y);
+                // Same rule as the click path: don't advertise a resize where a
+                // click will activate a tab.
+                int hit = window->HitTestResizeAllowingTabs(pt.x, pt.y);
                 LPCWSTR cursor = IDC_ARROW;
                 switch (hit)
                 {
@@ -1131,11 +1155,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             {
                 window->StartHoverCollapse();
             }
-            // Fade back to configured opacity and tint
-            if (window->config.IconOpacity < 255 || window->config.IconTintStrength > 0)
-            {
-                window->StartOpacityAnimation(window->config.IconOpacity, window->config.IconTintStrength);
-            }
+            // Fade back to the configured icon, header and border opacity
+            window->StartHoverFade(false);
             return 0;
         case WM_WINDOWPOSCHANGING:
         {
@@ -1149,6 +1170,20 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             return 0;
         }
+        case WM_CAPTURECHANGED:
+            // DexCorral's UI lives inside Explorer's process, where any other component
+            // can take the capture out from under us.
+            //
+            // Losing capture is not on its own a reason to stop: corrals are never the
+            // foreground window (MA_NOACTIVATE), and Windows hands background windows a
+            // weaker capture that it can cancel mid-drag. Ending the operation there
+            // would abort a resize the user is still performing. Only a capture loss
+            // with the button already released means the button-up is never coming.
+            if ((HWND)lParam != hwnd && !(GetKeyState(VK_LBUTTON) & 0x8000))
+            {
+                window->EndCapturedOperationWithoutDrop();
+            }
+            return 0;
         case WM_MOUSEACTIVATE:
             // Prevent corral from being brought to front when clicked
             return MA_NOACTIVATE;

@@ -37,6 +37,7 @@
 #include <memory>
 #include "Config.h"
 #include "DesktopIcons.h"
+#include "ChromeAlpha.h"
 
 class FolderWatcher;
 class CorralWindow;
@@ -166,6 +167,14 @@ public:
     void SetCurrentTintStrength(int tint) { currentTintStrength = (tint < 0) ? 0 : (tint > 255) ? 255
                                                                                                 : tint; }
 
+    /// Sets current header opacity (clamped to HEADER_OPACITY_MIN, see ChromeAlpha.h)
+    void SetCurrentHeaderOpacity(int opacity) { currentHeaderOpacity = ChromeAlpha::ClampHeaderOpacity(opacity); }
+    /// Sets current border opacity (0-255; 0 means no visible frame)
+    void SetCurrentBorderOpacity(int opacity) { currentBorderOpacity = ChromeAlpha::ClampBorderOpacity(opacity); }
+    /// Sets how far the text hover fade has run (0 = configured opacities, 255 = all text full).
+    /// The Appearance dialog snaps this to 0 so its live preview shows the value on the slider.
+    void SetCurrentTextHover(int progress) { currentTextHover = ChromeAlpha::ClampTextOpacity(progress); }
+
     /// Returns reference to the currently active tab
     CorralTabConfig &GetActiveTab();
     /// Returns const reference to the currently active tab
@@ -264,9 +273,11 @@ private:
     void OnAnimationTimer();
     void OnHoverCheckTimer();
 
-    // Opacity/tint hover animation
-    void StartOpacityAnimation(int target);
-    void StartOpacityAnimation(int target, int tintTargetVal);
+    // Opacity/tint/chrome hover animation
+    void StartOpacityAnimation(int target, int tintTargetVal, int headerTarget, int borderTarget,
+                               int textHoverTargetVal, int durationMs);
+    /// Fades icons, header, border and text towards their hovered (full) or configured values
+    void StartHoverFade(bool hoverIn);
     void OnOpacityAnimationTimer();
 
     // Quick-hide fade animation
@@ -324,9 +335,38 @@ private:
 
     // Resize support
     int HitTestResize(int x, int y); // Returns HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT, or 0
+
+    /**
+     * HitTestResize with the tab strip taking precedence over the top edge.
+     *
+     * The title bar starts at y=0, so the top resize band and the tabs share the same
+     * pixels — and resize used to win, making the top of every tab a dead zone where
+     * clicks started an invisible resize instead of switching tabs. A plain HTTOP hit
+     * therefore yields wherever a tab actually is. Corners are left alone: they sit at
+     * the far left/right of the header and are how a corral gets resized from the top.
+     */
+    int HitTestResizeAllowingTabs(int x, int y);
     void StartResize(int hitTest, int x, int y);
     void DoResize(int x, int y);
     void EndResize();
+
+    // Captured-operation recovery (drag / resize / reorder)
+    /// True while any mouse-captured operation is in progress
+    bool HasCapturedOperation() const;
+    /**
+     * Ends a captured operation whose WM_LBUTTONUP never arrived.
+     *
+     * Corrals are background windows (MA_NOACTIVATE, pinned to HWND_BOTTOM, owned by
+     * Progman), and Win32 only delivers captured mouse messages to a background window
+     * while the cursor is over it — so a button released outside the corral can go
+     * missing entirely, leaving a drag or resize running forever.
+     *
+     * Geometry changes are committed (the window is already there on screen), but the
+     * position-dependent side effects of a real drop are skipped: the release point is
+     * unknown by the time this runs, so merging into another corral or dropping an
+     * icon on a guessed target would act on a position the user never chose.
+     */
+    void EndCapturedOperationWithoutDrop();
 
     // Details-view column resize
     void StartColumnResize(int columnIndex, int x);
@@ -354,6 +394,10 @@ private:
     int resizeMode = 0; // HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT
     POINT resizeStart = {};
     RECT resizeStartRect = {};
+
+    // Guards EndCapturedOperationWithoutDrop against re-entering through the
+    // WM_CAPTURECHANGED its own ReleaseCapture() call sends.
+    bool isEndingCapturedOperation = false;
 
     std::vector<CorralIcon> icons;
     int selectedIcon = -1;
@@ -405,15 +449,34 @@ private:
 
     // Opacity/tint hover animation state
     static const UINT_PTR OPACITY_TIMER_ID = 3;
-    static const int OPACITY_ANIMATION_DURATION = 200; // ms
+    // Fading in has to keep up with the cursor, so it stays snappy. Fading out is
+    // deliberately slower: at the old 200 ms, crossing between adjacent corrals (or
+    // briefly leaving the header while still working in the corral) made the chrome
+    // flash out and back in. The longer exit absorbs that and reads as settling.
+    static const int OPACITY_FADE_IN_DURATION = 200;  // ms
+    static const int OPACITY_FADE_OUT_DURATION = 400; // ms
     bool isOpacityAnimating = false;
     DWORD opacityAnimationStartTime = 0;
+    int opacityAnimationDuration = OPACITY_FADE_IN_DURATION;
     int opacityStart = 255;
     int opacityTarget = 255;
     int currentOpacity = 255; // Current animated opacity (used by render)
     int tintStart = 0;
     int tintTarget = 0;
     int currentTintStrength = 0; // Current animated tint strength (used by render)
+    int headerOpacityStart = HEADER_OPACITY_DEFAULT;
+    int headerOpacityTarget = HEADER_OPACITY_DEFAULT;
+    int currentHeaderOpacity = HEADER_OPACITY_DEFAULT; // Current animated header alpha (used by render)
+    int borderOpacityStart = BORDER_OPACITY_DEFAULT;
+    int borderOpacityTarget = BORDER_OPACITY_DEFAULT;
+    int currentBorderOpacity = BORDER_OPACITY_DEFAULT; // Current animated border alpha (used by render)
+    // Text (tab titles, icon labels) rides the same fade, but as a progress
+    // rather than a value: the header title opacity is per tab, so a single
+    // animated value could not represent it. 0 = every text at its configured
+    // opacity, 255 = all of it fully opaque. See ChromeAlpha::HoverBlendTextOpacity.
+    int textHoverStart = 0;
+    int textHoverTarget = 0;
+    int currentTextHover = 0;
 
     // Quick-hide state: whole-window alpha (SourceConstantAlpha) animated
     // 255→0 before hiding the window, 0→255 after showing it again
