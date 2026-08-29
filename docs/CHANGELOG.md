@@ -11,19 +11,19 @@ Implementation detail belongs in the commit history.
 ## [Unreleased]
 
 ### Added
-- Two text opacity sliders in the Appearance dialog: **Header label** fades the tab title (per tab), **Icon label** fades the icon captions. Both reach fully invisible — a Corral with no title still drags and right-clicks, and icons with no captions stay clickable. Both also fade in on hover with the icons and chrome, so text set to 0% appears when you point at the Corral and fades away again when you leave.
+- Text opacity in the Appearance dialog: **Header label** fades a tab's title, **Icon label** fades the icon captions. Both go all the way to invisible, and both fade back in when you point at the Corral — so text set to 0% is hidden at rest rather than gone for good.
 - GitHub issue forms for bug reports, feature requests, and multi-monitor test reports.
 - Contributing guide gains a "Testing is a contribution" section naming the untested territory: multiple monitors, mixed DPI, unusual display hardware, and large desktops.
 
 ### Changed
-- Every opacity slider now sits together in the Appearance dialog's **Opacity** section, each one directly under what it affects. The Header and Icons sections keep only what is not an opacity.
+- Every opacity slider now sits together in the Appearance dialog's **Opacity** section, each one directly under what it affects.
 - DexCorral now requires Windows 11 (build 22000 or newer). Windows 10 is end of life and there is no machine to test it on, so the installer and `--register` refuse to run below that build. `--register --force` overrides the check, unsupported and untested.
 - Downloads are named after their version (`Portable_DexCorral_<version>.zip`), so packages from different releases stay distinguishable once downloaded.
 - Release notes show the real download sizes instead of a hand-maintained figure that had drifted from reality.
 - Documentation trimmed: the README is a short overview that points at the manual instead of repeating it, and changelog entries are now brief user-facing lines rather than symbol-level detail.
 
 ### Fixed
-- A black header font is no longer invisible. Tab titles are now drawn through the same path as the icon labels, which also drops subpixel antialiasing from the header — text on a Corral is very slightly softer, and correct over any wallpaper.
+- A black header font is no longer invisible. Header text is very slightly softer as a result, and now renders correctly over any wallpaper.
 
 ## [1.0.22] - 2026-08-27
 
