@@ -20,12 +20,16 @@
  */
 
 /**
- * Strings.cpp - Compiled-in English string table + lookup
+ * Strings.cpp - Compiled-in string tables + lookup
  *
- * English is the authoritative fallback and is never loaded from disk, so a
- * corrupt or hostile locale file can never break the base UI. Runtime locale
- * loading (JSON overrides from %APPDATA%/DexCorral/lang/) is Phase 3 of
- * docs/TRANSLATION_PLAN.md and hooks in via the override check in Tr().
+ * One flat table per shipped language, indexed by (size_t)Str in enum order.
+ * Nothing is ever loaded from disk. Locale files in a user-writable folder were
+ * considered and rejected: they would put a parser on the startup path, fed by
+ * an input any process running as the user can replace, before there is a UI to
+ * report the failure in. Compiled in, no file can blank, truncate, or replace
+ * the interface, and a missing row is a build error rather than a runtime one.
+ * Adding a language means adding a table here plus a code in SetLanguage(),
+ * then rebuilding.
  */
 
 #include "Strings.h"

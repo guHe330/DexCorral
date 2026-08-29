@@ -1,9 +1,9 @@
 /**
  * test_strings.cpp - Unit tests for the UI string catalog (Strings.h/.cpp).
  *
- * Verifies that every Str enum value resolves to a non-null, non-empty English
- * string and that TrFmt performs literal {0} token replacement (no printf).
- * See docs/TRANSLATION_PLAN.md §7.
+ * Verifies that every Str enum value resolves to a non-null, non-empty string in
+ * every shipped language, that placeholders stay in parity across languages, and
+ * that TrFmt performs literal {0}/{1} token replacement (no printf).
  */
 
 #include <gtest/gtest.h>
