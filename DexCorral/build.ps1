@@ -156,15 +156,29 @@ if ($exitCode -eq 0) {
         Write-Host "DexCorralTests.exe not found - skipping tests" -ForegroundColor DarkGray
     }
 
-    # Create release zip
-    $zipPath = Join-Path $buildDir "DexCorral.zip"
+    # Pull the version from Version.h (single source of truth). Both the
+    # release zip name and the installer build below derive from it.
+    $versionHeader = Join-Path $sourceDir "include\Version.h"
+    $releaseVersion = $null
+    if (Test-Path $versionHeader) {
+        $m = Select-String -Path $versionHeader -Pattern 'DEXCORRAL_VERSION\s+L"([0-9]+\.[0-9]+\.[0-9]+)"' | Select-Object -First 1
+        if ($m) { $releaseVersion = $m.Matches[0].Groups[1].Value }
+    }
+
+    # Create release zip. The version goes in the filename so zips from
+    # different versions stay distinguishable (matches the installer naming
+    # and the Portable_DexCorral_<version>.zip produced by CI).
+    $zipName = if ($releaseVersion) { "DexCorral_${releaseVersion}.zip" } else { "DexCorral.zip" }
+    $zipPath = Join-Path $buildDir $zipName
     $filesToZip = @(
         (Join-Path $buildDir "DexCorralHook.dll"),
         (Join-Path $buildDir "DexCorral.exe")
     ) | Where-Object { Test-Path $_ }
 
     if ($filesToZip.Count -gt 0) {
-        if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+        # Drop stale zips (older versions, plus the pre-versioning
+        # DexCorral.zip) so the folder only holds the current build.
+        Get-ChildItem -Path $buildDir -Filter "DexCorral*.zip" -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
         Compress-Archive -Path $filesToZip -DestinationPath $zipPath -CompressionLevel Optimal
         Write-Host ""
         Write-Host "Release zip: $zipPath" -ForegroundColor Cyan
@@ -183,14 +197,9 @@ if ($exitCode -eq 0) {
             Write-Host ""
             Write-Host "Building installer..." -ForegroundColor Green
 
-            # Pull the version from Version.h (single source of truth) and pass it
-            # to ISCC, otherwise the .iss falls back to its hardcoded 0.1.0 default.
-            $versionHeader = Join-Path $sourceDir "include\Version.h"
-            $setupVersion = $null
-            if (Test-Path $versionHeader) {
-                $m = Select-String -Path $versionHeader -Pattern 'DEXCORRAL_VERSION\s+L"([0-9]+\.[0-9]+\.[0-9]+)"' | Select-Object -First 1
-                if ($m) { $setupVersion = $m.Matches[0].Groups[1].Value }
-            }
+            # Pass the version read from Version.h to ISCC, otherwise the .iss
+            # falls back to its hardcoded 0.1.0 default.
+            $setupVersion = $releaseVersion
             # Remove stale setup exes so old version-named files don't linger
             # in the output folder and get mistaken for the current build.
             $outputDir = Join-Path $sourceDir "..\installer\innosetup\output"

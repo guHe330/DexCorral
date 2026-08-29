@@ -138,6 +138,10 @@ const wchar_t *const kEnglish[] = {
     /* Grp_Icons */                L"Icons",
     /* Lbl_Opacity */              L"Opacity",
     /* Lbl_Tint */                 L"Tint",
+    /* Lbl_Background */           L"Background",
+    /* Lbl_Border */               L"Border",
+    /* Lbl_HeaderLabel */          L"Header Label",
+    /* Lbl_IconLabel */            L"Icon Label",
     /* Btn_Color */                L"Color...",
     /* Grp_IconSpacing */          L"Icon Spacing",
     /* Lbl_Horiz */                L"Horiz",
@@ -187,8 +191,17 @@ const wchar_t *const kEnglish[] = {
                                    L"  DexCorral.exe --register     Register shell extension\n"
                                    L"  DexCorral.exe --unregister   Unregister shell extension\n"
                                    L"  DexCorral.exe --startup      Inject into Explorer and start (used by Run key)\n"
-                                   L"  DexCorral.exe --silent       Suppress message dialogs\n\n"
+                                   L"  DexCorral.exe --silent       Suppress message dialogs\n"
+                                   L"  DexCorral.exe --force        Register on an unsupported Windows version\n\n"
+                                   L"DexCorral requires Windows 11; Windows 10 is unsupported and untested.\n"
                                    L"After registration, restart Explorer or use --startup to activate.",
+    /* Reg_NeedsWin11 */           L"DexCorral requires Windows 11 (build {0} or newer).\n"
+                                   L"This system reports build {1}.\n\n"
+                                   L"Windows 10 is end of life and DexCorral is neither tested nor "
+                                   L"supported on it.\n\n"
+                                   L"To register anyway, at your own risk:\n"
+                                   L"  DexCorral.exe --register --force\n\n"
+                                   L"Please do not file bug reports from unsupported Windows versions.",
 };
 
 static_assert(sizeof(kEnglish) / sizeof(kEnglish[0]) == (size_t)Str::_Count,
@@ -299,6 +312,10 @@ const wchar_t *const kGerman[] = {
     /* Grp_Icons */                L"Symbole",
     /* Lbl_Opacity */              L"Deckkraft",
     /* Lbl_Tint */                 L"Tönung",
+    /* Lbl_Background */           L"Hintergrund",
+    /* Lbl_Border */               L"Rahmen",
+    /* Lbl_HeaderLabel */          L"Kopfzeilentext",
+    /* Lbl_IconLabel */            L"Symboltext",
     /* Btn_Color */                L"Farbe...",
     /* Grp_IconSpacing */          L"Symbolabstand",
     /* Lbl_Horiz */                L"Horiz.",
@@ -348,8 +365,17 @@ const wchar_t *const kGerman[] = {
                                    L"  DexCorral.exe --register     Shell-Erweiterung registrieren\n"
                                    L"  DexCorral.exe --unregister   Shell-Erweiterung deregistrieren\n"
                                    L"  DexCorral.exe --startup      In den Explorer injizieren und starten (vom Run-Schlüssel verwendet)\n"
-                                   L"  DexCorral.exe --silent       Meldungsdialoge unterdrücken\n\n"
+                                   L"  DexCorral.exe --silent       Meldungsdialoge unterdrücken\n"
+                                   L"  DexCorral.exe --force        Auf einer nicht unterstützten Windows-Version registrieren\n\n"
+                                   L"DexCorral benötigt Windows 11; Windows 10 wird nicht unterstützt und ist ungetestet.\n"
                                    L"Nach der Registrierung den Explorer neu starten oder --startup verwenden.",
+    /* Reg_NeedsWin11 */           L"DexCorral benötigt Windows 11 (Build {0} oder neuer).\n"
+                                   L"Dieses System meldet Build {1}.\n\n"
+                                   L"Windows 10 hat das Supportende erreicht; DexCorral ist darauf weder "
+                                   L"getestet noch unterstützt.\n\n"
+                                   L"Wenn du trotzdem registrieren möchtest, auf eigene Gefahr:\n"
+                                   L"  DexCorral.exe --register --force\n\n"
+                                   L"Bitte melde keine Fehler von nicht unterstützten Windows-Versionen.",
 };
 
 static_assert(sizeof(kGerman) / sizeof(kGerman[0]) == (size_t)Str::_Count,
@@ -395,6 +421,22 @@ std::wstring TrFmt(Str id, const std::wstring &arg0)
     {
         result.replace(pos, token.size(), arg0);
         pos += arg0.size();
+    }
+    return result;
+}
+
+std::wstring TrFmt(Str id, const std::wstring &arg0, const std::wstring &arg1)
+{
+    // Single left-to-right pass so a token appearing inside an argument is
+    // never re-expanded by a later replacement.
+    const std::wstring src = Tr(id);
+    std::wstring result;
+    result.reserve(src.size() + arg0.size() + arg1.size());
+    for (size_t i = 0; i < src.size();)
+    {
+        if (src.compare(i, 3, L"{0}") == 0)      { result += arg0; i += 3; }
+        else if (src.compare(i, 3, L"{1}") == 0) { result += arg1; i += 3; }
+        else                                     { result += src[i]; i++; }
     }
     return result;
 }

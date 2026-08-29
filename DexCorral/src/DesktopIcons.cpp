@@ -71,12 +71,19 @@ std::wstring DesktopIcons::GetShellDisplayName(const std::wstring &fullPath)
         return sfi.szDisplayName;
     }
 
-    // Fallback: filename without .lnk
+    // Fallback (SHGetFileInfoW failed — typically the file no longer exists, e.g. a
+    // stale/ghost entry): strip whatever extension the shell always hides regardless of
+    // the "show file extensions" setting. ".lnk" (shortcuts) and ".url" (Internet
+    // Shortcuts, e.g. Steam desktop launchers) are the common cases; both are 4 chars.
     size_t slash = fullPath.find_last_of(L"\\/");
     std::wstring name = (slash != std::wstring::npos) ? fullPath.substr(slash + 1) : fullPath;
-    if (name.length() > 4 && _wcsicmp(name.c_str() + name.length() - 4, L".lnk") == 0)
+    if (name.length() > 4)
     {
-        name = name.substr(0, name.length() - 4);
+        const wchar_t *ext = name.c_str() + name.length() - 4;
+        if (_wcsicmp(ext, L".lnk") == 0 || _wcsicmp(ext, L".url") == 0)
+        {
+            name = name.substr(0, name.length() - 4);
+        }
     }
     return name;
 }
@@ -510,11 +517,22 @@ std::vector<SpecialDesktopIcon> DesktopIcons::GetSpecialDesktopIcons()
                     wchar_t displayName[MAX_PATH] = {};
                     StrRetToBufW(&strretDisplay, pidlChild, displayName, MAX_PATH);
 
-                    SpecialDesktopIcon sdi;
-                    // Strip leading "::" to store just the CLSID
-                    sdi.clsid = parseName + 2;
-                    sdi.displayName = displayName;
-                    result.push_back(std::move(sdi));
+                    // Windows exposes several namespace items under the same localized
+                    // name (e.g. Control Panel appears twice: the browsable folder
+                    // {26EE0668-...} and the Start menu/desktop command object
+                    // {5399E694-...}, both resolving to shell32.dll,-4161). They are
+                    // indistinguishable in the menu, so keep only the first occurrence.
+                    bool duplicateName = std::any_of(result.begin(), result.end(),
+                                                     [&](const SpecialDesktopIcon &existing)
+                                                     { return existing.displayName == displayName; });
+                    if (!duplicateName)
+                    {
+                        SpecialDesktopIcon sdi;
+                        // Strip leading "::" to store just the CLSID
+                        sdi.clsid = parseName + 2;
+                        sdi.displayName = displayName;
+                        result.push_back(std::move(sdi));
+                    }
                 }
             }
         }

@@ -298,6 +298,14 @@ int CorralWindow::HitTestResize(int x, int y)
     return 0;
 }
 
+int CorralWindow::HitTestResizeAllowingTabs(int x, int y)
+{
+    int hit = HitTestResize(x, y);
+    if (hit == HTTOP && HitTestTab(x, y) >= 0)
+        return 0; // The tab owns these pixels
+    return hit;
+}
+
 void CorralWindow::StartResize(int hitTest, int x, int y)
 {
     isResizing = true;
@@ -782,10 +790,11 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         pendingRenameIcon = -1;
     }
 
-    // Check resize area first (but not when rolled up)
+    // Check resize area first (but not when rolled up) — except where the top edge
+    // would steal a click meant for a tab; see HitTestResizeAllowingTabs.
     if (!config.IsRolledUp)
     {
-        int resizeHit = HitTestResize(x, y);
+        int resizeHit = HitTestResizeAllowingTabs(x, y);
         if (resizeHit)
         {
             StartResize(resizeHit, x, y);
@@ -954,6 +963,11 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         iconDragStart = {x, y}; // Store starting position
         dropTargetIndex = -1;
         SetFocus(hwnd); // Take keyboard focus so F2 works
+        // SetFocus activates the window (and can raise it in the z-order) as a side
+        // effect — WM_MOUSEACTIVATE's MA_NOACTIVATE doesn't cover this path since it's
+        // not triggered by the click itself. Re-pin immediately, same as the right-click
+        // context menu's SetForegroundWindow/SendToBottom pair.
+        SendToBottom();
         SetCapture(hwnd);
         UpdateLayeredContent(); // Show selection highlight
         return;
@@ -1015,6 +1029,78 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
         }
         OpenFile(hit);
     }
+}
+
+bool CorralWindow::HasCapturedOperation() const
+{
+    return isDragging || isResizing || isResizingColumn || isDraggingScrollbar ||
+           isDraggingIcon || isDraggingTab || draggedIconIndex >= 0;
+}
+
+void CorralWindow::EndCapturedOperationWithoutDrop()
+{
+    if (isEndingCapturedOperation || !HasCapturedOperation())
+        return;
+
+    isEndingCapturedOperation = true;
+
+    if (isDraggingTab)
+    {
+        // The reorder is applied live during the drag, so the order on screen is
+        // what the user built — keep it.
+        isDraggingTab = false;
+        draggedTabIndex = -1;
+        ReleaseCapture();
+        if (App::GetInstance())
+            App::GetInstance()->SaveConfig();
+        UpdateLayeredContent();
+    }
+    else if (isResizingColumn)
+    {
+        EndColumnResize();
+    }
+    else if (isResizing)
+    {
+        EndResize();
+    }
+    else if (isDraggingScrollbar)
+    {
+        EndScrollbarDrag();
+    }
+    else if (isDraggingIcon)
+    {
+        // Abandon the drag rather than dropping: the release point is unknown, and
+        // guessing one could move the icon to another corral or out to the desktop.
+        isDraggingIcon = false;
+        draggedIconIndex = -1;
+        dropTargetIndex = -1;
+        iconDragOutside = false;
+        ReleaseCapture();
+        UpdateLayeredContent();
+    }
+    else if (draggedIconIndex >= 0)
+    {
+        // Selection click that never got its button-up
+        draggedIconIndex = -1;
+        ReleaseCapture();
+    }
+    else if (isDragging)
+    {
+        // Commit the position the corral is already sitting at, but skip the
+        // merge-into-another-corral check — that needs the real release point.
+        isDragging = false;
+        ReleaseCapture();
+        SyncConfigFromWindow();
+        if (App::GetInstance())
+        {
+            App::GetInstance()->CacheDesktopIconPositions();
+            App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->InvalidateDesktopIconCache();
+            App::GetInstance()->SaveConfig();
+        }
+    }
+
+    isEndingCapturedOperation = false;
 }
 
 void CorralWindow::OnLeftButtonUp(int x, int y)
@@ -1166,82 +1252,90 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
 
     const auto &icon = icons[iconIndex];
 
+    // Resolve the shell's own context menu for this item. Any of these can legitimately
+    // fail — most commonly because the backing file no longer exists (e.g. a stale/ghost
+    // entry left behind by a desync between our tracked Files list and disk). That must
+    // NOT stop "Remove from Corral" from being offered: it's the only way to clear an
+    // entry that the shell can no longer resolve.
     LPITEMIDLIST pidlFull = nullptr;
-    HRESULT hr;
-    if (icon.isSpecialIcon)
-    {
-        std::wstring parseName = L"::" + icon.clsid;
-        hr = SHParseDisplayName(parseName.c_str(), nullptr, &pidlFull, 0, nullptr);
-    }
-    else
-    {
-        hr = SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
-    }
-    if (FAILED(hr) || !pidlFull)
-        return;
-
     IShellFolder *pParentFolder = nullptr;
     LPCITEMIDLIST pidlChild = nullptr;
-    hr = SHBindToParent(pidlFull, IID_IShellFolder, (void **)&pParentFolder, &pidlChild);
-    if (FAILED(hr) || !pParentFolder)
-    {
-        CoTaskMemFree(pidlFull);
-        return;
-    }
-
     IContextMenu *pContextMenu = nullptr;
-    hr = pParentFolder->GetUIObjectOf(hwnd, 1, &pidlChild, IID_IContextMenu, nullptr, (void **)&pContextMenu);
-    if (FAILED(hr) || !pContextMenu)
+
+    HRESULT hr = icon.isSpecialIcon
+        ? SHParseDisplayName((L"::" + icon.clsid).c_str(), nullptr, &pidlFull, 0, nullptr)
+        : SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
+
+    if (SUCCEEDED(hr) && pidlFull)
     {
-        pParentFolder->Release();
-        CoTaskMemFree(pidlFull);
-        return;
+        hr = SHBindToParent(pidlFull, IID_IShellFolder, (void **)&pParentFolder, &pidlChild);
+        if (FAILED(hr))
+        {
+            pParentFolder = nullptr;
+        }
+        else
+        {
+            hr = pParentFolder->GetUIObjectOf(hwnd, 1, &pidlChild, IID_IContextMenu, nullptr, (void **)&pContextMenu);
+            if (FAILED(hr))
+            {
+                pContextMenu = nullptr;
+            }
+        }
     }
 
+    const UINT removeCmdId = 0x7FFF + 1;
     HMENU hMenu = CreatePopupMenu();
     if (hMenu)
     {
-        hr = pContextMenu->QueryContextMenu(hMenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_EXPLORE);
-        if (SUCCEEDED(hr))
+        bool haveShellItems = false;
+        if (pContextMenu)
+        {
+            hr = pContextMenu->QueryContextMenu(hMenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_EXPLORE);
+            haveShellItems = SUCCEEDED(hr);
+        }
+        if (haveShellItems)
         {
             AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-            AppendMenuW(hMenu, MF_STRING, 0x7FFF + 1, Tr(Str::Menu_RemoveFromCorral));
+        }
+        AppendMenuW(hMenu, MF_STRING, removeCmdId, Tr(Str::Menu_RemoveFromCorral));
 
-            SetForegroundWindow(hwnd);
-            int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
-                                     screenX, screenY, 0, hwnd, nullptr);
-            PostMessageW(hwnd, WM_NULL, 0, 0);
-            SendToBottom();
+        SetForegroundWindow(hwnd);
+        int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
+                                 screenX, screenY, 0, hwnd, nullptr);
+        PostMessageW(hwnd, WM_NULL, 0, 0);
+        SendToBottom();
 
-            if (cmd == 0x7FFF + 1)
+        if (cmd == (int)removeCmdId)
+        {
+            auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
+            if (it != GetActiveTab().Files.end())
             {
-                auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
-                if (it != GetActiveTab().Files.end())
+                GetActiveTab().Files.erase(it);
+                LoadFiles();
+                if (App::GetInstance())
                 {
-                    GetActiveTab().Files.erase(it);
-                    LoadFiles();
-                    if (App::GetInstance())
-                    {
-                        App::GetInstance()->SaveConfig();
-                    }
+                    App::GetInstance()->SaveConfig();
                 }
             }
-            else if (cmd > 0)
-            {
-                CMINVOKECOMMANDINFO ci = {};
-                ci.cbSize = sizeof(ci);
-                ci.hwnd = hwnd;
-                ci.lpVerb = MAKEINTRESOURCEA(cmd - 1);
-                ci.nShow = SW_SHOWNORMAL;
-                pContextMenu->InvokeCommand(&ci);
-            }
+        }
+        else if (haveShellItems && cmd > 0)
+        {
+            CMINVOKECOMMANDINFO ci = {};
+            ci.cbSize = sizeof(ci);
+            ci.hwnd = hwnd;
+            ci.lpVerb = MAKEINTRESOURCEA(cmd - 1);
+            ci.nShow = SW_SHOWNORMAL;
+            pContextMenu->InvokeCommand(&ci);
         }
         DestroyMenu(hMenu);
     }
 
-    pContextMenu->Release();
-    pParentFolder->Release();
-    CoTaskMemFree(pidlFull);
+    if (pContextMenu)
+        pContextMenu->Release();
+    if (pParentFolder)
+        pParentFolder->Release();
+    if (pidlFull)
+        CoTaskMemFree(pidlFull);
 }
 
 // ============================================================================
@@ -1555,9 +1649,10 @@ void CorralWindow::OnIconDrag(int x, int y)
     if (!isDraggingIcon || draggedIconIndex < 0)
         return;
 
-    // Find which icon slot we're over
+    // Find which icon slot we're over. icons[i].rect is in unscrolled content
+    // coordinates, so adjust for scroll the same way HitTestIcon does.
     int newDropTarget = -1;
-    POINT pt = {x, y};
+    POINT pt = {x, y + scrollPosition};
 
     for (int i = 0; i < (int)icons.size(); i++)
     {
@@ -1574,10 +1669,14 @@ void CorralWindow::OnIconDrag(int x, int y)
         UpdateLayeredContent();
     }
 
-    // Track if we're outside this corral (for drag-out detection)
+    // Track if we're outside this corral (for drag-out detection). This test uses
+    // the raw client point, not the scroll-adjusted one above — clientRect is in
+    // unscrolled client coordinates, so adding scrollPosition would report a drag
+    // near the bottom of a scrolled corral as having left the window.
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
-    iconDragOutside = !PtInRect(&clientRect, pt);
+    POINT clientPt = {x, y};
+    iconDragOutside = !PtInRect(&clientRect, clientPt);
 }
 
 void CorralWindow::OnIconDragEnd()

@@ -56,16 +56,16 @@ TEST_F(GermanCatalog, EveryIdResolvesToNonEmptyGerman) {
 TEST_F(GermanCatalog, PlaceholderParityWithEnglish) {
     // Every {0} in an English string must appear the same number of times in
     // the German one (and vice versa) so TrFmt substitutions never get lost.
-    auto countToken = [](const std::wstring &s) {
+    auto countToken = [](const std::wstring &s, const wchar_t *tok) {
         size_t n = 0, pos = 0;
-        while ((pos = s.find(L"{0}", pos)) != std::wstring::npos) { n++; pos += 3; }
+        while ((pos = s.find(tok, pos)) != std::wstring::npos) { n++; pos += 3; }
         return n;
     };
     for (size_t i = 0; i < (size_t)Str::_Count; i++) {
         SetLanguage(L"en");
-        size_t en = countToken(Tr((Str)i));
+        size_t en = countToken(Tr((Str)i), L"{0}") + countToken(Tr((Str)i), L"{1}");
         SetLanguage(L"de");
-        size_t de = countToken(Tr((Str)i));
+        size_t de = countToken(Tr((Str)i), L"{0}") + countToken(Tr((Str)i), L"{1}");
         EXPECT_EQ(en, de) << "placeholder count mismatch for Str id " << i;
     }
 }
@@ -94,4 +94,20 @@ TEST(StringCatalog, TrFmtIsLiteralNotPrintf) {
     // The {0} inside the *argument* must not be re-expanded (no infinite loop,
     // no double substitution) — it survives as literal text.
     EXPECT_NE(result.find(L"{0}"), std::wstring::npos);
+}
+
+TEST_F(GermanCatalog, TrFmtTwoArgsSubstitutesBothTokens) {
+    SetLanguage(L"en");
+    std::wstring r = TrFmt(Str::Reg_NeedsWin11, L"22000", L"19045");
+    EXPECT_NE(r.find(L"22000"), std::wstring::npos);
+    EXPECT_NE(r.find(L"19045"), std::wstring::npos);
+    EXPECT_EQ(r.find(L"{0}"), std::wstring::npos);
+    EXPECT_EQ(r.find(L"{1}"), std::wstring::npos);
+}
+
+TEST_F(GermanCatalog, TrFmtTwoArgsDoesNotReexpandArguments) {
+    SetLanguage(L"en");
+    // "{1}" arriving as arg0 must survive verbatim, not be replaced by arg1.
+    std::wstring r = TrFmt(Str::Reg_NeedsWin11, L"{1}", L"19045");
+    EXPECT_NE(r.find(L"{1}"), std::wstring::npos);
 }

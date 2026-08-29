@@ -1,6 +1,6 @@
 #include "ShellExtension.h"
 #include "Guids.h"
-#include "App.h"
+#include "HookBridge.h"
 #include <strsafe.h>
 
 // Defined in dllmain.cpp (same DLL) — gated by the DebugLogging config flag
@@ -100,23 +100,29 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::InvokeCommand(CMINVOKECOMMANDINFO* 
     if (HIWORD(pici->lpVerb) != 0)
         return E_INVALIDARG;
 
-    App* app = App::GetInstance();
-    if (!app) return E_FAIL;
+    // NOTE: this runs on EXPLORER'S OWN UI thread (Explorer calls IContextMenu::InvokeCommand
+    // directly when the user picks a context-menu item) — it is NOT the App's worker thread.
+    // Post to the app instead of calling FindFreeCorralPosition/CreateCorralAt/
+    // CreateVirtualCorralAt here: those read/mutate App::corrals and create a new window,
+    // which must only ever happen on the thread that owns that vector and pumps that
+    // window's messages (see WM_CREATE_CORRAL_AT in App.cpp).
+    HWND appWnd = HookBridge::GetAppMessageWindow();
+    if (!appWnd) return E_FAIL;
 
-    // Place new corrals in free space (top-right corner) rather than at the
-    // cursor, so they don't overlap existing corrals.
-    POINT pt = app->FindFreeCorralPosition(300, 200);
-
+    UINT msg;
     switch (LOWORD(pici->lpVerb)) {
     case IDM_NEW_CORRAL:
-        app->CreateCorralAt(pt);
-        return S_OK;
+        msg = WM_APP + 106; // WM_CREATE_CORRAL_AT
+        break;
     case IDM_NEW_VIRTUAL_CORRAL:
-        app->CreateVirtualCorralAt(pt);
-        return S_OK;
+        msg = WM_APP + 107; // WM_CREATE_VIRTUAL_CORRAL_AT
+        break;
     default:
         return E_INVALIDARG;
     }
+
+    PostMessage(appWnd, msg, 0, 0);
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::GetCommandString(UINT_PTR idCmd, UINT uType,
