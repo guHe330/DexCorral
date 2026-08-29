@@ -22,9 +22,9 @@
 /**
  * Strings.h - Centralized catalog of user-facing UI strings (i18n)
  *
- * Every user-facing string lives behind the Str enum so adding a language later
- * is a data task, not a code change (see docs/TRANSLATION_PLAN.md). English is
- * compiled in as the authoritative fallback; Tr() never returns null.
+ * Every user-facing string lives behind the Str enum so adding a language is a
+ * data task rather than a code change. Every shipped language is compiled in;
+ * English is the fallback and Tr() never returns null.
  *
  * Technical strings (window class names, font names, IPC object names, registry
  * paths, printf formats, URLs) must NOT go through this catalog.
@@ -182,7 +182,8 @@ enum class Str
 const wchar_t *Tr(Str id);
 
 // Returns Tr(id) with every "{0}" token replaced by arg0. Literal replacement
-// only — never printf-family formatting on translated text (TRANSLATION_PLAN §5.2).
+// only: a translated string is data, so a stray %s or %n in one must never be
+// handed to a printf-family function as a format specifier.
 std::wstring TrFmt(Str id, const std::wstring &arg0);
 
 // As above, replacing "{0}" with arg0 and "{1}" with arg1.
