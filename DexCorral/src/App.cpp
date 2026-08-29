@@ -37,6 +37,7 @@
 #include "CorralHook.h"
 #include "Version.h"
 #include "UpdateChecker.h"
+#include "Strings.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -81,11 +82,7 @@ static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
 {
     if (!s_SafeModeNoticePending || !tray || !tray->IsVisible())
         return;
-    if (tray->ShowBalloon(
-            L"DexCorral started in safe mode",
-            L"Explorer restarted repeatedly while the desktop hook was active, so the "
-            L"hook is disabled for this session. Desktop icons stay visible. The hook "
-            L"will be re-enabled on the next start."))
+    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(Str::SafeMode_Body)))
     {
         s_SafeModeNoticePending = false;
         DllLog(L"App: safe mode tray notice shown");
@@ -163,6 +160,14 @@ void App::Initialize()
 
     // Load configuration
     LoadConfig();
+
+    // Select UI language before any user-visible string is built:
+    // config.json "Language" wins; else the installer's choice; else English.
+    std::wstring lang = CorralWindow::Utf8ToWide(config.Language);
+    if (lang.empty())
+        lang = GetInstallerLanguage();
+    SetLanguage(lang);
+
     HookBridge::SetDebugLogging(config.DebugLogging);
     DllLog(L"App::Initialize: config loaded — %zu corrals, DebugLogging=%d",
            config.Corrals.size(), config.DebugLogging ? 1 : 0);
@@ -183,7 +188,7 @@ void App::Initialize()
 
     // Create tray icon
     HICON icon = LoadIconW(nullptr, IDI_APPLICATION);
-    trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, L"DexCorral - Double-click desktop to hide icons");
+    trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, Tr(Str::Tray_Tooltip));
     if (!trayIcon->IsVisible()) {
         // Shell notification area not ready yet (we're loaded very early in Explorer startup).
         // Start a retry timer; WM_TASKBARCREATED will also retry when Explorer is fully up.
@@ -219,7 +224,7 @@ void App::Initialize()
         defaultConfig.Height = 200;
 
         CorralTabConfig tab;
-        tab.Title = "Desktop";
+        tab.Title = CorralWindow::WideToUtf8(Tr(Str::Name_Desktop));
         tab.IsCatchAll = true; // First corral is catch-all
         tab.ColorHex = config.DefaultColorHex;
         tab.HeaderFontName = config.DefaultHeaderFontName;
@@ -596,10 +601,10 @@ void App::ToggleShortcutArrows()
 
     // Confirm with user since this requires Explorer restart
     const wchar_t *message = newState
-                                 ? L"This will hide shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?"
-                                 : L"This will restore shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?";
+                                 ? Tr(Str::Arrow_HideConfirm)
+                                 : Tr(Str::Arrow_RestoreConfirm);
 
-    int result = MessageBoxW(nullptr, message, L"DexCorral", MB_YESNO | MB_ICONQUESTION);
+    int result = MessageBoxW(nullptr, message, Tr(Str::App_Name), MB_YESNO | MB_ICONQUESTION);
     if (result != IDYES)
     {
         return;
@@ -613,7 +618,7 @@ void App::ToggleShortcutArrows()
     }
     else
     {
-        MessageBoxW(nullptr, L"Failed to change shortcut arrow setting.\n\nThis may require administrator privileges.", L"DexCorral", MB_OK | MB_ICONWARNING);
+        MessageBoxW(nullptr, Tr(Str::Arrow_ChangeFailed), Tr(Str::App_Name), MB_OK | MB_ICONWARNING);
     }
 }
 
@@ -1074,24 +1079,24 @@ void App::OnMouseMove(POINT pt)
 void App::ShowTrayMenu()
 {
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING, 3, L"About");
+    AppendMenuW(menu, MF_STRING, 3, Tr(Str::Menu_About));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, 1, L"Create New Corral");
-    AppendMenuW(menu, MF_STRING, 5, L"New Virtual Corral");
+    AppendMenuW(menu, MF_STRING, 1, Tr(Str::Menu_CreateNewCorral));
+    AppendMenuW(menu, MF_STRING, 5, Tr(Str::Menu_NewVirtualCorral));
 
     // Icon visibility toggle
     UINT flags = DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED;
-    AppendMenuW(menu, MF_STRING | flags, 2, L"Show Desktop Icons");
+    AppendMenuW(menu, MF_STRING | flags, 2, Tr(Str::Menu_ShowDesktopIcons));
 
     // Quick-hide toggle (same as double-clicking an empty desktop spot)
     UINT quickHideFlags = quickHideActive ? MF_CHECKED : MF_UNCHECKED;
-    AppendMenuW(menu, MF_STRING | quickHideFlags, 6, L"Quick-Hide Everything");
+    AppendMenuW(menu, MF_STRING | quickHideFlags, 6, Tr(Str::Menu_QuickHideEverything));
 
     // Update check (opt-in)
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     UINT updateFlags = config.CheckForUpdates ? MF_CHECKED : MF_UNCHECKED;
-    AppendMenuW(menu, MF_STRING | updateFlags, 7, L"Check for Updates Automatically");
-    AppendMenuW(menu, MF_STRING, 8, L"Check for Updates Now");
+    AppendMenuW(menu, MF_STRING | updateFlags, 7, Tr(Str::Menu_CheckUpdatesAuto));
+    AppendMenuW(menu, MF_STRING, 8, Tr(Str::Menu_CheckUpdatesNow));
 
     POINT pt;
     GetCursorPos(&pt);
@@ -1145,18 +1150,9 @@ void App::ShowCreationMenu(POINT pt)
 void App::ShowAbout()
 {
     // Build the About message with GPL-3.0 license notice
-    std::wstring aboutText = L"DexCorral - a free and open source Windows desktop icon organizer\n\n";
-    aboutText += L"Version: ";
-    aboutText += DEXCORRAL_VERSION;
-    aboutText += L"\n\n";
-    aboutText += L"Copyright (C) 2026 Gunter Heiss\n\n";
-    aboutText += L"This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.\n\n";
-    aboutText += L"This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n\n";
-    aboutText += L"You should have received a copy of the GNU General Public License along with this program.  If not, see https://www.gnu.org/licenses/\n\n";
-    aboutText += L"Website: https://dexcorral.com\n";
-    aboutText += L"GitHub: https://github.com/guHe330/DexCorral";
+    std::wstring aboutText = TrFmt(Str::About_Body, DEXCORRAL_VERSION);
 
-    MessageBoxW(messageWindow, aboutText.c_str(), L"About DexCorral", MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(messageWindow, aboutText.c_str(), Tr(Str::Title_About), MB_OK | MB_ICONINFORMATION);
 }
 
 void App::StartUpdateCheck(bool userInitiated)
@@ -1188,7 +1184,7 @@ void App::CreateCorral(POINT pt)
     newConfig.Height = 200;
 
     CorralTabConfig tab;
-    tab.Title = "New Corral";
+    tab.Title = CorralWindow::WideToUtf8(Tr(Str::Name_NewCorral));
     tab.ColorHex = config.DefaultColorHex; // Use saved default appearance
     tab.HeaderFontName = config.DefaultHeaderFontName;
     tab.HeaderFontSize = config.DefaultHeaderFontSize;
@@ -1361,7 +1357,7 @@ void App::CreateVirtualCorralAt(POINT pt)
 
     if (SUCCEEDED(hr))
     {
-        pfd->SetTitle(L"Select Folder for Virtual Corral");
+        pfd->SetTitle(Tr(Str::Dlg_SelectVirtualFolder));
     }
 
     hr = pfd->Show(messageWindow);
@@ -1391,14 +1387,14 @@ void App::CreateVirtualCorralAt(POINT pt)
     DWORD attrs = GetFileAttributesW(folderPath.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
     {
-        MessageBoxW(messageWindow, L"Invalid folder selected.", L"Error", MB_OK | MB_ICONWARNING);
+        MessageBoxW(messageWindow, Tr(Str::Err_InvalidFolderSelected), Tr(Str::Title_Error), MB_OK | MB_ICONWARNING);
         return;
     }
 
     // Check for network path
     if (folderPath.length() >= 2 && folderPath[0] == L'\\' && folderPath[1] == L'\\')
     {
-        MessageBoxW(messageWindow, L"Network paths are not supported.", L"Error", MB_OK | MB_ICONWARNING);
+        MessageBoxW(messageWindow, Tr(Str::Err_NetworkPaths), Tr(Str::Title_Error), MB_OK | MB_ICONWARNING);
         return;
     }
 
@@ -1407,7 +1403,7 @@ void App::CreateVirtualCorralAt(POINT pt)
         wchar_t rootPath[4] = {folderPath[0], L':', L'\\', L'\0'};
         if (GetDriveTypeW(rootPath) == DRIVE_REMOTE)
         {
-            MessageBoxW(messageWindow, L"Network drives are not supported.", L"Error", MB_OK | MB_ICONWARNING);
+            MessageBoxW(messageWindow, Tr(Str::Err_NetworkDrives), Tr(Str::Title_Error), MB_OK | MB_ICONWARNING);
             return;
         }
     }
@@ -1555,21 +1551,20 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             {
                 app->pendingUpdateUrl = result->ReleaseUrl;
                 app->trayIcon->ShowBalloon(
-                    L"DexCorral update available",
-                    L"Version " + result->LatestVersion +
-                        L" is available. Click here to open the download page.");
+                    Tr(Str::Update_AvailableTitle),
+                    TrFmt(Str::Update_AvailableBody, result->LatestVersion));
             }
             else if (result->UserInitiated)
             {
                 // Only surface the no-update / failure outcome for manual checks.
                 if (result->Success)
                     app->trayIcon->ShowBalloon(
-                        L"DexCorral is up to date",
-                        L"You are running the latest version (" DEXCORRAL_VERSION L").");
+                        Tr(Str::Update_UpToDateTitle),
+                        TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION));
                 else
                     app->trayIcon->ShowBalloon(
-                        L"Update check failed",
-                        L"Could not reach the update server. Please try again later.");
+                        Tr(Str::Update_FailedTitle),
+                        Tr(Str::Update_FailedBody));
             }
         }
         return 0;

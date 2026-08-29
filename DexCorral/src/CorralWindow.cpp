@@ -36,6 +36,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
+#include "Strings.h"
 #include <windowsx.h>
 #include <ShlObj.h>
 #include <string>
@@ -90,7 +91,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     if (config.Tabs.empty())
     {
         CorralTabConfig tab;
-        tab.Title = "New Tab";
+        tab.Title = WideToUtf8(Tr(Str::Name_NewTab));
         config.Tabs.push_back(tab);
     }
     // Clamp active tab index

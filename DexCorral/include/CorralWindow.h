@@ -210,6 +210,10 @@ public:
         const wchar_t *label;
     };
 
+    // String conversion utilities (used across split implementation files and App)
+    static std::string WideToUtf8(const std::wstring &wide);
+    static std::wstring Utf8ToWide(const std::string &utf8);
+
 private:
     // Virtual corral support
     void LoadVirtualFolderIcons();  // Load icons from virtual folder path
@@ -338,10 +342,6 @@ private:
     // Controlled by s_enableDpiScaling flag for easy toggling.
     int Dpi(int logicalPixels) const;
     static bool s_enableDpiScaling;
-
-    // String conversion utilities (used across split implementation files)
-    static std::string WideToUtf8(const std::wstring &wide);
-    static std::wstring Utf8ToWide(const std::string &utf8);
 
     HWND hwnd;
     CorralWindowConfig config;

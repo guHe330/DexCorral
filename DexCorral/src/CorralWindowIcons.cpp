@@ -34,6 +34,7 @@
 #include "FolderWatcher.h"
 #include "IconUtils.h"
 #include "LayoutMath.h"
+#include "Strings.h"
 #include <shellapi.h>
 #include <ShlObj.h>
 #include <commoncontrols.h>
@@ -725,7 +726,7 @@ std::vector<CorralWindow::DetailsColumn> CorralWindow::GetDetailsColumns() const
                 widths[i] = minW;
     }
 
-    static const wchar_t *labels[4] = {L"Name", L"Type", L"Size", L"Date modified"};
+    const wchar_t *labels[4] = {Tr(Str::Col_Name), Tr(Str::Col_Type), Tr(Str::Col_Size), Tr(Str::Col_DateModified)};
     std::vector<DetailsColumn> cols;
     cols.reserve(4);
     int x = firstLeft;

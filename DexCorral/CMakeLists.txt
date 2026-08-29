@@ -14,14 +14,21 @@ project(DexCorral VERSION ${_dexcorral_ver_major}.${_dexcorral_ver_minor}.${_dex
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Sources are UTF-8 (the string catalog contains umlauts); tell MSVC so wide
+# literals are decoded correctly regardless of the system ANSI codepage.
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 # Use static runtime linking (no vcredist needed)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # Registration tool (minimal EXE)
 add_executable(DexCorral WIN32
     src/main.cpp
+    src/Strings.cpp
     DexCorral.rc
 )
+
+target_include_directories(DexCorral PRIVATE include)
 
 target_compile_definitions(DexCorral PRIVATE UNICODE _UNICODE)
 
@@ -63,6 +70,7 @@ add_library(DexCorralHook SHARED
     src/IconUtils.cpp
     src/LayoutMath.cpp
     src/UpdateChecker.cpp
+    src/Strings.cpp
 )
 
 target_include_directories(DexCorralHook PRIVATE
@@ -113,8 +121,10 @@ add_executable(DexCorralTests
     tests/test_config.cpp
     tests/test_layout.cpp
     tests/test_icon_utils.cpp
+    tests/test_strings.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
+    src/Strings.cpp
 )
 
 target_include_directories(DexCorralTests PRIVATE include)

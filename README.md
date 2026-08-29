@@ -5,6 +5,8 @@ It helps you keep your desktop clean by grouping icons into shaded, customizable
 Corrals can also act as virtual folders — point one at a directory and its contents appear directly on your desktop, neatly contained within the Corral.
 
 > **A personal project, shared openly.** DexCorral is built and maintained by a single developer as a passion project. It's not backed by a company or a team, just one person who wanted a better way to organize a cluttered desktop. I'm sharing it because I think others might find it useful too. Development follows my own priorities and pace, but feedback and bug reports are always welcome.
+>
+> Before opening an issue or pull request, please read the [Contributing guidelines](CONTRIBUTING.md) — they explain how contributions are handled and the licensing terms (CLA) that apply to submitted code.
 
 > **Privacy & Trust.** DexCorral is ad-free and collects no telemetry or user data. Everything the application needs lives in two places on your PC: `Program Files\DexCorral` and `%AppData%\DexCorral`. The only network access is the **optional update check** (off by default): when you enable it, DexCorral asks GitHub for the latest published version number and nothing else — no personal data is ever sent, and it never downloads or installs anything on its own.
 
