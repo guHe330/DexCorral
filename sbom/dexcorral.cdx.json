@@ -33,10 +33,10 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "pkg:github/nlohmann/json@v3.11.3",
+      "bom-ref": "pkg:github/nlohmann/json@v3.12.0",
       "name": "json",
       "group": "nlohmann",
-      "version": "3.11.3",
+      "version": "3.12.0",
       "description": "JSON for Modern C++. Vendored as a single header at DexCorral/include/nlohmann/json.hpp.",
       "scope": "required",
       "licenses": [
@@ -46,18 +46,18 @@
           }
         }
       ],
-      "purl": "pkg:github/nlohmann/json@v3.11.3",
-      "cpe": "cpe:2.3:a:nlohmann:json:3.11.3:*:*:*:*:*:*:*",
+      "purl": "pkg:github/nlohmann/json@v3.12.0",
+      "cpe": "cpe:2.3:a:nlohmann:json:3.12.0:*:*:*:*:*:*:*",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6"
+          "content": "aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63"
         }
       ],
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp"
+          "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp"
         },
         {
           "type": "vcs",
@@ -75,7 +75,7 @@
         },
         {
           "name": "dexcorral:integrity",
-          "value": "SHA-256 verified byte-identical to the upstream v3.11.3 release asset."
+          "value": "SHA-256 verified byte-identical to the upstream v3.12.0 release asset."
         }
       ]
     },

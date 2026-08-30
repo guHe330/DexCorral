@@ -122,7 +122,7 @@ LICENSE
 This project is licensed under the GPL-3.0 License - see the LICENSE file for
 details.
 
-Third-party: nlohmann/json v3.11.3 (MIT License)
+Third-party: nlohmann/json v3.12.0 (MIT License)
 https://github.com/nlohmann/json
 
 ================================================================================

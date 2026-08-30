@@ -96,5 +96,5 @@ Stop-Process -Name explorer -Force; Start-Sleep 3; Start-Process explorer.exe
 
 | Dependency | How it's included |
 |------------|-------------------|
-| [nlohmann/json](https://github.com/nlohmann/json) 3.11.3 | Single header checked into `DexCorral/include/nlohmann/json.hpp` |
+| [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Single header checked into `DexCorral/include/nlohmann/json.hpp` |
 | [Google Test](https://github.com/google/googletest) 1.14.0 | Downloaded by CMake `FetchContent` on first build; cached in the build tree |
