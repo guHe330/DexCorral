@@ -55,6 +55,8 @@
 - Security: every release now ships a bill of materials (`DexCorral_${VERSION}_sbom.cdx.json`) listing every component DexCorral is built from, each with a checksum the build verifies, plus a weekly check for new versions of those components
 - Fixed: a Corral could stay in resize mode after you let go of the mouse button — moving the mouse afterwards kept resizing it. Releasing the button now always ends the resize, wherever the pointer happens to be, and the size you released at is saved
 
+- The bundled JSON library (nlohmann/json) is updated to 3.12.0, with the bill of materials and its checksum updated to match
+
 <!-- Older changes (v1.0.21) -->
 
 - DexCorral has its own icon now — on the application, the tray, the Corral windows, and in the installer and Add/Remove Programs, instead of Windows' generic default
