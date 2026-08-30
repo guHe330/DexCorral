@@ -1,0 +1,47 @@
+name: Security Guards
+
+# Cheap guards against silently undoing a security fix. Runs on every push/PR,
+# unlike build-release.yml which only fires on a version tag - by then a
+# regression would already be in a release.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+    # The update check must keep WinHTTP's default certificate validation.
+    - name: No TLS validation overrides
+      run: |
+        if grep -rnE 'SECURITY_FLAG_IGNORE_|WINHTTP_OPTION_SECURITY_FLAGS' \
+             DexCorral/src DexCorral/include DexCorral/ShellExtension; then
+          echo "::error::TLS validation override found. The update check must use WinHTTP's default certificate validation."
+          exit 1
+        fi
+
+    # The release URL comes from the GitHub API and is handed to ShellExecuteW,
+    # so it must stay behind the allowlist.
+    - name: Release URL allowlist still in place
+      run: |
+        if ! grep -q 'IsTrustedReleaseUrl' DexCorral/src/UpdateChecker.cpp; then
+          echo "::error::Release URL allowlist missing from UpdateChecker.cpp."
+          exit 1
+        fi
+
+    # A mutable action ref lets a compromised upstream run in the job that
+    # builds and publishes releases, so pin every action to a commit SHA.
+    - name: Actions pinned to commit SHAs
+      run: |
+        if grep -rnE '^\s*uses:' .github/workflows | grep -vE '@[0-9a-f]{40}(\s|$)'; then
+          echo "::error::Unpinned GitHub Action above. Pin it to a full commit SHA."
+          exit 1
+        fi

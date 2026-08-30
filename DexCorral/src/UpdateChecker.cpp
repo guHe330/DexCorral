@@ -28,6 +28,7 @@
 #include <string>
 #include <thread>
 #include <memory>
+#include <cstring>
 
 #pragma comment(lib, "winhttp.lib")
 
@@ -41,6 +42,13 @@ namespace
     const wchar_t *kApiHost = L"api.github.com";
     const wchar_t *kApiPath = L"/repos/guHe330/DexCorral/releases/latest";
     const wchar_t *kUserAgent = L"DexCorral-UpdateCheck";
+
+    // Any release URL we hand to ShellExecuteW must sit under this prefix. The
+    // API response is attacker-controlled if the transport or the API is ever
+    // compromised, and ShellExecuteW on an arbitrary string is a powerful
+    // primitive (file:, UNC, registered protocol handlers).
+    const char *kReleaseUrlPrefix = "https://github.com/guHe330/DexCorral/";
+    const wchar_t *kReleasesPageUrl = L"https://github.com/guHe330/DexCorral/releases/latest";
 
     struct Version
     {
@@ -84,6 +92,30 @@ namespace
         if (a.minor != b.minor)
             return a.minor > b.minor;
         return a.patch > b.patch;
+    }
+
+    /// True only for URLs under the project's own GitHub repository. The scheme
+    /// and host are matched case-insensitively (they are case-insensitive per
+    /// RFC 3986); the path is matched exactly. A userinfo trick such as
+    /// "https://github.com@evil/" fails because the prefix requires '/' right
+    /// after the host.
+    bool IsTrustedReleaseUrl(const std::string &url)
+    {
+        const size_t prefixLen = strlen(kReleaseUrlPrefix);
+        if (url.size() <= prefixLen)
+            return false;
+        if (_strnicmp(url.c_str(), kReleaseUrlPrefix, prefixLen) != 0)
+            return false;
+        if (url.find("..") != std::string::npos)
+            return false;
+        // Reject control characters and anything non-ASCII; a legitimate
+        // release URL has neither.
+        for (unsigned char c : url)
+        {
+            if (c < 0x21 || c > 0x7E)
+                return false;
+        }
+        return true;
     }
 
     std::wstring Utf8ToWide(const std::string &s)
@@ -193,7 +225,10 @@ namespace
             result.Success = true;
             result.UpdateAvailable = IsNewer(latest, current);
             result.LatestVersion = Utf8ToWide(display);
-            result.ReleaseUrl = Utf8ToWide(url);
+            // Never forward an unvetted URL to ShellExecuteW; fall back to the
+            // canonical releases page so the notification still works.
+            result.ReleaseUrl = IsTrustedReleaseUrl(url) ? Utf8ToWide(url)
+                                                         : std::wstring(kReleasesPageUrl);
             return true;
         }
         catch (...)
