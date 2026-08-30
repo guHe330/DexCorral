@@ -1,0 +1,123 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "authors": [
+      {
+        "name": "Gunter Heiss"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:github/guHe330/DexCorral",
+      "name": "DexCorral",
+      "version": "1.0.22",
+      "description": "Windows desktop icon organiser. Ships DexCorral.exe and DexCorralHook.dll.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/guHe330/DexCorral@v1.0.22"
+    },
+    "properties": [
+      {
+        "name": "dexcorral:note",
+        "value": "Hand-maintained. C++ has no package manifest for a scanner to read, so this file IS the manifest. Update it when a dependency changes; CI verifies the json.hpp hash below still matches the vendored file."
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/nlohmann/json@v3.11.3",
+      "name": "json",
+      "group": "nlohmann",
+      "version": "3.11.3",
+      "description": "JSON for Modern C++. Vendored as a single header at DexCorral/include/nlohmann/json.hpp.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/nlohmann/json@v3.11.3",
+      "cpe": "cpe:2.3:a:nlohmann:json:3.11.3:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/nlohmann/json"
+        }
+      ],
+      "properties": [
+        {
+          "name": "dexcorral:vendored",
+          "value": "true"
+        },
+        {
+          "name": "dexcorral:path",
+          "value": "DexCorral/include/nlohmann/json.hpp"
+        },
+        {
+          "name": "dexcorral:integrity",
+          "value": "SHA-256 verified byte-identical to the upstream v3.11.3 release asset."
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/google/googletest@v1.14.0",
+      "name": "googletest",
+      "group": "google",
+      "version": "1.14.0",
+      "description": "Test framework. Build-time only - linked into DexCorralTests.exe, never shipped to users.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:github/google/googletest@v1.14.0",
+      "cpe": "cpe:2.3:a:google:googletest:1.14.0:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1f357c27ca988c3f7c6b4bf68a9395005ac6761f034046e9dde0896e3aba00e4"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip"
+        }
+      ],
+      "properties": [
+        {
+          "name": "dexcorral:ships",
+          "value": "false"
+        },
+        {
+          "name": "dexcorral:source",
+          "value": "CMake FetchContent, URL_HASH pinned in DexCorral/CMakeLists.txt"
+        }
+      ]
+    }
+  ]
+}

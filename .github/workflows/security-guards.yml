@@ -37,6 +37,26 @@ jobs:
           exit 1
         fi
 
+    # The SBOM is hand-maintained (C++ has no manifest a tool could generate it
+    # from), so it can drift from reality without anyone noticing. Tie it to the
+    # file it describes: this also detects an edited or swapped vendored header.
+    - name: SBOM matches the vendored header
+      run: |
+        header=DexCorral/include/nlohmann/json.hpp
+        want=$(python3 -c "import json;print([c for c in json.load(open('sbom/dexcorral.cdx.json'))['components'] if c['name']=='json'][0]['hashes'][0]['content'])")
+        got=$(sha256sum "$header" | cut -d' ' -f1)
+        if [ "$want" != "$got" ]; then
+          echo "::error::$header does not match the SHA-256 recorded in sbom/dexcorral.cdx.json (want $want, got $got). Update the SBOM if the bump was intentional."
+          exit 1
+        fi
+        wantver=$(python3 -c "import json;print([c for c in json.load(open('sbom/dexcorral.cdx.json'))['components'] if c['name']=='json'][0]['version'])")
+        gotver=$(grep -oP '#define NLOHMANN_JSON_VERSION_MAJOR \K[0-9]+' "$header").$(grep -oP '#define NLOHMANN_JSON_VERSION_MINOR \K[0-9]+' "$header").$(grep -oP '#define NLOHMANN_JSON_VERSION_PATCH \K[0-9]+' "$header")
+        if [ "$wantver" != "$gotver" ]; then
+          echo "::error::SBOM says nlohmann/json $wantver, header says $gotver."
+          exit 1
+        fi
+        echo "SBOM agrees with $header ($gotver, $got)."
+
     # A mutable action ref lets a compromised upstream run in the job that
     # builds and publishes releases, so pin every action to a commit SHA.
     - name: Actions pinned to commit SHAs
