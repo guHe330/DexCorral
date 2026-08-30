@@ -39,6 +39,7 @@
 
 ### What's New
 
+- Upgrading over an existing install is reliable. The occasional "cannot replace DexCorralHook.dll" failure is gone: the installer now moves the old extension aside before copying and restarts Explorer afterwards, instead of racing a freshly started Explorer for the file
 - DexCorral speaks German. The installer asks for your language and the whole interface follows it; portable users can set `"Language": "de"` in `%APPDATA%\DexCorral\config.json`
 - The Corral header (title bar and tabs) now has its own opacity slider in the Appearance dialog, separate from the background. Fade a Corral into your wallpaper and the header fades with it, instead of staying solid on top of an invisible Corral
 - Inactive tabs adjust themselves: whatever header opacity you pick, they stay dimmer and darker than the active tab, so you can always tell which tab you're on. Nothing extra to set
