@@ -28,6 +28,11 @@ Implementation detail belongs in the commit history.
 - Diagonal resizing works. The corner grab zones were a 6×6 pixel target, smaller than the grip drawn in the bottom-right corner; the bottom corners now match the grip and the top corners are twice as wide.
 - A black header font is no longer invisible. Header text is very slightly softer as a result, and now renders correctly over any wallpaper.
 
+### Security
+- The update check only ever opens a DexCorral release page. It reads the release address from GitHub's API and previously handed whatever came back straight to Windows to open; it is now checked against the project's own repository first, and anything else falls back to the releases page. A tampered API response can no longer make DexCorral open an arbitrary link or local path.
+- The release build pins every GitHub Action it uses to an exact revision, so a change made upstream cannot alter the build that produces a release without that change being reviewed first.
+- A new CI check guards all three of the above on every push, so a later change cannot quietly undo them.
+
 ## [1.0.22] - 2026-08-27
 
 ### Added

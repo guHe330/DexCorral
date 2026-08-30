@@ -49,6 +49,8 @@
 - Fixed: a tab's reorder grip could be grabbed where no grip was shown, so a click near the left edge of a tab could start moving it unintentionally. Only the tab actually showing its grip can be dragged by it
 - Fixed: resizing a Corral often stopped half-way. Drag an edge too quickly, or let it snap to a neighbour, and the pointer slipped outside the Corral — which is where Windows stops telling a background window about the mouse. Resizing and moving now follow the pointer wherever it goes
 - Fixed: resizing a Corral diagonally was practically impossible. The corner grab areas were smaller than the grip drawn in the bottom-right corner; they now match it, and the top corners are twice as wide as before
+- Security: the update check now verifies that the release address it got from GitHub really points at the DexCorral repository before opening it, and falls back to the releases page if it doesn't
+- Security: the release build pins every GitHub Action to an exact revision, and a new CI check keeps these safeguards from being undone by a later change
 - Fixed: a Corral could stay in resize mode after you let go of the mouse button — moving the mouse afterwards kept resizing it. Releasing the button now always ends the resize, wherever the pointer happens to be, and the size you released at is saved
 
 <!-- Older changes (v1.0.21) -->
