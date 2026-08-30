@@ -47,6 +47,8 @@
 - Every opacity setting now sits together in one place: the Appearance dialog's Opacity group holds background, border, header and icon opacity as one set of sliders
 - Fixed: clicking a tab near its top edge did nothing. The top few pixels of every tab were reserved for resizing the Corral, so clicks that landed there were swallowed instead of switching tabs. The whole tab now responds, and the corners still resize
 - Fixed: a tab's reorder grip could be grabbed where no grip was shown, so a click near the left edge of a tab could start moving it unintentionally. Only the tab actually showing its grip can be dragged by it
+- Fixed: resizing a Corral often stopped half-way. Drag an edge too quickly, or let it snap to a neighbour, and the pointer slipped outside the Corral — which is where Windows stops telling a background window about the mouse. Resizing and moving now follow the pointer wherever it goes
+- Fixed: resizing a Corral diagonally was practically impossible. The corner grab areas were smaller than the grip drawn in the bottom-right corner; they now match it, and the top corners are twice as wide as before
 - Fixed: a Corral could stay in resize mode after you let go of the mouse button — moving the mouse afterwards kept resizing it. Releasing the button now always ends the resize, wherever the pointer happens to be, and the size you released at is saved
 
 <!-- Older changes (v1.0.21) -->

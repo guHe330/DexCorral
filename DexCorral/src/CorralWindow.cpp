@@ -989,25 +989,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             {
                 POINT pt;
                 GetCursorPos(&pt);
-                int newLeft = pt.x - (window->dragStart.x - window->dragStartRect.left);
-                int newTop = pt.y - (window->dragStart.y - window->dragStartRect.top);
-                int width = window->dragStartRect.right - window->dragStartRect.left;
-                int height = window->dragStartRect.bottom - window->dragStartRect.top;
-
-                // Apply snap unless Shift is held
-                if (!(GetKeyState(VK_SHIFT) & 0x8000))
-                {
-                    window->ApplySnap(newLeft, newTop, width, height);
-                }
-
-                SetWindowPos(hwnd, nullptr, newLeft, newTop, 0, 0,
-                             SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-
-                // Push desktop icons out of the way
-                if (App::GetInstance())
-                {
-                    App::GetInstance()->PushDesktopIconsFromCorrals();
-                }
+                window->DoWindowDrag(pt.x, pt.y);
             }
             return 0;
         }
@@ -1111,6 +1093,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 }
                 return 0;
             }
+            if (wParam == CURSOR_TRACK_TIMER_ID)
+            {
+                window->OnCursorTrackTimer();
+                return 0;
+            }
             if (wParam == SCROLL_REPOSITION_TIMER_ID)
             {
                 KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
@@ -1192,6 +1179,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
             KillTimer(hwnd, OPACITY_TIMER_ID);
             KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+            window->StopCursorTracking();
             return 0;
         }
     }

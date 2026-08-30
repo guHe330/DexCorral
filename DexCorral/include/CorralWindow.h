@@ -350,6 +350,18 @@ private:
     void DoResize(int x, int y);
     void EndResize();
 
+    /// Moves the window during a title-bar drag. Screen coordinates.
+    void DoWindowDrag(int screenX, int screenY);
+
+    // Cursor tracking for resize / move / column drag.
+    // Win32 stops delivering captured mouse messages to a background window once the
+    // cursor leaves it, and snapping or lag pushes the cursor out constantly — so a
+    // timer polls instead. WM_MOUSEMOVE still works; both paths compute from the
+    // button-down anchor, so they're idempotent.
+    void StartCursorTracking();
+    void StopCursorTracking();
+    void OnCursorTrackTimer();
+
     // Captured-operation recovery (drag / resize / reorder)
     /// True while any mouse-captured operation is in progress
     bool HasCapturedOperation() const;
@@ -395,6 +407,12 @@ private:
     POINT resizeStart = {};
     RECT resizeStartRect = {};
 
+    // See StartCursorTracking
+    static const UINT_PTR CURSOR_TRACK_TIMER_ID = 7;
+    static const UINT CURSOR_TRACK_INTERVAL = 8; // ms; clamped to USER_TIMER_MINIMUM
+    bool isTrackingCursor = false;
+    POINT lastTrackedCursor = {};
+
     // Guards EndCapturedOperationWithoutDrop against re-entering through the
     // WM_CAPTURECHANGED its own ReleaseCapture() call sends.
     bool isEndingCapturedOperation = false;
@@ -416,6 +434,7 @@ private:
     int iconSpacingY = 68;
     static const int ICON_PADDING_LEFT = 8;
     static const int RESIZE_BORDER = 6;
+    static const int RESIZE_CORNER = 12; // Corner grab zone; matches the drawn grip
     static const int SNAP_DISTANCE = 15; // Pixels to trigger snap
     static const int SNAP_GAP = 10;      // Gap between snapped corrals
 
