@@ -79,6 +79,36 @@ jobs:
 
         Write-Host "Version OK: Version.h is consistent with tag v$version"
 
+    # security-guards.yml runs on branch pushes, not on tags, so it never sees a
+    # release. Re-check the SBOM here: this is the last point before artifacts are
+    # published, and a released SBOM naming the wrong version is worse than useless.
+    - name: Verify the SBOM describes this release
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $sbom = Get-Content "sbom/dexcorral.cdx.json" -Raw | ConvertFrom-Json
+
+        $sbomVersion = $sbom.metadata.component.version
+        if ($sbomVersion -ne $version) {
+            throw "sbom/dexcorral.cdx.json says $sbomVersion, releasing $version. Bump metadata.component.version and its purl."
+        }
+
+        $expectedPurl = "pkg:github/guHe330/DexCorral@v$version"
+        if ($sbom.metadata.component.purl -ne $expectedPurl) {
+            throw "SBOM purl is $($sbom.metadata.component.purl), expected $expectedPurl"
+        }
+
+        # The shipped dependency must still be the one the SBOM vouches for.
+        $json = $sbom.components | Where-Object { $_.name -eq 'json' }
+        if (-not $json) { throw "No nlohmann/json component in the SBOM" }
+        $want = ($json.hashes | Where-Object { $_.alg -eq 'SHA-256' }).content
+        $got = (Get-FileHash "DexCorral/include/nlohmann/json.hpp" -Algorithm SHA256).Hash.ToLower()
+        if ($want -ne $got) {
+            throw "json.hpp hash $got does not match the SBOM ($want)"
+        }
+
+        Write-Host "SBOM OK: describes $version, nlohmann/json $($json.version) verified"
+
     - name: Configure CMake
       run: cmake -S DexCorral -B DexCorral/build -G "Visual Studio 17 2022" -A x64
 
