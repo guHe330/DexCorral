@@ -167,6 +167,27 @@ jobs:
           exit 1
         }
 
+    # Ship the SBOM alongside the binaries. A bill of materials nobody receives
+    # does not do the job it exists for.
+    - name: Stage the SBOM for release
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $sbom = Get-Content "sbom/dexcorral.cdx.json" -Raw | ConvertFrom-Json
+
+        # Stamp the build time. Kept out of the committed file on purpose - it
+        # would churn on every commit and mean nothing there; on a published
+        # artifact it says when this document was actually issued.
+        $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        $sbom.metadata | Add-Member -NotePropertyName timestamp -NotePropertyValue $ts -Force
+
+        # Write UTF-8 without a BOM explicitly: Windows PowerShell's Set-Content
+        # adds one, and a BOM makes strict JSON parsers reject the document.
+        $out = Join-Path $PWD "DexCorral_${version}_sbom.cdx.json"
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($out, ($sbom | ConvertTo-Json -Depth 20), $utf8NoBom)
+        Write-Host "Staged DexCorral_${version}_sbom.cdx.json ($ts)"
+
     - name: Prepare release notes
       shell: pwsh
       run: |
@@ -188,6 +209,7 @@ jobs:
         $body = $body -replace '\$\{VERSION\}', $version
         $body = $body -replace '\$\{SETUP_SIZE\}', (Format-Size "DexCorral_${version}_Setup.exe")
         $body = $body -replace '\$\{PORTABLE_SIZE\}', (Format-Size "Portable_DexCorral_${version}.zip")
+        $body = $body -replace '\$\{SBOM_SIZE\}', (Format-Size "DexCorral_${version}_sbom.cdx.json")
         Set-Content "release_notes.md" -Value $body
 
     - name: Create GitHub Release
@@ -199,6 +221,7 @@ jobs:
         files: |
           Portable_DexCorral_${{ steps.get_version.outputs.version }}.zip
           DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
+          DexCorral_${{ steps.get_version.outputs.version }}_sbom.cdx.json
         draft: false
         prerelease: false
       env:

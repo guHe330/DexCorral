@@ -8,6 +8,7 @@
 |------|-------------|------|
 | `DexCorral_${VERSION}_Setup.exe` | Installer (recommended) | ${SETUP_SIZE} |
 | `Portable_DexCorral_${VERSION}.zip` | Portable package (no installer) | ${PORTABLE_SIZE} |
+| `DexCorral_${VERSION}_sbom.cdx.json` | Software bill of materials (CycloneDX) | ${SBOM_SIZE} |
 
 > **Requires Windows 11** (build 22000 or newer). Windows 10 is end of life and is not supported.
 
@@ -51,7 +52,7 @@
 - Fixed: resizing a Corral diagonally was practically impossible. The corner grab areas were smaller than the grip drawn in the bottom-right corner; they now match it, and the top corners are twice as wide as before
 - Security: the update check now verifies that the release address it got from GitHub really points at the DexCorral repository before opening it, and falls back to the releases page if it doesn't
 - Security: the release build pins every GitHub Action to an exact revision, and a new CI check keeps these safeguards from being undone by a later change
-- Security: DexCorral now publishes a bill of materials listing every component it is built from, each with a checksum the build verifies, plus a weekly check for new versions of those components
+- Security: every release now ships a bill of materials (`DexCorral_${VERSION}_sbom.cdx.json`) listing every component DexCorral is built from, each with a checksum the build verifies, plus a weekly check for new versions of those components
 - Fixed: a Corral could stay in resize mode after you let go of the mouse button — moving the mouse afterwards kept resizing it. Releasing the button now always ends the resize, wherever the pointer happens to be, and the size you released at is saved
 
 <!-- Older changes (v1.0.21) -->
