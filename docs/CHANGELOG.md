@@ -25,6 +25,7 @@ Implementation detail belongs in the commit history.
 - Documentation trimmed: the README is a short overview that points at the manual instead of repeating it, and changelog entries are now brief user-facing lines rather than symbol-level detail.
 
 ### Fixed
+- Upgrading no longer fails with "cannot replace `DexCorralHook.dll`". The installer used to restart Explorer *before* copying the new files, so a fresh Explorer could load the old extension again and lock the file mid-copy. It now moves the old DLL aside first (Windows allows renaming a file that is still loaded), copies onto the freed name, and restarts Explorer afterwards. The moved-aside copy is deleted in the same pass, once Explorer has restarted and released it; anything still held falls back to deletion at the next reboot.
 - Resizing a corral no longer stalls part-way. A corral sits behind everything else, and Windows stops sending a background window mouse messages the moment the pointer leaves it — so any drag that outran the frame, or that snapped an edge out from under the pointer, silently froze. Resizing, moving and details-column dragging now follow the pointer wherever it goes.
 - Diagonal resizing works. The corner grab zones were a 6×6 pixel target, smaller than the grip drawn in the bottom-right corner; the bottom corners now match the grip and the top corners are twice as wide.
 - A black header font is no longer invisible. Header text is very slightly softer as a result, and now renders correctly over any wallpaper.
