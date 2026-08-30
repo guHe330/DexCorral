@@ -213,7 +213,7 @@ jobs:
         Set-Content "release_notes.md" -Value $body
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
       with:
         tag_name: ${{ steps.get_version.outputs.tag }}
         name: DexCorral ${{ steps.get_version.outputs.tag }}
