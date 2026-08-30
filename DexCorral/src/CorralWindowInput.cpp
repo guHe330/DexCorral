@@ -269,6 +269,14 @@ int CorralWindow::HitTestResize(int x, int y)
     bool nearTop = (y <= Dpi(RESIZE_BORDER) && y > 0); // Don't conflict with title bar at y=0
     bool nearBottom = (y >= rect.bottom - Dpi(RESIZE_BORDER));
 
+    // Wider band for corners: intersecting two RESIZE_BORDER strips leaves a 6x6
+    // target. Bottom corners grow both ways to match the drawn grip; top corners
+    // grow horizontally only, or they'd eat into the tab strip.
+    bool cornerLeft = (x <= Dpi(RESIZE_CORNER));
+    bool cornerRight = (x >= rect.right - Dpi(RESIZE_CORNER));
+    bool cornerTop = nearTop;
+    bool cornerBottom = (y >= rect.bottom - Dpi(RESIZE_CORNER));
+
     // When rolled up (minimized), disable resizing completely
     if (config.IsRolledUp)
     {
@@ -276,13 +284,13 @@ int CorralWindow::HitTestResize(int x, int y)
     }
 
     // Corners first (they take priority)
-    if (nearLeft && nearTop)
+    if (cornerLeft && cornerTop)
         return HTTOPLEFT;
-    if (nearRight && nearTop)
+    if (cornerRight && cornerTop)
         return HTTOPRIGHT;
-    if (nearLeft && nearBottom)
+    if (cornerLeft && cornerBottom)
         return HTBOTTOMLEFT;
-    if (nearRight && nearBottom)
+    if (cornerRight && cornerBottom)
         return HTBOTTOMRIGHT;
 
     // Then edges
@@ -313,6 +321,7 @@ void CorralWindow::StartResize(int hitTest, int x, int y)
     GetCursorPos(&resizeStart);
     GetWindowRect(hwnd, &resizeStartRect);
     SetCapture(hwnd);
+    StartCursorTracking();
 }
 
 void CorralWindow::DoResize(int screenX, int screenY)
@@ -383,6 +392,7 @@ void CorralWindow::EndResize()
     if (isResizing)
     {
         isResizing = false;
+        StopCursorTracking();
         ReleaseCapture();
         SyncConfigFromWindow();
         CalculateIconLayout();
@@ -395,6 +405,94 @@ void CorralWindow::EndResize()
             App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
+    }
+}
+
+void CorralWindow::DoWindowDrag(int screenX, int screenY)
+{
+    if (!isDragging)
+        return;
+
+    int newLeft = screenX - (dragStart.x - dragStartRect.left);
+    int newTop = screenY - (dragStart.y - dragStartRect.top);
+    int width = dragStartRect.right - dragStartRect.left;
+    int height = dragStartRect.bottom - dragStartRect.top;
+
+    // Apply snap unless Shift is held
+    if (!(GetKeyState(VK_SHIFT) & 0x8000))
+    {
+        ApplySnap(newLeft, newTop, width, height);
+    }
+
+    SetWindowPos(hwnd, nullptr, newLeft, newTop, 0, 0,
+                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    // Push desktop icons out of the way
+    if (App::GetInstance())
+    {
+        App::GetInstance()->PushDesktopIconsFromCorrals();
+    }
+}
+
+// ============================================================================
+// Cursor tracking
+// ============================================================================
+
+void CorralWindow::StartCursorTracking()
+{
+    if (isTrackingCursor)
+        return;
+    GetCursorPos(&lastTrackedCursor);
+    if (SetTimer(hwnd, CURSOR_TRACK_TIMER_ID, CURSOR_TRACK_INTERVAL, nullptr))
+        isTrackingCursor = true;
+}
+
+void CorralWindow::StopCursorTracking()
+{
+    if (!isTrackingCursor)
+        return;
+    KillTimer(hwnd, CURSOR_TRACK_TIMER_ID);
+    isTrackingCursor = false;
+}
+
+void CorralWindow::OnCursorTrackTimer()
+{
+    // Geometry operations only — icon and tab drags need a pointer that is over the
+    // corral, so polling one that has left the frame tells them nothing.
+    if (!isResizing && !isResizingColumn && !isDragging)
+    {
+        StopCursorTracking();
+        return;
+    }
+
+    // GetAsyncKeyState, not GetKeyState: the latter reflects the last message pulled
+    // from the queue, and the point of this timer is that they stopped arriving.
+    if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000))
+    {
+        EndCapturedOperationWithoutDrop(); // Released off-window; no WM_LBUTTONUP coming
+        return;
+    }
+
+    POINT pt;
+    if (!GetCursorPos(&pt))
+        return;
+    if (pt.x == lastTrackedCursor.x && pt.y == lastTrackedCursor.y)
+        return; // Idle — don't re-run snapping and icon pushing for nothing
+    lastTrackedCursor = pt;
+
+    if (isResizing)
+    {
+        DoResize(pt.x, pt.y);
+    }
+    else if (isResizingColumn)
+    {
+        POINT client = pt;
+        ScreenToClient(hwnd, &client);
+        DoColumnResize(client.x);
+    }
+    else if (isDragging)
+    {
+        DoWindowDrag(pt.x, pt.y);
     }
 }
 
@@ -411,6 +509,7 @@ void CorralWindow::StartColumnResize(int columnIndex, int x)
     resizeColumnIndex = columnIndex;
     resizeColStartX = x;
     resizeColStartWidth = cols[columnIndex].right - cols[columnIndex].left; // device px
+    StartCursorTracking();
     SetCapture(hwnd);
 }
 
@@ -450,6 +549,7 @@ void CorralWindow::EndColumnResize()
         return;
     isResizingColumn = false;
     resizeColumnIndex = -1;
+    StopCursorTracking();
     ReleaseCapture();
     SyncConfigFromWindow();
     if (App::GetInstance())
@@ -940,6 +1040,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
             App::GetInstance()->CacheDesktopIconPositions();
         }
         SetCapture(hwnd);
+        StartCursorTracking();
         return;
     }
 
@@ -992,6 +1093,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
             App::GetInstance()->CacheDesktopIconPositions();
         }
         SetCapture(hwnd);
+        StartCursorTracking();
     }
 }
 
@@ -1043,6 +1145,7 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         return;
 
     isEndingCapturedOperation = true;
+    StopCursorTracking();
 
     if (isDraggingTab)
     {
@@ -1089,6 +1192,7 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         // Commit the position the corral is already sitting at, but skip the
         // merge-into-another-corral check — that needs the real release point.
         isDragging = false;
+        StopCursorTracking();
         ReleaseCapture();
         SyncConfigFromWindow();
         if (App::GetInstance())
@@ -1142,6 +1246,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
     else if (isDragging)
     {
         isDragging = false;
+        StopCursorTracking();
         ReleaseCapture();
 
         // Check for merge with another corral
