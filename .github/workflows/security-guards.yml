@@ -57,6 +57,24 @@ jobs:
         fi
         echo "SBOM agrees with $header ($gotver, $got)."
 
+    # Version.h is the single source of truth for the version. The SBOM repeats
+    # it (CycloneDX has nowhere to reference it from), so pin the two together
+    # rather than trusting anyone to remember the second one at release time.
+    - name: SBOM version matches Version.h
+      run: |
+        want=$(grep -oP '#define DEXCORRAL_VERSION L"\K[0-9.]+' DexCorral/include/Version.h)
+        got=$(python3 -c "import json;print(json.load(open('sbom/dexcorral.cdx.json'))['metadata']['component']['version'])")
+        purl=$(python3 -c "import json;print(json.load(open('sbom/dexcorral.cdx.json'))['metadata']['component']['purl'])")
+        if [ "$want" != "$got" ]; then
+          echo "::error::Version.h says $want, sbom/dexcorral.cdx.json says $got. Bump metadata.component.version (and its purl) with the release."
+          exit 1
+        fi
+        if [ "$purl" != "pkg:github/guHe330/DexCorral@v$want" ]; then
+          echo "::error::SBOM purl is $purl, expected pkg:github/guHe330/DexCorral@v$want."
+          exit 1
+        fi
+        echo "SBOM product version agrees with Version.h ($want)."
+
     # A mutable action ref lets a compromised upstream run in the job that
     # builds and publishes releases, so pin every action to a commit SHA.
     - name: Actions pinned to commit SHAs
