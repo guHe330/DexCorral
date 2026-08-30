@@ -17,15 +17,15 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       with:
         fetch-depth: 0  # Fetch all history for tags
 
     - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v2
+      uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
     - name: Setup CMake
-      uses: lukka/get-cmake@latest
+      uses: lukka/get-cmake@fffaaafeea488556c2c12dad60690008bc1caacb # v4.4.2
 
     - name: Get version from tag
       id: get_version
@@ -161,7 +161,7 @@ jobs:
         Set-Content "release_notes.md" -Value $body
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
         tag_name: ${{ steps.get_version.outputs.tag }}
         name: DexCorral ${{ steps.get_version.outputs.tag }}
