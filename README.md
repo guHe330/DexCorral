@@ -95,7 +95,7 @@ Forks are welcome — that's what the GPL is for.
 
 ## Third-Party Libraries
 
-*   [nlohmann/json](https://github.com/nlohmann/json) 3.11.3 — [MIT](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT)
+*   [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 — [MIT](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT)
 
 ## License
 
