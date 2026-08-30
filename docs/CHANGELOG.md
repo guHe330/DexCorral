@@ -21,6 +21,7 @@ Implementation detail belongs in the commit history.
 - DexCorral now requires Windows 11 (build 22000 or newer). Windows 10 is end of life and there is no machine to test it on, so the installer and `--register` refuse to run below that build. `--register --force` overrides the check, unsupported and untested.
 - Downloads are named after their version (`Portable_DexCorral_<version>.zip`), so packages from different releases stay distinguishable once downloaded.
 - Release notes show the real download sizes instead of a hand-maintained figure that had drifted from reality.
+- Vendored nlohmann/json bumped from 3.11.3 to 3.12.0; the SBOM records the new version and checksum.
 - Documentation trimmed: the README is a short overview that points at the manual instead of repeating it, and changelog entries are now brief user-facing lines rather than symbol-level detail.
 
 ### Fixed
