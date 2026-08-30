@@ -32,7 +32,7 @@ Implementation detail belongs in the commit history.
 - The update check only ever opens a DexCorral release page. It reads the release address from GitHub's API and previously handed whatever came back straight to Windows to open; it is now checked against the project's own repository first, and anything else falls back to the releases page. A tampered API response can no longer make DexCorral open an arbitrary link or local path.
 - The release build pins every GitHub Action it uses to an exact revision, so a change made upstream cannot alter the build that produces a release without that change being reviewed first.
 - A new CI check guards all three of the above on every push, so a later change cannot quietly undo them.
-- A machine-readable bill of materials (`sbom/dexcorral.cdx.json`) lists what DexCorral is built from, with a checksum for each component. The build verifies that the bundled JSON library still matches its recorded checksum, and a weekly job watches for new upstream releases.
+- A machine-readable bill of materials (`sbom/dexcorral.cdx.json`) lists what DexCorral is built from, with a checksum for each component. The build verifies that the bundled JSON library still matches its recorded checksum and that the document describes the version actually being built, and a weekly job watches for new upstream releases.
 - The test framework is now fetched by content hash rather than by tag, so a build cannot silently pick up a different version than the one it was checked against.
 
 ## [1.0.22] - 2026-08-27
