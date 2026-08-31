@@ -1,0 +1,4 @@
+# The vendored nlohmann/json header is pinned by SHA-256 in sbom/dexcorral.cdx.json.
+# Never convert its line endings: the release build hashes the checked-out file on
+# Windows, and the CI guards hash it on Linux, against that one recorded value.
+DexCorral/include/nlohmann/json.hpp -text

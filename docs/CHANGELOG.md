@@ -10,7 +10,7 @@ Implementation detail belongs in the commit history.
 
 ## [Unreleased]
 
-## [1.0.23] - 2026-08-31
+## [1.0.24] - 2026-08-31
 
 ### Added
 - **Lock Position** in a Corral's context menu freezes it where it is: no mouse move, no mouse resize, and a small padlock in the title bar to say so. Tabs, roll-up and the per-monitor position memory all keep working. Aimed at the Corral that lives where you drop files — an accidental title-bar drag also shoves the desktop icons underneath it around, with no undo.
