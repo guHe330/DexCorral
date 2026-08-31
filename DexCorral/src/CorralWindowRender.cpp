@@ -622,7 +622,7 @@ void CorralWindow::UpdateLayeredContent()
                 continue;
 
             // Selection highlight (only for grid views, details view handled separately)
-            if (i == selectedIcon && !isDraggingIcon && !isDetailsView)
+            if (IsSelected(i) && !isDraggingIcon && !isDetailsView)
             {
                 BYTE selAlpha = SELECTION_ALPHA;
                 BYTE selR = SELECTION_R, selG = SELECTION_G, selB = SELECTION_B;
@@ -655,7 +655,7 @@ void CorralWindow::UpdateLayeredContent()
             }
 
             // Hover highlight (only for grid views, not selected, not dragging)
-            if (i == hoveredIcon && i != selectedIcon && !isDraggingIcon && !isDetailsView)
+            if (i == hoveredIcon && !IsSelected(i) && !isDraggingIcon && !isDetailsView)
             {
                 BYTE hovAlpha = HOVER_ALPHA;
                 BYTE hovPmR = (BYTE)((HOVER_R * hovAlpha) / 255);
@@ -718,7 +718,7 @@ void CorralWindow::UpdateLayeredContent()
                 // Details view: icon + name + type + size + date + sync status
 
                 // Draw selection highlight for this row (before drawing content)
-                if (i == selectedIcon && !isDraggingIcon)
+                if (IsSelected(i) && !isDraggingIcon)
                 {
                     BYTE selAlpha = 200;
                     BYTE selR = 60, selG = 120, selB = 200;
@@ -963,7 +963,7 @@ void CorralWindow::UpdateLayeredContent()
                 }
 
                 // Draw selection border for selected row in details view
-                if (i == selectedIcon && !isDraggingIcon)
+                if (IsSelected(i) && !isDraggingIcon)
                 {
                     DWORD borderPixel = (255 << 24) | (100 << 16) | (150 << 8) | 255;
                     // Top border
@@ -1133,6 +1133,41 @@ void CorralWindow::UpdateLayeredContent()
 
         SelectObject(memDC, oldIconFont);
         DeleteObject(iconFont);
+    }
+
+    // Rubber-band selection rectangle (tinted fill + solid outline)
+    if (isRubberBanding)
+    {
+        RECT band = GetRubberBandRect();
+        band.top -= scrollPosition;
+        band.bottom -= scrollPosition;
+        int bandTop = (std::max)((int)band.top, GetIconAreaTop());
+        int bandBottom = (std::min)((int)band.bottom, h);
+        int bandLeft = (std::max)((int)band.left, 0);
+        int bandRight = (std::min)((int)band.right, w);
+
+        const BYTE fillAlpha = 60;
+        DWORD outlinePixel = (255u << 24) | (120u << 16) | (170u << 8) | 230u;
+
+        for (int y = bandTop; y < bandBottom; y++)
+        {
+            for (int x = bandLeft; x < bandRight; x++)
+            {
+                bool edge = (y == bandTop || y == bandBottom - 1 || x == bandLeft || x == bandRight - 1);
+                if (edge)
+                {
+                    pixels[y * w + x] = outlinePixel;
+                    continue;
+                }
+                DWORD dst = pixels[y * w + x];
+                BYTE inv = 255 - fillAlpha;
+                BYTE outA = fillAlpha + (BYTE)((((dst >> 24) & 0xFF) * inv) / 255);
+                BYTE outR = (BYTE)((120 * fillAlpha) / 255) + (BYTE)((((dst >> 16) & 0xFF) * inv) / 255);
+                BYTE outG = (BYTE)((170 * fillAlpha) / 255) + (BYTE)((((dst >> 8) & 0xFF) * inv) / 255);
+                BYTE outB = (BYTE)((230 * fillAlpha) / 255) + (BYTE)(((dst & 0xFF) * inv) / 255);
+                pixels[y * w + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+            }
+        }
     }
 
     // Draw PowerShell-style scrollbar (only when needed, blends with appearance)
