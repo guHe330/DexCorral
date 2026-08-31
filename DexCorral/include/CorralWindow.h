@@ -35,6 +35,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <set>
 #include "Config.h"
 #include "DesktopIcons.h"
 #include "ChromeAlpha.h"
@@ -244,6 +245,36 @@ private:
     int HitTestDetailsHeader(int x, int y) const;        // Column index under header click, or -1
     int HitTestColumnGrip(int x, int y) const;           // Column index whose right grip is hit, or -1
 
+    // Selection (multi-select). selectedIcon doubles as the focus index; the set is
+    // what commands act on, and selectionAnchor is the fixed end of a Shift range.
+    bool IsSelected(int index) const;
+    std::vector<int> GetSelectedIndices() const;
+    void SelectSingle(int index);
+    void ClearSelection();
+    void ToggleSelection(int index);
+    void SelectRangeTo(int index, bool keepExisting);
+    void SelectAll();
+    void SetFocusIcon(int index, bool select);
+    void EnsureIconVisible(int index);
+
+    // Keyboard (see CorralWindowKeyboard.cpp)
+    bool OnKeyDown(WPARAM vk);
+    void OnChar(wchar_t ch);
+    void OnTypeAheadTimeout();
+    void MoveFocusByDirection(int vk, bool extend, bool focusOnly);
+    void ShowContextMenuForFocusedIcon();
+
+    // Shell verbs invoked on the current selection (Delete/Enter/Alt+Enter/Ctrl+C/X)
+    void InvokeVerbOnSelection(const char *verb);
+    void InvokeVerbOnFolder(const char *verb); // Ctrl+V: paste needs the folder's menu
+    void OpenSelection();
+
+    // Rubber-band selection
+    void StartRubberBand(int x, int y);
+    void DoRubberBand(int x, int y);
+    void EndRubberBand();
+    RECT GetRubberBandRect() const; // Client coords, scroll applied
+
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     void OnPaint();
     void UpdateLayeredContent(); // True per-pixel transparency rendering
@@ -418,8 +449,21 @@ private:
     bool isEndingCapturedOperation = false;
 
     std::vector<CorralIcon> icons;
-    int selectedIcon = -1;
+    int selectedIcon = -1; // Focus index; also selected unless the set says otherwise
+    std::set<int> selection;
+    int selectionAnchor = -1;
     int hoveredIcon = -1;
+
+    // Rubber-band selection (drag on empty corral space)
+    bool isRubberBanding = false;
+    POINT rubberBandStart = {};   // Content coords (scroll applied)
+    POINT rubberBandCurrent = {}; // Content coords (scroll applied)
+    std::set<int> rubberBandBase; // Selection before the band started (Ctrl adds to it)
+
+    // Type-ahead search
+    static const UINT_PTR TYPEAHEAD_TIMER_ID = 8;
+    static const UINT TYPEAHEAD_RESET_MS = 1000;
+    std::wstring typeAheadPrefix;
 
     // Tab hover + reorder ("Griff" drag handle)
     int hoveredTab = -1;             // Tab currently under the mouse (grip shown), or -1

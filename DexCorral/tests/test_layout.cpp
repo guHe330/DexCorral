@@ -172,3 +172,75 @@ TEST(EnforceSpacing, ExactlyAtMinimum_Unchanged) {
     EXPECT_EQ(sx, 48);
     EXPECT_EQ(sy, 52);
 }
+
+// ---------------------------------------------------------------------------
+// FindNeighbor (keyboard navigation)
+// ---------------------------------------------------------------------------
+
+TEST(FindNeighbor, EmptyAndOutOfRange) {
+    std::vector<IconCell> none;
+    EXPECT_EQ(FindNeighbor(none, 0, NavDirection::Down), -1);
+
+    int ch;
+    auto cells = ComputeGridLayout(3, 300, 0, 32, 90, 70, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, -1, NavDirection::Down), -1);
+    EXPECT_EQ(FindNeighbor(cells, 3, NavDirection::Down), -1);
+}
+
+TEST(FindNeighbor, SingleIcon_NoNeighbours) {
+    int ch;
+    auto cells = ComputeGridLayout(1, 300, 0, 32, 90, 70, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, 0, NavDirection::Up), -1);
+    EXPECT_EQ(FindNeighbor(cells, 0, NavDirection::Down), -1);
+    EXPECT_EQ(FindNeighbor(cells, 0, NavDirection::Left), -1);
+    EXPECT_EQ(FindNeighbor(cells, 0, NavDirection::Right), -1);
+}
+
+TEST(FindNeighbor, Grid_WithinRow) {
+    // 3 columns, 6 icons -> rows [0 1 2] [3 4 5]
+    int ch;
+    auto cells = ComputeGridLayout(6, 300, 0, 32, 90, 70, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Left),  0);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Right), 2);
+    EXPECT_EQ(FindNeighbor(cells, 0, NavDirection::Left),  -1);
+    EXPECT_EQ(FindNeighbor(cells, 2, NavDirection::Right), -1);
+}
+
+TEST(FindNeighbor, Grid_BetweenRows) {
+    int ch;
+    auto cells = ComputeGridLayout(6, 300, 0, 32, 90, 70, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Down), 4);
+    EXPECT_EQ(FindNeighbor(cells, 4, NavDirection::Up),   1);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Up),   -1);
+    EXPECT_EQ(FindNeighbor(cells, 4, NavDirection::Down), -1);
+}
+
+TEST(FindNeighbor, Grid_RaggedLastRow_FallsToNearestColumn) {
+    // 3 columns, 5 icons -> rows [0 1 2] [3 4]; below icon 2 there is no cell in
+    // that column, so Down picks the nearest column instead (icon 4).
+    int ch;
+    auto cells = ComputeGridLayout(5, 300, 0, 32, 90, 70, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, 2, NavDirection::Down), 4);
+    EXPECT_EQ(FindNeighbor(cells, 4, NavDirection::Up),   1);
+}
+
+TEST(FindNeighbor, SingleColumn) {
+    // clientWidth only fits one column
+    int ch;
+    auto cells = ComputeGridLayout(3, 120, 0, 32, 90, 70, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, 0, NavDirection::Down), 1);
+    EXPECT_EQ(FindNeighbor(cells, 2, NavDirection::Up),   1);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Left), -1);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Right), -1);
+}
+
+TEST(FindNeighbor, DetailsView_RowsOnly) {
+    int ch;
+    auto cells = ComputeDetailsLayout(4, 400, 0, 20, 16, 8, 8, ch);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Down), 2);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Up),   0);
+    EXPECT_EQ(FindNeighbor(cells, 3, NavDirection::Down), -1);
+    // Every row spans the same x range, so there is no horizontal neighbour.
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Left),  -1);
+    EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Right), -1);
+}
