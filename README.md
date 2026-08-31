@@ -24,6 +24,7 @@ multiple monitors.
 *   Virtual folders backed by real directories
 *   Adjustable background, header, border, and icon opacity
 *   Hover reveal and roll-up
+*   Per-Corral position lock against accidental moves
 *   Small, medium, large, and details views
 *   Catch-all Corral for new desktop items
 *   Multi-monitor and resolution-aware layouts

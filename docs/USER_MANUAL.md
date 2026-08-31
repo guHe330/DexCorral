@@ -53,6 +53,17 @@ A virtual tab mirrors any folder on your PC — point it at `Downloads` or a pro
 * Drag any **edge or corner** to resize. While moving or resizing, Corrals snap to screen edges and align to other Corrals on the same monitor.
 * Corrals are immune to **Win+D / Show Desktop** — they stay visible with your desktop.
 
+### Lock Position
+Right-click a Corral and choose **Lock Position** to freeze it where it is. A locked
+Corral cannot be moved or resized with the mouse, and a small padlock appears in its
+title bar. Everything else keeps working: tabs still switch, double-clicking the title
+bar still rolls it up, and positions are still restored per monitor and resolution.
+Choose **Lock Position** again to unlock.
+
+Worth doing for a Corral that sits where you drop files all day — an accidental drag
+does not just move the Corral, it pushes the desktop icons underneath it out of the way,
+and there is no undo for that.
+
 ### Roll-Up
 Double-click the title bar to **roll up** a Corral so only the title bar remains visible. Double-click again to expand it.
 
@@ -73,6 +84,7 @@ Right-click a Corral's title bar or background:
 * **Catch-All (receives new files)** — make this tab the catch-all for new desktop items.
 * **Add Special Icon** — add special shell items such as the Recycle Bin to the Corral.
 * **Show Desktop Icons** — toggle visibility of all native desktop icons.
+* **Lock Position** — freeze this Corral so it cannot be moved or resized by mouse (see above).
 * **Create New Corral / New Virtual Corral** — same as the tray menu.
 * **Close Tab / Delete Corral** — remove the current tab, or the whole Corral if it's the last tab. Contained icons return to the desktop.
 
