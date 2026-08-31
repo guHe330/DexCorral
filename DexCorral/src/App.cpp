@@ -1548,13 +1548,13 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     tab.IsCatchAll = false; // Virtual corrals cannot be catch-all
     newConfig.Tabs.push_back(tab);
 
-    SIZE size = DefaultCorralSize(desiredCenter);
-    POINT topLeft = {desiredCenter.x - size.cx / 2, desiredCenter.y - size.cy / 2};
-    POINT center = FindNearestFreeCorralPosition(topLeft, size.cx, size.cy);
-    newConfig.Left = (double)(center.x - size.cx / 2);
-    newConfig.Top = (double)(center.y - size.cy / 2);
-    newConfig.Width = size.cx;
-    newConfig.Height = size.cy;
+    SIZE corralSize = DefaultCorralSize(desiredCenter);
+    POINT topLeft = {desiredCenter.x - corralSize.cx / 2, desiredCenter.y - corralSize.cy / 2};
+    POINT center = FindNearestFreeCorralPosition(topLeft, corralSize.cx, corralSize.cy);
+    newConfig.Left = (double)(center.x - corralSize.cx / 2);
+    newConfig.Top = (double)(center.y - corralSize.cy / 2);
+    newConfig.Width = corralSize.cx;
+    newConfig.Height = corralSize.cy;
 
     auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
