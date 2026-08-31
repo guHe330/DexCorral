@@ -354,6 +354,7 @@ private:
     int HitTestTab(int x, int y);     // Returns tab index or -1
     RECT GetTabRect(int index) const; // Get rect for a specific tab
     RECT GetTabGripRect(int index) const; // Left-edge "Griff" drag handle for reordering
+    RECT GetLockGlyphRect() const;        // Padlock badge at the right end of the title bar (empty if unlocked)
     int HitTestTabGrip(int x, int y) const; // Returns tab index whose grip is hit, or -1
     void MoveTab(int from, int to);         // Reorder tabs, keeping the active tab pointed correctly
     void OnTabDrag(int x, int y);           // Live reorder while dragging a tab grip
@@ -471,6 +472,9 @@ private:
     int draggedTabIndex = -1;        // Index of the tab being dragged
     POINT tabDragStart = {};         // Mouse position where the tab drag began
     static const int TAB_GRIP_WIDTH = 12; // Logical px reserved on each tab's left edge for the grip
+    static const int LOCK_GLYPH_MIN_H = 9;   // Logical px, smallest readable padlock
+    static const int LOCK_GLYPH_MAX_H = 18;  // Logical px, so a tall header does not get a huge badge
+    static const int LOCK_GLYPH_MARGIN = 6;  // Logical px between the padlock and the right border
 
     // Icon layout - dynamically calculated from view mode
     int iconSize = 32;
