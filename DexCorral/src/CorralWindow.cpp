@@ -682,6 +682,34 @@ RECT CorralWindow::GetTabGripRect(int index) const
     return {tr.left, tr.top, tr.left + Dpi(TAB_GRIP_WIDTH), tr.bottom};
 }
 
+RECT CorralWindow::GetLockGlyphRect() const
+{
+    if (!config.IsLocked)
+        return {0, 0, 0, 0};
+
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+
+    const int barH = GetTitleBarHeight();
+    int gh = barH * 55 / 100;
+    if (gh < Dpi(LOCK_GLYPH_MIN_H))
+        gh = Dpi(LOCK_GLYPH_MIN_H);
+    if (gh > Dpi(LOCK_GLYPH_MAX_H))
+        gh = Dpi(LOCK_GLYPH_MAX_H);
+    if (gh > barH - 2)
+        gh = barH - 2; // Never taller than the bar it sits in
+    if (gh < 4)
+        return {0, 0, 0, 0};
+
+    const int gw = gh * 78 / 100;
+    const int right = clientRect.right - Dpi(LOCK_GLYPH_MARGIN);
+    const int top = (barH - gh) / 2;
+    if (right - gw <= 0)
+        return {0, 0, 0, 0}; // Corral too narrow to show it
+
+    return {right - gw, top, right, top + gh};
+}
+
 int CorralWindow::HitTestTabGrip(int x, int y) const
 {
     // Grips only make sense (and only appear) when there's more than one tab.
@@ -1030,8 +1058,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 }
 
                 // Same rule as the click path: don't advertise a resize where a
-                // click will activate a tab.
-                int hit = window->HitTestResizeAllowingTabs(pt.x, pt.y);
+                // click will activate a tab — or where the corral is locked and the
+                // resize would be refused.
+                int hit = window->config.IsLocked ? 0 : window->HitTestResizeAllowingTabs(pt.x, pt.y);
                 LPCWSTR cursor = IDC_ARROW;
                 switch (hit)
                 {
