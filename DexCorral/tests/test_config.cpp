@@ -238,6 +238,21 @@ TEST(MissingField, IconTintStrength_GetsDefault) {
     EXPECT_EQ(cfg.IconTintStrength, 0);
 }
 
+TEST(MissingField, WindowIsLocked_GetsDefault) {
+    // Old config predating Lock Position -> loads unlocked
+    nlohmann::json j = R"({"Left":0,"Top":0,"Width":300,"Height":200})"_json;
+    auto cfg = j.get<CorralWindowConfig>();
+    EXPECT_FALSE(cfg.IsLocked);
+}
+
+TEST(CorralWindowConfig, IsLockedRoundTrip) {
+    CorralWindowConfig orig;
+    orig.IsLocked = true;
+    nlohmann::json j = orig;
+    auto back = j.get<CorralWindowConfig>();
+    EXPECT_TRUE(back.IsLocked);
+}
+
 TEST(MissingField, SpacingPercents_DefaultTo100) {
     nlohmann::json j = R"({})"_json;
     auto cfg = j.get<CorralWindowConfig>();
