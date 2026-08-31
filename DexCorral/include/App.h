@@ -108,20 +108,17 @@ public:
     void ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
                                      const AppearanceApplyFlags &apply);
 
-    /// Creates a new corral at the specified screen coordinates
-    void CreateCorralAt(POINT pt);
-
-    /// Creates a new virtual (non-file) corral at the specified screen coordinates
-    void CreateVirtualCorralAt(POINT pt);
-
     /**
-     * Finds a center point for a new corral of the given size that does not
-     * overlap any existing corral. Tiles from the top-right corner of the
-     * primary monitor's work area, walking columns right-to-left and rows
-     * top-to-bottom. Falls back to a cascade from the top-right corner if no
-     * free tile exists.
+     * Creates a new corral centred on `desiredCenter`, nudged to the nearest
+     * spot that does not overlap an existing corral. Every creation path goes
+     * through here, varying only the seed point; `exclude` drops one corral
+     * from the overlap test (the source, when creating from a corral's own menu
+     * or by detaching a tab).
      */
-    POINT FindFreeCorralPosition(int width, int height);
+    void CreateCorralAt(POINT desiredCenter, HWND exclude = nullptr);
+
+    /// Creates a new virtual (non-file) corral, placed like CreateCorralAt
+    void CreateVirtualCorralAt(POINT desiredCenter);
 
     /**
      * Finds a center point for a new corral of the given size as close as
@@ -129,9 +126,36 @@ public:
      * monitor under that point and not overlapping any existing corral. The
      * corral whose HWND equals `exclude` is ignored (pass the source window so
      * a detached tab can sit right beside its origin). Falls back to the
-     * clamped desired position if no free spot exists.
+     * clamped desired position if no free spot exists or the nearest one is
+     * further away than the shift cap.
      */
     POINT FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height, HWND exclude = nullptr);
+
+    /// DPI of the monitor under `pt` (96 when it cannot be determined).
+    /// Usable before a window exists, unlike CorralWindow::Dpi.
+    static UINT DpiForPoint(POINT pt);
+
+    /// Default size for a new corral, scaled for the monitor under `nearPt`.
+    static SIZE DefaultCorralSize(POINT nearPt);
+
+    /**
+     * Restacks the corral band: all corrals stay below ordinary windows, but
+     * `newTop` (when given, and remembered afterwards) becomes the topmost
+     * among its peers. This replaces per-window "sink me to the bottom" calls,
+     * which sank the corral the user was interacting with below its siblings.
+     */
+    void RepinBand(CorralWindow *newTop = nullptr);
+
+    /// Forgets a corral that is going away (band top / hover-expand arbitration)
+    void ForgetCorral(CorralWindow *corral);
+
+    /**
+     * Hover-expand arbitration: only one rolled-up corral may hover-expand at a
+     * time, so an exposed sliver of a neighbour cannot fight the corral the user
+     * is actually in. Returns false when another corral currently owns it.
+     */
+    bool BeginHoverExpand(CorralWindow *corral);
+    void EndHoverExpand(CorralWindow *corral);
 
     /// Returns pointer to monitor manager (tracks display configuration)
     MonitorManager *GetMonitorManager() { return monitorManager.get(); }
@@ -183,7 +207,11 @@ private:
     void StartUpdateCheck(bool userInitiated);
     std::wstring pendingUpdateUrl; // Release page opened when the update balloon is clicked
     void ShowCreationMenu(POINT pt);
-    void CreateCorral(POINT pt);
+
+    /// Appearance defaults for a brand-new corral / tab. Single source of truth
+    /// for every creation path — geometry is the caller's business.
+    CorralWindowConfig MakeDefaultCorralConfig() const;
+    CorralTabConfig MakeDefaultTabConfig(const std::string &title) const;
     bool IsDesktopUnderMouse(POINT pt);
 
     /**
@@ -231,7 +259,7 @@ private:
     static LRESULT CALLBACK MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     // Fires whenever some other window becomes the foreground window, and posts
-    // WM_REPIN_CORRALS so the app thread reasserts SendToBottom() on every corral.
+    // WM_REPIN_CORRALS so the app thread restacks the corral band (RepinBand).
     // HWND_BOTTOM is a one-time placement, not a persistent style (unlike
     // WS_EX_TOPMOST for the top side) — without this, ordinary window activation
     // elsewhere can leave a corral sitting above other apps again. The callback
@@ -253,6 +281,13 @@ private:
     std::unique_ptr<DesktopMonitor> desktopMonitor;
     std::unique_ptr<MonitorManager> monitorManager;
     std::vector<std::unique_ptr<CorralWindow>> corrals;
+
+    // Topmost corral within the band (see RepinBand). Raw pointer into `corrals`;
+    // cleared by ForgetCorral when the window goes away.
+    CorralWindow *topCorral = nullptr;
+
+    // The corral currently hover-expanded, if any (see BeginHoverExpand)
+    CorralWindow *hoverExpandedCorral = nullptr;
 
     // Desktop icon push cache (free icons only — corral-owned ones filtered out)
     std::vector<DesktopIconInfo> cachedDesktopIconPositions;
