@@ -890,9 +890,9 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         pendingRenameIcon = -1;
     }
 
-    // Check resize area first (but not when rolled up) — except where the top edge
-    // would steal a click meant for a tab; see HitTestResizeAllowingTabs.
-    if (!config.IsRolledUp)
+    // Check resize area first (but not when rolled up, and not when locked) — except
+    // where the top edge would steal a click meant for a tab; see HitTestResizeAllowingTabs.
+    if (!config.IsRolledUp && !config.IsLocked)
     {
         int resizeHit = HitTestResizeAllowingTabs(x, y);
         if (resizeHit)
@@ -1030,17 +1030,20 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         {
             SetActiveTab(tabHit);
         }
-        // Allow dragging window from tab
-        isDragging = true;
-        GetCursorPos(&dragStart);
-        GetWindowRect(hwnd, &dragStartRect);
-
-        if (App::GetInstance())
+        // Allow dragging window from tab — but a locked corral only switches tabs
+        if (!config.IsLocked)
         {
-            App::GetInstance()->CacheDesktopIconPositions();
+            isDragging = true;
+            GetCursorPos(&dragStart);
+            GetWindowRect(hwnd, &dragStartRect);
+
+            if (App::GetInstance())
+            {
+                App::GetInstance()->CacheDesktopIconPositions();
+            }
+            SetCapture(hwnd);
+            StartCursorTracking();
         }
-        SetCapture(hwnd);
-        StartCursorTracking();
         return;
     }
 
@@ -1110,8 +1113,8 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         UpdateLayeredContent();
     }
 
-    // Title bar - start dragging window (empty area)
-    if (y < GetTitleBarHeight())
+    // Title bar - start dragging window (empty area); locked corrals stay put
+    if (y < GetTitleBarHeight() && !config.IsLocked)
     {
         isDragging = true;
         GetCursorPos(&dragStart);

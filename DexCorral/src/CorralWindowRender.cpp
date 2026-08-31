@@ -45,6 +45,73 @@
 #pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "uxtheme.lib")
 
+namespace
+{
+    /**
+     * Padlock glyph, rasterised analytically rather than drawn from a font.
+     *
+     * GDI text writes no alpha, so every string costs a TextLayer scratch-DIB round
+     * trip (see TextLayer.h). The lock is two primitives — a rounded-rect body and
+     * the upper half of an annulus for the shackle — so it can be sampled straight
+     * into the back buffer at whatever alpha the header is using, with no font
+     * availability or hinting risk at any DPI.
+     */
+    struct LockGlyph
+    {
+        double gw, gh, bodyTop, radius, cx, ro, ri;
+
+        LockGlyph(int w, int h)
+        {
+            gw = w;
+            gh = h;
+            bodyTop = gh * 0.42;
+            radius = gw * 0.22;
+            cx = gw * 0.5;
+            ro = gw * 0.36;
+            double thickness = gw * 0.15;
+            if (thickness < 1.0)
+                thickness = 1.0;
+            ri = ro - thickness;
+            if (ri < 0.0)
+                ri = 0.0;
+        }
+
+        bool Inside(double x, double y) const
+        {
+            // Body: rounded rect spanning the lower part of the glyph box
+            if (y >= bodyTop)
+            {
+                const double l = radius, r = gw - radius, t = bodyTop + radius, b = gh - radius;
+                const double dx = (x < l) ? l - x : ((x > r) ? x - r : 0.0);
+                const double dy = (y < t) ? t - y : ((y > b) ? y - b : 0.0);
+                if (x >= 0.0 && x <= gw && y <= gh && dx * dx + dy * dy <= radius * radius)
+                    return true;
+            }
+            // Shackle: upper half of an annulus centred on the body's top edge
+            if (y <= bodyTop)
+            {
+                const double dx = x - cx, dy = y - bodyTop;
+                const double d2 = dx * dx + dy * dy;
+                if (d2 <= ro * ro && d2 >= ri * ri)
+                    return true;
+            }
+            return false;
+        }
+
+        /// 4x4 supersampled coverage of one pixel, 0..255.
+        BYTE Coverage(int px, int py) const
+        {
+            const int n = 4;
+            int hits = 0;
+            for (int sy = 0; sy < n; sy++)
+                for (int sx = 0; sx < n; sx++)
+                    if (Inside(px + (sx + 0.5) / n, py + (sy + 0.5) / n))
+                        hits++;
+            return (BYTE)((hits * 255) / (n * n));
+        }
+    };
+}
+
 void CorralWindow::UpdateLayeredContent()
 {
     RECT rect;
@@ -239,6 +306,11 @@ void CorralWindow::UpdateLayeredContent()
      * window composited over an unknown wallpaper anyway. This matches how the
      * icon labels have always been drawn.
      */
+    // Reserved before the titles are laid out: the padlock sits over the last tab,
+    // so that tab has to give up the width or a long title runs under it.
+    const RECT lockRect = GetLockGlyphRect();
+    const int lockReserve = (lockRect.right > lockRect.left) ? (lockRect.right - lockRect.left) + Dpi(4) : 0;
+
     const int titleLayerH = (GetTitleBarHeight() < h) ? GetTitleBarHeight() : h;
     if (titleLayerH > 0 && !config.Tabs.empty())
     {
@@ -302,6 +374,8 @@ void CorralWindow::UpdateLayeredContent()
                 RECT tabRect = GetTabRect(i);
                 tabRect.left += 6;
                 tabRect.right -= 6;
+                if (i == (int)config.Tabs.size() - 1)
+                    tabRect.right -= lockReserve;
                 tabRect.top += 2;
 
                 DrawTextW(titles.DC(), wtitle.c_str(), (int)wtitle.length(), &tabRect,
@@ -384,6 +458,42 @@ void CorralWindow::UpdateLayeredContent()
                                 pixels[py * w + px] = dot;
                         }
                 }
+        }
+    }
+
+    // ---- Lock Position badge ----
+    // Composited over the title bar in the last tab's header colour and opacity, so
+    // it reads as part of the header rather than an overlay pasted on top of it.
+    if (lockRect.right > lockRect.left && !config.Tabs.empty())
+    {
+        const int lw = lockRect.right - lockRect.left;
+        const int lh = lockRect.bottom - lockRect.top;
+        const int ti = (int)config.Tabs.size() - 1;
+        const int lockAlpha = ChromeAlpha::HoverBlendTextOpacity(config.Tabs[ti].HeaderFontOpacity,
+                                                                 currentTextHover);
+        if (lockAlpha > 0)
+        {
+            LockGlyph glyph(lw, lh);
+            for (int gy = 0; gy < lh; gy++)
+            {
+                const int py = lockRect.top + gy;
+                if (py < 0 || py >= h)
+                    continue;
+                for (int gx = 0; gx < lw; gx++)
+                {
+                    const int px = lockRect.left + gx;
+                    if (px < 0 || px >= w)
+                        continue;
+                    BYTE coverage = glyph.Coverage(gx, gy);
+                    if (coverage == 0)
+                        continue;
+                    BYTE a = ChromeAlpha::TextCoverageAlpha(coverage, lockAlpha);
+                    if (a == 0)
+                        continue;
+                    DWORD lockPixel = ChromeAlpha::MakePremultiplied(a, tabFontR[ti], tabFontG[ti], tabFontB[ti]);
+                    pixels[py * w + px] = ChromeAlpha::PremultipliedOver(lockPixel, pixels[py * w + px]);
+                }
+            }
         }
     }
 
