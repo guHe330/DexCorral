@@ -807,7 +807,7 @@ void CorralWindow::NavigateToSubfolder(const std::wstring &folder)
     tab.CurrentSubPath += WideToUtf8(folder);
 
     scrollPosition = 0;
-    selectedIcon = -1;
+    ClearSelection();
     InitializeFolderWatcher();
     LoadFiles();
     SyncConfigFromWindow();
@@ -830,7 +830,7 @@ void CorralWindow::NavigateUp()
     tab.CurrentSubPath = sub;
 
     scrollPosition = 0;
-    selectedIcon = -1;
+    ClearSelection();
     InitializeFolderWatcher();
     LoadFiles();
     SyncConfigFromWindow();
@@ -939,7 +939,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 
             // Track hovered icon and hovered tab (the latter reveals the reorder grip)
             if (!window->isDragging && !window->isResizing && !window->isDraggingIcon &&
-                !window->isDraggingScrollbar && !window->isDraggingTab)
+                !window->isDraggingScrollbar && !window->isDraggingTab && !window->isRubberBanding)
             {
                 int prevHovered = window->hoveredIcon;
                 window->hoveredIcon = window->HitTestIcon(x, y);
@@ -951,7 +951,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 }
             }
 
-            if (window->isDraggingTab)
+            if (window->isRubberBanding)
+            {
+                window->DoRubberBand(x, y);
+            }
+            else if (window->isDraggingTab)
             {
                 window->OnTabDrag(x, y);
             }
@@ -1053,12 +1057,12 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             break;
         case WM_KEYDOWN:
-            if (wParam == VK_F2 && window->selectedIcon >= 0)
-            {
-                window->StartIconRename(window->selectedIcon);
+            if (window->OnKeyDown(wParam))
                 return 0;
-            }
             break;
+        case WM_CHAR:
+            window->OnChar((wchar_t)wParam);
+            return 0;
         case WM_TIMER:
             if (wParam == ANIMATION_TIMER_ID)
             {
@@ -1091,6 +1095,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 {
                     window->StartIconRename(idx);
                 }
+                return 0;
+            }
+            if (wParam == TYPEAHEAD_TIMER_ID)
+            {
+                window->OnTypeAheadTimeout();
                 return 0;
             }
             if (wParam == CURSOR_TRACK_TIMER_ID)
