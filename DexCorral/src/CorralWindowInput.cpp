@@ -1044,22 +1044,41 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         return;
     }
 
+    bool ctrlDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    bool shiftDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
     // Check if clicked on an icon - select it (drag starts on mouse move)
     int hit = HitTestIcon(x, y);
     if (hit >= 0)
     {
-        // Clicked on the label of an already-selected icon: defer the rename by the
+        if (ctrlDown || shiftDown)
+        {
+            if (ctrlDown)
+                ToggleSelection(hit);
+            else
+                SelectRangeTo(hit, false);
+            SetFocus(hwnd);
+            SendToBottom();
+            UpdateLayeredContent();
+            return;
+        }
+
+        // Clicked on the label of the one selected icon: defer the rename by the
         // system double-click time. If a double-click (open) follows, it cancels this
         // and opens instead — so click-to-select-then-double-click won't rename.
-        if (hit == selectedIcon && HitTestIconLabel(x, y, hit))
+        if (hit == selectedIcon && selection.size() == 1 && HitTestIconLabel(x, y, hit))
         {
             pendingRenameIcon = hit;
             SetTimer(hwnd, RENAME_TIMER_ID, GetDoubleClickTime(), nullptr);
             return;
         }
 
-        // Otherwise, just select the icon
-        selectedIcon = hit;
+        // Clicking inside an existing multi-selection keeps it (so a drag can carry
+        // it); it collapses to this icon on button-up if no drag happened.
+        if (IsSelected(hit))
+            selectedIcon = hit;
+        else
+            SelectSingle(hit);
         draggedIconIndex = hit; // Potential drag candidate
         iconDragStart = {x, y}; // Store starting position
         dropTargetIndex = -1;
@@ -1074,10 +1093,20 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         return;
     }
 
-    // Deselect
-    if (selectedIcon >= 0)
+    // Empty icon area: start a rubber-band selection (Ctrl adds to the selection)
+    if (y >= GetIconAreaTop() && !config.IsRolledUp)
     {
-        selectedIcon = -1;
+        SetFocus(hwnd);
+        SendToBottom();
+        StartRubberBand(x, y);
+        UpdateLayeredContent();
+        return;
+    }
+
+    // Deselect
+    if (!selection.empty() || selectedIcon >= 0)
+    {
+        ClearSelection();
         UpdateLayeredContent();
     }
 
@@ -1136,7 +1165,7 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
 bool CorralWindow::HasCapturedOperation() const
 {
     return isDragging || isResizing || isResizingColumn || isDraggingScrollbar ||
-           isDraggingIcon || isDraggingTab || draggedIconIndex >= 0;
+           isDraggingIcon || isDraggingTab || isRubberBanding || draggedIconIndex >= 0;
 }
 
 void CorralWindow::EndCapturedOperationWithoutDrop()
@@ -1180,6 +1209,11 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         iconDragOutside = false;
         ReleaseCapture();
         UpdateLayeredContent();
+    }
+    else if (isRubberBanding)
+    {
+        // The band already selected what it covered; just stop tracking.
+        EndRubberBand();
     }
     else if (draggedIconIndex >= 0)
     {
@@ -1237,9 +1271,20 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
         OnIconDragEnd();
         ReleaseCapture();
     }
+    else if (isRubberBanding)
+    {
+        EndRubberBand();
+    }
     else if (draggedIconIndex >= 0)
     {
-        // Mouse up without dragging - just a selection click
+        // Mouse up without dragging - just a selection click. A plain click inside a
+        // multi-selection collapses it to the clicked icon, like Explorer.
+        bool modifier = (GetKeyState(VK_CONTROL) & 0x8000) || (GetKeyState(VK_SHIFT) & 0x8000);
+        if (!modifier && selection.size() > 1 && IsSelected(draggedIconIndex))
+        {
+            SelectSingle(draggedIconIndex);
+            UpdateLayeredContent();
+        }
         draggedIconIndex = -1;
         ReleaseCapture();
     }
@@ -1298,7 +1343,11 @@ void CorralWindow::OnRightButtonDown(int x, int y)
     int hit = HitTestIcon(x, y);
     if (hit >= 0)
     {
-        selectedIcon = hit;
+        // Right-clicking inside a multi-selection keeps it; otherwise it selects.
+        if (!IsSelected(hit))
+            SelectSingle(hit);
+        else
+            selectedIcon = hit;
         UpdateLayeredContent();
 
         POINT pt = {x, y};

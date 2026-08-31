@@ -58,6 +58,11 @@
 
 - The bundled JSON library (nlohmann/json) is updated to 3.12.0, with the bill of materials and its checksum updated to match
 
+- Corrals now respond to the keyboard like Explorer does. Arrow keys move between icons, Home/End jump to the first/last, Esc clears the selection, and typing a few letters jumps to the icon whose name starts with them
+- Delete, Enter, Alt+Enter and Ctrl+C/X/V now work on Corral icons. They run the shell's own commands, so you get the usual confirmation, the Recycle Bin, and Ctrl+Z undo in Explorer. Shift+Delete still deletes permanently
+- Several icons can be selected at once: Ctrl+click to add or remove one, Shift+click for a range, Ctrl+A for all, Shift+arrows to extend, or drag a selection rectangle over empty space in the Corral
+- F5 reloads a Corral's contents, the Menu key opens the selected icon's context menu, and Backspace goes up one folder in a folder Corral
+
 <!-- Older changes (v1.0.21) -->
 
 - DexCorral has its own icon now — on the application, the tray, the Corral windows, and in the installer and Add/Remove Programs, instead of Windows' generic default
