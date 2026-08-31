@@ -10,6 +10,8 @@ Implementation detail belongs in the commit history.
 
 ## [Unreleased]
 
+## [1.0.23] - 2026-08-31
+
 ### Added
 - **Lock Position** in a Corral's context menu freezes it where it is: no mouse move, no mouse resize, and a small padlock in the title bar to say so. Tabs, roll-up and the per-monitor position memory all keep working. Aimed at the Corral that lives where you drop files — an accidental title-bar drag also shoves the desktop icons underneath it around, with no undo.
 - Keyboard support in Corrals, matching Explorer: arrow keys move the selection, Home/End jump to the first/last icon, Esc clears it, and type-ahead jumps to a name. Delete, Enter, Alt+Enter and Ctrl+C/X/V run the shell's own verbs, so confirmations, the Recycle Bin and Explorer's undo all apply. F5 reloads, the Menu key opens the context menu, Backspace goes up a folder.

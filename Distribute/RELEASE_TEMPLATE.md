@@ -39,13 +39,29 @@
 
 ### What's New
 
+- DexCorral now requires Windows 11 (build 22000 or newer). Windows 10 has reached end of life and there is no machine here to test it on, so the installer refuses to run below that build. Nothing changes if you are already on Windows 11
+- A Corral can be locked in place: right-click it and choose **Lock Position**. It can no longer be moved or resized with the mouse, and a small padlock in the title bar shows why. Tabs still switch, double-click still rolls it up, and it still finds its saved place on each monitor. Worth doing for the Corral that sits where you drop files — an accidental drag also pushes the desktop icons under it out of the way, and that cannot be undone
+- Corrals now respond to the keyboard like Explorer does. Arrow keys move between icons, Home/End jump to the first/last, Esc clears the selection, and typing a few letters jumps to the icon whose name starts with them
+- Delete, Enter, Alt+Enter and Ctrl+C/X/V now work on Corral icons. They run the shell's own commands, so you get the usual confirmation, the Recycle Bin, and Ctrl+Z undo in Explorer. Shift+Delete still deletes permanently
+- Several icons can be selected at once: Ctrl+click to add or remove one, Shift+click for a range, Ctrl+A for all, Shift+arrows to extend, or drag a selection rectangle over empty space in the Corral
+- F5 reloads a Corral's contents, the Menu key opens the selected icon's context menu, and Backspace goes up one folder in a folder Corral
+- DexCorral speaks German. The installer asks for your language and the whole interface follows it; portable users can set `"Language": "de"` in `%APPDATA%\DexCorral\config.json`
 - New Corrals appear where you ask for them. Right-click the desktop and the Corral turns up where you clicked; ask for one from a Corral's own menu and it lands beside it; from the tray it follows the mouse. In every case it slides to the nearest spot that doesn't cover another Corral — and if the desktop is too crowded for that to be close by, it simply appears where you asked rather than jumping across the screen
 - New Corrals are the right size on high-DPI screens. The starting size was fixed pixels, so on a 4K display at 150% a new Corral came out a third too small for everything drawn inside it. It now scales with the monitor it appears on
 - A new Corral is no longer created underneath the ones already on your desktop, and the Corral you are using stays on top of its neighbours. Clicking an icon in a Corral that overlaps another one now acts on the Corral you clicked, not the one that happened to be created first
 - Rolled-up Corrals wait a moment before springing open on hover, and only one opens at a time — so brushing past a stack of them on the way somewhere else no longer opens each in turn
-- A Corral can be locked in place: right-click it and choose **Lock Position**. It can no longer be moved or resized with the mouse, and a small padlock in the title bar shows why. Tabs still switch, double-click still rolls it up, and it still finds its saved place on each monitor. Worth doing for the Corral that sits where you drop files — an accidental drag also pushes the desktop icons under it out of the way, and that cannot be undone
+- Two new sliders control text opacity: **Header label** fades a tab's title, **Icon label** fades the captions under the icons. Both go all the way to invisible, and both fade back in when you point at the Corral — so text set to 0% is hidden at rest rather than lost. Every opacity slider now sits together in the Appearance dialog's Opacity section, each one directly under what it affects
+- Fixed: resizing a Corral often stopped half-way. Drag an edge too quickly, or let it snap to a neighbour, and the pointer slipped outside the Corral — which is where Windows stops telling a background window about the mouse. Resizing and moving now follow the pointer wherever it goes
+- Fixed: resizing a Corral diagonally was practically impossible. The corner grab areas were smaller than the grip drawn in the bottom-right corner; they now match it, and the top corners are twice as wide as before
+- Fixed: a black header font was invisible. Header text now renders correctly over any wallpaper, at the cost of being very slightly softer
 - Upgrading over an existing install is reliable. The occasional "cannot replace DexCorralHook.dll" failure is gone: the installer now moves the old extension aside before copying and restarts Explorer afterwards, instead of racing a freshly started Explorer for the file
-- DexCorral speaks German. The installer asks for your language and the whole interface follows it; portable users can set `"Language": "de"` in `%APPDATA%\DexCorral\config.json`
+- Security: the update check now verifies that the release address it got from GitHub really points at the DexCorral repository before opening it, and falls back to the releases page if it doesn't
+- Security: the release build pins every GitHub Action to an exact revision, and a new CI check keeps these safeguards from being undone by a later change
+- Security: every release now ships a bill of materials (`DexCorral_${VERSION}_sbom.cdx.json`) listing every component DexCorral is built from, each with a checksum the build verifies, plus a weekly check for new versions of those components
+- The bundled JSON library (nlohmann/json) is updated to 3.12.0, with the bill of materials and its checksum updated to match
+
+<!-- Older changes (v1.0.22) -->
+
 - The Corral header (title bar and tabs) now has its own opacity slider in the Appearance dialog, separate from the background. Fade a Corral into your wallpaper and the header fades with it, instead of staying solid on top of an invisible Corral
 - Inactive tabs adjust themselves: whatever header opacity you pick, they stay dimmer and darker than the active tab, so you can always tell which tab you're on. Nothing extra to set
 - The header slider stops just short of invisible on purpose — the header is what you grab to move a Corral, roll it up, or open its menu, so a faint edge always remains. A rolled-up Corral is kept a little more visible still, and unrolling brings back exactly the setting you chose
@@ -54,19 +70,7 @@
 - Every opacity setting now sits together in one place: the Appearance dialog's Opacity group holds background, border, header and icon opacity as one set of sliders
 - Fixed: clicking a tab near its top edge did nothing. The top few pixels of every tab were reserved for resizing the Corral, so clicks that landed there were swallowed instead of switching tabs. The whole tab now responds, and the corners still resize
 - Fixed: a tab's reorder grip could be grabbed where no grip was shown, so a click near the left edge of a tab could start moving it unintentionally. Only the tab actually showing its grip can be dragged by it
-- Fixed: resizing a Corral often stopped half-way. Drag an edge too quickly, or let it snap to a neighbour, and the pointer slipped outside the Corral — which is where Windows stops telling a background window about the mouse. Resizing and moving now follow the pointer wherever it goes
-- Fixed: resizing a Corral diagonally was practically impossible. The corner grab areas were smaller than the grip drawn in the bottom-right corner; they now match it, and the top corners are twice as wide as before
-- Security: the update check now verifies that the release address it got from GitHub really points at the DexCorral repository before opening it, and falls back to the releases page if it doesn't
-- Security: the release build pins every GitHub Action to an exact revision, and a new CI check keeps these safeguards from being undone by a later change
-- Security: every release now ships a bill of materials (`DexCorral_${VERSION}_sbom.cdx.json`) listing every component DexCorral is built from, each with a checksum the build verifies, plus a weekly check for new versions of those components
 - Fixed: a Corral could stay in resize mode after you let go of the mouse button — moving the mouse afterwards kept resizing it. Releasing the button now always ends the resize, wherever the pointer happens to be, and the size you released at is saved
-
-- The bundled JSON library (nlohmann/json) is updated to 3.12.0, with the bill of materials and its checksum updated to match
-
-- Corrals now respond to the keyboard like Explorer does. Arrow keys move between icons, Home/End jump to the first/last, Esc clears the selection, and typing a few letters jumps to the icon whose name starts with them
-- Delete, Enter, Alt+Enter and Ctrl+C/X/V now work on Corral icons. They run the shell's own commands, so you get the usual confirmation, the Recycle Bin, and Ctrl+Z undo in Explorer. Shift+Delete still deletes permanently
-- Several icons can be selected at once: Ctrl+click to add or remove one, Shift+click for a range, Ctrl+A for all, Shift+arrows to extend, or drag a selection rectangle over empty space in the Corral
-- F5 reloads a Corral's contents, the Menu key opens the selected icon's context menu, and Backspace goes up one folder in a folder Corral
 
 <!-- Older changes (v1.0.21) -->
 
