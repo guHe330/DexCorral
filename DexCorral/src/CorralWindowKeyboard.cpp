@@ -518,7 +518,7 @@ void CorralWindow::InvokeVerbOnSelection(const char *verb)
         CoTaskMemFree(group.first);
     }
 
-    SendToBottom();
+    PinToBandTop();
 
     // Deleted entries are pruned by the reload. The folder watcher / DesktopMonitor
     // would get here eventually; this just makes it immediate.
@@ -545,7 +545,7 @@ void CorralWindow::InvokeVerbOnFolder(const char *verb)
         {
             SetForegroundWindow(hwnd);
             InvokeVerb(hwnd, menu, verb);
-            SendToBottom();
+            PinToBandTop();
             menu->Release();
         }
         folder->Release();

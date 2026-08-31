@@ -39,6 +39,10 @@
 
 ### What's New
 
+- New Corrals appear where you ask for them. Right-click the desktop and the Corral turns up where you clicked; ask for one from a Corral's own menu and it lands beside it; from the tray it follows the mouse. In every case it slides to the nearest spot that doesn't cover another Corral — and if the desktop is too crowded for that to be close by, it simply appears where you asked rather than jumping across the screen
+- New Corrals are the right size on high-DPI screens. The starting size was fixed pixels, so on a 4K display at 150% a new Corral came out a third too small for everything drawn inside it. It now scales with the monitor it appears on
+- A new Corral is no longer created underneath the ones already on your desktop, and the Corral you are using stays on top of its neighbours. Clicking an icon in a Corral that overlaps another one now acts on the Corral you clicked, not the one that happened to be created first
+- Rolled-up Corrals wait a moment before springing open on hover, and only one opens at a time — so brushing past a stack of them on the way somewhere else no longer opens each in turn
 - A Corral can be locked in place: right-click it and choose **Lock Position**. It can no longer be moved or resized with the mouse, and a small padlock in the title bar shows why. Tabs still switch, double-click still rolls it up, and it still finds its saved place on each monitor. Worth doing for the Corral that sits where you drop files — an accidental drag also pushes the desktop icons under it out of the way, and that cannot be undone
 - Upgrading over an existing install is reliable. The occasional "cannot replace DexCorralHook.dll" failure is gone: the installer now moves the old extension aside before copying and restarts Explorer afterwards, instead of racing a freshly started Explorer for the file
 - DexCorral speaks German. The installer asks for your language and the whole interface follows it; portable users can set `"Language": "de"` in `%APPDATA%\DexCorral\config.json`

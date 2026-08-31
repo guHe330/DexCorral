@@ -39,6 +39,7 @@
 #include "../resources/resource.h"
 #include "UpdateChecker.h"
 #include "Strings.h"
+#include "LayoutMath.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -85,9 +86,9 @@ static const UINT WM_DESKTOP_FILE_DELETED = WM_APP + 105;
 // DexCorralShellExt::InvokeCommand (ShellExtension.cpp) runs on EXPLORER'S OWN UI
 // thread — Explorer calls IContextMenu::InvokeCommand directly when the user picks
 // "New DexCorral"/"New Virtual DexCorral" from the desktop's native right-click menu.
-// It must not call FindFreeCorralPosition/CreateCorralAt/CreateVirtualCorralAt itself:
-// those read/mutate App::corrals (and create a new window), which belong to this
-// thread. No payload needed — the handler computes the position itself.
+// It must not call CreateCorralAt/CreateVirtualCorralAt itself: those read/mutate
+// App::corrals (and create a new window), which belong to this thread. The click
+// point rides along as (wParam, lParam) so the corral appears where the user asked.
 static const UINT WM_CREATE_CORRAL_AT = WM_APP + 106;
 static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
 
@@ -261,33 +262,28 @@ void App::Initialize()
 
     if (corrals.empty())
     {
-        // First run: create a default catch-all corral at center of screen
-        CorralWindowConfig defaultConfig;
-        defaultConfig.Left = GetSystemMetrics(SM_CXSCREEN) / 2 - 150;
-        defaultConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
-        defaultConfig.Width = 300;
-        defaultConfig.Height = 200;
+        // First run: a default catch-all corral in the centre of the primary
+        // monitor's work area (work area, not screen: it must clear the taskbar).
+        RECT work;
+        if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0))
+        {
+            work.left = 0;
+            work.top = 0;
+            work.right = GetSystemMetrics(SM_CXSCREEN);
+            work.bottom = GetSystemMetrics(SM_CYSCREEN);
+        }
+        POINT centerPt = {(work.left + work.right) / 2, (work.top + work.bottom) / 2};
 
-        CorralTabConfig tab;
-        tab.Title = CorralWindow::WideToUtf8(Tr(Str::Name_Desktop));
+        CorralWindowConfig defaultConfig = MakeDefaultCorralConfig();
+        CorralTabConfig tab = MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_Desktop)));
         tab.IsCatchAll = true; // First corral is catch-all
-        tab.ColorHex = config.DefaultColorHex;
-        tab.HeaderFontName = config.DefaultHeaderFontName;
-        tab.HeaderFontSize = config.DefaultHeaderFontSize;
-        tab.HeaderFontColor = config.DefaultHeaderFontColor;
-        tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
         defaultConfig.Tabs.push_back(tab);
 
-        // Apply default appearance settings (same as CreateCorral)
-        defaultConfig.TitleBarHeight = config.DefaultTitleBarHeight;
-        defaultConfig.HeaderOpacity = config.DefaultHeaderOpacity;
-        defaultConfig.BorderOpacity = config.DefaultBorderOpacity;
-        defaultConfig.IconOpacity = config.DefaultIconOpacity;
-        defaultConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
-        defaultConfig.IconTintColor = config.DefaultIconTintColor;
-        defaultConfig.IconTintStrength = config.DefaultIconTintStrength;
-        defaultConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
-        defaultConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
+        SIZE size = DefaultCorralSize(centerPt);
+        defaultConfig.Left = (double)(centerPt.x - size.cx / 2);
+        defaultConfig.Top = (double)(centerPt.y - size.cy / 2);
+        defaultConfig.Width = size.cx;
+        defaultConfig.Height = size.cy;
 
         auto corral = std::make_unique<CorralWindow>(defaultConfig);
         corral->Show();
@@ -363,6 +359,8 @@ void App::Shutdown()
     DesktopIcons::SetIconsVisible(true);
 
     // Clean up corrals
+    topCorral = nullptr;
+    hoverExpandedCorral = nullptr;
     corrals.clear();
 
     // Stop mouse hook
@@ -427,11 +425,66 @@ void App::RemoveCorral(CorralWindowConfig *configToRemove)
     {
         if (&(*it)->GetConfig() == configToRemove)
         {
+            ForgetCorral(it->get());
             corrals.erase(it);
             break;
         }
     }
     SaveConfig();
+}
+
+void App::RepinBand(CorralWindow *newTop)
+{
+    if (newTop)
+        topCorral = newTop;
+
+    // Corrals stay collectively below ordinary windows; this only fixes their
+    // order *within* that band. SetWindowPos(HWND_BOTTOM) sinks a window below
+    // everything, so sending them bottom-ward in top-to-bottom order leaves the
+    // first one processed on top.
+    auto sink = [](CorralWindow *c)
+    {
+        if (c && c->GetHWND())
+            SetWindowPos(c->GetHWND(), HWND_BOTTOM, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    };
+
+    if (topCorral)
+        sink(topCorral);
+
+    // The rest newest-first, so a corral created earlier never buries a newer one.
+    for (auto it = corrals.rbegin(); it != corrals.rend(); ++it)
+    {
+        if (it->get() != topCorral)
+            sink(it->get());
+    }
+}
+
+void App::ForgetCorral(CorralWindow *corral)
+{
+    if (topCorral == corral)
+        topCorral = nullptr;
+    if (hoverExpandedCorral == corral)
+        hoverExpandedCorral = nullptr;
+}
+
+bool App::BeginHoverExpand(CorralWindow *corral)
+{
+    if (!corral)
+        return false;
+    // Suppress outright rather than queueing: a sliver of a neighbour peeking
+    // out beside the expanded corral must stay inert. (ForgetCorral clears the
+    // owner when its window goes away, so a stale pointer can't wedge this.)
+    if (hoverExpandedCorral && hoverExpandedCorral != corral)
+        return false;
+    hoverExpandedCorral = corral;
+    return true;
+}
+
+void App::EndHoverExpand(CorralWindow *corral)
+{
+    if (hoverExpandedCorral == corral)
+        hoverExpandedCorral = nullptr;
 }
 
 void App::RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab)
@@ -1213,8 +1266,9 @@ void App::ShowTrayMenu()
         break;
     case 1:
     {
-        POINT centerPt = FindFreeCorralPosition(300, 200);
-        ShowCreationMenu(centerPt);
+        POINT cursorPt;
+        GetCursorPos(&cursorPt);
+        ShowCreationMenu(cursorPt);
         break;
     }
     case 2:
@@ -1225,8 +1279,9 @@ void App::ShowTrayMenu()
         break;
     case 5:
     {
-        POINT centerPt = FindFreeCorralPosition(300, 200);
-        CreateVirtualCorralAt(centerPt);
+        POINT cursorPt;
+        GetCursorPos(&cursorPt);
+        CreateVirtualCorralAt(cursorPt);
         break;
     }
     case 7:
@@ -1243,7 +1298,7 @@ void App::ShowTrayMenu()
 
 void App::ShowCreationMenu(POINT pt)
 {
-    CreateCorral(pt);
+    CreateCorralAt(pt);
 }
 
 void App::ShowAbout()
@@ -1272,35 +1327,19 @@ void App::StartUpdateCheck(bool userInitiated)
     UpdateChecker::StartAsyncCheck(messageWindow, WM_UPDATE_CHECK_DONE, userInitiated);
 }
 
-void App::CreateCorral(POINT pt)
+void App::CreateCorralAt(POINT desiredCenter, HWND exclude)
 {
-    CorralWindowConfig newConfig;
+    CorralWindowConfig newConfig = MakeDefaultCorralConfig();
+    newConfig.Tabs.push_back(MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_NewCorral))));
 
-    // Create at fixed default size centered on point
-    newConfig.Left = (double)pt.x - 150;
-    newConfig.Top = (double)pt.y - 100;
-    newConfig.Width = 300;
-    newConfig.Height = 200;
+    SIZE size = DefaultCorralSize(desiredCenter);
+    POINT topLeft = {desiredCenter.x - size.cx / 2, desiredCenter.y - size.cy / 2};
+    POINT center = FindNearestFreeCorralPosition(topLeft, size.cx, size.cy, exclude);
 
-    CorralTabConfig tab;
-    tab.Title = CorralWindow::WideToUtf8(Tr(Str::Name_NewCorral));
-    tab.ColorHex = config.DefaultColorHex; // Use saved default appearance
-    tab.HeaderFontName = config.DefaultHeaderFontName;
-    tab.HeaderFontSize = config.DefaultHeaderFontSize;
-    tab.HeaderFontColor = config.DefaultHeaderFontColor;
-    tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
-    newConfig.Tabs.push_back(tab);
-
-    // Apply default appearance settings
-    newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
-    newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
-    newConfig.BorderOpacity = config.DefaultBorderOpacity;
-    newConfig.IconOpacity = config.DefaultIconOpacity;
-    newConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
-    newConfig.IconTintColor = config.DefaultIconTintColor;
-    newConfig.IconTintStrength = config.DefaultIconTintStrength;
-    newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
-    newConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
+    newConfig.Left = (double)(center.x - size.cx / 2);
+    newConfig.Top = (double)(center.y - size.cy / 2);
+    newConfig.Width = size.cx;
+    newConfig.Height = size.cy;
 
     auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
@@ -1308,60 +1347,74 @@ void App::CreateCorral(POINT pt)
     SaveConfig();
 }
 
-void App::CreateCorralAt(POINT pt)
+UINT App::DpiForPoint(POINT pt)
 {
-    CreateCorral(pt);
+    // GetDpiForMonitor lives in Shcore.dll (Win8.1+); bound lazily so no extra
+    // import library is needed and pre-8.1 simply falls back to 96.
+    typedef HRESULT(WINAPI * PFN_GetDpiForMonitor)(HMONITOR, int, UINT *, UINT *);
+    static PFN_GetDpiForMonitor pfn = []() -> PFN_GetDpiForMonitor
+    {
+        HMODULE h = LoadLibraryW(L"Shcore.dll");
+        return h ? (PFN_GetDpiForMonitor)GetProcAddress(h, "GetDpiForMonitor") : nullptr;
+    }();
+
+    if (pfn)
+    {
+        HMONITOR hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        UINT dpiX = 0, dpiY = 0;
+        if (hMon && SUCCEEDED(pfn(hMon, 0 /*MDT_EFFECTIVE_DPI*/, &dpiX, &dpiY)) && dpiX)
+            return dpiX;
+    }
+    return 96;
 }
 
-POINT App::FindFreeCorralPosition(int width, int height)
+SIZE App::DefaultCorralSize(POINT nearPt)
 {
-    // Work area of the primary monitor (excludes the taskbar)
-    RECT work;
-    if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0))
+    // 300x200 at 96 DPI. Everything drawn inside the corral scales with the
+    // monitor DPI, so the frame has to as well or it comes out undersized.
+    const UINT dpi = DpiForPoint(nearPt);
+    SIZE s = {MulDiv(300, (int)dpi, 96), MulDiv(200, (int)dpi, 96)};
+
+    // Never seed a corral larger than a third of the work area it lands on.
+    MONITORINFO mi = {sizeof(mi)};
+    HMONITOR hMon = MonitorFromPoint(nearPt, MONITOR_DEFAULTTONEAREST);
+    if (hMon && GetMonitorInfoW(hMon, &mi))
     {
-        work.left = 0;
-        work.top = 0;
-        work.right = GetSystemMetrics(SM_CXSCREEN);
-        work.bottom = GetSystemMetrics(SM_CYSCREEN);
+        LONG maxW = (mi.rcWork.right - mi.rcWork.left) / 3;
+        LONG maxH = (mi.rcWork.bottom - mi.rcWork.top) / 3;
+        if (maxW > 0 && s.cx > maxW)
+            s.cx = maxW;
+        if (maxH > 0 && s.cy > maxH)
+            s.cy = maxH;
     }
+    return s;
+}
 
-    const int margin = 16; // gap from screen edges and between corrals
+CorralWindowConfig App::MakeDefaultCorralConfig() const
+{
+    CorralWindowConfig c;
+    c.TitleBarHeight = config.DefaultTitleBarHeight;
+    c.HeaderOpacity = config.DefaultHeaderOpacity;
+    c.BorderOpacity = config.DefaultBorderOpacity;
+    c.IconOpacity = config.DefaultIconOpacity;
+    c.IconLabelOpacity = config.DefaultIconLabelOpacity;
+    c.IconTintColor = config.DefaultIconTintColor;
+    c.IconTintStrength = config.DefaultIconTintStrength;
+    c.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
+    c.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
+    return c;
+}
 
-    // Existing corral rects in screen coordinates
-    std::vector<RECT> existing;
-    for (const auto &corral : corrals)
-    {
-        RECT r;
-        if (corral && GetWindowRect(corral->GetHWND(), &r))
-            existing.push_back(r);
-    }
-
-    // Tile from the top-right corner: columns right-to-left, rows top-to-bottom
-    for (int left = work.right - margin - width; left >= work.left + margin; left -= (width + margin))
-    {
-        for (int top = work.top + margin; top + height <= work.bottom - margin; top += (height + margin))
-        {
-            RECT candidate = {left, top, left + width, top + height};
-            bool overlaps = false;
-            for (const auto &r : existing)
-            {
-                RECT tmp;
-                if (IntersectRect(&tmp, &candidate, &r))
-                {
-                    overlaps = true;
-                    break;
-                }
-            }
-            if (!overlaps)
-                return {left + width / 2, top + height / 2};
-        }
-    }
-
-    // No free tile available — cascade from the top-right corner
-    int offset = (int)corrals.size() * 30;
-    int left = work.right - margin - width - offset;
-    int top = work.top + margin + offset;
-    return {left + width / 2, top + height / 2};
+CorralTabConfig App::MakeDefaultTabConfig(const std::string &title) const
+{
+    CorralTabConfig t;
+    t.Title = title;
+    t.ColorHex = config.DefaultColorHex;
+    t.HeaderFontName = config.DefaultHeaderFontName;
+    t.HeaderFontSize = config.DefaultHeaderFontSize;
+    t.HeaderFontColor = config.DefaultHeaderFontColor;
+    t.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
+    return t;
 }
 
 POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height, HWND exclude)
@@ -1383,6 +1436,8 @@ POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int he
 
     // Existing corral rects (current size, so rolled-up/expanded state is honoured),
     // excluding the source window so a detached tab may sit right beside it.
+    // Desktop icons are deliberately not avoided: PushDesktopIconsFromCorrals
+    // already moves them out from under a corral.
     std::vector<RECT> existing;
     for (const auto &corral : corrals)
     {
@@ -1393,56 +1448,16 @@ POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int he
             existing.push_back(r);
     }
 
-    auto fits = [&](int left, int top) -> bool
-    {
-        if (left < work.left || top < work.top ||
-            left + width > work.right || top + height > work.bottom)
-            return false;
-        RECT cand = {left, top, left + width, top + height};
-        for (const auto &r : existing)
-        {
-            RECT tmp;
-            if (IntersectRect(&tmp, &cand, &r))
-                return false;
-        }
-        return true;
-    };
+    // Past roughly one corral-diagonal of displacement, landing where the user
+    // asked (overlapping) beats teleporting across the monitor.
+    const int maxShift = width + height;
 
-    // Clamp the desired position into the work area first.
-    int dl = std::max((int)work.left, std::min((int)desiredTopLeft.x, (int)work.right - width));
-    int dt = std::max((int)work.top, std::min((int)desiredTopLeft.y, (int)work.bottom - height));
-    if (fits(dl, dt))
-        return {dl + width / 2, dt + height / 2};
-
-    // Scan the work area on a coarse grid and pick the free spot closest to the
-    // clamped desired position (nearest by squared distance of the top-left).
-    const int step = 16;
-    long long bestDist = -1;
-    int bestL = dl, bestT = dt;
-    for (int top = (int)work.top; top + height <= (int)work.bottom; top += step)
-    {
-        for (int left = (int)work.left; left + width <= (int)work.right; left += step)
-        {
-            if (!fits(left, top))
-                continue;
-            long long dx = left - dl;
-            long long dy = top - dt;
-            long long dist = dx * dx + dy * dy;
-            if (bestDist < 0 || dist < bestDist)
-            {
-                bestDist = dist;
-                bestL = left;
-                bestT = top;
-            }
-        }
-    }
-
-    // bestL/bestT is either the nearest free spot or the clamped desired
-    // position (when the work area is fully occupied).
-    return {bestL + width / 2, bestT + height / 2};
+    POINT topLeft = LayoutMath::FindNearestFreeTopLeft(desiredTopLeft, width, height,
+                                                       work, existing, maxShift);
+    return {topLeft.x + width / 2, topLeft.y + height / 2};
 }
 
-void App::CreateVirtualCorralAt(POINT pt)
+void App::CreateVirtualCorralAt(POINT desiredCenter)
 {
     // Show folder browser dialog
     IFileDialog *pfd = nullptr;
@@ -1525,34 +1540,21 @@ void App::CreateVirtualCorralAt(POINT pt)
     WideCharToMultiByte(CP_UTF8, 0, folderName.c_str(), (int)folderName.size(), &utf8Name[0], size, nullptr, nullptr);
 
     // Create config
-    CorralWindowConfig newConfig;
-    newConfig.Left = (double)pt.x - 150;
-    newConfig.Top = (double)pt.y - 100;
-    newConfig.Width = 300;
-    newConfig.Height = 200;
+    CorralWindowConfig newConfig = MakeDefaultCorralConfig();
 
-    CorralTabConfig tab;
-    tab.Title = utf8Name;
-    tab.ColorHex = config.DefaultColorHex;
+    CorralTabConfig tab = MakeDefaultTabConfig(utf8Name);
     tab.IsVirtual = true;
     tab.VirtualFolderPath = utf8Path;
     tab.IsCatchAll = false; // Virtual corrals cannot be catch-all
-    tab.HeaderFontName = config.DefaultHeaderFontName;
-    tab.HeaderFontSize = config.DefaultHeaderFontSize;
-    tab.HeaderFontColor = config.DefaultHeaderFontColor;
-    tab.HeaderFontOpacity = config.DefaultHeaderFontOpacity;
     newConfig.Tabs.push_back(tab);
 
-    // Apply default appearance settings
-    newConfig.TitleBarHeight = config.DefaultTitleBarHeight;
-    newConfig.HeaderOpacity = config.DefaultHeaderOpacity;
-    newConfig.BorderOpacity = config.DefaultBorderOpacity;
-    newConfig.IconOpacity = config.DefaultIconOpacity;
-    newConfig.IconLabelOpacity = config.DefaultIconLabelOpacity;
-    newConfig.IconTintColor = config.DefaultIconTintColor;
-    newConfig.IconTintStrength = config.DefaultIconTintStrength;
-    newConfig.IconSpacingXPercent = config.DefaultIconSpacingXPercent;
-    newConfig.IconSpacingYPercent = config.DefaultIconSpacingYPercent;
+    SIZE corralSize = DefaultCorralSize(desiredCenter);
+    POINT topLeft = {desiredCenter.x - corralSize.cx / 2, desiredCenter.y - corralSize.cy / 2};
+    POINT center = FindNearestFreeCorralPosition(topLeft, corralSize.cx, corralSize.cy);
+    newConfig.Left = (double)(center.x - corralSize.cx / 2);
+    newConfig.Top = (double)(center.y - corralSize.cy / 2);
+    newConfig.Width = corralSize.cx;
+    newConfig.Height = corralSize.cy;
 
     auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
@@ -1703,22 +1705,18 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     // "New DexCorral" / "New Virtual DexCorral" picked from Explorer's own desktop
     // context menu — posted from DexCorralShellExt::InvokeCommand, which runs on
-    // Explorer's UI thread (see WM_CREATE_CORRAL_AT comment above). No payload: the
-    // position is computed here, on the thread that owns `corrals`.
-    if (uMsg == WM_CREATE_CORRAL_AT)
+    // Explorer's UI thread (see WM_CREATE_CORRAL_AT comment above). The payload is
+    // the invocation point in screen coordinates; the placement search runs here,
+    // on the thread that owns `corrals`.
+    if (uMsg == WM_CREATE_CORRAL_AT || uMsg == WM_CREATE_VIRTUAL_CORRAL_AT)
     {
         if (app)
         {
-            app->CreateCorralAt(app->FindFreeCorralPosition(300, 200));
-        }
-        return 0;
-    }
-
-    if (uMsg == WM_CREATE_VIRTUAL_CORRAL_AT)
-    {
-        if (app)
-        {
-            app->CreateVirtualCorralAt(app->FindFreeCorralPosition(300, 200));
+            POINT pt = {(int)(LONG)wParam, (int)(LONG)lParam};
+            if (uMsg == WM_CREATE_CORRAL_AT)
+                app->CreateCorralAt(pt);
+            else
+                app->CreateVirtualCorralAt(pt);
         }
         return 0;
     }
@@ -1732,13 +1730,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         // for the duration of a corral interaction, and reshuffling the z-order under
         // an in-flight drag buys nothing. The drag's own paths re-pin when it ends.
         if (!GetCapture())
-        {
-            for (auto &corral : app->corrals)
-            {
-                if (corral)
-                    corral->SendToBottom();
-            }
-        }
+            app->RepinBand();
         return 0;
     }
 

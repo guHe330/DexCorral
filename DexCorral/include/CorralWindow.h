@@ -128,8 +128,13 @@ public:
     /// Hides the corral window
     void Hide();
 
-    /// Sends corral to bottom z-order (behind all other windows)
-    void SendToBottom();
+    /**
+     * Re-pins the corral band below all ordinary windows, with this corral on
+     * top of its peers. Call after anything that may have raised the corral
+     * (SetFocus, SetForegroundWindow, Show) — the corral the user just touched
+     * must not end up beneath a sibling.
+     */
+    void PinToBandTop();
 
     /// Loads files/folders from the active tab into the icon grid
     void LoadFiles();
@@ -512,6 +517,10 @@ private:
     static const int ANIMATION_DURATION = 300; // ms
     static const UINT_PTR ANIMATION_TIMER_ID = 1;
     static const UINT_PTR HOVER_CHECK_TIMER_ID = 2;
+    // Dwell before a rolled-up corral hover-expands, so brushing past an exposed
+    // sliver of one on the way to another doesn't open it.
+    static const UINT_PTR HOVER_DWELL_TIMER_ID = 9;
+    static const int HOVER_DWELL_DELAY = 300; // ms
     bool mouseInsideWindow = false; // Track mouse presence
 
     // Opacity/tint hover animation state
