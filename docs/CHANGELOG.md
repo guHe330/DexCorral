@@ -20,6 +20,7 @@ Implementation detail belongs in the commit history.
 - Contributing guide gains a "Testing is a contribution" section naming the untested territory: multiple monitors, mixed DPI, unusual display hardware, and large desktops.
 
 ### Changed
+- All four ways of creating a Corral now place it the same way: the desktop right-click uses the point you clicked (it used to ignore it and tile from the top-right), a Corral's own menu and the tray now avoid overlapping existing Corrals. Placement seeks the nearest free spot, capped so a crowded desktop puts the Corral where you asked rather than across the monitor. Desktop icons are deliberately not avoided — they are pushed out from under a Corral as before.
 - Every opacity slider now sits together in the Appearance dialog's **Opacity** section, each one directly under what it affects.
 - DexCorral now requires Windows 11 (build 22000 or newer). Windows 10 is end of life and there is no machine to test it on, so the installer and `--register` refuse to run below that build. `--register --force` overrides the check, unsupported and untested.
 - Downloads are named after their version (`Portable_DexCorral_<version>.zip`), so packages from different releases stay distinguishable once downloaded.
@@ -28,6 +29,9 @@ Implementation detail belongs in the commit history.
 - Documentation trimmed: the README is a short overview that points at the manual instead of repeating it, and changelog entries are now brief user-facing lines rather than symbol-level detail.
 
 ### Fixed
+- New Corrals no longer appear behind the ones already on the desktop, and the Corral you interact with is raised above its neighbours instead of being sunk below them. Corrals still sit below ordinary windows as a group; they now have a sensible order *within* that group, so a click on an overlapped Corral acts on the one you clicked.
+- New Corrals are DPI-scaled. The default 300x200 was raw pixels while everything drawn inside scaled with the monitor, so a new Corral came out undersized on high-DPI displays.
+- Hover-expanding a rolled-up Corral now waits for a short dwell, and only one Corral may be hover-expanded at a time. An exposed sliver of a neighbouring Corral no longer opens itself while you travel to another.
 - Upgrading no longer fails with "cannot replace `DexCorralHook.dll`". The installer used to restart Explorer *before* copying the new files, so a fresh Explorer could load the old extension again and lock the file mid-copy. It now moves the old DLL aside first (Windows allows renaming a file that is still loaded), copies onto the freed name, and restarts Explorer afterwards. The moved-aside copy is deleted in the same pass, once Explorer has restarted and released it; anything still held falls back to deletion at the next reboot.
 - Resizing a corral no longer stalls part-way. A corral sits behind everything else, and Windows stops sending a background window mouse messages the moment the pointer leaves it — so any drag that outran the frame, or that snapped an edge out from under the pointer, silently froze. Resizing, moving and details-column dragging now follow the pointer wherever it goes.
 - Diagonal resizing works. The corner grab zones were a 6×6 pixel target, smaller than the grip drawn in the bottom-right corner; the bottom corners now match the grip and the top corners are twice as wide.

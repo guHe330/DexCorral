@@ -20,6 +20,7 @@
  */
 
 #include "LayoutMath.h"
+#include <algorithm>
 
 namespace LayoutMath
 {
@@ -160,6 +161,66 @@ namespace LayoutMath
             spacingX = iconSize + minLabelX;
         if (spacingY < iconSize + minLabelY)
             spacingY = iconSize + minLabelY;
+    }
+
+    POINT FindNearestFreeTopLeft(POINT desiredTopLeft, int width, int height,
+                                 const RECT &work, const std::vector<RECT> &occupied,
+                                 int maxShift)
+    {
+        auto fits = [&](int left, int top) -> bool
+        {
+            if (left < work.left || top < work.top ||
+                left + width > work.right || top + height > work.bottom)
+                return false;
+            RECT cand = {left, top, left + width, top + height};
+            for (const auto &r : occupied)
+            {
+                RECT tmp;
+                if (IntersectRect(&tmp, &cand, &r))
+                    return false;
+            }
+            return true;
+        };
+
+        // Clamp the desired position into the work area first. If the rect is
+        // larger than the work area, min/max would invert — pin to the top-left.
+        int dl = (std::max)((int)work.left, (std::min)((int)desiredTopLeft.x, (int)work.right - width));
+        int dt = (std::max)((int)work.top, (std::min)((int)desiredTopLeft.y, (int)work.bottom - height));
+        if (work.right - work.left < width)
+            dl = work.left;
+        if (work.bottom - work.top < height)
+            dt = work.top;
+        if (fits(dl, dt))
+            return {dl, dt};
+
+        // Scan on a coarse grid, nearest by squared distance of the top-left.
+        const int step = 16;
+        long long bestDist = -1;
+        int bestL = dl, bestT = dt;
+        for (int top = (int)work.top; top + height <= (int)work.bottom; top += step)
+        {
+            for (int left = (int)work.left; left + width <= (int)work.right; left += step)
+            {
+                if (!fits(left, top))
+                    continue;
+                long long dx = left - dl;
+                long long dy = top - dt;
+                long long dist = dx * dx + dy * dy;
+                if (bestDist < 0 || dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestL = left;
+                    bestT = top;
+                }
+            }
+        }
+
+        if (bestDist < 0)
+            return {dl, dt}; // work area fully occupied
+        if (maxShift > 0 && bestDist > (long long)maxShift * maxShift)
+            return {dl, dt}; // nearest free spot is too far to be helpful
+
+        return {bestL, bestT};
     }
 
 } // namespace LayoutMath
