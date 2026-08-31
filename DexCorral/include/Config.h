@@ -95,6 +95,7 @@ struct CorralWindowConfig
     double Height = 200;
     bool IsRolledUp = false;
     bool ExcludeFromQuickHide = false; // Corral stays visible during quick-hide (double-click desktop)
+    bool IsLocked = false;             // Blocks mouse move/resize; system repositioning still applies
     std::vector<CorralTabConfig> Tabs;
     int ActiveTabIndex = 0;
 
@@ -113,7 +114,7 @@ struct CorralWindowConfig
     int IconSpacingXPercent = 100;         // Horizontal icon spacing (50-200%)
     int IconSpacingYPercent = 100;         // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, IsLocked, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig

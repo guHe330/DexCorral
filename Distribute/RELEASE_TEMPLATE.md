@@ -39,6 +39,7 @@
 
 ### What's New
 
+- A Corral can be locked in place: right-click it and choose **Lock Position**. It can no longer be moved or resized with the mouse, and a small padlock in the title bar shows why. Tabs still switch, double-click still rolls it up, and it still finds its saved place on each monitor. Worth doing for the Corral that sits where you drop files — an accidental drag also pushes the desktop icons under it out of the way, and that cannot be undone
 - Upgrading over an existing install is reliable. The occasional "cannot replace DexCorralHook.dll" failure is gone: the installer now moves the old extension aside before copying and restarts Explorer afterwards, instead of racing a freshly started Explorer for the file
 - DexCorral speaks German. The installer asks for your language and the whole interface follows it; portable users can set `"Language": "de"` in `%APPDATA%\DexCorral\config.json`
 - The Corral header (title bar and tabs) now has its own opacity slider in the Appearance dialog, separate from the background. Fade a Corral into your wallpaper and the header fades with it, instead of staying solid on top of an invisible Corral

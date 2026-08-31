@@ -209,6 +209,10 @@ void CorralWindow::ShowContextMenu(int x, int y)
     // Quick-hide exclusion (corral stays visible when double-clicking the desktop)
     UINT quickHideFlags = MF_STRING | (config.ExcludeFromQuickHide ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(menu, quickHideFlags, 9, Tr(Str::Menu_ExcludeFromQuickHide));
+
+    // Lock Position (blocks mouse move/resize; roll-up and system repositioning still work)
+    UINT lockFlags = MF_STRING | (config.IsLocked ? MF_CHECKED : MF_UNCHECKED);
+    AppendMenuW(menu, lockFlags, 16, Tr(Str::Menu_LockPosition));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 6, Tr(Str::Menu_CreateNewCorral));
     AppendMenuW(menu, MF_STRING, 8, Tr(Str::Menu_NewVirtualCorral));
@@ -402,6 +406,15 @@ void CorralWindow::ShowContextMenu(int x, int y)
                 }
             }
         }
+        break;
+    case 16:
+        // Lock Position
+        config.IsLocked = !config.IsLocked;
+        if (App::GetInstance())
+        {
+            App::GetInstance()->SaveConfig();
+        }
+        UpdateLayeredContent(); // Show/hide the lock glyph
         break;
     case 15:
     {
