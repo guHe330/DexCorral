@@ -60,6 +60,7 @@ add_library(DexCorralHook SHARED
     src/CorralWindowInput.cpp
     src/CorralWindowDialogs.cpp
     src/CorralWindowCommands.cpp
+    src/CorralWindowKeyboard.cpp
     src/Config.cpp
     src/MouseHook.cpp
     src/TrayIcon.cpp

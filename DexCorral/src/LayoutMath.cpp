@@ -24,6 +24,63 @@
 namespace LayoutMath
 {
 
+    int FindNeighbor(const std::vector<IconCell> &cells, int current, NavDirection dir)
+    {
+        if (current < 0 || current >= (int)cells.size())
+            return -1;
+
+        const RECT &cur = cells[current].rect;
+        int curX = (cur.left + cur.right) / 2;
+        int curY = (cur.top + cur.bottom) / 2;
+
+        int best = -1;
+        long long bestPerp = 0, bestGap = 0;
+
+        for (int i = 0; i < (int)cells.size(); i++)
+        {
+            if (i == current)
+                continue;
+            const RECT &r = cells[i].rect;
+            int cx = (r.left + r.right) / 2;
+            int cy = (r.top + r.bottom) / 2;
+
+            long long gap, perp;
+            switch (dir)
+            {
+            case NavDirection::Up:
+                gap = curY - cy;
+                perp = cx - curX;
+                break;
+            case NavDirection::Down:
+                gap = cy - curY;
+                perp = cx - curX;
+                break;
+            case NavDirection::Left:
+                gap = curX - cx;
+                perp = cy - curY;
+                break;
+            default: // Right
+                gap = cx - curX;
+                perp = cy - curY;
+                break;
+            }
+            if (gap <= 0)
+                continue; // Not in the requested direction
+            if (perp < 0)
+                perp = -perp;
+
+            // Perpendicular offset first (stay in the same column/row), then distance.
+            if (best < 0 || perp < bestPerp || (perp == bestPerp && gap < bestGap))
+            {
+                best = i;
+                bestPerp = perp;
+                bestGap = gap;
+            }
+        }
+
+        return best;
+    }
+
     std::vector<IconCell> ComputeGridLayout(
         int iconCount, int clientWidth, int iconAreaTop,
         int iconSize, int iconSpacingX, int iconSpacingY,
