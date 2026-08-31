@@ -186,6 +186,10 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
 
 CorralWindow::~CorralWindow()
 {
+    // Drop any App-side references to this window (band top, hover-expand owner)
+    if (App::GetInstance())
+        App::GetInstance()->ForgetCorral(this);
+
     // Stop folder watcher
     if (folderWatcher)
     {
@@ -314,12 +318,15 @@ std::wstring CorralWindow::GetPublicDesktopPath()
 // Public methods
 // ============================================================================
 
-void CorralWindow::SendToBottom()
+void CorralWindow::PinToBandTop()
 {
-    if (hwnd)
-    {
+    if (!hwnd)
+        return;
+
+    if (App *app = App::GetInstance())
+        app->RepinBand(this);
+    else
         SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    }
 }
 
 void CorralWindow::Show()
@@ -336,7 +343,7 @@ void CorralWindow::Show()
         quickHideAlpha = 255;
 
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-        SendToBottom();
+        PinToBandTop();
 
         if (GetActiveTab().IsVirtual)
         {
@@ -552,24 +559,18 @@ void CorralWindow::DetachTab(int tabIndex)
     scrollPosition = 0;
     LoadFiles();
 
-    // Create new window for the detached tab. Start from a +30 cascade off the
-    // source's top-left, then ask App for the nearest free spot that fits on the
-    // monitor and doesn't overlap any corral — including the source window, so
-    // the detached tab is moved fully clear of the corral it came from rather
-    // than landing on top of (or behind) it. CreateCorral treats pt as the
-    // *center* of the new window; the helper returns a center point, so it can
-    // be passed straight through.
+    // Create new window for the detached tab, seeded at a +30 cascade off the
+    // source's top-left. CreateCorralAt finds the nearest free spot from there;
+    // the source is not excluded, so the detached tab moves fully clear of the
+    // corral it came from rather than landing on top of it.
     RECT rect;
     GetWindowRect(hwnd, &rect);
-    const int kNewWidth = 300;
-    const int kNewHeight = 200;
-    POINT desiredTopLeft = {rect.left + 30, rect.top + 30};
 
     if (App::GetInstance())
     {
-        POINT pt = App::GetInstance()->FindNearestFreeCorralPosition(
-            desiredTopLeft, kNewWidth, kNewHeight, nullptr);
-        App::GetInstance()->CreateCorralAt(pt);
+        SIZE size = App::DefaultCorralSize({rect.left, rect.top});
+        POINT desiredCenter = {rect.left + 30 + size.cx / 2, rect.top + 30 + size.cy / 2};
+        App::GetInstance()->CreateCorralAt(desiredCenter);
 
         // Get the new corral and replace its default tab with our detached tab
         const auto &corrals = App::GetInstance()->GetCorrals();
@@ -934,10 +935,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 TRACKMOUSEEVENT tme = {sizeof(tme), TME_LEAVE, hwnd, 0};
                 TrackMouseEvent(&tme);
 
-                // Check if we should hover-expand
+                // Hover-expand only after a dwell, and only if no other corral
+                // is already expanded (arbitrated by App).
                 if (window->config.IsRolledUp && !window->isHoverExpanded && !window->isAnimating)
                 {
-                    window->StartHoverExpand();
+                    SetTimer(hwnd, HOVER_DWELL_TIMER_ID, HOVER_DWELL_DELAY, nullptr);
                 }
 
                 // Fade icons, header and border to full and remove tint on hover
@@ -1103,6 +1105,20 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->OnHoverCheckTimer();
                 return 0;
             }
+            if (wParam == HOVER_DWELL_TIMER_ID)
+            {
+                KillTimer(hwnd, HOVER_DWELL_TIMER_ID);
+                POINT cur;
+                RECT wr;
+                GetCursorPos(&cur);
+                GetWindowRect(hwnd, &wr);
+                if (window->mouseInsideWindow && PtInRect(&wr, cur) &&
+                    window->config.IsRolledUp && !window->isHoverExpanded && !window->isAnimating)
+                {
+                    window->StartHoverExpand();
+                }
+                return 0;
+            }
             if (wParam == OPACITY_TIMER_ID)
             {
                 window->OnOpacityAnimationTimer();
@@ -1157,6 +1173,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             return 0;
         case WM_MOUSELEAVE:
             window->mouseInsideWindow = false;
+            KillTimer(hwnd, HOVER_DWELL_TIMER_ID);
             // Reset hovered icon
             if (window->hoveredIcon >= 0)
             {
@@ -1215,6 +1232,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         case WM_DESTROY:
             KillTimer(hwnd, ANIMATION_TIMER_ID);
             KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
+            KillTimer(hwnd, HOVER_DWELL_TIMER_ID);
             KillTimer(hwnd, OPACITY_TIMER_ID);
             KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
             window->StopCursorTracking();

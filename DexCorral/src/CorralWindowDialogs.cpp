@@ -241,7 +241,7 @@ void CorralWindow::EndIconRename(bool save)
     // Restore layered window style (was disabled for child edit control to work)
     LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
-    SendToBottom();
+    PinToBandTop();
 
     // Redraw to show the updated label
     UpdateLayeredContent();
@@ -446,7 +446,7 @@ void CorralWindow::ShowRenameDialog()
         hwnd,
         RenameDlgProc,
         (LPARAM)nameBuffer);
-    SendToBottom();
+    PinToBandTop();
 
     if (result == IDOK && wcslen(nameBuffer) > 0)
     {
@@ -1313,7 +1313,7 @@ void CorralWindow::ShowAppearanceDialog()
         hwnd,
         AppearanceDlgProc,
         (LPARAM)&dlgData);
-    SendToBottom();
+    PinToBandTop();
 
     if (result != IDOK)
     {

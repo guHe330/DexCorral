@@ -117,4 +117,21 @@ namespace LayoutMath
     void EnforceSpacingMinimums(int &spacingX, int &spacingY, int iconSize,
                                 int minLabelX, int minLabelY);
 
+    /**
+     * Finds the top-left for a width x height rect as close as possible to
+     * `desiredTopLeft` that fits inside `work` and overlaps none of `occupied`.
+     *
+     * The desired position is clamped into the work area and tried first; if it
+     * is taken, the work area is scanned on a coarse grid for the nearest free
+     * spot. `maxShift` caps how far that spot may sit from the clamped desired
+     * position — beyond it, appearing where the user asked (overlapping) beats
+     * teleporting across the monitor, so the clamped desired position is
+     * returned. A non-positive `maxShift` means no cap.
+     *
+     * Pure arithmetic: the caller resolves the work area and the occupied rects.
+     */
+    POINT FindNearestFreeTopLeft(POINT desiredTopLeft, int width, int height,
+                                 const RECT &work, const std::vector<RECT> &occupied,
+                                 int maxShift);
+
 } // namespace LayoutMath

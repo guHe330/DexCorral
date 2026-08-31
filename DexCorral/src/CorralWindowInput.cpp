@@ -1061,7 +1061,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
             else
                 SelectRangeTo(hit, false);
             SetFocus(hwnd);
-            SendToBottom();
+            PinToBandTop();
             UpdateLayeredContent();
             return;
         }
@@ -1089,8 +1089,8 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         // SetFocus activates the window (and can raise it in the z-order) as a side
         // effect — WM_MOUSEACTIVATE's MA_NOACTIVATE doesn't cover this path since it's
         // not triggered by the click itself. Re-pin immediately, same as the right-click
-        // context menu's SetForegroundWindow/SendToBottom pair.
-        SendToBottom();
+        // context menu's SetForegroundWindow/PinToBandTop pair.
+        PinToBandTop();
         SetCapture(hwnd);
         UpdateLayeredContent(); // Show selection highlight
         return;
@@ -1100,7 +1100,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
     if (y >= GetIconAreaTop() && !config.IsRolledUp)
     {
         SetFocus(hwnd);
-        SendToBottom();
+        PinToBandTop();
         StartRubberBand(x, y);
         UpdateLayeredContent();
         return;
@@ -1460,7 +1460,7 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
         int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                  screenX, screenY, 0, hwnd, nullptr);
         PostMessageW(hwnd, WM_NULL, 0, 0);
-        SendToBottom();
+        PinToBandTop();
 
         if (cmd == (int)removeCmdId)
         {
