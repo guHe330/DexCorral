@@ -102,12 +102,25 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::InvokeCommand(CMINVOKECOMMANDINFO* 
 
     // NOTE: this runs on EXPLORER'S OWN UI thread (Explorer calls IContextMenu::InvokeCommand
     // directly when the user picks a context-menu item) — it is NOT the App's worker thread.
-    // Post to the app instead of calling FindFreeCorralPosition/CreateCorralAt/
-    // CreateVirtualCorralAt here: those read/mutate App::corrals and create a new window,
-    // which must only ever happen on the thread that owns that vector and pumps that
-    // window's messages (see WM_CREATE_CORRAL_AT in App.cpp).
+    // Post to the app instead of calling CreateCorralAt/CreateVirtualCorralAt here: those
+    // read/mutate App::corrals and create a new window, which must only ever happen on the
+    // thread that owns that vector and pumps that window's messages (see WM_CREATE_CORRAL_AT
+    // in App.cpp).
     HWND appWnd = HookBridge::GetAppMessageWindow();
     if (!appWnd) return E_FAIL;
+
+    // Where the user right-clicked, so the corral appears there. Explorer fills
+    // ptInvoke for the desktop background menu; the cursor is the fallback.
+    POINT pt = {0, 0};
+    bool havePt = false;
+    if (pici->cbSize >= sizeof(CMINVOKECOMMANDINFOEX)) {
+        auto* ex = reinterpret_cast<CMINVOKECOMMANDINFOEX*>(pici);
+        if (ex->fMask & CMIC_MASK_PTINVOKE) {
+            pt = ex->ptInvoke;
+            havePt = true;
+        }
+    }
+    if (!havePt) GetCursorPos(&pt);
 
     UINT msg;
     switch (LOWORD(pici->lpVerb)) {
@@ -121,7 +134,7 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::InvokeCommand(CMINVOKECOMMANDINFO* 
         return E_INVALIDARG;
     }
 
-    PostMessage(appWnd, msg, 0, 0);
+    PostMessage(appWnd, msg, (WPARAM)(LONG)pt.x, (LPARAM)(LONG)pt.y);
     return S_OK;
 }
 

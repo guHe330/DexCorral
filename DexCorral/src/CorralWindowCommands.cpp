@@ -234,7 +234,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
     SetForegroundWindow(hwnd);
     int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
     PostMessageW(hwnd, WM_NULL, 0, 0);
-    SendToBottom();
+    PinToBandTop();
 
     DestroyMenu(menu);
 
@@ -261,39 +261,17 @@ void CorralWindow::ShowContextMenu(int x, int y)
     case 6:
         if (App::GetInstance())
         {
-            // Find a good position for the new corral
+            // Seed just right of this corral and let App place it; `hwnd` is
+            // excluded so "right beside the source" stays available.
             RECT currentRect;
             GetWindowRect(hwnd, &currentRect);
 
-            // Get screen dimensions
-            HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            MONITORINFO mi = {sizeof(mi)};
-            GetMonitorInfo(hMon, &mi);
+            const int gap = 20;
+            SIZE size = App::DefaultCorralSize({currentRect.right, currentRect.top});
+            POINT desiredCenter = {currentRect.right + gap + size.cx / 2,
+                                   currentRect.top + size.cy / 2};
 
-            POINT newPos;
-            int corralWidth = 300;
-            int corralHeight = 200;
-            int gap = 20;
-
-            // Try to place to the right of current corral
-            newPos.x = currentRect.right + gap + corralWidth / 2;
-            newPos.y = currentRect.top + corralHeight / 2;
-
-            // If that would go off screen, try below
-            if (newPos.x + corralWidth / 2 > mi.rcWork.right)
-            {
-                newPos.x = currentRect.left + corralWidth / 2;
-                newPos.y = currentRect.bottom + gap + corralHeight / 2;
-            }
-
-            // If that would also go off screen, offset from current
-            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom)
-            {
-                newPos.x = currentRect.left + 50 + corralWidth / 2;
-                newPos.y = currentRect.top + 50 + corralHeight / 2;
-            }
-
-            App::GetInstance()->CreateCorralAt(newPos);
+            App::GetInstance()->CreateCorralAt(desiredCenter, hwnd);
         }
         break;
     case 7:
@@ -322,31 +300,12 @@ void CorralWindow::ShowContextMenu(int x, int y)
             RECT currentRect;
             GetWindowRect(hwnd, &currentRect);
 
-            HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            MONITORINFO mi = {sizeof(mi)};
-            GetMonitorInfo(hMon, &mi);
+            const int gap = 20;
+            SIZE size = App::DefaultCorralSize({currentRect.right, currentRect.top});
+            POINT desiredCenter = {currentRect.right + gap + size.cx / 2,
+                                   currentRect.top + size.cy / 2};
 
-            POINT newPos;
-            int corralWidth = 300;
-            int corralHeight = 200;
-            int gap = 20;
-
-            newPos.x = currentRect.right + gap + corralWidth / 2;
-            newPos.y = currentRect.top + corralHeight / 2;
-
-            if (newPos.x + corralWidth / 2 > mi.rcWork.right)
-            {
-                newPos.x = currentRect.left + corralWidth / 2;
-                newPos.y = currentRect.bottom + gap + corralHeight / 2;
-            }
-
-            if (newPos.y + corralHeight / 2 > mi.rcWork.bottom)
-            {
-                newPos.x = currentRect.left + 50 + corralWidth / 2;
-                newPos.y = currentRect.top + 50 + corralHeight / 2;
-            }
-
-            App::GetInstance()->CreateVirtualCorralAt(newPos);
+            App::GetInstance()->CreateVirtualCorralAt(desiredCenter);
         }
         break;
     case 10:
@@ -498,6 +457,9 @@ void CorralWindow::ToggleRollUp()
     isAnimating = false;
     KillTimer(hwnd, ANIMATION_TIMER_ID);
     KillTimer(hwnd, HOVER_CHECK_TIMER_ID);
+    KillTimer(hwnd, HOVER_DWELL_TIMER_ID);
+    if (App::GetInstance())
+        App::GetInstance()->EndHoverExpand(this);
 
     config.IsRolledUp = !config.IsRolledUp;
 
@@ -601,7 +563,7 @@ void CorralWindow::ChangeFolderPath()
     // Reload icons
     LoadFiles();
 
-    SendToBottom();
+    PinToBandTop();
 
     // Save config
     if (App::GetInstance())
@@ -617,6 +579,11 @@ void CorralWindow::ChangeFolderPath()
 void CorralWindow::StartHoverExpand()
 {
     if (!config.IsRolledUp || isHoverExpanded || isAnimating)
+        return;
+
+    // Only one corral may be hover-expanded at a time — otherwise a sliver of a
+    // neighbour poking out beside this one expands too and the two fight.
+    if (App::GetInstance() && !App::GetInstance()->BeginHoverExpand(this))
         return;
 
     RECT rect;
@@ -656,6 +623,9 @@ void CorralWindow::StartHoverCollapse()
 {
     if (!isHoverExpanded || isAnimating)
         return;
+
+    if (App::GetInstance())
+        App::GetInstance()->EndHoverExpand(this);
 
     RECT rect;
     GetWindowRect(hwnd, &rect);
@@ -860,7 +830,10 @@ void CorralWindow::StartQuickShow()
         // Plain ShowWindow (not Show()) so files are not reloaded on every toggle.
         quickHideAlpha = 0;
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-        SendToBottom();
+        // Re-pin without promoting: quick-show restores every corral at once and
+        // must not decide which of them ends up on top.
+        if (App::GetInstance())
+            App::GetInstance()->RepinBand();
     }
     quickHideStartAlpha = quickHideAlpha;
     quickHideAnimationStartTime = GetTickCount();

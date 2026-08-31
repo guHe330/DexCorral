@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 #include "LayoutMath.h"
+#include <cstdlib>
 
 using namespace LayoutMath;
 
@@ -243,4 +244,75 @@ TEST(FindNeighbor, DetailsView_RowsOnly) {
     // Every row spans the same x range, so there is no horizontal neighbour.
     EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Left),  -1);
     EXPECT_EQ(FindNeighbor(cells, 1, NavDirection::Right), -1);
+}
+
+// ---------------------------------------------------------------------------
+// New-corral placement (FindNearestFreeTopLeft)
+// ---------------------------------------------------------------------------
+
+static const RECT kWork = {0, 0, 1920, 1040}; // 1080p minus a taskbar
+
+TEST(Placement, DesiredSpotFreeIsUsedVerbatim) {
+    auto p = FindNearestFreeTopLeft({500, 400}, 300, 200, kWork, {}, 0);
+    EXPECT_EQ(p.x, 500);
+    EXPECT_EQ(p.y, 400);
+}
+
+TEST(Placement, ClampsIntoWorkArea) {
+    auto p = FindNearestFreeTopLeft({1900, -50}, 300, 200, kWork, {}, 0);
+    EXPECT_EQ(p.x, 1920 - 300);
+    EXPECT_EQ(p.y, 0);
+}
+
+TEST(Placement, RectLargerThanWorkAreaPinsToTopLeft) {
+    auto p = FindNearestFreeTopLeft({500, 400}, 4000, 3000, kWork, {}, 0);
+    EXPECT_EQ(p.x, 0);
+    EXPECT_EQ(p.y, 0);
+}
+
+TEST(Placement, MovesOffAnOccupiedSpot) {
+    std::vector<RECT> occupied = {{450, 350, 750, 550}};
+    auto p = FindNearestFreeTopLeft({500, 400}, 300, 200, kWork, occupied, 0);
+    RECT placed = {p.x, p.y, p.x + 300, p.y + 200};
+    RECT tmp;
+    EXPECT_FALSE(IntersectRect(&tmp, &placed, &occupied[0]));
+}
+
+TEST(Placement, PicksTheNearestFreeSpot) {
+    // One corral squarely on the desired spot: the result should be adjacent,
+    // not across the screen.
+    std::vector<RECT> occupied = {{500, 400, 800, 600}};
+    auto p = FindNearestFreeTopLeft({500, 400}, 300, 200, kWork, occupied, 0);
+    EXPECT_LE(std::abs(p.x - 500) + std::abs(p.y - 400), 320);
+}
+
+TEST(Placement, DistanceCapFallsBackToDesired) {
+    // The only free band is far below; with a tight cap the corral should appear
+    // where it was asked for rather than teleporting across the monitor.
+    std::vector<RECT> occupied = {{0, 0, 1920, 600}};
+    auto p = FindNearestFreeTopLeft({100, 100}, 300, 200, kWork, occupied, 50);
+    EXPECT_EQ(p.x, 100);
+    EXPECT_EQ(p.y, 100);
+}
+
+TEST(Placement, NoCapAllowsTheDistantSpot) {
+    std::vector<RECT> occupied = {{0, 0, 1920, 600}};
+    auto p = FindNearestFreeTopLeft({100, 100}, 300, 200, kWork, occupied, 0);
+    EXPECT_GE(p.y, 600);
+}
+
+TEST(Placement, FullyOccupiedWorkAreaReturnsDesired) {
+    std::vector<RECT> occupied = {{0, 0, 1920, 1040}};
+    auto p = FindNearestFreeTopLeft({640, 480}, 300, 200, kWork, occupied, 0);
+    EXPECT_EQ(p.x, 640);
+    EXPECT_EQ(p.y, 480);
+}
+
+TEST(Placement, ExcludedRectsAreSimplyAbsent) {
+    // The exclude-the-source behaviour is the caller's: passing a shorter list
+    // must let the corral land on the spot that rect covered.
+    std::vector<RECT> occupied = {{500, 400, 800, 600}};
+    auto blocked = FindNearestFreeTopLeft({500, 400}, 300, 200, kWork, occupied, 0);
+    auto free = FindNearestFreeTopLeft({500, 400}, 300, 200, kWork, {}, 0);
+    EXPECT_NE(blocked.x == 500 && blocked.y == 400, free.x == 500 && free.y == 400);
 }
