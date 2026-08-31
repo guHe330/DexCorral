@@ -11,6 +11,8 @@ Implementation detail belongs in the commit history.
 ## [Unreleased]
 
 ### Added
+- Keyboard support in Corrals, matching Explorer: arrow keys move the selection, Home/End jump to the first/last icon, Esc clears it, and type-ahead jumps to a name. Delete, Enter, Alt+Enter and Ctrl+C/X/V run the shell's own verbs, so confirmations, the Recycle Bin and Explorer's undo all apply. F5 reloads, the Menu key opens the context menu, Backspace goes up a folder.
+- Multi-select in Corrals: Ctrl+click, Shift+click, Ctrl+A, Shift+arrows, and a drag-out selection rectangle. Commands act on the whole selection in one shell call, so a multi-file delete is a single undo step.
 - German: the whole interface is available in German. The installer asks which language you want and the app follows that choice; portable users set `"Language": "de"` in `config.json`. Anything a translation misses falls back to English rather than showing blank.
 - Text opacity in the Appearance dialog: **Header label** fades a tab's title, **Icon label** fades the icon captions. Both go all the way to invisible, and both fade back in when you point at the Corral — so text set to 0% is hidden at rest rather than gone for good.
 - GitHub issue forms for bug reports, feature requests, and multi-monitor test reports.

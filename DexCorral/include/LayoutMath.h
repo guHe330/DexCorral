@@ -41,6 +41,27 @@ namespace LayoutMath
         RECT iconRect; ///< Icon image rect within the cell
     };
 
+    /// Direction for keyboard navigation between icon cells.
+    enum class NavDirection
+    {
+        Up,
+        Down,
+        Left,
+        Right
+    };
+
+    /**
+     * Finds the neighbouring cell in a direction, purely geometrically.
+     *
+     * Candidates are the cells whose centre lies strictly in the given direction.
+     * The winner is the one with the smallest offset on the perpendicular axis,
+     * ties broken by the smallest gap along the direction axis. This works for any
+     * column count and for details view (one row per item) without special cases.
+     *
+     * @return Index of the neighbour, or -1 if there is none.
+     */
+    int FindNeighbor(const std::vector<IconCell> &cells, int current, NavDirection dir);
+
     /**
      * Computes grid layout for SmallIcons / MediumIcons / LargeIcons view.
      *

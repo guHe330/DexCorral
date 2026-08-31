@@ -232,7 +232,7 @@ void CorralWindow::ClearIcons()
         }
     }
     icons.clear();
-    selectedIcon = -1;
+    ClearSelection();
 }
 
 void CorralWindow::LoadFileDetails(CorralIcon &icon)
@@ -556,7 +556,7 @@ void CorralWindow::LoadVirtualFolderIcons()
         // Path changed under us: re-point the folder watchers and persist.
         InitializeFolderWatcher();
         scrollPosition = 0;
-        selectedIcon = -1;
+        ClearSelection();
         if (App::GetInstance())
             App::GetInstance()->SaveConfig();
     }
