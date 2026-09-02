@@ -201,6 +201,9 @@ private:
     void ShowTrayMenu();
     void ShowAbout();
 
+    /// Switches the UI language at runtime and persists the choice.
+    void ApplyLanguage(const std::string &langCode);
+
     // Opt-in update check (AppConfig::CheckForUpdates). Spawns an async GitHub
     // Releases query; the result arrives as WM_UPDATE_CHECK_DONE. userInitiated
     // bypasses the 24h throttle and surfaces "up to date" / "couldn't check".

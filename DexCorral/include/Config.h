@@ -145,8 +145,9 @@ struct AppConfig
     bool CheckForUpdates = false;
     long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
 
-    // UI language code ("en", "de"). Empty = use the installer's choice
-    // (HKCU\Software\DexCorral\Language), falling back to English.
+    // UI language code ("en", "de"), set by the tray menu's Language submenu.
+    // Empty = use the installer's choice (HKCU\Software\DexCorral\Language),
+    // falling back to English.
     std::string Language = "";
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language)
