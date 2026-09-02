@@ -1250,6 +1250,21 @@ void App::ShowTrayMenu()
     AppendMenuW(menu, MF_STRING | updateFlags, 7, Tr(Str::Menu_CheckUpdatesAuto));
     AppendMenuW(menu, MF_STRING, 8, Tr(Str::Menu_CheckUpdatesNow));
 
+    // UI language. The portable zip never runs the installer, so without this
+    // its users can only change the language by editing config.json by hand.
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    std::wstring activeLang = CorralWindow::Utf8ToWide(config.Language);
+    if (activeLang.empty())
+        activeLang = GetInstallerLanguage();
+    if (activeLang != L"de")
+        activeLang = L"en";
+    HMENU langMenu = CreatePopupMenu();
+    // Endonyms — identical in every table, so deliberately not translated.
+    AppendMenuW(langMenu, MF_STRING, 10, L"English");
+    AppendMenuW(langMenu, MF_STRING, 11, L"Deutsch");
+    CheckMenuRadioItem(langMenu, 10, 11, activeLang == L"de" ? 11 : 10, MF_BYCOMMAND);
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)langMenu, Tr(Str::Menu_Language));
+
     POINT pt;
     GetCursorPos(&pt);
 
@@ -1293,7 +1308,35 @@ void App::ShowTrayMenu()
     case 8:
         StartUpdateCheck(true);
         break;
+    case 10:
+        ApplyLanguage("en");
+        break;
+    case 11:
+        ApplyLanguage("de");
+        break;
     }
+}
+
+void App::ApplyLanguage(const std::string &langCode)
+{
+    if (config.Language == langCode)
+        return;
+
+    config.Language = langCode;
+    SaveConfig();
+
+    const std::wstring wide = CorralWindow::Utf8ToWide(langCode);
+    SetLanguage(wide);
+    // DexCorral.exe's own dialogs read only the registry key, never config.json.
+    SetInstallerLanguage(wide);
+
+    // Menus and dialogs call Tr() as they are built, so they need no refresh.
+    // The tray tooltip and the corrals' layered surfaces cache their text, so
+    // redraw those (header states, detail-view column headers, size units).
+    if (trayIcon)
+        trayIcon->UpdateTooltip(Tr(Str::Tray_Tooltip));
+    for (auto &corral : corrals)
+        corral->RecalculateLayout();
 }
 
 void App::ShowCreationMenu(POINT pt)

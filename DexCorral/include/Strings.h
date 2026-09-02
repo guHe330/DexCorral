@@ -50,6 +50,7 @@ enum class Str
     Menu_QuickHideEverything,    // "Quick-Hide Everything"
     Menu_CheckUpdatesAuto,       // "Check for Updates Automatically"
     Menu_CheckUpdatesNow,        // "Check for Updates Now"
+    Menu_Language,               // "Language" (submenu)
 
     // Safe-mode notice (App.cpp)
     SafeMode_Title,              // "DexCorral started in safe mode"
@@ -199,3 +200,8 @@ void SetLanguage(const std::wstring &langCode);
 // HKCU\Software\DexCorral\Language (written by the installer). Empty if unset.
 // config.json's "Language" takes precedence over this when non-empty.
 std::wstring GetInstallerLanguage();
+
+// Writes langCode to HKCU\Software\DexCorral\Language. The in-app switcher
+// calls this so DexCorral.exe's own dialogs, which read only that key, follow
+// the language picked in the app.
+void SetInstallerLanguage(const std::wstring &langCode);

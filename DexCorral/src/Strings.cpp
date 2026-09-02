@@ -55,6 +55,7 @@ const wchar_t *const kEnglish[] = {
     /* Menu_QuickHideEverything */ L"Quick-Hide Everything",
     /* Menu_CheckUpdatesAuto */    L"Check for Updates Automatically",
     /* Menu_CheckUpdatesNow */     L"Check for Updates Now",
+    /* Menu_Language */            L"Language",
 
     // Safe-mode notice
     /* SafeMode_Title */           L"DexCorral started in safe mode",
@@ -230,6 +231,7 @@ const wchar_t *const kGerman[] = {
     /* Menu_QuickHideEverything */ L"Alles schnell ausblenden",
     /* Menu_CheckUpdatesAuto */    L"Automatisch nach Updates suchen",
     /* Menu_CheckUpdatesNow */     L"Jetzt nach Updates suchen",
+    /* Menu_Language */            L"Sprache",
 
     // Safe-mode notice
     /* SafeMode_Title */           L"DexCorral im abgesicherten Modus gestartet",
@@ -416,6 +418,17 @@ std::wstring GetInstallerLanguage()
                      RRF_RT_REG_SZ, nullptr, buf, &size) == ERROR_SUCCESS)
         return buf;
     return L"";
+}
+
+void SetInstallerLanguage(const std::wstring &langCode)
+{
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\DexCorral", 0, nullptr,
+                        0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS)
+        return; // best effort: the app itself uses config.json, not this key
+    RegSetValueExW(key, L"Language", 0, REG_SZ, (const BYTE *)langCode.c_str(),
+                   (DWORD)((langCode.size() + 1) * sizeof(wchar_t)));
+    RegCloseKey(key);
 }
 
 std::wstring TrFmt(Str id, const std::wstring &arg0)
