@@ -8,7 +8,7 @@ Entries describe what changed from a user's point of view, and why when that is 
 
 ## [Unreleased]
 
-## [1.0.26] - 2026-09-02
+## [1.0.27] - 2026-09-02
 
 ### Security
 - Releases now publish a SHA-256 for the installer and the portable zip, and both artifacts carry a GitHub build provenance attestation tying them to the workflow run and commit that built them. The binaries are still unsigned, so SmartScreen still warns and reports an unknown publisher; this at least makes a download checkable instead of something you have to take on trust. Verify with `Get-FileHash`, or with `gh attestation verify <file> --repo guHe330/DexCorral`.

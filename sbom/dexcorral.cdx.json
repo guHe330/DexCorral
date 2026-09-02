@@ -12,7 +12,7 @@
       "type": "application",
       "bom-ref": "pkg:github/guHe330/DexCorral",
       "name": "DexCorral",
-      "version": "1.0.26",
+      "version": "1.0.27",
       "description": "Windows desktop icon organiser. Ships DexCorral.exe and DexCorralHook.dll.",
       "licenses": [
         {
@@ -21,7 +21,7 @@
           }
         }
       ],
-      "purl": "pkg:github/guHe330/DexCorral@v1.0.26"
+      "purl": "pkg:github/guHe330/DexCorral@v1.0.27"
     },
     "properties": [
       {
