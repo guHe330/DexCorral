@@ -52,6 +52,7 @@
 !docs/CHANGELOG.md
 !docs/USER_MANUAL.md
 !docs/BUILD_GUIDE.md
+!SECURITY.md
 
 # Build directories
 build/
