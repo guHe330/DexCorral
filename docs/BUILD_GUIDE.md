@@ -8,7 +8,7 @@ How to build DexCorral from source.
 - CMake 3.15 or later (included with Visual Studio, or install separately)
 - Windows 11 SDK (included with the workload above)
 - Internet access on first build (CMake fetches Google Test automatically)
-- Optional: [Inno Setup 6](https://jrsoftware.org/isdl.php) — if installed, the build script also produces the installer
+- Optional: [Inno Setup 6](https://jrsoftware.org/isdl.php): if installed, the build script also produces the installer
 
 ## Verify your environment
 
@@ -27,7 +27,7 @@ The script:
 1. Kills any running DexCorral process (unlocks the exe for relinking).
 2. Restarts Explorer if `DexCorralHook.dll` is locked by the shell.
 3. Configures and builds with CMake + Ninja (falls back to NMake if Ninja is absent).
-4. Runs the unit tests — if any test fails, the build stops and the zip/installer steps are skipped.
+4. Runs the unit tests. If any test fails, the build stops and the zip/installer steps are skipped.
 5. Packages `DexCorral_<version>.zip` from the two output binaries (older version-named zips are removed first).
 6. Builds the Inno Setup installer if ISCC is available (output: `installer/innosetup/output/DexCorral_<version>_Setup.exe`).
 
@@ -45,7 +45,7 @@ Output goes to `DexCorral/build/`.
 # Full clean rebuild
 powershell -File build.ps1 -Clean
 
-# Quick iteration — skip tests
+# Quick iteration: skip tests
 powershell -File build.ps1 -SkipTests
 
 # Debug build
@@ -67,7 +67,7 @@ Win32-dependent behaviour (Explorer hook, drag-drop, DPI scaling, multi-monitor,
 
 | File | Description |
 |------|-------------|
-| `build/DexCorralHook.dll` | Monolith shell extension — all app logic + Explorer hook. |
+| `build/DexCorralHook.dll` | Monolith shell extension: all app logic + Explorer hook. |
 | `build/DexCorral.exe` | Registration tool (run once as admin to install the shell extension). |
 | `build/DexCorralTests.exe` | Unit test runner. |
 | `build/DexCorral_<version>.zip` | Release archive containing the two distributable binaries, named after the version in `Version.h`. |
@@ -82,7 +82,7 @@ From `DexCorral/build/`, as Administrator:
 .\DexCorral.exe --register --force   # register on an unsupported Windows version (Windows 11 is required otherwise)
 ```
 
-After the first registration, rebuilding the DLL only requires Explorer to reload it — the build script handles unlocking automatically. To remove the registration: `DexCorral.exe --unregister`.
+After the first registration, rebuilding the DLL only requires Explorer to reload it; the build script handles unlocking automatically. To remove the registration: `DexCorral.exe --unregister`.
 
 ## Unlock the DLL manually
 

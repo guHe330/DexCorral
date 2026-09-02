@@ -1,10 +1,8 @@
 # Changelog
 
-All notable changes to DexCorral will be documented in this file.
-Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+All notable changes to DexCorral will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-Entries describe what changed from a user's point of view, and why when that is not obvious.
-Implementation detail belongs in the commit history.
+Entries describe what changed from a user's point of view, and why when that is not obvious. Implementation detail belongs in the commit history.
 
 ---
 
@@ -13,8 +11,8 @@ Implementation detail belongs in the commit history.
 ## [1.0.25] - 2026-09-02
 
 ### Added
-- **Language** submenu in the tray menu switches the interface language while the app is running — no restart, no editing `config.json`. It overrides the installer's choice, and for the portable package it is the only way to change the language, since nothing writes one at install time. The choice also applies to `DexCorral.exe`'s own registration dialogs. Names already given to Corrals and tabs keep their wording, being your text rather than the app's.
-- The User Manual now documents everything DexCorral writes outside its own folder — every registry key, why it exists, and whether the uninstaller removes it. The uninstall notes and the portable package's readme point at it, and the portable instructions now cover the registry rather than stopping at "delete the folder".
+- **Language** submenu in the tray menu switches the interface language while the app is running, with no restart, no editing `config.json`. It overrides the installer's choice, and for the portable package it is the only way to change the language, since nothing writes one at install time. The choice also applies to `DexCorral.exe`'s own registration dialogs. Names already given to Corrals and tabs keep their wording, being your text rather than the app's.
+- The User Manual now documents everything DexCorral writes outside its own folder: every registry key, why it exists, and whether the uninstaller removes it. The uninstall notes and the portable package's readme point at it, and the portable instructions now cover the registry rather than stopping at "delete the folder".
 
 ### Fixed
 - Uninstalling no longer leaves `HKCU\Software\DexCorral` behind. The installer deleted the language value it had written, but the safe-mode counters are written later, from inside Explorer, so the key survived with them still in it. The whole key now goes.
@@ -22,16 +20,16 @@ Implementation detail belongs in the commit history.
 ## [1.0.24] - 2026-08-31
 
 ### Added
-- **Lock Position** in a Corral's context menu freezes it where it is: no mouse move, no mouse resize, and a small padlock in the title bar to say so. Tabs, roll-up and the per-monitor position memory all keep working. Aimed at the Corral that lives where you drop files — an accidental title-bar drag also shoves the desktop icons underneath it around, with no undo.
+- **Lock Position** in a Corral's context menu freezes it where it is: no mouse move, no mouse resize, and a small padlock in the title bar to say so. Tabs, roll-up and the per-monitor position memory all keep working. Aimed at the Corral that lives where you drop files. An accidental title-bar drag also shoves the desktop icons underneath it around, with no undo.
 - Keyboard support in Corrals, matching Explorer: arrow keys move the selection, Home/End jump to the first/last icon, Esc clears it, and type-ahead jumps to a name. Delete, Enter, Alt+Enter and Ctrl+C/X/V run the shell's own verbs, so confirmations, the Recycle Bin and Explorer's undo all apply. F5 reloads, the Menu key opens the context menu, Backspace goes up a folder.
 - Multi-select in Corrals: Ctrl+click, Shift+click, Ctrl+A, Shift+arrows, and a drag-out selection rectangle. Commands act on the whole selection in one shell call, so a multi-file delete is a single undo step.
 - German: the whole interface is available in German. The installer asks which language you want and the app follows that choice. Anything a translation misses falls back to English rather than showing blank.
-- Text opacity in the Appearance dialog: **Header label** fades a tab's title, **Icon label** fades the icon captions. Both go all the way to invisible, and both fade back in when you point at the Corral — so text set to 0% is hidden at rest rather than gone for good.
+- Text opacity in the Appearance dialog: **Header label** fades a tab's title, **Icon label** fades the icon captions. Both go all the way to invisible, and both fade back in when you point at the Corral, so text set to 0% is hidden at rest rather than gone for good.
 - GitHub issue forms for bug reports, feature requests, and multi-monitor test reports.
 - Contributing guide gains a "Testing is a contribution" section naming the untested territory: multiple monitors, mixed DPI, unusual display hardware, and large desktops.
 
 ### Changed
-- All four ways of creating a Corral now place it the same way: the desktop right-click uses the point you clicked (it used to ignore it and tile from the top-right), a Corral's own menu and the tray now avoid overlapping existing Corrals. Placement seeks the nearest free spot, capped so a crowded desktop puts the Corral where you asked rather than across the monitor. Desktop icons are deliberately not avoided — they are pushed out from under a Corral as before.
+- All four ways of creating a Corral now place it the same way: the desktop right-click uses the point you clicked (it used to ignore it and tile from the top-right), a Corral's own menu and the tray now avoid overlapping existing Corrals. Placement seeks the nearest free spot, capped so a crowded desktop puts the Corral where you asked rather than across the monitor. Desktop icons are deliberately not avoided; they are pushed out from under a Corral as before.
 - Every opacity slider now sits together in the Appearance dialog's **Opacity** section, each one directly under what it affects.
 - DexCorral now requires Windows 11 (build 22000 or newer). Windows 10 is end of life and there is no machine to test it on, so the installer and `--register` refuse to run below that build. `--register --force` overrides the check, unsupported and untested.
 - Downloads are named after their version (`Portable_DexCorral_<version>.zip`), so packages from different releases stay distinguishable once downloaded.
@@ -44,7 +42,7 @@ Implementation detail belongs in the commit history.
 - New Corrals are DPI-scaled. The default 300x200 was raw pixels while everything drawn inside scaled with the monitor, so a new Corral came out undersized on high-DPI displays.
 - Hover-expanding a rolled-up Corral now waits for a short dwell, and only one Corral may be hover-expanded at a time. An exposed sliver of a neighbouring Corral no longer opens itself while you travel to another.
 - Upgrading no longer fails with "cannot replace `DexCorralHook.dll`". The installer used to restart Explorer *before* copying the new files, so a fresh Explorer could load the old extension again and lock the file mid-copy. It now moves the old DLL aside first (Windows allows renaming a file that is still loaded), copies onto the freed name, and restarts Explorer afterwards. The moved-aside copy is deleted in the same pass, once Explorer has restarted and released it; anything still held falls back to deletion at the next reboot.
-- Resizing a corral no longer stalls part-way. A corral sits behind everything else, and Windows stops sending a background window mouse messages the moment the pointer leaves it — so any drag that outran the frame, or that snapped an edge out from under the pointer, silently froze. Resizing, moving and details-column dragging now follow the pointer wherever it goes.
+- Resizing a corral no longer stalls part-way. A corral sits behind everything else, and Windows stops sending a background window mouse messages the moment the pointer leaves it, so any drag that outran the frame, or that snapped an edge out from under the pointer, silently froze. Resizing, moving and details-column dragging now follow the pointer wherever it goes.
 - Diagonal resizing works. The corner grab zones were a 6×6 pixel target, smaller than the grip drawn in the bottom-right corner; the bottom corners now match the grip and the top corners are twice as wide.
 - A black header font is no longer invisible. Header text is very slightly softer as a result, and now renders correctly over any wallpaper.
 
@@ -58,16 +56,16 @@ Implementation detail belongs in the commit history.
 ## [1.0.22] - 2026-08-27
 
 ### Added
-- Header opacity is now a per-corral setting, with its own slider in the Appearance dialog. It stops short of fully transparent because the header is a corral's only grab handle — at zero it would be an invisible window that still swallows the mouse.
+- Header opacity is now a per-corral setting, with its own slider in the Appearance dialog. It stops short of fully transparent because the header is a corral's only grab handle: at zero it would be an invisible window that still swallows the mouse.
 - Border opacity is now a per-corral setting. At zero the corral is a frameless shape on the wallpaper; the resize grip stays visible.
-- Inactive tabs are derived from the header opacity instead of being configured separately — they stay dimmer than the active tab at every setting, with no second slider to keep in sync.
+- Inactive tabs are derived from the header opacity instead of being configured separately, so they stay dimmer than the active tab at every setting, with no second slider to keep in sync.
 - Hovering a corral now fades its header and border to full strength alongside the icons, so a near-invisible corral presents a solid grab handle the moment you reach for it.
 - Both new opacity settings are covered by "use as default for new corrals", "apply changes to all corrals", and "copy full style to all corrals".
 
 ### Changed
 - The hover fade is no longer symmetric: fading in stays at 200 ms, fading out is 400 ms. Crossing between adjacent corrals used to make the chrome flash out and back in.
 - A rolled-up corral keeps a minimum header visibility, since rolled up the header is the entire corral. The configured value is untouched and returns on unroll.
-- The Appearance dialog's Opacity group now holds every opacity setting as labelled rows — background, border, header, and icons.
+- The Appearance dialog's Opacity group now holds every opacity setting as labelled rows: background, border, header, and icons.
 
 ### Fixed
 - Clicking a tab often did nothing: the top few pixels of every tab started an invisible resize instead of activating the tab. Corners still resize from the top.
@@ -105,7 +103,7 @@ Implementation detail belongs in the commit history.
 - Optional update check, off by default. When enabled, DexCorral asks GitHub once a day whether a newer release exists and shows a tray balloon; clicking it opens the release page. Nothing is downloaded automatically.
 - Quick-hide: double-click an empty spot on the desktop to fade out all icons and corrals at once, and again to bring them back. Corrals can opt out individually, and the tray menu toggles the same state.
 - Desktop "Sort by" is carried out by DexCorral itself, so Explorer never repositions corral-owned icons.
-- Corral-owned icons cannot be moved by Explorer or third-party tools — only DexCorral moves them.
+- Corral-owned icons cannot be moved by Explorer or third-party tools: only DexCorral moves them.
 - Crash containment: if anything goes wrong inside the Explorer hook, it releases the hidden icons and goes inert for the session instead of taking Explorer down with it.
 - Safe mode: three consecutive sessions dying at startup start DexCorral with the hook disabled and a tray balloon, then retry normally on the next session.
 
@@ -116,7 +114,7 @@ Implementation detail belongs in the commit history.
 - The catch-all can be turned off entirely; having no catch-all at all is now allowed, and startup no longer forces one.
 - Auto-arrange no longer leaves empty grid slots where hidden icons used to be, and works even when nothing is hidden.
 - Hidden icons are matched by their full path rather than their display name, so a name collision can no longer hide the wrong icon.
-- With debug logging off — the default — DexCorral writes no log files at all.
+- With debug logging off (the default), DexCorral writes no log files at all.
 - Unhooking leaves other tools' subclasses intact: if something installed after DexCorral, its hook stays in place but inert rather than breaking the other tool.
 - The version in `Version.h` is the single source of truth, and the release workflow verifies the pushed tag matches it.
 - Release builds are pinned to a runner that still ships Visual Studio 2022.
