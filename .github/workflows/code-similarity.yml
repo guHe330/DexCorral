@@ -2,6 +2,10 @@ name: Scancode Toolkit
 on:
   workflow_dispatch:
 
+# Checkout and artifact upload only; nothing here writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   scancode:
     runs-on: ubuntu-latest
