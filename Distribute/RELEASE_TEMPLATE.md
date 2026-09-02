@@ -12,7 +12,7 @@
 
 > **Requires Windows 11** (build 22000 or newer). Windows 10 is end of life and is not supported.
 
-> **Note:** Both packages are currently unsigned, so Windows SmartScreen shows a warning and reports the publisher as unknown. Click "More info" then "Run anyway" to proceed. You do not have to take that on trust: verify the download first with the checksums or the build attestation below.
+> **Note:** Both packages are currently unsigned, so Windows SmartScreen shows a warning and reports the publisher as unknown. Click "More info" then "Run anyway" to proceed. You do not have to take that on trust: check the download against the SHA-256 below first.
 
 ### Verifying your download
 
@@ -27,12 +27,6 @@ Check a file in PowerShell:
 
 ```powershell
 Get-FileHash DexCorral_${VERSION}_Setup.exe -Algorithm SHA256
-```
-
-Both artifacts also carry a GitHub build provenance attestation, which ties them to the exact workflow run and commit that produced them. With the [GitHub CLI](https://cli.github.com/):
-
-```powershell
-gh attestation verify DexCorral_${VERSION}_Setup.exe --repo guHe330/DexCorral
 ```
 
 ### Installation Options
@@ -63,7 +57,7 @@ gh attestation verify DexCorral_${VERSION}_Setup.exe --repo guHe330/DexCorral
 <!-- Per-release, not cumulative: list only the changes since the last tag.
      Emptied after each release ships. -->
 
-- Downloads can now be verified: this release lists a SHA-256 for the installer and the portable zip, and both carry a GitHub build provenance attestation. See [Verifying your download](#verifying-your-download) above. The binaries are still unsigned, so SmartScreen still warns.
+- Downloads can now be verified: this release lists a SHA-256 for the installer and the portable zip. See [Verifying your download](#verifying-your-download) above. The binaries are still unsigned, so SmartScreen still warns.
 - Quick-hide is now documented: double-click an empty spot on the desktop to hide every icon and Corral at once, with **Exclude from Quick-Hide** to keep chosen Corrals visible.
 - README and docs reorganized, with features shown next to the screenshots that demonstrate them.
 
