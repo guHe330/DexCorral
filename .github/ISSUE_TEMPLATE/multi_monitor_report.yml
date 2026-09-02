@@ -5,9 +5,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        The maintainer develops on a **single-monitor machine**. Corral positions are stored per monitor
-        and per resolution, corrals move to the primary display when their monitor disappears and return
-        when it comes back — all of it written without ever being run on a real multi-display setup.
+        Multi-monitor behaviour needs **much wider coverage than in-house testing can give it**. Corral
+        positions are stored per monitor and per resolution, corrals move to the primary display when
+        their monitor disappears and return when it comes back. There are far more display arrangements,
+        scaling combinations and hot-plug orders out there than can be reproduced here.
 
         You do not have to test everything. **One section is a useful report.** Good news is worth
         posting too: "restart persistence works on 3 screens" tells me as much as a bug does.

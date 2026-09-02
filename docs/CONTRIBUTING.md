@@ -22,9 +22,9 @@ For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json
 
 You do not need to write code to help, and right now testing is worth more than code.
 
-DexCorral is alpha software developed on **one machine, with one monitor**, against the maintainer's own way of using a desktop. Every setup that differs from that is untested territory. The gaps that most need someone else's hardware:
+DexCorral is alpha software, and development covers only a handful of hardware and display configurations. Anything beyond those is untested territory. The gaps where reports from other setups help most:
 
-- **Multiple monitors.** Per-monitor positions, per-resolution layouts, and monitor unplug/replug handling have never run on a real multi-display setup. The [Multi-monitor test report](https://github.com/guHe330/DexCorral/issues/new?template=multi_monitor_report.yml) form has a checklist; one completed section is a useful report.
+- **Multiple monitors.** Per-monitor positions, per-resolution layouts, and monitor unplug/replug handling need far wider coverage than they get here, especially across mixed refresh rates, arrangements and hot-plug order. The [Multi-monitor test report](https://github.com/guHe330/DexCorral/issues/new?template=multi_monitor_report.yml) form has a checklist; one completed section is a useful report.
 - **Mixed DPI**, such as a 150% laptop panel next to a 100% external screen.
 - **Unusual display hardware**: ultrawides, portrait orientation, TVs, wireless displays, docks.
 - **Large or unusual desktops**: hundreds of icons, OneDrive-synced folders, network paths.
