@@ -106,9 +106,17 @@ tray icon and choose Language to switch; the change is immediate and is saved
 for next time. The installer asks at install time, but the portable package has
 no installer, so the tray menu is where you set it.
 
-NOTE: The binaries are currently unsigned. Windows SmartScreen may show a
-warning when you first run the application. Click "More info" then "Run
-anyway" to proceed.
+NOTE: The binaries are currently unsigned, so Windows SmartScreen warns and
+reports the publisher as unknown. Click "More info" then "Run anyway" to
+proceed. To verify this download instead of trusting it, the Releases page
+lists a SHA-256 for every file:
+
+    Get-FileHash Portable_DexCorral_<version>.zip -Algorithm SHA256
+
+Each release is also covered by a GitHub build provenance attestation, which
+ties the file to the workflow run and commit that built it:
+
+    gh attestation verify Portable_DexCorral_<version>.zip --repo guHe330/DexCorral
 
 An Inno Setup installer is also available on the Releases page for a more
 integrated install experience.

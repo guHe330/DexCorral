@@ -8,6 +8,16 @@ Entries describe what changed from a user's point of view, and why when that is 
 
 ## [Unreleased]
 
+## [1.0.26] - 2026-09-02
+
+### Security
+- Releases now publish a SHA-256 for the installer and the portable zip, and both artifacts carry a GitHub build provenance attestation tying them to the workflow run and commit that built them. The binaries are still unsigned, so SmartScreen still warns and reports an unknown publisher; this at least makes a download checkable instead of something you have to take on trust. Verify with `Get-FileHash`, or with `gh attestation verify <file> --repo guHe330/DexCorral`.
+
+### Changed
+- The unsigned-binaries note in the README, the User Manual and the portable readme now points at those checks instead of just telling you to click through the SmartScreen warning.
+- README restructured: features are grouped with the screenshots that show them, and quick-hide (double-click the desktop to hide every icon and Corral, with per-Corral opt-out) is documented there and in the portable readme for the first time.
+- Documentation throughout dropped em dashes and hard-wrapped paragraphs.
+
 ## [1.0.25] - 2026-09-02
 
 ### Added

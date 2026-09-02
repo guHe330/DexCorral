@@ -83,7 +83,7 @@ Download the latest version from [Releases](https://github.com/guHe330/DexCorral
 
 The installer registers the Explorer shell extension, configures startup, and launches DexCorral without requiring an Explorer restart.
 
-The binaries are currently unsigned, so Windows SmartScreen may display a warning.
+The binaries are currently unsigned, so Windows SmartScreen warns and reports the publisher as unknown. Every release publishes SHA-256 checksums and a GitHub build provenance attestation, so you can verify a download before running it.
 
 ### Portable / Manual
 
@@ -93,6 +93,8 @@ Place `DexCorral.exe` and `DexCorralHook.dll` in the same directory, then run as
 DexCorral.exe --register
 DexCorral.exe --startup
 ```
+
+The portable package is unsigned too, and the same checksums and attestation on the release page cover it.
 
 Full installation and uninstall instructions are in the [User Manual](docs/USER_MANUAL.md#installation).
 

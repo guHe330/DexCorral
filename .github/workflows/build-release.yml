@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write      # build provenance attestation
+  attestations: write
 
 jobs:
   build:
@@ -205,12 +207,28 @@ jobs:
             return ($bytes / 1KB).ToString("N0", $inv) + " KB"
         }
 
+        # Checksums let a downloader verify the artifact. The binaries are
+        # unsigned, so this is the only integrity check we can offer.
+        function Get-Sha([string]$path) {
+            if (-not (Test-Path $path)) { throw "Cannot hash missing artifact: $path" }
+            return (Get-FileHash $path -Algorithm SHA256).Hash.ToLower()
+        }
+
         $body = Get-Content "Distribute/RELEASE_TEMPLATE.md" -Raw
         $body = $body -replace '\$\{VERSION\}', $version
         $body = $body -replace '\$\{SETUP_SIZE\}', (Format-Size "DexCorral_${version}_Setup.exe")
         $body = $body -replace '\$\{PORTABLE_SIZE\}', (Format-Size "Portable_DexCorral_${version}.zip")
         $body = $body -replace '\$\{SBOM_SIZE\}', (Format-Size "DexCorral_${version}_sbom.cdx.json")
+        $body = $body -replace '\$\{SETUP_SHA256\}', (Get-Sha "DexCorral_${version}_Setup.exe")
+        $body = $body -replace '\$\{PORTABLE_SHA256\}', (Get-Sha "Portable_DexCorral_${version}.zip")
         Set-Content "release_notes.md" -Value $body
+
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      with:
+        subject-path: |
+          Portable_DexCorral_${{ steps.get_version.outputs.version }}.zip
+          DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
