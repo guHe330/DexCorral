@@ -56,6 +56,9 @@ User Interface
   an executable to open it).
 * Roll-up Interaction: Double-click title bars to collapse Corrals and save
   screen real estate.
+* Quick-Hide: Double-click an empty spot on the desktop to hide all icons and
+  Corrals at once, and again to restore them. Individual Corrals can be
+  exempted so they stay visible.
 * View Modes: Small, medium, or large icon grids, or a details list with
   name, type, size, date, and cloud sync status.
 * Multi-Monitor Aware: Corral positions are remembered per monitor and per

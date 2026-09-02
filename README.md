@@ -31,6 +31,14 @@ It runs as a small DLL inside Explorer instead of faking a desktop window, so Co
 
 ## Features
 
+### Quick-hide the whole desktop
+
+Double-click an empty spot on the desktop and every icon and Corral fades out at once. Double-click again and everything comes back exactly as it was.
+
+- Individual Corrals can be exempted with **Exclude from Quick-Hide**, so the ones you always want in view stay put.
+- The tray menu's **Quick-Hide Everything** toggles the same state.
+- It is temporary: restarting DexCorral always restores your normal desktop.
+
 ### Tabs
 
 <img src="docs/assets/screenshots/tabs.gif" alt="Switching between tabs" width="500">
