@@ -85,11 +85,23 @@ INSTALLATION (PORTABLE)
 
 3. Restart Explorer or log out/in for the shell extension to load.
 
-To uninstall, run: DexCorral.exe --unregister
+To uninstall, run DexCorral.exe --unregister (as Administrator), restart
+Explorer, then delete this folder. Deleting the folder on its own leaves the
+shell extension registered and pointing at a DLL that is gone, so run
+--unregister first. To also remove your settings:
 
-LANGUAGE: The UI is available in English (default) and German. The installer
-asks for the language; for the portable package, set "Language": "de" (or
-"en") in %APPDATA%\DexCorral\config.json.
+  Remove-Item "$env:APPDATA\DexCorral" -Recurse -Force
+  Remove-Item "HKCU:\Software\DexCorral" -Recurse -Force
+
+DexCorral writes nothing else outside its own folder. The registry entries are
+the shell extension's COM registration (removed by --unregister) and, under
+HKCU\Software\DexCorral, your language choice and two safe-mode counters. The
+full list is in the User Manual, "What DexCorral writes outside its own folder".
+
+LANGUAGE: The UI is available in English (default) and German. Right-click the
+tray icon and choose Language to switch; the change is immediate and is saved
+for next time. The installer asks at install time, but the portable package has
+no installer, so the tray menu is where you set it.
 
 NOTE: The binaries are currently unsigned. Windows SmartScreen may show a
 warning when you first run the application. Click "More info" then "Run

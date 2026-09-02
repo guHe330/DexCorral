@@ -26,6 +26,10 @@ Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group
 
 After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
 
+The uninstaller removes every registry entry DexCorral created, with one exception: if you turned on **Hide shortcut arrows**, turn it off again before uninstalling — it changes a Windows-wide setting that is not DexCorral's to restore afterwards. See [What DexCorral writes outside its own folder](#what-dexcorral-writes-outside-its-own-folder) for the full list.
+
+Removed the portable package by deleting its folder? That leaves the same entries behind. Run `DexCorral.exe --unregister` as Administrator first; to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
+
 ## Core Concepts
 
 ### Corrals
@@ -151,6 +155,7 @@ The DexCorral tray icon's right-click menu offers:
 * **Create New Corral** / **New Virtual Corral**.
 * **Show Desktop Icons** — toggle all native desktop icons.
 * **Quick-Hide Everything** — hide/show icons and corrals at once (same as double-clicking the desktop).
+* **Language** — switch the interface between English and German. The change takes effect immediately, no restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.
 
 ## Desktop Integration
 
@@ -169,6 +174,23 @@ All settings (corral layouts, tabs, colors, fonts, assigned files) are stored in
 ```
 
 The format is forward- and backward-compatible: fields missing from an older config simply get default values. The file is written automatically; if you edit it by hand, do so while DexCorral is not running.
+
+### What DexCorral writes outside its own folder
+
+Everything you configure lives in `config.json` above. The registry is used only where Windows requires it — to register the shell extension, to start at login, and for two settings that must be readable before the config file is:
+
+| Key | Value | Why | Removed by the uninstaller |
+|---|---|---|---|
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
+| `HKCU\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the tray menu's **Language** submenu. | Yes |
+| `HKCU\Software\DexCorral` | `HookStartPending`, `HookFailureCount` | Safe-mode counters. If Explorer dies three times in a row while DexCorral is loading, the next session starts without the hook rather than repeating the crash. Written from inside Explorer, where the config file is not available. | Yes |
+| `HKCR\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
+| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. | Yes |
+| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Icon overlay handler. | Yes |
+| `HKCR\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
+| `…\Explorer\Shell Icons` | `29` | Only if you turn on **Hide shortcut arrows**. This is a Windows-wide setting, not a DexCorral one. | **No** — turn the option off before uninstalling, or the arrows stay hidden |
+
+The `HKCR` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes; they are the reason registration needs Administrator rights. Nothing else on the system is touched, and DexCorral writes nothing outside your own user account except those registration keys.
 
 ## Known Limitations
 
