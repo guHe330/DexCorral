@@ -188,7 +188,7 @@ The `HKCR` and `HKLM` entries are the ones `DexCorral.exe --register` creates an
 
 ## Troubleshooting
 
-- **SmartScreen / antivirus warnings**: the binaries are currently unsigned, so Windows reports the publisher as unknown. Code signing is planned. In the meantime every release lists a SHA-256 for each file, so you can check a download with `Get-FileHash <file> -Algorithm SHA256` rather than taking it on trust.
+- **SmartScreen / antivirus warnings**: the binaries are currently unsigned, so Windows reports the publisher as unknown. Code signing is planned. In the meantime every release publishes SHA-256 checksums and a GitHub build provenance attestation, so you can verify a download rather than taking it on trust: see the release page for both, and `gh attestation verify <file> --repo guHe330/DexCorral` to check the attestation.
 - **Corrals don't appear after install**: right-click the desktop once to wake the shell, or log out and back in (the Start-with-Windows entry re-injects DexCorral at login).
 - **Desktop icons misbehave**: restarting Explorer resets the hook: `Stop-Process -Name explorer -Force; Start-Process explorer.exe` in PowerShell, or via Task Manager.
 - **Bug reports**: please file issues at the [GitHub issue tracker](https://github.com/guHe330/DexCorral/issues).
