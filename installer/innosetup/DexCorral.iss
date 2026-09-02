@@ -76,10 +76,13 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   Flags: uninsdeletevalue
 ; UI language chosen in the installer's language dialog. The app uses this as
 ; the default; config.json's "Language" (in-app setting) overrides it.
+; uninsdeletekey, not uninsdeletevalue: the hook writes HookStartPending and
+; HookFailureCount under this key at runtime, so deleting only Language would
+; leave the key behind. Nothing here needs to survive an uninstall.
 Root: HKCU; Subkey: "Software\DexCorral"; \
   ValueType: string; ValueName: "Language"; \
   ValueData: "{code:GetLangCode}"; \
-  Flags: uninsdeletevalue
+  Flags: uninsdeletekey
 
 [UninstallRun]
 ; Unregister the shell extension (silent)
