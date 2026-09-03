@@ -68,3 +68,6 @@ installer/**/*.pfx
 
 # Claude Code
 .claude/
+
+# Local maintenance scripts
+downloads.ps1

@@ -9,26 +9,47 @@ DexCorral requires **Windows 11** (build 22000 or newer). Windows 10 is end of l
 ### Installer (recommended)
 
 1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorral/releases) page.
-2. Run it. Administrator rights are required to register the shell extension. (SmartScreen may warn; see [Troubleshooting](#troubleshooting).)
+2. Run it and choose how to install (see [Install for all users, or just me](#install-for-all-users-or-just-me) below). (SmartScreen may warn; see [Troubleshooting](#troubleshooting).)
 3. The installer registers the shell extension and starts DexCorral inside the running Explorer, with no Explorer restart and no logout needed. A default Corral appears on your desktop immediately.
 
 DexCorral loads automatically at every login. Its shell extension is loaded by Explorer on startup, so there is nothing to configure.
 
+### Install for all users, or just me
+
+Setup's first page asks which one you want. Both give you the same DexCorral; they differ in who gets it and what it takes to install.
+
+- **Install for all users**: goes to `C:\Program Files\DexCorral` and registers in `HKLM`. Needs Administrator rights, so Windows shows a UAC prompt. Every account on the PC gets DexCorral, and an administrator updates it once for everybody. Choose this on a shared or family PC.
+- **Install for me only**: goes to `%LOCALAPPDATA%\Programs\DexCorral` and registers in `HKCU`. No Administrator rights and no UAC prompt, which makes it the option on a work PC where you do not have admin. Only your account gets DexCorral, and you update your own copy. Other users on the PC are unaffected.
+
+**The two cannot be installed side by side.** They register the same shell extension, and a per-user install would quietly take precedence over a machine-wide one for your account, leaving you on a different version than everyone else with nothing on screen to say so. Setup checks for the other kind before it writes anything: installing just for yourself over an existing all-users install offers to remove that one first, and installing for all users warns you about any per-user installs it can see (only the owner of one can remove it).
+
+If you are not sure, pick **all users**. It has one extra load path into Explorer, so it recovers on its own if Explorer crashes mid-session, where a per-user install waits until your next login or your next right-click on the desktop.
+
 ### Portable package
 
 1. Download `Portable_DexCorral_<version>.zip` and extract it to any folder.
-2. Open a command prompt **as Administrator** in that folder and run `DexCorral.exe --register` (one-time setup). On an unsupported Windows version this stops with a message instead of registering. Adding `--force` (`DexCorral.exe --register --force`) registers anyway, unsupported and untested.
+2. Open a command prompt in that folder and run the one-time registration:
+   - Just for you: `DexCorral.exe --register --scope=user`, no Administrator rights needed.
+   - For all users: `DexCorral.exe --register --scope=machine`, from a command prompt opened **as Administrator**.
+
+   Without `--scope`, DexCorral picks machine scope if the folder is under `Program Files` and user scope otherwise. On an unsupported Windows version this stops with a message instead of registering. Adding `--force` registers anyway, unsupported and untested.
 3. Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
+
+Run `DexCorral.exe` with no arguments for the full list of options.
 
 ### Uninstalling
 
 Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group's **Uninstall DexCorral** entry. The uninstaller asks whether to **keep your configuration** (corral layouts and appearance settings). Choose *Yes* if you plan to reinstall later. It then unregisters the shell extension and restarts Explorer to fully unload.
 
+The uninstaller removes only what its own install mode created. Uninstalling a per-user install never touches an all-users install, and uninstalling an all-users install removes the shared registration and files but leaves every account's own settings in `%APPDATA%\DexCorral` alone, including yours if you said *Yes* above.
+
 After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
 
 The uninstaller removes every registry entry DexCorral created, with one exception: if you turned on **Hide shortcut arrows**, turn it off again before uninstalling, because it changes a Windows-wide setting that is not DexCorral's to restore afterwards. See [What DexCorral writes outside its own folder](#what-dexcorral-writes-outside-its-own-folder) for the full list.
 
-Removed the portable package by deleting its folder? That leaves the same entries behind. Run `DexCorral.exe --unregister` as Administrator first; to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
+Removed the portable package by deleting its folder? That leaves the same entries behind. Run `DexCorral.exe --unregister` first, with the same `--scope` you registered with (as Administrator for `--scope=machine`); to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
+
+Upgrading from 1.0.27 or earlier? Those versions registered without any notion of scope. The installer clears the old entries for you; for a portable install, run `DexCorral.exe --cleanup-legacy` once as Administrator.
 
 ## Core Concepts
 
@@ -163,20 +184,25 @@ The format is forward- and backward-compatible: fields missing from an older con
 
 ### What DexCorral writes outside its own folder
 
-Everything you configure lives in `config.json` above. The registry is used only where Windows requires it: to register the shell extension, to start at login, and for two settings that must be readable before the config file is:
+Everything you configure lives in `config.json` above. The registry is used only where Windows requires it: to register the shell extension, to start at login, and for a few settings that must be readable before the config file is.
+
+Which hive these live in follows the install mode you chose. `<root>` below is `HKLM` for an all-users install and `HKCU` for a per-user one. Two keys are all-users only, because Windows reads them from `HKLM` and nowhere else.
 
 | Key | Value | Why | Removed by the uninstaller |
 |---|---|---|---|
-| `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
-| `HKCU\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the tray menu's **Language** submenu. | Yes |
-| `HKCU\Software\DexCorral` | `HookStartPending`, `HookFailureCount` | Safe-mode counters. If Explorer dies three times in a row while DexCorral is loading, the next session starts without the hook rather than repeating the crash. Written from inside Explorer, where the config file is not available. | Yes |
-| `HKCR\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
-| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. | Yes |
-| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Icon overlay handler. | Yes |
-| `HKCR\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
+| `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
+| `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the tray menu's **Language** submenu. | Yes |
+| `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
+| `HKCU\Software\DexCorral` | `HookStartPending`, `HookFailureCount` | Safe-mode counters. If Explorer dies three times in a row while DexCorral is loading, the next session starts without the hook rather than repeating the crash. Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
+| `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
+| `<root>\Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
+| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
+| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Second startup load path. No overlay is ever drawn. All-users installs only. | Yes |
 | `…\Explorer\Shell Icons` | `29` | Only if you turn on **Hide shortcut arrows**. This is a Windows-wide setting, not a DexCorral one. | **No**. Turn the option off before uninstalling, or the arrows stay hidden |
 
-The `HKCR` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes; they are the reason registration needs Administrator rights. Nothing else on the system is touched, and DexCorral writes nothing outside your own user account except those registration keys.
+The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes. They are the reason an all-users registration needs Administrator rights; a per-user registration writes only to `HKCU` and needs none. Nothing else on the system is touched.
+
+Versions up to 1.0.27 wrote the COM registration through `HKEY_CLASSES_ROOT` instead, with no per-user option. `DexCorral.exe --cleanup-legacy`, run once as Administrator, removes what those versions left behind; the installer does it for you.
 
 ## Known Limitations
 

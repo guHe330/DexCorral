@@ -30,11 +30,11 @@
 // git tag (vX.Y.Z) matches DEXCORRAL_VERSION before building. Keep all five
 // macros below consistent — CI checks them.
 // ---------------------------------------------------------------------------
-#define DEXCORRAL_VERSION L"1.0.27"
+#define DEXCORRAL_VERSION L"1.0.28"
 #define DEXCORRAL_VERSION_MAJOR 1
 #define DEXCORRAL_VERSION_MINOR 0
-#define DEXCORRAL_VERSION_PATCH 27
+#define DEXCORRAL_VERSION_PATCH 28
 
 // Resource-file (.rc) forms — keep in sync with the numbers above.
 #define DEXCORRAL_VERSION_COMMA DEXCORRAL_VERSION_MAJOR, DEXCORRAL_VERSION_MINOR, DEXCORRAL_VERSION_PATCH, 0
-#define DEXCORRAL_VERSION_DOTTED "1.0.27.0"
+#define DEXCORRAL_VERSION_DOTTED "1.0.28.0"

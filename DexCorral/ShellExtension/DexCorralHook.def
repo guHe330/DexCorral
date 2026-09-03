@@ -5,4 +5,7 @@ EXPORTS
     DllRegisterServer   PRIVATE
     DllUnregisterServer PRIVATE
     IsHookInstalled     PRIVATE
+    DexCorralRegister
+    DexCorralUnregister
+    DexCorralCleanupLegacy
     WakeHookProc

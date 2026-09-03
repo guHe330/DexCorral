@@ -21,6 +21,7 @@
 
 #include <Windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <strsafe.h>
 #include <string>
 #include "Strings.h"
@@ -53,8 +54,48 @@ static DWORD GetWindowsBuildNumber()
     return info.dwBuildNumber;
 }
 
-typedef HRESULT(__stdcall *DllRegisterServerFunc)();
-typedef HRESULT(__stdcall *DllUnregisterServerFunc)();
+typedef HRESULT(__stdcall *ScopedRegFunc)(int);
+typedef HRESULT(__stdcall *CleanupLegacyFunc)();
+
+// Mirrors InstallScope in ShellExtension/include/Registration.h. Kept as a
+// plain int across the DLL boundary so the exe needs no shell-extension header.
+static const int kScopeUser    = 0;
+static const int kScopeMachine = 1;
+
+// True if this process runs elevated. A machine-scope register writes HKLM and
+// would fail late without it; checking up front gives a usable error instead.
+static bool IsProcessElevated()
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        return false;
+
+    TOKEN_ELEVATION elevation = {};
+    DWORD size = sizeof(elevation);
+    const bool ok = GetTokenInformation(token, TokenElevation, &elevation, size, &size) != 0;
+    CloseHandle(token);
+    return ok && elevation.TokenIsElevated != 0;
+}
+
+// Machine scope when the exe sits under %ProgramFiles%, user scope otherwise.
+// Only used when no --scope was passed; both installers pass one explicitly.
+static int InferScopeFromExePath(const wchar_t *exePath)
+{
+    PWSTR dir = nullptr;
+    const KNOWNFOLDERID *folders[] = { &FOLDERID_ProgramFiles, &FOLDERID_ProgramFilesX86 };
+    for (const KNOWNFOLDERID *folder : folders)
+    {
+        if (FAILED(SHGetKnownFolderPath(*folder, 0, nullptr, &dir)) || !dir)
+            continue;
+        const size_t len = wcslen(dir);
+        const bool under = len > 0 && _wcsnicmp(exePath, dir, len) == 0 &&
+                           (exePath[len] == L'\\' || exePath[len] == 0);
+        CoTaskMemFree(dir);
+        dir = nullptr;
+        if (under) return kScopeMachine;
+    }
+    return kScopeUser;
+}
 
 // ─── --startup: inject DexCorralHook.dll into Explorer via WH_GETMESSAGE ───────
 //
@@ -138,11 +179,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     if (!argv)
         return 1;
 
-    bool doRegister   = false;
-    bool doUnregister = false;
-    bool doStartup    = false;
-    bool silent       = false;
-    bool force        = false;
+    bool doRegister    = false;
+    bool doUnregister  = false;
+    bool doStartup     = false;
+    bool doCleanupOld  = false;
+    bool silent        = false;
+    bool force         = false;
+    int  scope         = -1;   // -1 = not given, infer from the exe's location
 
     for (int i = 1; i < argc; i++)
     {
@@ -151,15 +194,24 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         else if (_wcsicmp(argv[i], L"--startup")    == 0 || _wcsicmp(argv[i], L"-startup")    == 0) doStartup    = true;
         else if (_wcsicmp(argv[i], L"--silent")     == 0 || _wcsicmp(argv[i], L"-silent")     == 0) silent       = true;
         else if (_wcsicmp(argv[i], L"--force")      == 0 || _wcsicmp(argv[i], L"-force")      == 0) force        = true;
+        else if (_wcsicmp(argv[i], L"--cleanup-legacy") == 0)                                       doCleanupOld = true;
+        else if (_wcsicmp(argv[i], L"--scope=user")     == 0)                                       scope        = kScopeUser;
+        else if (_wcsicmp(argv[i], L"--scope=machine")  == 0)                                       scope        = kScopeMachine;
     }
     LocalFree(argv);
 
     // Resolve path to DexCorralHook.dll (always next to this EXE)
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+
     wchar_t dllPath[MAX_PATH];
-    GetModuleFileNameW(nullptr, dllPath, MAX_PATH);
+    wcscpy_s(dllPath, MAX_PATH, exePath);
     wchar_t *lastSlash = wcsrchr(dllPath, L'\\');
     if (lastSlash)
         wcscpy_s(lastSlash + 1, MAX_PATH - (lastSlash - dllPath + 1), L"DexCorralHook.dll");
+
+    if (scope < 0)
+        scope = InferScopeFromExePath(exePath);
 
     // ── --startup: inject into Explorer and exit ──────────────────────────────
     if (doStartup)
@@ -184,8 +236,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         }
     }
 
-    // ── --register / --unregister ─────────────────────────────────────────────
-    if (doRegister || doUnregister)
+    // ── HKLM work needs elevation; say so before touching anything ────────────
+    // --cleanup-legacy always qualifies: the keys it removes are all in HKLM/HKCR,
+    // so unelevated it would report success having done nothing.
+    if ((doCleanupOld || ((doRegister || doUnregister) && scope == kScopeMachine)) &&
+        !IsProcessElevated())
+    {
+        if (!silent)
+            MessageBoxW(nullptr, Tr(Str::Reg_NeedsElevation), Tr(Str::App_Name), MB_ICONERROR);
+        return 1;
+    }
+
+    // ── --register / --unregister / --cleanup-legacy ──────────────────────────
+    if (doRegister || doUnregister || doCleanupOld)
     {
         HMODULE hDll = LoadLibraryW(dllPath);
         if (!hDll)
@@ -197,9 +260,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         }
 
         HRESULT hr;
+
+        // Removes the pre-1.0.28 scopeless layout. Runs before a register so an
+        // upgrade cannot leave the old HKCR CLSID shadowing the new one.
+        if (doCleanupOld)
+        {
+            auto fn = (CleanupLegacyFunc)GetProcAddress(hDll, "DexCorralCleanupLegacy");
+            if (fn) fn();   // best effort: old keys may already be gone, or unreachable
+        }
+
         if (doRegister)
         {
-            auto fn = (DllRegisterServerFunc)GetProcAddress(hDll, "DllRegisterServer");
+            auto fn = (ScopedRegFunc)GetProcAddress(hDll, "DexCorralRegister");
             if (!fn)
             {
                 if (!silent)
@@ -207,7 +279,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
                 FreeLibrary(hDll);
                 return 1;
             }
-            hr = fn();
+            hr = fn(scope);
             if (SUCCEEDED(hr))
             {
                 if (!silent)
@@ -228,7 +300,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
         if (doUnregister)
         {
-            auto fn = (DllUnregisterServerFunc)GetProcAddress(hDll, "DllUnregisterServer");
+            auto fn = (ScopedRegFunc)GetProcAddress(hDll, "DexCorralUnregister");
             if (!fn)
             {
                 if (!silent)
@@ -236,7 +308,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
                 FreeLibrary(hDll);
                 return 1;
             }
-            hr = fn();
+            hr = fn(scope);
             if (SUCCEEDED(hr))
             {
                 if (!silent)

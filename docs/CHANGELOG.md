@@ -8,7 +8,24 @@ Entries describe what changed from a user's point of view, and why when that is 
 
 ## [Unreleased]
 
+## [1.0.28] - 2026-09-03
+
+### Added
+- **Per-user installation.** The installer's first page now asks whether to install for all users or for the current account only. A per-user install goes to `%LOCALAPPDATA%\Programs\DexCorral`, registers entirely under `HKCU` and needs no Administrator rights, so DexCorral can be used on a PC where you do not have admin. An all-users install behaves as it always did.
+- `DexCorral.exe --register` and `--unregister` take `--scope=user` or `--scope=machine`. Without one, the scope is inferred from whether the binary sits under `Program Files`. `--scope=machine` without elevation now stops with an explanation instead of failing partway through registration.
+- `DexCorral.exe --cleanup-legacy` removes the scopeless registry layout written by 1.0.27 and earlier. The installer runs it on all-users upgrades; portable users run it once themselves.
+- `--register` records `InstallDir`, `InstallScope` and `Version` under `Software\DexCorral`, which is how Setup detects an install of the other kind.
+
+### Fixed
+- On an all-users install, the "start at login" entry and the language setting were written to `HKCU` while Setup ran elevated, so they landed in the profile of whoever answered the UAC prompt rather than the account being installed for. On a PC with more than one user, DexCorral then never started at login for anybody else. Both now go to `HKLM` for an all-users install and apply to every account. This was the main reason installing and uninstalling across several accounts on one machine misbehaved.
+- Installing or uninstalling as an administrator could kill and restart `explorer.exe` in every logged-on user's session, blanking other people's desktops. The restart is now limited to the session Setup is running in.
+- A second user on a machine-wide install never received a `Run` entry at all, and so depended entirely on the `HKLM` load vectors.
+
 ### Changed
+- Registration never writes through `HKEY_CLASSES_ROOT` any more. An `HKCR` write lands in `HKLM` if the key exists there and in `HKCU` otherwise, which made the effective scope depend on history rather than intent. Everything now goes to `Software\Classes` under an explicit root.
+- The two install modes are mutually exclusive and Setup enforces it. They share one CLSID, and because `HKCU\Software\Classes` shadows `HKLM\Software\Classes`, a per-user install would otherwise silently take precedence for that account, leaving it on a different version than the rest of the PC with nothing to indicate it. Installing for yourself over an all-users install offers to remove that one first; installing for all users lists any per-user installs it can find and asks whether to continue.
+- An uninstall now only removes what its own mode created, so removing a per-user install cannot break a machine-wide one that other accounts still use.
+- The language chosen at install time is read from `HKCU` first and `HKLM` second, so one all-users install sets the default for every account while the tray menu's per-user choice still wins.
 - New "Plays nicely with animated desktops" section shows Corrals over a running Lively wallpaper (Matrix Rain Customizeable, courtesy of Lively).
 - Screenshots re-taken; the hero image is wider, the title now sits above it, and the tabs animation was dropped.
 

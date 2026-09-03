@@ -81,23 +81,44 @@ INSTALLATION (PORTABLE)
 
 1. Extract all files from this archive to any folder.
 
-2. Run DexCorral.exe --register (as Administrator, one-time setup).
+2. Register the shell extension (one-time setup). Pick who it is for:
+
+     DexCorral.exe --register --scope=user
+       Just your account. No Administrator rights needed.
+
+     DexCorral.exe --register --scope=machine
+       Every account on this PC. Run from a command prompt opened as
+       Administrator.
+
+   Without --scope, machine scope is used if this folder is under
+   Program Files, and user scope otherwise.
+
+   Do not register both ways on one PC: they share a registration and the
+   per-user one silently takes precedence for that account.
+
    Requires Windows 11 (build 22000 or newer); on an older version this
    refuses with a message. Add --force to register anyway -- unsupported,
    untested, and not eligible for bug reports.
 
 3. Restart Explorer or log out/in for the shell extension to load.
 
-To uninstall, run DexCorral.exe --unregister (as Administrator), restart
-Explorer, then delete this folder. Deleting the folder on its own leaves the
-shell extension registered and pointing at a DLL that is gone, so run
---unregister first. To also remove your settings:
+To uninstall, run DexCorral.exe --unregister with the same --scope you
+registered with (as Administrator for --scope=machine), restart Explorer, then
+delete this folder. Deleting the folder on its own leaves the shell extension
+registered and pointing at a DLL that is gone, so run --unregister first.
+
+Coming from 1.0.27 or earlier? Those versions registered without any notion of
+scope. Run DexCorral.exe --cleanup-legacy once as Administrator to clear what
+they left behind.
+
+To also remove your settings:
 
   Remove-Item "$env:APPDATA\DexCorral" -Recurse -Force
   Remove-Item "HKCU:\Software\DexCorral" -Recurse -Force
 
 DexCorral writes nothing else outside its own folder. The registry entries are
-the shell extension's COM registration (removed by --unregister) and, under
+the shell extension's COM registration (removed by --unregister), which goes to
+HKCU with --scope=user and HKLM with --scope=machine, and, under
 HKCU\Software\DexCorral, your language choice and two safe-mode counters. The
 full list is in the User Manual, "What DexCorral writes outside its own folder".
 

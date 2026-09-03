@@ -285,14 +285,35 @@ STDAPI DllCanUnloadNow() {
     return S_FALSE;
 }
 
+// regsvr32 entry points. They carry no scope argument, so the scope is inferred
+// from where the DLL sits. The installer calls the scoped exports below instead.
 STDAPI DllRegisterServer() {
     wchar_t dllPath[MAX_PATH];
     GetModuleFileNameW(g_hModule, dllPath, MAX_PATH);
-    return RegisterShellExtension(dllPath);
+    return RegisterShellExtension(dllPath, InferInstallScope(dllPath));
 }
 
 STDAPI DllUnregisterServer() {
-    return UnregisterShellExtension();
+    wchar_t dllPath[MAX_PATH];
+    GetModuleFileNameW(g_hModule, dllPath, MAX_PATH);
+    return UnregisterShellExtension(InferInstallScope(dllPath));
+}
+
+// === Scoped registration exports (used by DexCorral.exe --register/--unregister) ===
+// scope: 0 = user (HKCU), 1 = machine (HKLM). See Registration.h.
+
+extern "C" __declspec(dllexport) HRESULT __stdcall DexCorralRegister(int scope) {
+    wchar_t dllPath[MAX_PATH];
+    GetModuleFileNameW(g_hModule, dllPath, MAX_PATH);
+    return RegisterShellExtension(dllPath, (InstallScope)scope);
+}
+
+extern "C" __declspec(dllexport) HRESULT __stdcall DexCorralUnregister(int scope) {
+    return UnregisterShellExtension((InstallScope)scope);
+}
+
+extern "C" __declspec(dllexport) HRESULT __stdcall DexCorralCleanupLegacy() {
+    return CleanupLegacyRegistration();
 }
 
 // Legacy export — kept for compatibility

@@ -167,14 +167,15 @@ enum class Str
     Reg_HookLoadFailed,          // "Failed to load DexCorralHook.dll."
     Reg_WakeProcMissing,         // "WakeHookProc not found in DexCorralHook.dll."
     Reg_HookLoadFailedHint,      // load failure + same-folder hint
-    Reg_RegisterProcMissing,     // "DllRegisterServer not found in DexCorralHook.dll."
+    Reg_RegisterProcMissing,     // "DexCorralRegister not found in DexCorralHook.dll."
     Reg_RegisterSuccess,         // registered + restart Explorer steps
     Reg_RegisterFailed,          // "Failed to register shell extension..."
-    Reg_UnregisterProcMissing,   // "DllUnregisterServer not found in DexCorralHook.dll."
+    Reg_UnregisterProcMissing,   // "DexCorralUnregister not found in DexCorralHook.dll."
     Reg_UnregisterSuccess,       // unregistered + restart Explorer
     Reg_UnregisterFailed,        // "Failed to unregister shell extension."
     Reg_Usage,                   // command-line usage text
     Reg_NeedsWin11,              // {0} = required build, {1} = this build
+    Reg_NeedsElevation,          // --scope=machine without admin rights
 
     _Count // sentinel — keep last
 };

@@ -90,16 +90,25 @@ Download the latest version from [Releases](https://github.com/guHe330/DexCorral
 
 The installer registers the Explorer shell extension, configures startup, and launches DexCorral without requiring an Explorer restart.
 
+Its first page asks how to install:
+
+- **All users**: `C:\Program Files\DexCorral`, registered in `HKLM`, needs Administrator rights. Every account on the PC gets DexCorral.
+- **Just me**: `%LOCALAPPDATA%\Programs\DexCorral`, registered in `HKCU`, no Administrator rights and no UAC prompt. Only the installing account gets DexCorral.
+
+The two modes register the same shell extension and cannot be installed side by side; Setup detects the other one and offers to resolve it before writing anything. See [Install for all users, or just me](docs/USER_MANUAL.md#install-for-all-users-or-just-me).
+
 The binaries are currently unsigned, so Windows SmartScreen warns and reports the publisher as unknown. Every release publishes SHA-256 checksums and a GitHub build provenance attestation, so you can verify a download before running it.
 
 ### Portable / Manual
 
-Place `DexCorral.exe` and `DexCorralHook.dll` in the same directory, then run as Administrator:
+Place `DexCorral.exe` and `DexCorralHook.dll` in the same directory, then register for yourself:
 
 ```powershell
-DexCorral.exe --register
+DexCorral.exe --register --scope=user
 DexCorral.exe --startup
 ```
+
+Use `--scope=machine` from an Administrator prompt to register for every account instead. Without `--scope`, DexCorral picks machine scope if the folder is under `Program Files` and user scope otherwise.
 
 The portable package is unsigned too, and the same checksums and attestation on the release page cover it.
 

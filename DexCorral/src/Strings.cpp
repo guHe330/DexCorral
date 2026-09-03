@@ -181,14 +181,14 @@ const wchar_t *const kEnglish[] = {
     /* Reg_HookLoadFailed */       L"Failed to load DexCorralHook.dll.",
     /* Reg_WakeProcMissing */      L"WakeHookProc not found in DexCorralHook.dll.",
     /* Reg_HookLoadFailedHint */   L"Failed to load DexCorralHook.dll.\nMake sure it's in the same folder as this EXE.",
-    /* Reg_RegisterProcMissing */  L"DllRegisterServer not found in DexCorralHook.dll.",
+    /* Reg_RegisterProcMissing */  L"DexCorralRegister not found in DexCorralHook.dll.",
     /* Reg_RegisterSuccess */      L"DexCorral shell extension registered successfully.\n\n"
                                    L"Restart Explorer for changes to take effect:\n"
                                    L"  1. Open Task Manager\n"
                                    L"  2. Find 'Windows Explorer'\n"
                                    L"  3. Right-click > Restart",
     /* Reg_RegisterFailed */       L"Failed to register shell extension.\n\nTry running as Administrator.",
-    /* Reg_UnregisterProcMissing */L"DllUnregisterServer not found in DexCorralHook.dll.",
+    /* Reg_UnregisterProcMissing */L"DexCorralUnregister not found in DexCorralHook.dll.",
     /* Reg_UnregisterSuccess */    L"DexCorral shell extension unregistered successfully.\n\n"
                                    L"Restart Explorer for changes to take effect.",
     /* Reg_UnregisterFailed */     L"Failed to unregister shell extension.",
@@ -199,6 +199,12 @@ const wchar_t *const kEnglish[] = {
                                    L"  DexCorral.exe --startup      Inject into Explorer and start (used by Run key)\n"
                                    L"  DexCorral.exe --silent       Suppress message dialogs\n"
                                    L"  DexCorral.exe --force        Register on an unsupported Windows version\n\n"
+                                   L"Scope (applies to --register and --unregister):\n"
+                                   L"  --scope=user      This user only, HKCU, no admin rights needed\n"
+                                   L"  --scope=machine   All users, HKLM, must run as Administrator\n"
+                                   L"  --cleanup-legacy  Remove registry keys from installs before 1.0.28\n\n"
+                                   L"Without --scope the scope is inferred: under Program Files means machine.\n"
+                                   L"The two scopes share one CLSID and must not both be installed.\n\n"
                                    L"DexCorral requires Windows 11; Windows 10 is unsupported and untested.\n"
                                    L"After registration, restart Explorer or use --startup to activate.",
     /* Reg_NeedsWin11 */           L"DexCorral requires Windows 11 (build {0} or newer).\n"
@@ -208,6 +214,11 @@ const wchar_t *const kEnglish[] = {
                                    L"To register anyway, at your own risk:\n"
                                    L"  DexCorral.exe --register --force\n\n"
                                    L"Please do not file bug reports from unsupported Windows versions.",
+    /* Reg_NeedsElevation */       L"A machine-wide (all users) registration writes to HKEY_LOCAL_MACHINE "
+                                   L"and needs Administrator rights.\n\n"
+                                   L"Run this command from an elevated prompt, or install DexCorral for "
+                                   L"your account only:\n"
+                                   L"  DexCorral.exe --register --scope=user",
 };
 
 static_assert(sizeof(kEnglish) / sizeof(kEnglish[0]) == (size_t)Str::_Count,
@@ -357,14 +368,14 @@ const wchar_t *const kGerman[] = {
     /* Reg_HookLoadFailed */       L"DexCorralHook.dll konnte nicht geladen werden.",
     /* Reg_WakeProcMissing */      L"WakeHookProc wurde in DexCorralHook.dll nicht gefunden.",
     /* Reg_HookLoadFailedHint */   L"DexCorralHook.dll konnte nicht geladen werden.\nStellen Sie sicher, dass sie im selben Ordner wie diese EXE liegt.",
-    /* Reg_RegisterProcMissing */  L"DllRegisterServer wurde in DexCorralHook.dll nicht gefunden.",
+    /* Reg_RegisterProcMissing */  L"DexCorralRegister wurde in DexCorralHook.dll nicht gefunden.",
     /* Reg_RegisterSuccess */      L"Die DexCorral-Shell-Erweiterung wurde erfolgreich registriert.\n\n"
                                    L"Starten Sie den Explorer neu, damit die Änderungen wirksam werden:\n"
                                    L"  1. Task-Manager öffnen\n"
                                    L"  2. 'Windows-Explorer' suchen\n"
                                    L"  3. Rechtsklick > Neu starten",
     /* Reg_RegisterFailed */       L"Die Shell-Erweiterung konnte nicht registriert werden.\n\nVersuchen Sie es als Administrator.",
-    /* Reg_UnregisterProcMissing */L"DllUnregisterServer wurde in DexCorralHook.dll nicht gefunden.",
+    /* Reg_UnregisterProcMissing */L"DexCorralUnregister wurde in DexCorralHook.dll nicht gefunden.",
     /* Reg_UnregisterSuccess */    L"Die DexCorral-Shell-Erweiterung wurde erfolgreich deregistriert.\n\n"
                                    L"Starten Sie den Explorer neu, damit die Änderungen wirksam werden.",
     /* Reg_UnregisterFailed */     L"Die Shell-Erweiterung konnte nicht deregistriert werden.",
@@ -375,6 +386,12 @@ const wchar_t *const kGerman[] = {
                                    L"  DexCorral.exe --startup      In den Explorer injizieren und starten (vom Run-Schlüssel verwendet)\n"
                                    L"  DexCorral.exe --silent       Meldungsdialoge unterdrücken\n"
                                    L"  DexCorral.exe --force        Auf einer nicht unterstützten Windows-Version registrieren\n\n"
+                                   L"Gültigkeitsbereich (für --register und --unregister):\n"
+                                   L"  --scope=user      Nur dieser Benutzer, HKCU, keine Administratorrechte nötig\n"
+                                   L"  --scope=machine   Alle Benutzer, HKLM, muss als Administrator laufen\n"
+                                   L"  --cleanup-legacy  Registry-Schlüssel von Installationen vor 1.0.28 entfernen\n\n"
+                                   L"Ohne --scope wird der Bereich abgeleitet: unter Programme bedeutet machine.\n"
+                                   L"Beide Bereiche teilen sich eine CLSID und dürfen nicht gleichzeitig installiert sein.\n\n"
                                    L"DexCorral benötigt Windows 11; Windows 10 wird nicht unterstützt und ist ungetestet.\n"
                                    L"Nach der Registrierung den Explorer neu starten oder --startup verwenden.",
     /* Reg_NeedsWin11 */           L"DexCorral benötigt Windows 11 (Build {0} oder neuer).\n"
@@ -384,6 +401,11 @@ const wchar_t *const kGerman[] = {
                                    L"Wenn du trotzdem registrieren möchtest, auf eigene Gefahr:\n"
                                    L"  DexCorral.exe --register --force\n\n"
                                    L"Bitte melde keine Fehler von nicht unterstützten Windows-Versionen.",
+    /* Reg_NeedsElevation */       L"Eine systemweite Registrierung (alle Benutzer) schreibt nach "
+                                   L"HKEY_LOCAL_MACHINE und benötigt Administratorrechte.\n\n"
+                                   L"Führe den Befehl in einer Eingabeaufforderung als Administrator aus, "
+                                   L"oder installiere DexCorral nur für dein Konto:\n"
+                                   L"  DexCorral.exe --register --scope=user",
 };
 
 static_assert(sizeof(kGerman) / sizeof(kGerman[0]) == (size_t)Str::_Count,
@@ -412,11 +434,18 @@ void SetLanguage(const std::wstring &langCode)
 
 std::wstring GetInstallerLanguage()
 {
-    wchar_t buf[16] = {};
-    DWORD size = sizeof(buf);
-    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\DexCorral", L"Language",
-                     RRF_RT_REG_SZ, nullptr, buf, &size) == ERROR_SUCCESS)
-        return buf;
+    // HKCU first, then HKLM. A machine-wide install writes the language once to
+    // HKLM for every user; a per-user install and the in-app language setting
+    // both write HKCU, which is why that one wins.
+    const HKEY roots[] = { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE };
+    for (HKEY root : roots)
+    {
+        wchar_t buf[16] = {};
+        DWORD size = sizeof(buf);
+        if (RegGetValueW(root, L"Software\\DexCorral", L"Language",
+                         RRF_RT_REG_SZ, nullptr, buf, &size) == ERROR_SUCCESS)
+            return buf;
+    }
     return L"";
 }
 
