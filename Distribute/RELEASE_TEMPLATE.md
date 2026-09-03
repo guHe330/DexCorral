@@ -66,6 +66,7 @@ gh attestation verify DexCorral_${VERSION}_Setup.exe --repo guHe330/DexCorral
 - Downloads can now be verified: this release lists a SHA-256 for the installer and the portable zip, and both carry a GitHub build provenance attestation. See [Verifying your download](#verifying-your-download) above. The binaries are still unsigned, so SmartScreen still warns.
 - Quick-hide is now documented: double-click an empty spot on the desktop to hide every icon and Corral at once, with **Exclude from Quick-Hide** to keep chosen Corrals visible.
 - README and docs reorganized, with features shown next to the screenshots that demonstrate them.
+- README now shows Corrals running over an animated Lively wallpaper, with fresh screenshots.
 
 ### Known Issues
 

@@ -1,6 +1,7 @@
+<h1 align="center">DexCorral</h1>
+
 <p align="center">
-  <img alt="Desktop organized with DexCorral" src="docs/assets/screenshots/desktop-after.png" width="640" />
-  <h2 align="center">DexCorral</h2>
+  <img alt="Desktop organized with DexCorral" src="docs/assets/screenshots/desktop-after.png" width="700" />
 </p>
 
 [![Build and Release](https://github.com/guHe330/DexCorral/actions/workflows/build-release.yml/badge.svg)](https://github.com/guHe330/DexCorral/actions/workflows/build-release.yml)
@@ -41,8 +42,6 @@ Double-click an empty spot on the desktop and every icon and Corral fades out at
 
 ### Tabs
 
-<img src="docs/assets/screenshots/tabs.gif" alt="Switching between tabs" width="500">
-
 - Multiple tabs per Corral, each with its own icons and view settings.
 - Virtual folders backed by real directories.
 
@@ -53,6 +52,14 @@ Double-click an empty spot on the desktop and every icon and Corral fades out at
 - Per-pixel alpha over any wallpaper, animated ones included.
 - Background, header, border, and icon opacity are adjustable separately.
 - Hover reveal and roll-up keep the desktop clear until you need it.
+
+### Plays nicely with animated desktops
+
+<img src="docs/assets/screenshots/dexcorral-and-lively.gif" alt="Corrals over an animated Lively wallpaper" width="500">
+
+Because the Corrals are drawn by Explorer itself rather than by a window floating above the desktop, an animated wallpaper keeps running behind them and shows through the transparency, frame for frame. [Lively Wallpaper](https://github.com/rocksdanister/lively) is what I use, and DexCorral needs no special setup to work with it.
+
+Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 
 ### Live appearance preview
 

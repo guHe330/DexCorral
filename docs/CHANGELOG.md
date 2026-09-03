@@ -8,6 +8,10 @@ Entries describe what changed from a user's point of view, and why when that is 
 
 ## [Unreleased]
 
+### Changed
+- New "Plays nicely with animated desktops" section shows Corrals over a running Lively wallpaper (Matrix Rain Customizeable, courtesy of Lively).
+- Screenshots re-taken; the hero image is wider, the title now sits above it, and the tabs animation was dropped.
+
 ## [1.0.27] - 2026-09-02
 
 ### Security
