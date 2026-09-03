@@ -71,8 +71,6 @@ Corral positions are remembered **per monitor and per resolution**. Moving a Cor
 ### Customizing
 Right-click a Corral's title bar or background:
 
-<img src="assets/screenshots/corral-context-menu.png" alt="The corral context menu, showing Add Tab, Rename Tab, Appearance, View, Sort By, and corral commands" width="380">
-
 - **Add Tab**: add a new tab to this Corral.
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
 - **Rename Tab**: change the current tab's title.
@@ -88,8 +86,6 @@ Right-click a Corral's title bar or background:
 
 ### Appearance Dialog
 **Appearance...** gives live-preview control over:
-
-<img src="assets/screenshots/appearance-dialog.png" alt="The Appearance dialog with background colour, opacity, header, icon and spacing controls" width="380">
 
 - **Background color**: the Corral fill.
 - **Opacity**: one slider each for the background fill, border, header, header label, icons and icon labels. The border's resize grip stays visible however far down you take it.
