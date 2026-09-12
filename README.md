@@ -120,6 +120,7 @@ Full installation and uninstall instructions are in the [User Manual](docs/USER_
 - [Changelog](docs/CHANGELOG.md)
 - [Privacy](docs/PRIVACY.md)
 - [Build Guide](docs/BUILD_GUIDE.md)
+- [Windows APIs and Hooks](docs/WIN32_API_AND_HOOKS.md)
 - [Contributing](docs/CONTRIBUTING.md)
 
 ## Issues
