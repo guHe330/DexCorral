@@ -2,10 +2,6 @@
 
 All notable changes to DexCorral will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-Entries describe what changed from a user's point of view, and why when that is not obvious. Implementation detail belongs in the commit history.
-
----
-
 ## [Unreleased]
 
 ## [1.0.28] - 2026-09-03
