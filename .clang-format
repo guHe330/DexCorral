@@ -1,0 +1,18 @@
+# Matches the existing style in DexCorral/src and DexCorral/ShellExtension:
+# Allman braces, 4-space indent, right-aligned pointers and references,
+# case labels at switch level.
+#
+# This describes the house style; it is not enforced by CI, and the tree has
+# never been formatted wholesale. Run it on code you are already touching.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 110
+PointerAlignment: Right
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+IndentCaseLabels: false
+AccessModifierOffset: -4
+SortIncludes: false
+AlignConsecutiveAssignments: false
+BreakBeforeBraces: Allman

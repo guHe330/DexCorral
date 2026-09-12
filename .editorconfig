@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# Vendored, and pinned by SHA-256 in sbom/dexcorral.cdx.json (see .gitattributes).
+# Any whitespace or newline fixup here breaks the CI guard and the release build.
+[DexCorral/include/nlohmann/json.hpp]
+insert_final_newline = false
+trim_trailing_whitespace = false

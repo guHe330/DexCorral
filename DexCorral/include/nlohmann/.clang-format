@@ -1,0 +1,4 @@
+# Vendored third-party header, pinned by SHA-256 in sbom/dexcorral.cdx.json.
+# Reformatting it breaks the CI guard and the release build.
+DisableFormat: true
+SortIncludes: Never
