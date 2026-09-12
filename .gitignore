@@ -50,14 +50,21 @@
 !Distribute/RELEASE_TEMPLATE.md
 !installer/INSTALLER_NOTES.md
 !docs/CHANGELOG.md
+!docs/PRIVACY.md
 !docs/USER_MANUAL.md
 !docs/BUILD_GUIDE.md
+!docs/WIN32_API_AND_HOOKS.md
 !SECURITY.md
+!.github/PULL_REQUEST_TEMPLATE.md
 
 # Build directories
 build/
+build-clang/
 vs2022/
 vs_build/
+
+# CMake presets are per-developer overrides, not project config
+CMakeUserPresets.json
 
 # Installer build artifacts
 installer/msix/staging/
