@@ -28,7 +28,7 @@ It runs as a small DLL inside Explorer instead of faking a desktop window, so Co
 
 > **Alpha software.** DexCorral is a personal project developed around my own workflow. Expect bugs and occasional breaking changes.
 
-> **Private by design.** No ads, telemetry, or user tracking. Network access is limited to an optional update check, disabled by default.
+> **Private by design.** No ads, telemetry, or user tracking. Network access is limited to an optional update check, disabled by default. Details in the [Privacy notes](docs/PRIVACY.md).
 
 ## Features
 
@@ -118,6 +118,7 @@ Full installation and uninstall instructions are in the [User Manual](docs/USER_
 
 - [User Manual](docs/USER_MANUAL.md)
 - [Changelog](docs/CHANGELOG.md)
+- [Privacy](docs/PRIVACY.md)
 - [Build Guide](docs/BUILD_GUIDE.md)
 - [Contributing](docs/CONTRIBUTING.md)
 

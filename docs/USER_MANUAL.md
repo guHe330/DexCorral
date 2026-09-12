@@ -162,6 +162,8 @@ The DexCorral tray icon's right-click menu offers:
 - **Create New Corral** / **New Virtual Corral**.
 - **Show Desktop Icons**: toggle all native desktop icons.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop).
+- **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API once every 24 hours whether a newer version exists and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
+- **Check for Updates Now**: run that check once, right now, without switching the automatic one on.
 - **Language**: switch the interface between English and German. The change takes effect immediately, no restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.
 
 ## Desktop Integration

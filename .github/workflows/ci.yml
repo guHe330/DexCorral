@@ -1,0 +1,69 @@
+name: CI
+
+# Builds every push to main and every pull request. build-release.yml only
+# fires on a v* tag, so without this nothing compiles a change before it is
+# merged. This workflow publishes nothing - a release comes from a tag alone.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    # windows-2022 (VS 2022) is the toolchain of record: it matches local dev
+    # and the release build in build-release.yml. windows-latest (VS 2026 since
+    # the 2026-07 image roll) runs alongside it as advance warning only and must
+    # never block a merge -- promote it to the pinned image once it has been
+    # green a while.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: windows-2022
+            blocking: true
+          - image: windows-latest
+            blocking: false
+
+    name: build-and-test (${{ matrix.image }})
+    runs-on: ${{ matrix.image }}
+    continue-on-error: ${{ !matrix.blocking }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+    - name: Setup CMake
+      uses: lukka/get-cmake@fffaaafeea488556c2c12dad60690008bc1caacb # v4.4.2
+
+    # No -G: let CMake pick the newest Visual Studio on the runner, so the same
+    # step works on both images. Pinning "Visual Studio 17 2022" (as
+    # build-release.yml still does, deliberately) breaks configure outright on
+    # an image that has rolled to VS 2026.
+    - name: Configure CMake
+      run: cmake -S DexCorral -B DexCorral/build -A x64
+
+    # Builds DexCorral.exe, DexCorralHook.dll and DexCorralTests.exe.
+    - name: Build Release
+      run: cmake --build DexCorral/build --config Release
+
+    - name: Run tests
+      shell: pwsh
+      run: |
+        & "DexCorral/build/Release/DexCorralTests.exe"
+        if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+
+    # A build that silently stopped producing the DLL would still pass the
+    # tests above, which only link the pure-logic sources.
+    - name: Verify build outputs
+      shell: pwsh
+      run: |
+        foreach ($f in "DexCorral.exe", "DexCorralHook.dll") {
+            $p = "DexCorral/build/Release/$f"
+            if (-not (Test-Path $p)) { throw "Missing build output: $p" }
+            Write-Host "$f  $((Get-Item $p).Length) bytes"
+        }
