@@ -4,6 +4,8 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+## [1.0.29] - 2026-09-27
+
 ### Fixed
 - Deleting an icon from a corral could leave a ghost of it on the desktop, most often on OneDrive-backed desktops. The icon "jumped out" of the corral, and deleting the ghost failed with "item not found". A deleted file now stays hidden until Explorer has dropped it, and Explorer is told about the deletion directly. ([#27](https://github.com/guHe330/DexCorral/issues/27))
 - When the desktop hook hit an error it could pass a message to Explorer a second time, even though Explorer had already started processing it, which could corrupt the desktop view. Errors raised inside Explorer's own code are no longer caught and blamed on the hook. They now behave as they would without DexCorral, and the log names where they came from. ([#27](https://github.com/guHe330/DexCorral/issues/27))
