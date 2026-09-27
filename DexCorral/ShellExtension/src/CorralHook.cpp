@@ -163,6 +163,69 @@ static void GoInertAfterException(const wchar_t* where, DWORD exceptionCode) {
     }
 }
 
+// Per-message bookkeeping for the subclass SEH wrappers (UI thread only;
+// frames nest when Explorer's proc re-enters a subclass). It lets the
+// wrapper tell a fault in hook code from a fault in Explorer's own proc, and
+// whether Explorer already saw the message.
+struct HookMsgFrame {
+    HookMsgFrame* prev;
+    LONG originalDepthAtEntry;
+    bool forwarded;          // The message was handed to Explorer's proc
+};
+static HookMsgFrame* g_MsgFrame = nullptr;
+static LONG g_OriginalProcDepth = 0;
+
+// Hands the message being processed to Explorer's original proc. Every
+// pass-through of the current message goes through here (plain queries such
+// as LVM_GETITEMCOUNT still use CallWindowProcW).
+static LRESULT ForwardToOriginal(WNDPROC proc, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    if (g_MsgFrame) g_MsgFrame->forwarded = true;
+    g_OriginalProcDepth++;
+    __try {
+        return CallWindowProcW(proc, hwnd, uMsg, wParam, lParam);
+    } __finally {
+        g_OriginalProcDepth--;
+    }
+}
+
+// Faults raised inside Explorer's own proc are not the hook's: let them take
+// the path they would take without DexCorral. Catching them would leave
+// Explorer running in whatever state the fault interrupted.
+static int HookExceptionFilter(const HookMsgFrame* frame, const wchar_t* where, DWORD exceptionCode) {
+    if (g_OriginalProcDepth > frame->originalDepthAtEntry) {
+        DllLog(L"%s: exception 0x%08X raised inside Explorer's own window proc — not handled by the hook",
+               where, exceptionCode);
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// SEH guard shared by both subclass procs. No C++ objects with destructors in
+// here (C2712). A fault in hook code makes the hook go inert; the message is
+// then passed through only if Explorer hasn't seen it yet — replaying a
+// message Explorer was already processing would run it twice.
+typedef LRESULT (*SubclassProcImpl)(HWND, UINT, WPARAM, LPARAM);
+
+static LRESULT GuardedSubclassCall(SubclassProcImpl impl, WNDPROC original, const wchar_t* where,
+                                   HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    if (g_HookInert) return CallWindowProcW(original, hwnd, uMsg, wParam, lParam);
+
+    HookMsgFrame frame = { g_MsgFrame, g_OriginalProcDepth, false };
+    g_MsgFrame = &frame;
+    DWORD exCode = 0;
+    __try {
+        __try {
+            return impl(hwnd, uMsg, wParam, lParam);
+        } __finally {
+            g_MsgFrame = frame.prev;
+        }
+    } __except (exCode = GetExceptionCode(), HookExceptionFilter(&frame, where, exCode)) {
+        GoInertAfterException(where, exCode);
+    }
+    if (frame.forwarded) return 0;
+    return CallWindowProcW(original, hwnd, uMsg, wParam, lParam);
+}
+
 // ============================================================================
 // Safe mode — crash sentinel for an explorer.exe-resident hook.
 //
@@ -1059,7 +1122,7 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
             }
         }
 
-        LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
 
         if (g_InsideCustomSort) return result;
 
@@ -1100,7 +1163,7 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
     if (uMsg == LVM_SETITEMCOUNT ||
         uMsg == LVM_INSERTITEMW || uMsg == LVM_INSERTITEMA ||
         uMsg == LVM_DELETEITEM || uMsg == LVM_DELETEALLITEMS) {
-        LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
         InvalidateHiddenIndexCache();
         if (g_OurAutoArrange && !g_InsideCustomSort) {
             ScheduleCompaction(hwnd, L"item insert/delete");
@@ -1110,12 +1173,12 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
 
     // Renames (item text) and identity changes (lParam/PIDL) invalidate the memo
     if (uMsg == LVM_SETITEMTEXTW || uMsg == LVM_SETITEMTEXTA) {
-        LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
         InvalidateHiddenIndexCache();
         return result;
     }
     if (uMsg == LVM_SETITEMW || uMsg == LVM_SETITEMA) {
-        LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
         const LVITEMW* item = (const LVITEMW*)lParam;
         if (item && (item->mask & (LVIF_TEXT | LVIF_PARAM))) {
             InvalidateHiddenIndexCache();
@@ -1132,7 +1195,7 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
 
         // Let Windows sort first, then fix up positions. Sorting reindexes
         // items, so the per-index memo is stale afterwards.
-        LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
         InvalidateHiddenIndexCache();
         Log(L"ListViewSubclassProc: %s returned %lld, scheduling compaction", msgName, (long long)result);
         ScheduleCompaction(hwnd, msgName);
@@ -1146,21 +1209,21 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
 
         if (!g_HiddenIcons.empty()) {
             // Let Windows arrange first, then fix up
-            LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+            LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
             Log(L"ListViewSubclassProc: LVM_ARRANGE returned %lld, scheduling compaction", (long long)result);
             ScheduleCompaction(hwnd, L"LVM_ARRANGE");
             return result;
         }
 
         Log(L"ListViewSubclassProc: No hidden icons - passing LVM_ARRANGE to Windows");
-        return CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        return ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
     }
 
     // Intercept LVM_HITTEST - makes hidden icons invisible to ALL hit testing:
     // clicks, drag-drop targets, context menus, tooltips, etc.
     if (uMsg == LVM_HITTEST || uMsg == LVM_SUBITEMHITTEST) {
         RefreshHiddenIconCache();
-        LRESULT hit = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT hit = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
         if (hit >= 0 && ShouldHideIconByIndex((int)hit)) {
             // Clear the hit test result so caller thinks nothing was hit
             LVHITTESTINFO* ht = (LVHITTESTINFO*)lParam;
@@ -1198,7 +1261,7 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
     case WM_LBUTTONUP:
         // After mouse up (end of rubber-band selection), deselect any hidden icons
         {
-            LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+            LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
             RefreshHiddenIconCache();
             DeselectHiddenIcons(hwnd);
             return result;
@@ -1209,14 +1272,14 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
         if (wParam == VK_UP || wParam == VK_DOWN || wParam == VK_LEFT || wParam == VK_RIGHT) {
             RefreshHiddenIconCache();
             if (!g_HiddenIcons.empty()) {
-                LRESULT result = CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+                LRESULT result = ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
                 // Check if newly focused item is hidden - if so, send another arrow key to skip it
                 int focused = (int)CallWindowProcW(g_OriginalListViewProc, hwnd,
                     LVM_GETNEXTITEM, -1, LVNI_FOCUSED);
                 if (focused >= 0 && ShouldHideIconByIndex(focused)) {
                     // Skip this hidden icon by sending another arrow key in the same direction
                     Log(L"ListViewSubclassProc: Skipping hidden icon %d on arrow key", focused);
-                    CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+                    ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
                 }
                 return result;
             }
@@ -1234,22 +1297,13 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
         }
     }
 
-    return CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+    return ForwardToOriginal(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
 }
 
-// SEH guard around the real proc. No C++ objects with destructors in here
-// (C2712). On an escaped exception the hook goes inert and the message is
-// passed through — an exception must never propagate into Explorer.
+// SEH-guarded entry point — see GuardedSubclassCall.
 static LRESULT CALLBACK ListViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (!g_HookInert) {
-        DWORD exCode = 0;
-        __try {
-            return ListViewSubclassProcImpl(hwnd, uMsg, wParam, lParam);
-        } __except (exCode = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) {
-            GoInertAfterException(L"ListViewSubclassProc", exCode);
-        }
-    }
-    return CallWindowProcW(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+    return GuardedSubclassCall(ListViewSubclassProcImpl, g_OriginalListViewProc,
+                               L"ListViewSubclassProc", hwnd, uMsg, wParam, lParam);
 }
 
 // ============================================================================
@@ -1349,7 +1403,7 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
     // ---- Fake the auto-arrange checkmark in the context menu ----
     if (uMsg == WM_INITMENUPOPUP) {
         // Let Explorer build the menu first
-        LRESULT result = CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
 
         // Override the auto-arrange checkmark with our state
         HMENU hMenu = (HMENU)wParam;
@@ -1409,7 +1463,7 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
             const wchar_t* sortNames[] = { L"Name", L"Size", L"Item type", L"Date modified" };
             Log(L"  Sort by %s — sorting in-hook (Explorer does not reposition)", sortNames[sortIdx]);
 
-            LRESULT result = CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+            LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
             EnsureExplorerAutoArrangeOff();
 
             // Win11 Explorer sorts its item list internally (no LVM_SORTITEMS),
@@ -1428,7 +1482,7 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
         }
 
         // All other commands: let Explorer handle, then compact if needed
-        LRESULT result = CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+        LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
 
         bool needsCompaction = false;
         if (cmdId == g_CmdAlignToGrid) {
@@ -1466,7 +1520,7 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
             case CDDS_PREPAINT: {
                 // Call original chain first so other third-party hooks get
                 // their PREPAINT notification, then ensure we also get per-item callbacks.
-                LRESULT originalResult = CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+                LRESULT originalResult = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
                 return originalResult | CDRF_NOTIFYITEMDRAW;
             }
 
@@ -1480,28 +1534,19 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
 
                 // Not a DexCorral icon - let the original chain decide.
                 // This preserves other hooks' ability to hide their own icons.
-                return CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+                return ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
             }
             }
         }
     }
 
-    return CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+    return ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
 }
 
-// SEH guard around the real proc. No C++ objects with destructors in here
-// (C2712). On an escaped exception the hook goes inert and the message is
-// passed through — an exception must never propagate into Explorer.
+// SEH-guarded entry point — see GuardedSubclassCall.
 static LRESULT CALLBACK ShellDefViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (!g_HookInert) {
-        DWORD exCode = 0;
-        __try {
-            return ShellDefViewSubclassProcImpl(hwnd, uMsg, wParam, lParam);
-        } __except (exCode = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) {
-            GoInertAfterException(L"ShellDefViewSubclassProc", exCode);
-        }
-    }
-    return CallWindowProcW(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+    return GuardedSubclassCall(ShellDefViewSubclassProcImpl, g_OriginalShellDefViewProc,
+                               L"ShellDefViewSubclassProc", hwnd, uMsg, wParam, lParam);
 }
 
 // ============================================================================

@@ -64,6 +64,10 @@ static const UINT_PTR TRAY_RETRY_TIMER = 1;
 static const UINT_PTR ADOPTION_TIMER = 2;
 static const UINT ADOPTION_POLL_MS = 800;
 
+// Fires when the next transient hidden identity expires, so the hook's hidden
+// list is refreshed then instead of whenever the next unrelated update happens.
+static const UINT_PTR TRANSIENT_HIDDEN_TIMER = 3;
+
 // Posted by the mouse hook on a desktop double-click; handled on the app
 // thread (hit-testing the desktop ListView is too slow for a WH_MOUSE_LL
 // callback). lParam carries the click point as POINTS.
@@ -816,38 +820,85 @@ std::vector<HiddenIconInfo> App::CollectCorralIconIdentities() const
     return result;
 }
 
-// How long a renamed icon's old identity stays hidden alongside the new one.
-// Covers the shell's asynchronous processing of the rename, including slow
-// cases (OneDrive-backed desktops).
-static const DWORD TRANSIENT_HIDDEN_MS = 5000;
+// How long a deleted corral file's identity stays hidden. Longer than the
+// rename window (the default duration): a deleted item's removal from the
+// desktop view has been seen to lag well beyond it on OneDrive-backed desktops.
+static const DWORD DELETED_HIDDEN_MS = 60000;
 
-void App::AddTransientHiddenIcon(const std::wstring &displayName, const std::wstring &parsingName)
+void App::AddTransientHiddenIcon(const std::wstring &displayName, const std::wstring &parsingName,
+                                 DWORD durationMs)
 {
     if (displayName.empty() && parsingName.empty())
         return;
 
     std::lock_guard<std::mutex> lock(transientHiddenLock);
-    transientHiddenIcons.push_back({{displayName, parsingName}, GetTickCount() + TRANSIENT_HIDDEN_MS});
+    transientHiddenIcons.push_back({{displayName, parsingName}, GetTickCount() + durationMs});
+}
+
+void App::HideDeletedDesktopFile(const std::wstring &fileName)
+{
+    if (fileName.empty())
+        return;
+
+    // The file may have lived on the user or the public desktop; it no longer
+    // exists, so which one can't be resolved. Cover both.
+    for (int csidl : {CSIDL_DESKTOPDIRECTORY, CSIDL_COMMON_DESKTOPDIRECTORY})
+    {
+        wchar_t buf[MAX_PATH];
+        if (FAILED(SHGetFolderPathW(NULL, csidl, NULL, 0, buf)))
+            continue;
+        std::wstring path = std::wstring(buf) + L"\\" + fileName;
+        if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES)
+            continue; // Still there — a real item, not a ghost
+
+        AddTransientHiddenIcon(DesktopIcons::GetShellDisplayName(path), path, DELETED_HIDDEN_MS);
+
+        // Nudge the desktop view to drop its item. Redundant when the shell
+        // already noticed; without it a stale item has been seen to linger.
+        SHChangeNotify(SHCNE_DELETE, SHCNF_PATHW | SHCNF_FLUSHNOWAIT, path.c_str(), nullptr);
+    }
 }
 
 void App::UpdateHookHiddenIcons()
 {
     auto icons = CollectCorralIconIdentities();
 
-    // Append unexpired transition aliases (old identities of just-renamed
-    // icons) so a desktop item the shell hasn't updated yet stays hidden
+    // Append unexpired transient identities (old names of just-renamed icons,
+    // just-deleted files) so a desktop item the shell hasn't updated yet
+    // stays hidden
+    DWORD nextExpiryMs = 0;
     {
         std::lock_guard<std::mutex> lock(transientHiddenLock);
         DWORD now = GetTickCount();
         transientHiddenIcons.erase(
             std::remove_if(transientHiddenIcons.begin(), transientHiddenIcons.end(),
                            [now](const TransientHiddenIcon &t)
-                           { return (LONG)(t.expiresAtTick - now) <= 0; }),
+                           {
+                               if ((LONG)(t.expiresAtTick - now) <= 0)
+                                   return true;
+                               // A file exists at that path again: it's a real item
+                               // now, not a stale one, and must not stay hidden
+                               const std::wstring &p = t.icon.parsingName;
+                               return !p.empty() && p.compare(0, 2, L"::") != 0 &&
+                                      GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES;
+                           }),
             transientHiddenIcons.end());
         for (const auto &t : transientHiddenIcons)
         {
             icons.push_back(t.icon);
+            DWORD remaining = t.expiresAtTick - now;
+            if (nextExpiryMs == 0 || remaining < nextExpiryMs)
+                nextExpiryMs = remaining;
         }
+    }
+
+    // Re-run when the next identity expires so it is released on time
+    if (messageWindow)
+    {
+        if (nextExpiryMs)
+            SetTimer(messageWindow, TRANSIENT_HIDDEN_TIMER, nextExpiryMs + 50, nullptr);
+        else
+            KillTimer(messageWindow, TRANSIENT_HIDDEN_TIMER);
     }
 
     HookBridge::UpdateHiddenIcons(icons);
@@ -1808,6 +1859,14 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    // A transient hidden identity expired — release it (re-arms itself if more remain)
+    if (app && uMsg == WM_TIMER && wParam == TRANSIENT_HIDDEN_TIMER)
+    {
+        KillTimer(hwnd, TRANSIENT_HIDDEN_TIMER);
+        app->UpdateHookHiddenIcons();
+        return 0;
+    }
+
     // Retry timer — fired when Shell_NotifyIconW(NIM_ADD) failed at startup
     if (uMsg == WM_TIMER && wParam == TRAY_RETRY_TIMER)
     {
@@ -2293,6 +2352,8 @@ void App::OnDesktopFileDeleted(const std::wstring &fileName)
 
     if (changed)
     {
+        // Before SaveConfig pushes the new hidden list — see HideDeletedDesktopFile
+        HideDeletedDesktopFile(fileName);
         SaveConfig();
     }
 }

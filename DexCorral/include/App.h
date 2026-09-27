@@ -191,7 +191,17 @@ public:
      * identity — hiding both prevents the icon from flickering onto the
      * desktop during the transition.
      */
-    void AddTransientHiddenIcon(const std::wstring &displayName, const std::wstring &parsingName);
+    void AddTransientHiddenIcon(const std::wstring &displayName, const std::wstring &parsingName,
+                                DWORD durationMs = 5000);
+
+    /**
+     * Keeps a just-deleted corral file hidden until the desktop catches up.
+     * The desktop view drops the item asynchronously (on OneDrive desktops it
+     * can take seconds, or not happen until nudged). Unhiding it right away
+     * leaves a ghost icon that "jumps out" of the corral and can't be opened
+     * or deleted. Call before SaveConfig() pushes the new hidden list.
+     */
+    void HideDeletedDesktopFile(const std::wstring &fileName);
 
 private:
     void Initialize();
