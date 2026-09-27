@@ -67,13 +67,8 @@ The two modes cannot be installed side by side; Setup detects the other one and 
 <!-- Per-release, not cumulative: list only the changes since the last tag.
      Emptied after each release ships. -->
 
-- **Install for all users, or just for yourself.** The installer now asks on its first page. A per-user install goes to `%LOCALAPPDATA%\Programs\DexCorral`, registers in `HKCU` and needs no Administrator rights at all, which makes DexCorral usable on a PC where you do not have admin. An all-users install works as before.
-- Fixed: on an all-users install, the "start at login" entry and the language setting were written to the profile of the account that answered the UAC prompt, not the account being installed for. On a PC with more than one user this meant DexCorral never started at login for anyone but the installer. Both now go to `HKLM` and apply to every account.
-- Fixed: installing or uninstalling as an administrator could restart Explorer for every logged-on user, not just the one running Setup. It is now limited to the current session.
-- The two install modes are mutually exclusive, since they share one shell extension registration. Setup detects the other kind before writing anything and offers to remove it or warns you about it.
-- Registration is now explicit about where it writes: `DexCorral.exe --register --scope=user` or `--scope=machine`, and never through `HKEY_CLASSES_ROOT`. Upgrades clean up the old scopeless entries automatically; portable users can run `DexCorral.exe --cleanup-legacy` once.
-- Upgrading from 1.0.27 or earlier keeps working as an all-users install; nothing to do beyond running the installer.
-- README now shows Corrals running over an animated Lively wallpaper, with fresh screenshots.
+- Fixed: deleting an icon from a corral could leave a ghost of it on the desktop, most often on OneDrive-backed desktops. The icon seemed to jump out of the corral, and deleting it there failed with "item not found". Deleted icons now stay hidden until Explorer has caught up.
+- Fixed: after such a ghost, an error in the desktop hook could make every corral icon show up on the desktop as well, so each one appeared twice. The hook no longer hands Explorer the same message twice, and it no longer catches errors that come from Explorer's own code, which could leave Explorer running in a broken state.
 
 ### Known Issues
 

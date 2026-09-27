@@ -509,9 +509,13 @@ void CorralWindow::LoadIconImages()
         {
             files.erase(std::remove(files.begin(), files.end(), stale), files.end());
         }
-        if (App::GetInstance())
+        if (App *app = App::GetInstance())
         {
-            App::GetInstance()->SaveConfig();
+            // The desktop may still show the gone file — keep it hidden until
+            // the shell catches up, instead of letting a ghost icon appear
+            for (const auto &stale : staleFiles)
+                app->HideDeletedDesktopFile(Utf8ToWide(stale));
+            app->SaveConfig();
         }
     }
 }
