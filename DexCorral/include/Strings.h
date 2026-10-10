@@ -66,11 +66,6 @@ enum class Str
     Title_About,                 // "About DexCorral"
     About_Body,                  // GPL notice; {0} = version
 
-    // Shortcut-arrow toggle (App.cpp)
-    Arrow_HideConfirm,           // hide arrows confirmation
-    Arrow_RestoreConfirm,        // restore arrows confirmation
-    Arrow_ChangeFailed,          // failure notice
-
     // Update check balloons (App.cpp)
     Update_AvailableTitle,       // "DexCorral update available"
     Update_AvailableBody,        // {0} = new version

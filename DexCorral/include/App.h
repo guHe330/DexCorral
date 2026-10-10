@@ -86,8 +86,6 @@ public:
     /// Returns true while quick-hide is active (everything hidden)
     bool IsQuickHideActive() const { return quickHideActive; }
 
-    /// Toggles shortcut arrow overlay on icons (requires Explorer restart)
-    void ToggleShortcutArrows();
 
     /// Sets the default corral background color (hex format, e.g., "FF0000" for red)
     void SetDefaultColorHex(const std::string &colorHex);

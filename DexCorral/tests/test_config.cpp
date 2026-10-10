@@ -36,7 +36,6 @@ TEST(AppConfig, Defaults) {
     AppConfig c;
     EXPECT_TRUE(c.DesktopIconsVisible);
     EXPECT_EQ(c.DefaultColorHex, "#7F0000FF");
-    EXPECT_FALSE(c.HideShortcutArrows);
     EXPECT_EQ(c.DefaultTitleBarHeight, 26);
     EXPECT_EQ(c.DefaultHeaderFontName, "Segoe UI Semibold");
     EXPECT_EQ(c.DefaultHeaderFontSize, 10);
@@ -188,7 +187,6 @@ TEST(AppConfig, RoundTrip) {
     AppConfig orig;
     orig.DesktopIconsVisible = false;
     orig.DefaultColorHex = "#AAFFFFFF";
-    orig.HideShortcutArrows = true;
     orig.DefaultTitleBarHeight = 40;
     orig.DefaultIconOpacity = 200;
     orig.DefaultIconSpacingXPercent = 130;
@@ -202,7 +200,6 @@ TEST(AppConfig, RoundTrip) {
 
     EXPECT_FALSE(back.DesktopIconsVisible);
     EXPECT_EQ(back.DefaultColorHex, "#AAFFFFFF");
-    EXPECT_TRUE(back.HideShortcutArrows);
     EXPECT_EQ(back.DefaultTitleBarHeight, 40);
     EXPECT_EQ(back.DefaultIconOpacity, 200);
     EXPECT_EQ(back.DefaultIconSpacingXPercent, 130);

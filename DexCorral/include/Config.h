@@ -122,7 +122,6 @@ struct AppConfig
     std::vector<CorralWindowConfig> Corrals;
     bool DesktopIconsVisible = true;
     std::string DefaultColorHex = "#7F0000FF"; // Default appearance for new corrals
-    bool HideShortcutArrows = false;           // Hide the small arrow overlay on shortcut icons
 
     // Default appearance for new corrals/tabs
     int DefaultTitleBarHeight = 26;
@@ -150,7 +149,7 @@ struct AppConfig
     // falling back to English.
     std::string Language = "";
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, HideShortcutArrows, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language)
 };
 
 /**
