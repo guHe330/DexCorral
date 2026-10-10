@@ -211,12 +211,37 @@ struct AppearanceApplyFlags
     }
 };
 
+/// Outcome of Config::Load, so the caller can tell the user when their file was not usable
+enum class ConfigLoadStatus
+{
+    Ok,                 /// config.json read cleanly
+    Missing,            /// No config.json (first run): defaults returned
+    RestoredFromBackup, /// config.json unreadable, config.bak used instead
+    Reset               /// config.json unreadable and no usable backup: defaults returned
+};
+
 class Config
 {
 public:
     static std::string GetConfigPath();
-    static AppConfig Load();
+
+    /**
+     * Loads config.json.
+     *
+     * A file that cannot be parsed is never silently replaced by defaults: it is
+     * copied to config.corrupt.json and the last config that loaded cleanly
+     * (config.bak) is used instead. `status` reports which of those happened.
+     */
+    static AppConfig Load(ConfigLoadStatus *status = nullptr);
     static void Save(const AppConfig &config);
+
+    /// Load/Save against an explicit path (the unit tests use a temp folder)
+    static AppConfig LoadFrom(const std::wstring &path, ConfigLoadStatus *status = nullptr);
+    static void SaveTo(const std::wstring &path, const AppConfig &config);
+
+    /// "config.bak" / "config.corrupt.json" next to the given config file
+    static std::wstring GetBackupPath(const std::wstring &configPath);
+    static std::wstring GetCorruptPath(const std::wstring &configPath);
 
     /**
      * Clamps loaded values into their usable ranges.

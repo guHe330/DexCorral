@@ -63,6 +63,15 @@ const wchar_t *const kEnglish[] = {
                                    L"hook is disabled for this session. Desktop icons stay visible. The hook "
                                    L"will be re-enabled on the next start.",
 
+    // Unreadable config.json notice
+    /* Config_RestoredTitle */     L"DexCorral restored your layout from a backup",
+    /* Config_RestoredBody */      L"config.json could not be read, so the last working backup was loaded. "
+                                   L"The unreadable file was kept as config.corrupt.json in %APPDATA%\\DexCorral.",
+    /* Config_ResetTitle */        L"DexCorral could not read its configuration",
+    /* Config_ResetBody */         L"config.json could not be read and no backup was usable, so DexCorral started "
+                                   L"with a fresh layout. The unreadable file was kept as config.corrupt.json in "
+                                   L"%APPDATA%\\DexCorral.",
+
     // About dialog
     /* Title_About */              L"About DexCorral",
     /* About_Body */               L"DexCorral - a free and open source Windows desktop icon organizer\n\n"
@@ -249,6 +258,16 @@ const wchar_t *const kGerman[] = {
     /* SafeMode_Body */            L"Der Explorer wurde wiederholt neu gestartet, während der Desktop-Hook aktiv "
                                    L"war; der Hook ist daher für diese Sitzung deaktiviert. Desktopsymbole bleiben "
                                    L"sichtbar. Beim nächsten Start wird der Hook wieder aktiviert.",
+
+    // Unreadable config.json notice
+    /* Config_RestoredTitle */     L"DexCorral hat das Layout aus einer Sicherung geladen",
+    /* Config_RestoredBody */      L"config.json konnte nicht gelesen werden, daher wurde die letzte funktionierende "
+                                   L"Sicherung geladen. Die unlesbare Datei liegt als config.corrupt.json in "
+                                   L"%APPDATA%\\DexCorral.",
+    /* Config_ResetTitle */        L"DexCorral konnte seine Konfiguration nicht lesen",
+    /* Config_ResetBody */         L"config.json konnte nicht gelesen werden und es gab keine brauchbare Sicherung, "
+                                   L"daher startet DexCorral mit einem neuen Layout. Die unlesbare Datei liegt als "
+                                   L"config.corrupt.json in %APPDATA%\\DexCorral.",
 
     // About dialog
     /* Title_About */              L"Über DexCorral",

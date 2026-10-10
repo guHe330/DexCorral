@@ -126,6 +126,23 @@ static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
     }
 }
 
+// Unreadable-config tray notice — armed by LoadConfig when config.json could not
+// be parsed, and shown the same way: once the tray icon is actually visible.
+static ConfigLoadStatus s_ConfigNoticePending = ConfigLoadStatus::Ok;
+
+static void ShowConfigNoticeIfPending(TrayIcon *tray)
+{
+    if (s_ConfigNoticePending == ConfigLoadStatus::Ok || !tray || !tray->IsVisible())
+        return;
+    bool restored = (s_ConfigNoticePending == ConfigLoadStatus::RestoredFromBackup);
+    if (tray->ShowBalloon(Tr(restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
+                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody)))
+    {
+        s_ConfigNoticePending = ConfigLoadStatus::Ok;
+        DllLog(L"App: unreadable-config tray notice shown (restored=%d)", restored ? 1 : 0);
+    }
+}
+
 // Entry point called from the DLL worker thread
 extern "C" int RunApp(HANDLE hStopEvent)
 {
@@ -256,6 +273,10 @@ void App::Initialize()
         ShowSafeModeNoticeIfPending(trayIcon.get());
     }
 
+    // config.json was unreadable: say so rather than leaving the user to wonder
+    // where their corrals went
+    ShowConfigNoticeIfPending(trayIcon.get());
+
     // Restore corrals
     RestoreCorrals();
     DllLog(L"App::Initialize: %zu corrals restored", corrals.size());
@@ -376,7 +397,14 @@ void App::Shutdown()
 
 void App::LoadConfig()
 {
-    config = Config::Load();
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    config = Config::Load(&status);
+    if (status == ConfigLoadStatus::RestoredFromBackup || status == ConfigLoadStatus::Reset)
+    {
+        DllLog(L"App::LoadConfig: config.json unreadable (%s)",
+               status == ConfigLoadStatus::RestoredFromBackup ? L"restored from config.bak" : L"no usable backup, defaults");
+        s_ConfigNoticePending = status;
+    }
 }
 
 void App::SaveConfig()
@@ -1874,6 +1902,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             KillTimer(hwnd, TRAY_RETRY_TIMER);
             DllLog(L"App: TRAY_RETRY_TIMER — tray icon added successfully");
             ShowSafeModeNoticeIfPending(app->trayIcon.get());
+            ShowConfigNoticeIfPending(app->trayIcon.get());
         }
         return 0;
     }
@@ -1886,6 +1915,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         {
             app->trayIcon->Show();
             ShowSafeModeNoticeIfPending(app->trayIcon.get());
+            ShowConfigNoticeIfPending(app->trayIcon.get());
         }
         return 0;
     }

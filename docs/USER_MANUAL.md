@@ -184,6 +184,13 @@ All settings (corral layouts, tabs, colors, fonts, assigned files) are stored in
 
 The format is forward- and backward-compatible: fields missing from an older config simply get default values. The file is written automatically; if you edit it by hand, do so while DexCorral is not running.
 
+Two more files can appear next to it:
+
+- `config.bak` is a copy of the last `config.json` that loaded without errors, refreshed each time DexCorral starts.
+- `config.corrupt.json` is written when `config.json` cannot be read, for example after a hand edit with a stray comma. DexCorral then loads `config.bak` instead, keeps your unreadable file under this name so you can repair it, and shows a tray notification saying so. With no usable backup it starts with a fresh layout.
+
+Deleting `config.json` still means "start over": the backup is not restored in that case.
+
 ### What DexCorral writes outside its own folder
 
 Everything you configure lives in `config.json` above. The registry is used only where Windows requires it: to register the shell extension, to start at login, and for a few settings that must be readable before the config file is.
