@@ -71,7 +71,9 @@ enum class Str
 
     // About dialog (App.cpp)
     Title_About,                 // "About DexCorral"
-    About_Body,                  // GPL notice; {0} = version
+    About_Body,                  // name, copyright and license in brief; {0} = version
+    Btn_Website,                 // "Website"
+    Btn_License,                 // "License"
 
     // Update check balloons (App.cpp)
     Update_AvailableTitle,       // "DexCorral update available"

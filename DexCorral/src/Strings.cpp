@@ -81,14 +81,14 @@ const wchar_t *const kEnglish[] = {
                                    L"Set a different one as QuickHideHotkey in config.json.",
 
     // About dialog
-    /* Title_About */              L"About DexCorral",    /* About_Body */               L"DexCorral - a free and open source Windows desktop icon organizer\n\n"
-                                   L"Version: {0}\n\n"
+    /* Title_About */              L"About DexCorral",
+    /* About_Body */               L"DexCorral {0}\n"
+                                   L"A free and open source desktop icon organizer for Windows.\n\n"
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
-                                   L"This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.\n\n"
-                                   L"This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n\n"
-                                   L"You should have received a copy of the GNU General Public License along with this program.  If not, see https://www.gnu.org/licenses/\n\n"
-                                   L"Website: https://dexcorral.com\n"
-                                   L"GitHub: https://github.com/guHe330/DexCorral",
+                                   L"Free software under the GNU General Public License, version 3 or later. "
+                                   L"It comes with no warranty.",
+    /* Btn_Website */              L"Website",
+    /* Btn_License */              L"License",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral update available",
@@ -285,14 +285,14 @@ const wchar_t *const kGerman[] = {
                                    L"config.json festlegen.",
 
     // About dialog
-    /* Title_About */              L"Über DexCorral",    /* About_Body */               L"DexCorral - ein freier und quelloffener Desktop-Symbol-Organizer für Windows\n\n"
-                                   L"Version: {0}\n\n"
+    /* Title_About */              L"Über DexCorral",
+    /* About_Body */               L"DexCorral {0}\n"
+                                   L"Ein freier und quelloffener Desktop-Symbol-Organizer für Windows.\n\n"
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
-                                   L"Dieses Programm ist freie Software: Sie können es unter den Bedingungen der GNU General Public License, wie von der Free Software Foundation veröffentlicht, weitergeben und/oder modifizieren, entweder gemäß Version 3 der Lizenz oder (nach Ihrer Wahl) jeder späteren Version.\n\n"
-                                   L"Die Veröffentlichung dieses Programms erfolgt in der Hoffnung, dass es Ihnen von Nutzen sein wird, aber OHNE IRGENDEINE GARANTIE, sogar ohne die implizite Garantie der MARKTREIFE oder der VERWENDBARKEIT FÜR EINEN BESTIMMTEN ZWECK. Details finden Sie in der GNU General Public License.\n\n"
-                                   L"Sie sollten ein Exemplar der GNU General Public License zusammen mit diesem Programm erhalten haben. Falls nicht, siehe https://www.gnu.org/licenses/\n\n"
-                                   L"Website: https://dexcorral.com\n"
-                                   L"GitHub: https://github.com/guHe330/DexCorral",
+                                   L"Freie Software unter der GNU General Public License, Version 3 oder später. "
+                                   L"Es besteht keinerlei Garantie.",
+    /* Btn_Website */              L"Website",
+    /* Btn_License */              L"Lizenz",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral-Update verfügbar",
