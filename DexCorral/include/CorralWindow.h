@@ -339,6 +339,8 @@ private:
     // Icon reordering
     void OnIconDrag(int x, int y);
     void OnIconDragEnd();
+    std::vector<int> GetDraggedIconIndices() const; // Icons an icon drag carries: the selection, or just the one
+    bool IsIconBeingDragged(int index) const;
 
     // Icon rename
     RECT GetIconLabelRect(int iconIndex) const;
