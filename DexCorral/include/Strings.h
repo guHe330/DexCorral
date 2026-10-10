@@ -108,6 +108,7 @@ enum class Str
     Menu_AddSpecialIcon,         // "Add Special Icon"
     Menu_ExcludeFromQuickHide,   // "Exclude from Quick-Hide"
     Menu_LockPosition,           // "Lock Position"
+    Menu_ExpandOnHover,          // "Expand on Hover" (rolled-up corrals)
     Menu_CloseTab,               // "Close Tab"
     Menu_DeleteCorral,           // "Delete Corral"
     Menu_RemoveFromCorral,       // "Remove from Corral"

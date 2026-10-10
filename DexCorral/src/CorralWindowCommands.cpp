@@ -223,6 +223,10 @@ void CorralWindow::ShowContextMenu(int x, int y)
     // Lock Position (blocks mouse move/resize; roll-up and system repositioning still work)
     UINT lockFlags = MF_STRING | (config.IsLocked ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(menu, lockFlags, 16, Tr(Str::Menu_LockPosition));
+
+    // Expand on Hover (a rolled-up corral unrolls under a resting mouse)
+    UINT expandFlags = MF_STRING | (config.ExpandOnHover ? MF_CHECKED : MF_UNCHECKED);
+    AppendMenuW(menu, expandFlags, 17, Tr(Str::Menu_ExpandOnHover));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 6, Tr(Str::Menu_CreateNewCorral));
     AppendMenuW(menu, MF_STRING, 8, Tr(Str::Menu_NewVirtualCorral));
@@ -389,6 +393,16 @@ void CorralWindow::ShowContextMenu(int x, int y)
             App::GetInstance()->SaveConfig();
         }
         UpdateLayeredContent(); // Show/hide the lock glyph
+        break;
+    case 17:
+        // Expand on Hover
+        config.ExpandOnHover = !config.ExpandOnHover;
+        if (!config.ExpandOnHover && isHoverExpanded && !isAnimating)
+            StartHoverCollapse(); // It was opened by the very hover being switched off
+        if (App::GetInstance())
+        {
+            App::GetInstance()->SaveConfig();
+        }
         break;
     case 15:
     {
@@ -658,7 +672,7 @@ void CorralWindow::ChangeFolderPath()
 
 void CorralWindow::StartHoverExpand()
 {
-    if (!config.IsRolledUp || isHoverExpanded || isAnimating)
+    if (!config.IsRolledUp || !config.ExpandOnHover || isHoverExpanded || isAnimating)
         return;
 
     // Only one corral may be hover-expanded at a time — otherwise a sliver of a

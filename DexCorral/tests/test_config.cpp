@@ -57,6 +57,7 @@ TEST(CorralWindowConfig, Defaults) {
     EXPECT_DOUBLE_EQ(c.Width,  300.0);
     EXPECT_DOUBLE_EQ(c.Height, 200.0);
     EXPECT_FALSE(c.IsRolledUp);
+    EXPECT_TRUE(c.ExpandOnHover); // Existing corrals keep unrolling on hover
     EXPECT_EQ(c.ActiveTabIndex, 0);
     EXPECT_EQ(c.TitleBarHeight, 32);  // Header height is per-corral
     EXPECT_EQ(c.HeaderOpacity, 240);  // Matches the previously hard-coded active tab alpha
@@ -537,4 +538,17 @@ TEST_F(ConfigFiles, DeletedFile_DoesNotResurrectTheBackup) {
     AppConfig c = Config::LoadFrom(path, &status);
     EXPECT_EQ(status, ConfigLoadStatus::Missing);
     EXPECT_TRUE(c.Corrals.empty());
+}
+TEST(MissingField, ExpandOnHover_DefaultsToOn) {
+    // A config written before the setting existed must keep the old behaviour
+    nlohmann::json j = R"({"Left":10,"Top":20})"_json;
+    auto corral = j.get<CorralWindowConfig>();
+    EXPECT_TRUE(corral.ExpandOnHover);
+}
+
+TEST(CorralWindowConfig, ExpandOnHover_RoundTripsWhenOff) {
+    CorralWindowConfig orig;
+    orig.ExpandOnHover = false;
+    auto back = toJson(orig).get<CorralWindowConfig>();
+    EXPECT_FALSE(back.ExpandOnHover);
 }
