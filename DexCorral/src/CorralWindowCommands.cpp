@@ -271,7 +271,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
             POINT desiredCenter = {currentRect.right + gap + size.cx / 2,
                                    currentRect.top + size.cy / 2};
 
-            App::GetInstance()->CreateCorralAt(desiredCenter, hwnd);
+            App::GetInstance()->CreateCorralAt(desiredCenter, hwnd, true);
         }
         break;
     case 7:
@@ -390,6 +390,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
         {
             App::GetInstance()->SaveConfig();
         }
+        ShowRenameDialog(); // Name it now; Esc keeps "New Tab"
         break;
     }
     }

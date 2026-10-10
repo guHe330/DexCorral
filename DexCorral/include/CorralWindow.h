@@ -242,6 +242,7 @@ public:
     static std::string WideToUtf8(const std::wstring &wide);
     static std::wstring Utf8ToWide(const std::string &utf8);
     static std::wstring GetDesktopPath();       // The user's desktop folder
+    void PromptRename();                         // Rename dialog for the active tab (also offered right after creation)
     static std::wstring GetPublicDesktopPath(); // The all-users desktop folder
 
 private:

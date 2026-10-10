@@ -21,6 +21,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Icons can be moved between tabs. Drag them onto a tab, in the same Corral or another one, or use the new **Move to Tab** submenu in the icon context menu. A drag from the desktop or an Explorer window that rests on a tab brings that tab forward, so a drop is no longer limited to the tab a Corral happens to be showing. ([#37](https://github.com/guHe330/DexCorral/issues/37))
 
 ### Changed
+- **Create New Corral** and **Add Tab** ask for the name right away instead of leaving a "New Corral" or "New Tab" to be renamed through the menu. Esc keeps the default name. The rename dialog is now titled "Rename Tab", which is what it does. ([#41](https://github.com/guHe330/DexCorral/issues/41))
 - The **Close Tab** and **Delete Corral** confirmations now say what happens next: the icons go back to the desktop and no files are deleted, or, for a virtual tab, that its folder is left alone. Close Tab also names the tab. ([#39](https://github.com/guHe330/DexCorral/issues/39))
 - **Remove from Corral** acts on all selected icons when the one you right-clicked is part of a selection, and is no longer offered on virtual tabs, where it did nothing. ([#37](https://github.com/guHe330/DexCorral/issues/37))
 

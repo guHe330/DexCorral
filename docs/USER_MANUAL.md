@@ -71,7 +71,7 @@ A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a projec
 ## Managing Corrals
 
 ### Creating
-- Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**.
+- Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab**.
 - Choose **New Virtual Corral** instead to pick a folder and create a Corral mirroring it.
 
 ### Moving and Resizing
@@ -93,7 +93,7 @@ Corral positions are remembered **per monitor and per resolution**. Moving a Cor
 ### Customizing
 Right-click a Corral's title bar or background:
 
-- **Add Tab**: add a new tab to this Corral.
+- **Add Tab**: add a new tab to this Corral and name it.
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
 - **Rename Tab**: change the current tab's title.
 - **Appearance...**: open the appearance dialog (see below).

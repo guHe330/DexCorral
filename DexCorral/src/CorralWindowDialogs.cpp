@@ -356,6 +356,11 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
     return FALSE;
 }
 
+void CorralWindow::PromptRename()
+{
+    ShowRenameDialog();
+}
+
 void CorralWindow::ShowRenameDialog()
 {
     WORD dlgTemplate[512] = {};
@@ -371,7 +376,7 @@ void CorralWindow::ShowRenameDialog()
     *p++ = 0;
     *p++ = 0;
 
-    const wchar_t *dlgTitle = Tr(Str::Dlg_RenameCorral);
+    const wchar_t *dlgTitle = Tr(Str::Dlg_RenameTab);
     size_t titleLen = wcslen(dlgTitle) + 1;
     memcpy(p, dlgTitle, titleLen * sizeof(wchar_t));
     p += titleLen;

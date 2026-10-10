@@ -134,7 +134,7 @@ const wchar_t *const kEnglish[] = {
     /* Confirm_DeleteCorralTitle */L"Delete Corral",
 
     // Rename dialog / file rename
-    /* Dlg_RenameCorral */         L"Rename Corral",
+    /* Dlg_RenameTab */            L"Rename Tab",
     /* Err_RenameFailedBody */     L"Failed to rename file. The file may be in use or you may not have permission.",
     /* Err_RenameFailedTitle */    L"Rename Error",
 
@@ -329,7 +329,7 @@ const wchar_t *const kGerman[] = {
     /* Confirm_DeleteCorralTitle */L"Corral löschen",
 
     // Rename dialog / file rename
-    /* Dlg_RenameCorral */         L"Corral umbenennen",
+    /* Dlg_RenameTab */            L"Tab umbenennen",
     /* Err_RenameFailedBody */     L"Die Datei konnte nicht umbenannt werden. Sie wird möglicherweise verwendet, oder Ihnen fehlt die Berechtigung.",
     /* Err_RenameFailedTitle */    L"Fehler beim Umbenennen",
 

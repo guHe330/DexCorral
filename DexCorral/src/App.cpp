@@ -1392,7 +1392,7 @@ void App::ApplyLanguage(const std::string &langCode)
 
 void App::ShowCreationMenu(POINT pt)
 {
-    CreateCorralAt(pt);
+    CreateCorralAt(pt, nullptr, true);
 }
 
 void App::ShowAbout()
@@ -1421,7 +1421,7 @@ void App::StartUpdateCheck(bool userInitiated)
     UpdateChecker::StartAsyncCheck(messageWindow, WM_UPDATE_CHECK_DONE, userInitiated);
 }
 
-void App::CreateCorralAt(POINT desiredCenter, HWND exclude)
+void App::CreateCorralAt(POINT desiredCenter, HWND exclude, bool promptForName)
 {
     CorralWindowConfig newConfig = MakeDefaultCorralConfig();
     newConfig.Tabs.push_back(MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_NewCorral))));
@@ -1437,8 +1437,14 @@ void App::CreateCorralAt(POINT desiredCenter, HWND exclude)
 
     auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
+    CorralWindow *created = corral.get();
     corrals.push_back(std::move(corral));
     SaveConfig();
+
+    // A corral the user just asked for is named on the spot instead of sitting
+    // there as "New Corral" until they find Rename Tab. Esc keeps the default.
+    if (promptForName)
+        created->PromptRename();
 }
 
 UINT App::DpiForPoint(POINT pt)
@@ -1808,7 +1814,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         {
             POINT pt = {(int)(LONG)wParam, (int)(LONG)lParam};
             if (uMsg == WM_CREATE_CORRAL_AT)
-                app->CreateCorralAt(pt);
+                app->CreateCorralAt(pt, nullptr, true);
             else
                 app->CreateVirtualCorralAt(pt);
         }
