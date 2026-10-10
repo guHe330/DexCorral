@@ -18,6 +18,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ### Added
+- DexCorral now respects the Windows **Animation effects** setting (Settings > Accessibility > Visual effects). With it off, the hover fade, the unrolling of a rolled-up Corral and the Quick-Hide fade jump straight to their end state. ([#58](https://github.com/guHe330/DexCorral/issues/58))
 - **Reset to Defaults** in the Appearance dialog sets every setting back to the look a new Corral gets. ([#56](https://github.com/guHe330/DexCorral/issues/56))
 - Tray menu: **User Manual** opens the manual in your browser, and **Open Config Folder** opens `%APPDATA%\DexCorral`, where `config.json`, its backup and the debug logs live. ([#49](https://github.com/guHe330/DexCorral/issues/49))
 - **Expand on Hover** in a Corral's context menu. Uncheck it and that Corral, when rolled up, stays rolled up until you double-click its title bar instead of opening whenever the mouse rests on it. On by default. ([#47](https://github.com/guHe330/DexCorral/issues/47))

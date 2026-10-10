@@ -744,10 +744,22 @@ void CorralWindow::StartHoverCollapse()
     SetTimer(hwnd, ANIMATION_TIMER_ID, 16, nullptr);
 }
 
+bool CorralWindow::AnimationsEnabled()
+{
+    // Settings > Accessibility > Visual effects > Animation effects. Asked every
+    // time rather than cached: it is one cheap call, and the user can flip the
+    // switch while DexCorral is running.
+    BOOL enabled = TRUE;
+    if (!SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &enabled, 0))
+        return true;
+    return enabled != FALSE;
+}
+
 void CorralWindow::OnAnimationTimer()
 {
     DWORD elapsed = GetTickCount() - animationStartTime;
-    float progress = (float)elapsed / ANIMATION_DURATION;
+    // With animations off in Windows the first tick lands on the end state
+    float progress = AnimationsEnabled() ? (float)elapsed / ANIMATION_DURATION : 1.0f;
 
     if (progress >= 1.0f)
     {
@@ -851,7 +863,7 @@ void CorralWindow::StartOpacityAnimation(int target, int tintTargetVal, int head
 void CorralWindow::OnOpacityAnimationTimer()
 {
     DWORD elapsed = GetTickCount() - opacityAnimationStartTime;
-    float progress = (float)elapsed / opacityAnimationDuration;
+    float progress = AnimationsEnabled() ? (float)elapsed / opacityAnimationDuration : 1.0f;
 
     if (progress >= 1.0f)
     {
@@ -939,7 +951,7 @@ void CorralWindow::StartQuickShow()
 void CorralWindow::OnQuickHideAnimationTimer()
 {
     DWORD elapsed = GetTickCount() - quickHideAnimationStartTime;
-    float progress = (float)elapsed / QUICKHIDE_ANIMATION_DURATION;
+    float progress = AnimationsEnabled() ? (float)elapsed / QUICKHIDE_ANIMATION_DURATION : 1.0f;
     if (progress >= 1.0f)
         progress = 1.0f;
 
