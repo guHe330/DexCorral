@@ -1443,7 +1443,6 @@ void App::CreateCorralAt(POINT desiredCenter, HWND exclude, bool promptForName)
 
     // A corral the user just asked for is named on the spot instead of sitting
     // there as "New Corral" until they find Rename Tab. Esc keeps the default.
-    // The dialog pumps messages, so make sure the corral still exists afterwards.
     if (promptForName)
         created->PromptRename();
 }
