@@ -33,6 +33,7 @@
 #include "FolderWatcher.h"
 #include "Strings.h"
 #include <shobjidl.h>
+#include <Shlwapi.h>
 #include <algorithm>
 
 // ============================================================================
@@ -155,8 +156,17 @@ void CorralWindow::ShowContextMenu(int x, int y)
     AppendMenuW(viewMenu, MF_STRING | (currentMode == ViewMode::Details ? MF_CHECKED : 0), 13, Tr(Str::Menu_Details));
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)viewMenu, Tr(Str::Menu_View));
 
-    // Sort By submenu — virtual corrals in Details view (Explorer-style)
-    if (GetActiveTab().IsVirtual && currentMode == ViewMode::Details)
+    // Sort By submenu. A virtual tab has a standing sort (column + direction,
+    // Explorer-style) in every view; a normal tab is sorted once, on request,
+    // because its order is otherwise the user's own arrangement.
+    if (!GetActiveTab().IsVirtual)
+    {
+        HMENU sortMenu = CreatePopupMenu();
+        AppendMenuW(sortMenu, MF_STRING, 66, Tr(Str::Col_Name));
+        AppendMenuW(sortMenu, MF_STRING, 67, Tr(Str::Col_Type));
+        AppendMenuW(menu, MF_POPUP, (UINT_PTR)sortMenu, Tr(Str::Menu_SortBy));
+    }
+    else
     {
         int sortCol = GetActiveTab().DetailsSortColumn;
         bool asc = GetActiveTab().DetailsSortAscending;
@@ -335,6 +345,11 @@ void CorralWindow::ShowContextMenu(int x, int y)
         if (App::GetInstance())
             App::GetInstance()->SaveConfig();
         break;
+    case 66:
+    case 67:
+        // One-off sort of a normal tab (66 = by name, 67 = by type)
+        SortEntries(cmd == 67);
+        break;
     case 64:
     case 65:
         // Sort direction (64 = Ascending, 65 = Descending)
@@ -417,6 +432,66 @@ void CorralWindow::SetViewMode(ViewMode mode)
     {
         App::GetInstance()->SaveConfig();
     }
+}
+
+void CorralWindow::SortEntries(bool byType)
+{
+    if (GetActiveTab().IsVirtual)
+        return;
+
+    struct Entry
+    {
+        std::string configName;
+        std::wstring name;
+        std::wstring type;
+    };
+
+    std::vector<Entry> entries;
+    for (const CorralIcon &icon : icons)
+    {
+        Entry e;
+        e.configName = icon.fileName;
+        e.name = icon.displayName;
+        // The extension stands in for the type: the type description is only
+        // loaded for the details view. Folders and special icons have none and
+        // so come first.
+        if (!icon.isSpecialIcon && !icon.isFolder)
+            e.type = PathFindExtensionW(icon.wFileName.c_str());
+        entries.push_back(std::move(e));
+    }
+
+    std::stable_sort(entries.begin(), entries.end(),
+                     [byType](const Entry &a, const Entry &b)
+                     {
+                         if (byType)
+                         {
+                             int cmp = lstrcmpiW(a.type.c_str(), b.type.c_str());
+                             if (cmp != 0)
+                                 return cmp < 0;
+                         }
+                         // Natural order, as Explorer sorts names ("File 2" before "File 10")
+                         return StrCmpLogicalW(a.name.c_str(), b.name.c_str()) < 0;
+                     });
+
+    // Entries whose file is currently missing have no icon; keep them, at the end.
+    auto &files = GetActiveTab().Files;
+    std::vector<std::string> sorted;
+    for (const Entry &e : entries)
+        sorted.push_back(e.configName);
+    for (const std::string &name : files)
+    {
+        if (std::find(sorted.begin(), sorted.end(), name) == sorted.end())
+            sorted.push_back(name);
+    }
+
+    if (sorted == files)
+        return;
+
+    files = std::move(sorted);
+    ClearSelection();
+    LoadFiles();
+    if (App::GetInstance())
+        App::GetInstance()->SaveConfig();
 }
 
 void CorralWindow::DeleteCorral()
