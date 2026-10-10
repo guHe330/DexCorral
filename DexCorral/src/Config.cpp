@@ -77,42 +77,120 @@ void Config::Normalize(AppConfig &config)
     }
 }
 
-AppConfig Config::Load()
+namespace
 {
-    std::string path = GetConfigPath();
-    std::ifstream file(path);
-
-    if (!file.is_open())
+    enum class ReadResult
     {
-        return AppConfig();
+        NotFound,
+        Unreadable,
+        Good
+    };
+
+    /// Reads and normalizes one config file. `out` is only written on Good.
+    ReadResult ReadConfigFile(const std::wstring &path, AppConfig &out)
+    {
+        if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
+            return ReadResult::NotFound;
+
+        std::ifstream file(path.c_str(), std::ios::binary);
+        if (!file.is_open())
+            return ReadResult::Unreadable;
+
+        try
+        {
+            nlohmann::json j;
+            file >> j;
+            AppConfig loaded = j.get<AppConfig>();
+            Config::Normalize(loaded);
+            out = std::move(loaded);
+            return ReadResult::Good;
+        }
+        catch (...)
+        {
+            return ReadResult::Unreadable;
+        }
     }
 
-    try
+    /// "…\config.json" -> "…\config" + suffix
+    std::wstring SiblingPath(const std::wstring &path, const wchar_t *suffix)
     {
-        nlohmann::json j;
-        file >> j;
-        AppConfig loaded = j.get<AppConfig>();
-        Normalize(loaded);
+        size_t dot = path.find_last_of(L'.');
+        size_t slash = path.find_last_of(L"\\/");
+        std::wstring base = (dot != std::wstring::npos && (slash == std::wstring::npos || dot > slash))
+                                ? path.substr(0, dot)
+                                : path;
+        return base + suffix;
+    }
+} // namespace
+
+std::wstring Config::GetBackupPath(const std::wstring &configPath)
+{
+    return SiblingPath(configPath, L".bak");
+}
+
+std::wstring Config::GetCorruptPath(const std::wstring &configPath)
+{
+    return SiblingPath(configPath, L".corrupt.json");
+}
+
+AppConfig Config::Load(ConfigLoadStatus *status)
+{
+    return LoadFrom(Utf8ToWide(GetConfigPath()), status);
+}
+
+AppConfig Config::LoadFrom(const std::wstring &path, ConfigLoadStatus *status)
+{
+    ConfigLoadStatus localStatus;
+    if (!status)
+        status = &localStatus;
+
+    AppConfig loaded;
+    switch (ReadConfigFile(path, loaded))
+    {
+    case ReadResult::Good:
+        // Keep a copy of the last config that loaded cleanly. Taken here rather
+        // than on every save so the backup is always a file that is known to parse.
+        CopyFileW(path.c_str(), GetBackupPath(path).c_str(), FALSE);
+        *status = ConfigLoadStatus::Ok;
+        return loaded;
+
+    case ReadResult::NotFound:
+        // First run, or the user deleted the file to start over: the backup is
+        // deliberately not restored here.
+        *status = ConfigLoadStatus::Missing;
+        return AppConfig();
+
+    case ReadResult::Unreadable:
+        break;
+    }
+
+    // The next save replaces config.json, so set the unreadable file aside first:
+    // a hand edit with one stray comma should be fixable, not gone.
+    CopyFileW(path.c_str(), GetCorruptPath(path).c_str(), FALSE);
+
+    if (ReadConfigFile(GetBackupPath(path), loaded) == ReadResult::Good)
+    {
+        *status = ConfigLoadStatus::RestoredFromBackup;
         return loaded;
     }
-    catch (...)
-    {
-        return AppConfig();
-    }
+
+    *status = ConfigLoadStatus::Reset;
+    return AppConfig();
 }
 
 void Config::Save(const AppConfig &config)
 {
-    std::string path = GetConfigPath();
-    std::string tmpPath = path + ".tmp";
+    SaveTo(Utf8ToWide(GetConfigPath()), config);
+}
+
+void Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
+{
+    std::wstring wTmp = wPath + L".tmp";
 
     try
     {
         // Serialize first so a serialization failure never touches the file.
         std::string data = nlohmann::json(config).dump(4);
-
-        std::wstring wTmp = Utf8ToWide(tmpPath);
-        std::wstring wPath = Utf8ToWide(path);
 
         // Write to a temp file, flush, and only then atomically replace the
         // real config. This prevents a crash/kill mid-write from leaving a
@@ -139,6 +217,6 @@ void Config::Save(const AppConfig &config)
     }
     catch (...)
     {
-        DeleteFileW(Utf8ToWide(tmpPath).c_str());
+        DeleteFileW(wTmp.c_str());
     }
 }

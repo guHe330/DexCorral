@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 #include "Config.h"
+#include <Windows.h>
+#include <fstream>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -408,4 +410,134 @@ TEST(Normalize, LeavesValidValuesAlone) {
 
     EXPECT_EQ(cfg.Corrals[0].HeaderOpacity, 128);
     EXPECT_EQ(cfg.Corrals[0].BorderOpacity, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Load / Save against real files: backup and recovery of an unreadable config
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A fresh, empty folder under %TEMP% that is removed again when the test ends.
+class ConfigFiles : public ::testing::Test {
+protected:
+    std::wstring dir;
+    std::wstring path;
+
+    void SetUp() override {
+        wchar_t temp[MAX_PATH];
+        GetTempPathW(MAX_PATH, temp);
+        dir = std::wstring(temp) + L"DexCorralTests_" + std::to_wstring(GetCurrentProcessId()) +
+              L"_" + std::to_wstring(GetTickCount64());
+        CreateDirectoryW(dir.c_str(), nullptr);
+        path = dir + L"\\config.json";
+    }
+
+    void TearDown() override {
+        for (const wchar_t* name : {L"\\config.json", L"\\config.bak", L"\\config.corrupt.json", L"\\config.json.tmp"})
+            DeleteFileW((dir + name).c_str());
+        RemoveDirectoryW(dir.c_str());
+    }
+
+    static bool Exists(const std::wstring& p) {
+        return GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES;
+    }
+
+    static void WriteText(const std::wstring& p, const std::string& text) {
+        std::ofstream f(p.c_str(), std::ios::binary | std::ios::trunc);
+        f << text;
+    }
+
+    static std::string ReadText(const std::wstring& p) {
+        std::ifstream f(p.c_str(), std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    }
+
+    static AppConfig OneCorral(double width) {
+        AppConfig c;
+        CorralWindowConfig corral;
+        corral.Width = width;
+        c.Corrals.push_back(corral);
+        return c;
+    }
+};
+
+} // namespace
+
+TEST_F(ConfigFiles, MissingFile_GivesDefaultsAndWritesNothing) {
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    AppConfig c = Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::Missing);
+    EXPECT_TRUE(c.Corrals.empty());
+    EXPECT_FALSE(Exists(Config::GetBackupPath(path)));
+    EXPECT_FALSE(Exists(Config::GetCorruptPath(path)));
+}
+
+TEST_F(ConfigFiles, SaveThenLoad_RoundTripsAndKeepsBackup) {
+    Config::SaveTo(path, OneCorral(444));
+
+    ConfigLoadStatus status = ConfigLoadStatus::Missing;
+    AppConfig c = Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::Ok);
+    ASSERT_EQ(c.Corrals.size(), 1u);
+    EXPECT_DOUBLE_EQ(c.Corrals[0].Width, 444.0);
+    EXPECT_TRUE(Exists(Config::GetBackupPath(path)));
+    EXPECT_FALSE(Exists(path + L".tmp"));
+}
+
+TEST_F(ConfigFiles, UnreadableFile_RestoresBackupAndKeepsTheBadFile) {
+    Config::SaveTo(path, OneCorral(444));
+    Config::LoadFrom(path); // clean load: this is what writes config.bak
+
+    const std::string broken = "{ \"Corrals\": [ { \"Width\": 444, } ";
+    WriteText(path, broken);
+
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    AppConfig c = Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::RestoredFromBackup);
+    ASSERT_EQ(c.Corrals.size(), 1u);
+    EXPECT_DOUBLE_EQ(c.Corrals[0].Width, 444.0);
+    EXPECT_EQ(ReadText(Config::GetCorruptPath(path)), broken);
+}
+
+TEST_F(ConfigFiles, UnreadableFile_DoesNotOverwriteTheBackup) {
+    Config::SaveTo(path, OneCorral(444));
+    Config::LoadFrom(path);
+    const std::string goodBackup = ReadText(Config::GetBackupPath(path));
+
+    WriteText(path, "not json at all");
+    Config::LoadFrom(path);
+    Config::LoadFrom(path); // a second start before anything was saved
+
+    EXPECT_EQ(ReadText(Config::GetBackupPath(path)), goodBackup);
+}
+
+TEST_F(ConfigFiles, UnreadableFile_WithoutBackup_ResetsAndKeepsTheBadFile) {
+    WriteText(path, "");
+
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    AppConfig c = Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::Reset);
+    EXPECT_TRUE(c.Corrals.empty());
+    EXPECT_TRUE(Exists(Config::GetCorruptPath(path)));
+}
+
+TEST_F(ConfigFiles, WrongType_CountsAsUnreadable) {
+    // Valid JSON, but "Corrals" is not an array: must not be mistaken for a good file
+    WriteText(path, "{ \"Corrals\": 5 }");
+
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::Reset);
+}
+
+TEST_F(ConfigFiles, DeletedFile_DoesNotResurrectTheBackup) {
+    Config::SaveTo(path, OneCorral(444));
+    Config::LoadFrom(path);
+    DeleteFileW(path.c_str());
+
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    AppConfig c = Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::Missing);
+    EXPECT_TRUE(c.Corrals.empty());
 }

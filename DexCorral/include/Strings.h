@@ -56,6 +56,12 @@ enum class Str
     SafeMode_Title,              // "DexCorral started in safe mode"
     SafeMode_Body,               // explanation balloon text
 
+    // Unreadable config.json notice (App.cpp)
+    Config_RestoredTitle,        // layout restored from config.bak
+    Config_RestoredBody,         // where the unreadable file was kept
+    Config_ResetTitle,           // no usable backup, fresh layout
+    Config_ResetBody,            // where the unreadable file was kept
+
     // About dialog (App.cpp)
     Title_About,                 // "About DexCorral"
     About_Body,                  // GPL notice; {0} = version
