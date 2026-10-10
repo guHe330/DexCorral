@@ -89,6 +89,7 @@ const wchar_t *const kEnglish[] = {
                                    L"It comes with no warranty.",
     /* Btn_Website */              L"Website",
     /* Btn_License */              L"License",
+
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral update available",
     /* Update_AvailableBody */     L"Version {0} is available. Click here to open the download page.",
@@ -292,6 +293,7 @@ const wchar_t *const kGerman[] = {
                                    L"Es besteht keinerlei Garantie.",
     /* Btn_Website */              L"Website",
     /* Btn_License */              L"Lizenz",
+
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral-Update verfügbar",
     /* Update_AvailableBody */     L"Version {0} ist verfügbar. Klicken Sie hier, um die Downloadseite zu öffnen.",
