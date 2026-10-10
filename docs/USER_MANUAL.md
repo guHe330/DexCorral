@@ -173,12 +173,12 @@ Right-clicking an icon shows the standard Windows context menu (Open, Cut, Copy,
 Double-click an empty spot on the desktop to hide everything at once: all native desktop icons and all corrals (they fade out). Double-click the desktop again to bring everything back exactly as it was.
 
 - Corrals can opt out: right-click a corral and check **Exclude from Quick-Hide** to keep it visible while everything else hides.
-- The tray menu's **Quick-Hide Everything** entry toggles the same state.
+- Double-clicking the **tray icon** does the same, and so does the tray menu's **Quick-Hide Everything** entry.
 - Quick-hide is temporary: restarting DexCorral always restores your normal desktop.
 - For a keyboard shortcut, switch on **Quick-Hide Hotkey** in the tray menu. It is off by default, and its combination is Ctrl+Alt+H. To use another one, set `QuickHideHotkey` in `config.json` to something like `"Ctrl+Shift+F9"` or `"Win+Alt+D"`: at least one of Ctrl, Alt, Shift, Win, plus one letter, digit or function key. If the combination is already taken, DexCorral says so and leaves the hotkey off.
 ## Tray Icon
 
-The DexCorral tray icon's right-click menu offers:
+Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 - **About**: version and license information.
 - **User Manual**: opens this manual on GitHub in your browser.

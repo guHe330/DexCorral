@@ -1811,7 +1811,9 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         }
         if (lParam == WM_LBUTTONDBLCLK)
         {
-            app->ToggleDesktopIcons();
+            // Same gesture, same result as double-clicking the desktop. The
+            // narrower icons-only toggle stays in the menu.
+            app->ToggleQuickHide();
             return 0;
         }
         // User clicked the "update available" balloon — open the release page.
