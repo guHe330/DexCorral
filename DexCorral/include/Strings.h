@@ -106,6 +106,7 @@ enum class Str
     Menu_CloseTab,               // "Close Tab"
     Menu_DeleteCorral,           // "Delete Corral"
     Menu_RemoveFromCorral,       // "Remove from Corral"
+    Menu_MoveToTab,              // "Move to Tab" (submenu listing the corral's other tabs)
 
     // Confirmations (CorralWindowCommands.cpp)
     Confirm_CloseTabBody,        // "Close this tab?"

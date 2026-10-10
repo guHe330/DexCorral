@@ -61,6 +61,7 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 
 **Reordering tabs:** hover a tab to reveal a grip handle ("⠿") on its left edge, then drag it left or right.
 
+**Moving icons between tabs:** drag the icons onto the tab you want them in, in the same Corral or in another one, or right-click an icon and pick the tab from **Move to Tab**. When you drag something in from the desktop or an Explorer window, resting on a tab for half a second brings that tab forward, and dropping straight onto a tab works too.
 ### Catch-All
 One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
 
@@ -147,7 +148,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
 
 ### Right-Click Menu
-Right-clicking an icon shows the standard Windows context menu (Open, Cut, Copy, Delete, Properties, ...) plus **Remove from Corral**, which returns the icon to the regular desktop without deleting anything.
+Right-clicking an icon shows the standard Windows context menu (Open, Cut, Copy, Delete, Properties, ...) plus two DexCorral entries: **Move to Tab**, when the Corral has other tabs, and **Remove from Corral**, which returns the icon to the regular desktop without deleting anything. Both act on every selected icon if the one you clicked is part of a selection. Virtual tabs show neither: their icons are the files of a folder.
 
 ## Quick-Hide
 

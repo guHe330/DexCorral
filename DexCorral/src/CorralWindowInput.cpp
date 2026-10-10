@@ -1210,6 +1210,7 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         draggedIconIndex = -1;
         dropTargetIndex = -1;
         iconDragOutside = false;
+        hoveredTab = -1;
         ReleaseCapture();
         UpdateLayeredContent();
     }
@@ -1441,6 +1442,13 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
     }
 
     const UINT removeCmdId = 0x7FFF + 1;
+    const UINT moveCmdBase = removeCmdId + 1; // + tab index
+
+    // DexCorral's own commands act on the whole selection when the icon is part
+    // of one. Taken now: the icon list is rebuilt by the commands themselves.
+    const bool isVirtualTab = GetActiveTab().IsVirtual;
+    const std::vector<std::string> actionEntries = GetActionEntries(iconIndex);
+
     HMENU hMenu = CreatePopupMenu();
     if (hMenu)
     {
@@ -1450,11 +1458,36 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
             hr = pContextMenu->QueryContextMenu(hMenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_EXPLORE);
             haveShellItems = SUCCEEDED(hr);
         }
-        if (haveShellItems)
+
+        // A virtual tab shows a folder: there is nothing to remove from the corral
+        // or to move to another tab, the files simply live in that folder.
+        if (!isVirtualTab)
         {
-            AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+            if (haveShellItems)
+            {
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+            }
+
+            HMENU moveMenu = CreatePopupMenu();
+            int moveTargets = 0;
+            for (int i = 0; moveMenu && i < (int)config.Tabs.size(); i++)
+            {
+                if (i == config.ActiveTabIndex || config.Tabs[i].IsVirtual)
+                    continue;
+                // A literal '&' in a tab title must not become a menu mnemonic
+                std::wstring title = Utf8ToWide(config.Tabs[i].Title);
+                for (size_t pos = 0; (pos = title.find(L'&', pos)) != std::wstring::npos; pos += 2)
+                    title.insert(pos, 1, L'&');
+                AppendMenuW(moveMenu, MF_STRING, moveCmdBase + i, title.c_str());
+                moveTargets++;
+            }
+            if (moveTargets > 0)
+                AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)moveMenu, Tr(Str::Menu_MoveToTab));
+            else if (moveMenu)
+                DestroyMenu(moveMenu);
+
+            AppendMenuW(hMenu, MF_STRING, removeCmdId, Tr(Str::Menu_RemoveFromCorral));
         }
-        AppendMenuW(hMenu, MF_STRING, removeCmdId, Tr(Str::Menu_RemoveFromCorral));
 
         SetForegroundWindow(hwnd);
         int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
@@ -1464,16 +1497,23 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
 
         if (cmd == (int)removeCmdId)
         {
-            auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), icon.fileName);
-            if (it != GetActiveTab().Files.end())
+            auto &files = GetActiveTab().Files;
+            size_t before = files.size();
+            for (const std::string &name : actionEntries)
+                files.erase(std::remove(files.begin(), files.end(), name), files.end());
+            if (files.size() != before)
             {
-                GetActiveTab().Files.erase(it);
+                ClearSelection();
                 LoadFiles();
                 if (App::GetInstance())
                 {
                     App::GetInstance()->SaveConfig();
                 }
             }
+        }
+        else if (cmd >= (int)moveCmdBase && cmd < (int)(moveCmdBase + config.Tabs.size()))
+        {
+            MoveEntriesToTab(actionEntries, cmd - (int)moveCmdBase);
         }
         else if (haveShellItems && cmd > 0)
         {
@@ -1715,6 +1755,7 @@ void CorralDropTarget::EndDragSession()
         dragData = nullptr;
     }
     hasDropData = false;
+    springTab = -1;
 }
 
 void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt)
@@ -1744,10 +1785,41 @@ void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt)
 
 DWORD CorralDropTarget::EffectAt(DWORD grfKeyState, POINTL pt)
 {
-    // Over an icon the drop goes to that item (open with / move into folder),
-    // whatever kind of tab this is.
     POINT clientPt = {pt.x, pt.y};
     ScreenToClient(owner->hwnd, &clientPt);
+
+    // Spring-loaded tabs: a drag resting on an inactive tab brings it forward, so
+    // the drop can go to any tab and not only the one that happens to be showing.
+    int tab = owner->HitTestTab(clientPt.x, clientPt.y);
+    if (tab >= 0 && tab != owner->config.ActiveTabIndex)
+    {
+        if (tab != springTab)
+        {
+            springTab = tab;
+            springStart = GetTickCount();
+        }
+        else if (GetTickCount() - springStart >= (DWORD)CorralWindow::TAB_SPRING_DELAY)
+        {
+            owner->SetActiveTab(tab);
+            springTab = -1;
+        }
+
+        if (tab != owner->config.ActiveTabIndex)
+        {
+            // Not forward yet. A drop here still goes to this tab (see Drop), so
+            // show what it will roughly do; the exact effect follows once it is active.
+            if (owner->config.Tabs[tab].IsVirtual)
+                return (allowedEffects & DROPEFFECT_COPY) ? DROPEFFECT_COPY : DROPEFFECT_NONE;
+            return hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+        }
+    }
+    else
+    {
+        springTab = -1;
+    }
+
+    // Over an icon the drop goes to that item (open with / move into folder),
+    // whatever kind of tab this is.
     if (owner->HitTestIcon(clientPt.x, clientPt.y) >= 0)
         return DROPEFFECT_COPY;
 
@@ -1803,9 +1875,15 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::DragLeave()
 
 HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
 {
-    // Check if dropped on a corral icon -> shell-execute (open with that icon)
     POINT clientPt = {pt.x, pt.y};
     ScreenToClient(owner->hwnd, &clientPt);
+
+    // Dropped straight onto an inactive tab: that tab takes the drop
+    int tab = owner->HitTestTab(clientPt.x, clientPt.y);
+    if (tab >= 0 && tab != owner->config.ActiveTabIndex)
+        owner->SetActiveTab(tab);
+
+    // Check if dropped on a corral icon -> shell-execute (open with that icon)
     int hit = owner->HitTestIcon(clientPt.x, clientPt.y);
 
     LogCorralDrop(L"Drop: screen=(%d,%d) client=(%d,%d) hitIcon=%d",
@@ -2079,9 +2157,17 @@ void CorralWindow::OnIconDrag(int x, int y)
         }
     }
 
-    if (newDropTarget != dropTargetIndex)
+    // Over one of this corral's other tabs: dropping there moves the icons to it.
+    // The tab's reorder grip doubles as the "you are over this tab" cue.
+    int tabUnderCursor = HitTestTab(x, y);
+    bool canTakeIcons = tabUnderCursor >= 0 && tabUnderCursor != config.ActiveTabIndex &&
+                        !config.Tabs[tabUnderCursor].IsVirtual && !GetActiveTab().IsVirtual;
+    int newHoveredTab = canTakeIcons ? tabUnderCursor : -1;
+
+    if (newDropTarget != dropTargetIndex || newHoveredTab != hoveredTab)
     {
         dropTargetIndex = newDropTarget;
+        hoveredTab = newHoveredTab;
         UpdateLayeredContent();
     }
 
@@ -2125,6 +2211,7 @@ void CorralWindow::OnIconDragEnd()
         draggedIconIndex = -1;
         dropTargetIndex = -1;
         iconDragOutside = false;
+        hoveredTab = -1;
         return;
     }
 
@@ -2143,11 +2230,19 @@ void CorralWindow::OnIconDragEnd()
 
     App *app = App::GetInstance();
 
+    POINT screenPt;
+    GetCursorPos(&screenPt);
+
+    // One of this corral's own inactive tabs under the cursor, or -1
+    POINT ownPt = screenPt;
+    ScreenToClient(hwnd, &ownPt);
+    int ownTab = iconDragOutside ? -1 : HitTestTab(ownPt.x, ownPt.y);
+    if (ownTab == config.ActiveTabIndex)
+        ownTab = -1;
+
     // Check if dragged outside the corral
     if (iconDragOutside)
     {
-        POINT screenPt;
-        GetCursorPos(&screenPt);
 
         // Check if dropped on another corral
         CorralWindow *targetCorral = nullptr;
@@ -2171,13 +2266,21 @@ void CorralWindow::OnIconDragEnd()
 
         if (targetCorral)
         {
+            // Dropped on one of the target's tabs: that tab; anywhere else: the
+            // one it is showing.
+            POINT targetPt = screenPt;
+            ScreenToClient(targetCorral->GetHWND(), &targetPt);
+            int targetTab = targetCorral->HitTestTab(targetPt.x, targetPt.y);
+            if (targetTab < 0)
+                targetTab = targetCorral->config.ActiveTabIndex;
+
             // A virtual tab cannot hold desktop icons. Leave them where they are
             // rather than taking them out of this corral and adding them nowhere.
-            if (!targetCorral->GetActiveTab().IsVirtual)
+            if (targetTab >= 0 && targetTab < (int)targetCorral->config.Tabs.size() &&
+                !targetCorral->config.Tabs[targetTab].IsVirtual)
             {
                 removeDraggedFromTab();
-                for (const std::string &name : names)
-                    targetCorral->AddFile(name);
+                targetCorral->AddFilesToTab(names, targetTab);
                 ClearSelection();
                 LoadFiles();
                 if (app)
@@ -2259,6 +2362,11 @@ void CorralWindow::OnIconDragEnd()
             }
         }
     }
+    else if (ownTab >= 0)
+    {
+        // Dropped on another tab of this corral
+        MoveEntriesToTab(names, ownTab);
+    }
     else if (dropTargetIndex >= 0 && dropTargetIndex < (int)icons.size() &&
              std::find(dragged.begin(), dragged.end(), dropTargetIndex) == dragged.end())
     {
@@ -2297,5 +2405,59 @@ void CorralWindow::OnIconDragEnd()
     draggedIconIndex = -1;
     dropTargetIndex = -1;
     iconDragOutside = false;
+    hoveredTab = -1;
     UpdateLayeredContent();
+}
+
+void CorralWindow::AddFilesToTab(const std::vector<std::string> &names, int tabIndex)
+{
+    if (tabIndex < 0 || tabIndex >= (int)config.Tabs.size() || config.Tabs[tabIndex].IsVirtual)
+        return;
+
+    auto &files = config.Tabs[tabIndex].Files;
+    for (const std::string &name : names)
+    {
+        if (!name.empty() && std::find(files.begin(), files.end(), name) == files.end())
+            files.push_back(name);
+    }
+
+    if (tabIndex == config.ActiveTabIndex)
+        LoadFiles();
+}
+
+void CorralWindow::MoveEntriesToTab(const std::vector<std::string> &names, int tabIndex)
+{
+    if (tabIndex < 0 || tabIndex >= (int)config.Tabs.size() || tabIndex == config.ActiveTabIndex)
+        return;
+    if (GetActiveTab().IsVirtual || config.Tabs[tabIndex].IsVirtual)
+        return;
+
+    auto &from = GetActiveTab().Files;
+    for (const std::string &name : names)
+        from.erase(std::remove(from.begin(), from.end(), name), from.end());
+
+    AddFilesToTab(names, tabIndex);
+    ClearSelection();
+    LoadFiles();
+
+    if (App::GetInstance())
+        App::GetInstance()->SaveConfig();
+}
+
+std::vector<std::string> CorralWindow::GetActionEntries(int iconIndex) const
+{
+    std::vector<std::string> names;
+    if (iconIndex < 0 || iconIndex >= (int)icons.size())
+        return names;
+
+    if (selection.size() > 1 && IsSelected(iconIndex))
+    {
+        for (int i : GetSelectedIndices())
+            names.push_back(icons[i].fileName);
+    }
+    else
+    {
+        names.push_back(icons[iconIndex].fileName);
+    }
+    return names;
 }
