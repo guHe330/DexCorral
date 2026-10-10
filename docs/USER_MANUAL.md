@@ -87,6 +87,7 @@ Worth doing for a Corral that sits where you drop files all day. An accidental d
 ### Roll-Up
 Double-click the title bar to **roll up** a Corral so only the title bar remains visible. Double-click again to expand it.
 
+A rolled-up Corral also opens by itself while the mouse rests on it, and closes again when the mouse leaves. If one sits where your mouse often passes and keeps popping open, right-click it and uncheck **Expand on Hover**; it then only opens on a double-click.
 ### Multi-Monitor
 Corral positions are remembered **per monitor and per resolution**. Moving a Corral to another monitor or changing display resolution restores the layout you used there last.
 
@@ -104,6 +105,7 @@ Right-click a Corral's title bar or background:
 - **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral.
 - **Show Desktop Icons**: toggle visibility of all native desktop icons.
 - **Lock Position**: freeze this Corral so it cannot be moved or resized by mouse (see above).
+- **Expand on Hover**: whether this Corral, when rolled up, opens under a resting mouse (see [Roll-Up](#roll-up)).
 - **Create New Corral / New Virtual Corral**: same as the tray menu.
 - **Close Tab / Delete Corral**: remove the current tab, or the whole Corral if it's the last tab. Contained icons return to the desktop.
 
