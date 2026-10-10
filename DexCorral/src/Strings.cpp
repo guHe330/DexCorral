@@ -53,6 +53,7 @@ const wchar_t *const kEnglish[] = {
     /* Menu_NewVirtualCorral */    L"New Virtual Corral",
     /* Menu_ShowDesktopIcons */    L"Show Desktop Icons",
     /* Menu_QuickHideEverything */ L"Quick-Hide Everything",
+    /* Menu_QuickHideHotkey */     L"Quick-Hide Hotkey ({0})",
     /* Menu_CheckUpdatesAuto */    L"Check for Updates Automatically",
     /* Menu_CheckUpdatesNow */     L"Check for Updates Now",
     /* Menu_Language */            L"Language",
@@ -72,9 +73,13 @@ const wchar_t *const kEnglish[] = {
                                    L"with a fresh layout. The unreadable file was kept as config.corrupt.json in "
                                    L"%APPDATA%\\DexCorral.",
 
+    // Quick-hide hotkey could not be registered
+    /* Hotkey_FailedTitle */       L"Hotkey not available",
+    /* Hotkey_FailedBody */        L"{0} is not a usable combination, or Windows or another program already uses it. "
+                                   L"Set a different one as QuickHideHotkey in config.json.",
+
     // About dialog
-    /* Title_About */              L"About DexCorral",
-    /* About_Body */               L"DexCorral - a free and open source Windows desktop icon organizer\n\n"
+    /* Title_About */              L"About DexCorral",    /* About_Body */               L"DexCorral - a free and open source Windows desktop icon organizer\n\n"
                                    L"Version: {0}\n\n"
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
                                    L"This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.\n\n"
@@ -247,6 +252,7 @@ const wchar_t *const kGerman[] = {
     /* Menu_NewVirtualCorral */    L"Neues virtuelles Corral",
     /* Menu_ShowDesktopIcons */    L"Desktopsymbole anzeigen",
     /* Menu_QuickHideEverything */ L"Alles schnell ausblenden",
+    /* Menu_QuickHideHotkey */     L"Tastenkürzel für Schnell-Ausblenden ({0})",
     /* Menu_CheckUpdatesAuto */    L"Automatisch nach Updates suchen",
     /* Menu_CheckUpdatesNow */     L"Jetzt nach Updates suchen",
     /* Menu_Language */            L"Sprache",
@@ -267,9 +273,14 @@ const wchar_t *const kGerman[] = {
                                    L"daher startet DexCorral mit einem neuen Layout. Die unlesbare Datei liegt als "
                                    L"config.corrupt.json in %APPDATA%\\DexCorral.",
 
+    // Quick-hide hotkey could not be registered
+    /* Hotkey_FailedTitle */       L"Tastenkürzel nicht verfügbar",
+    /* Hotkey_FailedBody */        L"{0} ist keine gültige Kombination oder wird bereits von Windows oder einem "
+                                   L"anderen Programm verwendet. Eine andere lässt sich als QuickHideHotkey in "
+                                   L"config.json festlegen.",
+
     // About dialog
-    /* Title_About */              L"Über DexCorral",
-    /* About_Body */               L"DexCorral - ein freier und quelloffener Desktop-Symbol-Organizer für Windows\n\n"
+    /* Title_About */              L"Über DexCorral",    /* About_Body */               L"DexCorral - ein freier und quelloffener Desktop-Symbol-Organizer für Windows\n\n"
                                    L"Version: {0}\n\n"
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
                                    L"Dieses Programm ist freie Software: Sie können es unter den Bedingungen der GNU General Public License, wie von der Free Software Foundation veröffentlicht, weitergeben und/oder modifizieren, entweder gemäß Version 3 der Lizenz oder (nach Ihrer Wahl) jeder späteren Version.\n\n"

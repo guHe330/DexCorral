@@ -148,6 +148,21 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 - **Select several icons** with Ctrl+click, Shift+click, Ctrl+A or by dragging a rectangle over them. Dragging one of the selected icons carries all of them: to another Corral, back out to the desktop, or to a new place in the same Corral.
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
 
+### Keyboard
+Click a Corral to give it the keyboard. It then behaves like an Explorer window:
+
+| Keys | Action |
+|---|---|
+| Arrow keys, Home, End | Move the selection; with Shift, extend it |
+| PageUp, PageDown | Scroll one screenful |
+| Ctrl+Tab, Ctrl+Shift+Tab (or Ctrl+PgDn, Ctrl+PgUp) | Next / previous tab |
+| Typing a name | Jump to the icon that starts with it |
+| Enter, Alt+Enter | Open, Properties |
+| F2, Delete, Ctrl+C / X / V | Rename, delete, copy / cut / paste |
+| Ctrl+A, Esc | Select all, clear the selection |
+| F5 | Reload |
+| Menu key | Context menu |
+| Backspace | Up one folder (virtual tabs) |
 ### Right-Click Menu
 Right-clicking an icon shows the standard Windows context menu (Open, Cut, Copy, Delete, Properties, ...) plus two DexCorral entries: **Move to Tab**, when the Corral has other tabs, and **Remove from Corral**, which returns the icon to the regular desktop without deleting anything. Both act on every selected icon if the one you clicked is part of a selection. Virtual tabs show neither: their icons are the files of a folder.
 
@@ -158,7 +173,7 @@ Double-click an empty spot on the desktop to hide everything at once: all native
 - Corrals can opt out: right-click a corral and check **Exclude from Quick-Hide** to keep it visible while everything else hides.
 - The tray menu's **Quick-Hide Everything** entry toggles the same state.
 - Quick-hide is temporary: restarting DexCorral always restores your normal desktop.
-
+- For a keyboard shortcut, switch on **Quick-Hide Hotkey** in the tray menu. It is off by default, and its combination is Ctrl+Alt+H. To use another one, set `QuickHideHotkey` in `config.json` to something like `"Ctrl+Shift+F9"` or `"Win+Alt+D"`: at least one of Ctrl, Alt, Shift, Win, plus one letter, digit or function key. If the combination is already taken, DexCorral says so and leaves the hotkey off.
 ## Tray Icon
 
 The DexCorral tray icon's right-click menu offers:
@@ -167,6 +182,7 @@ The DexCorral tray icon's right-click menu offers:
 - **Create New Corral** / **New Virtual Corral**.
 - **Show Desktop Icons**: toggle all native desktop icons.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop).
+- **Quick-Hide Hotkey**: switch a global keyboard shortcut for the same toggle on or off (see [Quick-Hide](#quick-hide)).
 - **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API once every 24 hours whether a newer version exists and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
 - **Check for Updates Now**: run that check once, right now, without switching the automatic one on.
 - **Language**: switch the interface between English and German. The change takes effect immediately, no restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.

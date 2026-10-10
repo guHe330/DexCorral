@@ -83,6 +83,10 @@ public:
      */
     void ToggleQuickHide();
 
+    /// (Re)registers the global quick-hide hotkey from config.QuickHideHotkey.
+    /// Returns false if a hotkey is configured but could not be registered.
+    bool ApplyQuickHideHotkey();
+
     /// Returns true while quick-hide is active (everything hidden)
     bool IsQuickHideActive() const { return quickHideActive; }
 
@@ -238,6 +242,7 @@ private:
 
     // Quick-hide state
     bool quickHideActive = false;
+    bool quickHideHotkeyRegistered = false;
     bool desktopIconsVisibleBeforeQuickHide = true; // Restored when quick-hide ends
 
     // Double-click detection for the low-level mouse hook (WH_MOUSE_LL delivers

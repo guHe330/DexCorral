@@ -40,6 +40,7 @@
 #include "UpdateChecker.h"
 #include "Strings.h"
 #include "LayoutMath.h"
+#include "Hotkey.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -106,6 +107,9 @@ static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
 // s_RepinPending coalesces bursts of foreground changes into a single repin.
 static const UINT WM_REPIN_CORRALS = WM_APP + 108;
 static volatile LONG s_RepinPending = 0;
+
+// Id of the one global hotkey the message window registers (quick-hide toggle)
+static const int QUICK_HIDE_HOTKEY_ID = 1;
 
 // Stop event — signaled by DLL_PROCESS_DETACH to tell the App message loop to quit
 static HANDLE g_AppStopEvent = nullptr;
@@ -277,6 +281,10 @@ void App::Initialize()
     // where their corrals went
     ShowConfigNoticeIfPending(trayIcon.get());
 
+    // Optional global quick-hide hotkey (off unless configured). A failure here
+    // is only logged: the tray menu shows the hotkey as not active.
+    ApplyQuickHideHotkey();
+
     // Restore corrals
     RestoreCorrals();
     DllLog(L"App::Initialize: %zu corrals restored", corrals.size());
@@ -354,6 +362,12 @@ void App::Initialize()
 
 void App::Shutdown()
 {
+    if (quickHideHotkeyRegistered)
+    {
+        UnregisterHotKey(messageWindow, QUICK_HIDE_HOTKEY_ID);
+        quickHideHotkeyRegistered = false;
+    }
+
     // Unregister shell change notifications
     if (shellNotifyId)
     {
@@ -681,8 +695,38 @@ void App::ToggleDesktopIcons()
     SaveConfig();
 }
 
-void App::ToggleQuickHide()
+bool App::ApplyQuickHideHotkey()
 {
+    if (quickHideHotkeyRegistered)
+    {
+        UnregisterHotKey(messageWindow, QUICK_HIDE_HOTKEY_ID);
+        quickHideHotkeyRegistered = false;
+    }
+
+    if (config.QuickHideHotkey.empty())
+        return true;
+
+    HotkeySpec spec;
+    if (!ParseHotkey(config.QuickHideHotkey, spec))
+    {
+        DllLog(L"App: QuickHideHotkey '%s' is not a valid hotkey",
+               CorralWindow::Utf8ToWide(config.QuickHideHotkey).c_str());
+        return false;
+    }
+
+    // MOD_NOREPEAT: holding the keys down must not flip quick-hide back and forth
+    if (!RegisterHotKey(messageWindow, QUICK_HIDE_HOTKEY_ID, spec.modifiers | MOD_NOREPEAT, spec.vk))
+    {
+        DllLog(L"App: RegisterHotKey failed for '%s' (error %lu)",
+               CorralWindow::Utf8ToWide(config.QuickHideHotkey).c_str(), GetLastError());
+        return false;
+    }
+
+    quickHideHotkeyRegistered = true;
+    return true;
+}
+
+void App::ToggleQuickHide(){
     quickHideActive = !quickHideActive;
 
     if (quickHideActive)
@@ -1295,6 +1339,13 @@ void App::ShowTrayMenu()
     UINT quickHideFlags = quickHideActive ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, MF_STRING | quickHideFlags, 6, Tr(Str::Menu_QuickHideEverything));
 
+    // Global hotkey for the same toggle. Checked only while it is really
+    // registered; the label names the combination it is, or would be.
+    std::wstring hotkeyName = CorralWindow::Utf8ToWide(
+        config.QuickHideHotkey.empty() ? std::string(DEFAULT_QUICK_HIDE_HOTKEY) : config.QuickHideHotkey);
+    AppendMenuW(menu, MF_STRING | (quickHideHotkeyRegistered ? MF_CHECKED : MF_UNCHECKED), 9,
+                TrFmt(Str::Menu_QuickHideHotkey, hotkeyName).c_str());
+
     // Update check (opt-in)
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     UINT updateFlags = config.CheckForUpdates ? MF_CHECKED : MF_UNCHECKED;
@@ -1358,6 +1409,33 @@ void App::ShowTrayMenu()
         break;
     case 8:
         StartUpdateCheck(true);
+        break;
+    case 9:
+        if (quickHideHotkeyRegistered)
+        {
+            // Switch off
+            config.QuickHideHotkey.clear();
+            ApplyQuickHideHotkey();
+            SaveConfig();
+        }
+        else
+        {
+            // Switch on: the configured combination if there is one, else the default
+            if (config.QuickHideHotkey.empty())
+                config.QuickHideHotkey = DEFAULT_QUICK_HIDE_HOTKEY;
+            if (ApplyQuickHideHotkey())
+            {
+                SaveConfig();
+            }
+            else
+            {
+                std::wstring tried = CorralWindow::Utf8ToWide(config.QuickHideHotkey);
+                config.QuickHideHotkey.clear();
+                SaveConfig();
+                if (trayIcon)
+                    trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle), TrFmt(Str::Hotkey_FailedBody, tried));
+            }
+        }
         break;
     case 10:
         ApplyLanguage("en");
@@ -1729,6 +1807,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             }
             return 0;
         }
+    }
+
+    if (app && uMsg == WM_HOTKEY && wParam == QUICK_HIDE_HOTKEY_ID)
+    {
+        app->ToggleQuickHide();
+        return 0;
     }
 
     if (app && uMsg == WM_DISPLAYCHANGE)

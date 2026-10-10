@@ -263,6 +263,8 @@ private:
     int GetDetailsHeaderHeight() const;                  // Header band height (0 if not shown)
     std::vector<DetailsColumn> GetDetailsColumns() const; // Absolute column x ranges
     void SortVirtualIcons();                             // Sort icons per DetailsSortColumn/Ascending
+    void CycleTab(int direction);                        // +1 next tab, -1 previous, wrapping
+    void ScrollByPage(bool down);                        // PageUp / PageDown
     void SortEntries(bool byType);                       // One-off sort of a normal tab's stored order (name, or type then name)
     int HitTestDetailsHeader(int x, int y) const;        // Column index under header click, or -1
     int HitTestColumnGrip(int x, int y) const;           // Column index whose right grip is hit, or -1
