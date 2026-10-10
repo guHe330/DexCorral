@@ -99,6 +99,7 @@ Right-click a Corral's title bar or background:
 - **Appearance...**: open the appearance dialog (see below).
 - **Change Folder...**: for virtual tabs, point the tab at a different folder.
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
+- **Sort By**: on a normal tab, sorts the icons once by **Name** or **Type**; you can still drag them into any order afterwards, and new icons are added at the end. On a virtual tab it sets the standing sort column and direction, in every view.
 - **Catch-All (receives new files)**: make this tab the catch-all for new desktop items.
 - **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral.
 - **Show Desktop Icons**: toggle visibility of all native desktop icons.

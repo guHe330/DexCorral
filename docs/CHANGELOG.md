@@ -18,6 +18,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ### Added
+- **Sort By** for normal Corrals: sort a tab's icons once by name or by type. The order stays yours to rearrange afterwards. Virtual tabs now offer their Sort By submenu in the icon views as well, not only in Details. ([#43](https://github.com/guHe330/DexCorral/issues/43))
 - Icons can be moved between tabs. Drag them onto a tab, in the same Corral or another one, or use the new **Move to Tab** submenu in the icon context menu. A drag from the desktop or an Explorer window that rests on a tab brings that tab forward, so a drop is no longer limited to the tab a Corral happens to be showing. ([#37](https://github.com/guHe330/DexCorral/issues/37))
 
 ### Changed
