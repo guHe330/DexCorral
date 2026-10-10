@@ -117,7 +117,7 @@ enum class Str
     Confirm_DeleteCorralTitle,   // "Delete Corral"
 
     // Rename dialog / file rename (CorralWindowDialogs.cpp)
-    Dlg_RenameCorral,            // "Rename Corral"
+    Dlg_RenameTab,               // "Rename Tab" (also shown right after creating a corral or tab)
     Err_RenameFailedBody,        // file rename failure text
     Err_RenameFailedTitle,       // "Rename Error"
 

@@ -113,7 +113,7 @@ public:
      * from the overlap test (the source, when creating from a corral's own menu
      * or by detaching a tab).
      */
-    void CreateCorralAt(POINT desiredCenter, HWND exclude = nullptr);
+    void CreateCorralAt(POINT desiredCenter, HWND exclude = nullptr, bool promptForName = false);
 
     /// Creates a new virtual (non-file) corral, placed like CreateCorralAt
     void CreateVirtualCorralAt(POINT desiredCenter);
