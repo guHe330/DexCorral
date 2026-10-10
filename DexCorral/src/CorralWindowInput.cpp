@@ -2095,9 +2095,31 @@ void CorralWindow::OnIconDrag(int x, int y)
     iconDragOutside = !PtInRect(&clientRect, clientPt);
 }
 
+std::vector<int> CorralWindow::GetDraggedIconIndices() const
+{
+    if (draggedIconIndex < 0 || draggedIconIndex >= (int)icons.size())
+        return {};
+    // A drag that starts on a selected icon carries the whole selection
+    if (selection.size() > 1 && IsSelected(draggedIconIndex))
+        return GetSelectedIndices();
+    return {draggedIconIndex};
+}
+
+bool CorralWindow::IsIconBeingDragged(int index) const
+{
+    if (!isDraggingIcon)
+        return false;
+    if (index == draggedIconIndex)
+        return true;
+    return selection.size() > 1 && IsSelected(draggedIconIndex) && IsSelected(index);
+}
+
 void CorralWindow::OnIconDragEnd()
 {
-    if (!isDraggingIcon || draggedIconIndex < 0 || draggedIconIndex >= (int)GetActiveTab().Files.size())
+    std::vector<int> dragged = GetDraggedIconIndices();
+
+    // Virtual tabs show a folder; their icons have no place in Files to move.
+    if (!isDraggingIcon || dragged.empty() || GetActiveTab().IsVirtual)
     {
         isDraggingIcon = false;
         draggedIconIndex = -1;
@@ -2106,7 +2128,20 @@ void CorralWindow::OnIconDragEnd()
         return;
     }
 
-    std::string draggedFile = GetActiveTab().Files[draggedIconIndex];
+    // Work on config names, in on-screen order, rather than on indices: the icon
+    // list is shorter than Files whenever a listed file has gone missing.
+    std::vector<std::string> names;
+    for (int i : dragged)
+        names.push_back(icons[i].fileName);
+
+    auto &files = GetActiveTab().Files;
+    auto removeDraggedFromTab = [&]()
+    {
+        for (const std::string &name : names)
+            files.erase(std::remove(files.begin(), files.end(), name), files.end());
+    };
+
+    App *app = App::GetInstance();
 
     // Check if dragged outside the corral
     if (iconDragOutside)
@@ -2115,7 +2150,6 @@ void CorralWindow::OnIconDragEnd()
         GetCursorPos(&screenPt);
 
         // Check if dropped on another corral
-        App *app = App::GetInstance();
         CorralWindow *targetCorral = nullptr;
 
         if (app)
@@ -2137,84 +2171,125 @@ void CorralWindow::OnIconDragEnd()
 
         if (targetCorral)
         {
-            // Move to another corral
-            GetActiveTab().Files.erase(GetActiveTab().Files.begin() + draggedIconIndex);
-            targetCorral->AddFile(draggedFile);
-            LoadFiles();
-            if (app)
+            // A virtual tab cannot hold desktop icons. Leave them where they are
+            // rather than taking them out of this corral and adding them nowhere.
+            if (!targetCorral->GetActiveTab().IsVirtual)
             {
-                app->SaveConfig();
+                removeDraggedFromTab();
+                for (const std::string &name : names)
+                    targetCorral->AddFile(name);
+                ClearSelection();
+                LoadFiles();
+                if (app)
+                {
+                    app->SaveConfig();
+                }
             }
         }
         else
         {
             // Dropped outside all corrals - remove from this corral (back to desktop)
-            GetActiveTab().Files.erase(GetActiveTab().Files.begin() + draggedIconIndex);
+            removeDraggedFromTab();
+            ClearSelection();
             LoadFiles();
             if (app)
             {
                 app->SaveConfig();
                 app->UpdateHookHiddenIcons();
 
-                // Position the icon at the drop location on the desktop,
+                // Position the icons at the drop location on the desktop,
                 // identified canonically so a name-twin can't be moved instead
-                IconPositionRequest req;
-                if (CorralWindow::IsSpecialIconEntry(draggedFile))
+                HWND hListView = DesktopIcons::GetDesktopListView();
+                if (hListView)
                 {
-                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(draggedFile);
-                    req.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                    req.parsingName = L"::" + clsid;
-                }
-                else
-                {
-                    std::wstring wFileName = Utf8ToWide(draggedFile);
-                    std::wstring fullPath = GetDesktopPath() + L"\\" + wFileName;
-                    if (GetFileAttributesW(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES)
-                    {
-                        std::wstring pubPath = GetPublicDesktopPath() + L"\\" + wFileName;
-                        if (GetFileAttributesW(pubPath.c_str()) != INVALID_FILE_ATTRIBUTES)
-                            fullPath = pubPath;
-                    }
-                    req.parsingName = fullPath;
-                    req.displayName = DesktopIcons::GetShellDisplayName(fullPath);
-                }
+                    POINT clientPt = screenPt;
+                    ScreenToClient(hListView, &clientPt);
 
-                if (!req.displayName.empty() || !req.parsingName.empty())
-                {
-                    // Convert screen coords to desktop ListView client coords
-                    HWND hListView = DesktopIcons::GetDesktopListView();
-                    if (hListView)
+                    // Several icons are laid out in rows from the drop point, one
+                    // desktop grid cell apart, so they do not land on one spot.
+                    DWORD spacing = (DWORD)SendMessageW(hListView, LVM_GETITEMSPACING, FALSE, 0);
+                    int stepX = LOWORD(spacing) > 0 ? LOWORD(spacing) : Dpi(76);
+                    int stepY = HIWORD(spacing) > 0 ? HIWORD(spacing) : Dpi(100);
+                    RECT listRect = {};
+                    GetClientRect(hListView, &listRect);
+
+                    std::vector<IconPositionRequest> requests;
+                    int px = clientPt.x;
+                    int py = clientPt.y;
+                    for (const std::string &name : names)
                     {
-                        POINT clientPt = screenPt;
-                        ScreenToClient(hListView, &clientPt);
-                        req.pt = {clientPt.x, clientPt.y};
-                        DesktopIcons::PositionIconsByPath({req});
+                        IconPositionRequest req;
+                        if (CorralWindow::IsSpecialIconEntry(name))
+                        {
+                            std::wstring clsid = CorralWindow::GetSpecialIconClsid(name);
+                            req.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                            req.parsingName = L"::" + clsid;
+                        }
+                        else
+                        {
+                            std::wstring wFileName = Utf8ToWide(name);
+                            std::wstring fullPath = GetDesktopPath() + L"\\" + wFileName;
+                            if (GetFileAttributesW(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+                            {
+                                std::wstring pubPath = GetPublicDesktopPath() + L"\\" + wFileName;
+                                if (GetFileAttributesW(pubPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+                                    fullPath = pubPath;
+                            }
+                            req.parsingName = fullPath;
+                            req.displayName = DesktopIcons::GetShellDisplayName(fullPath);
+                        }
+
+                        if (req.displayName.empty() && req.parsingName.empty())
+                            continue;
+
+                        req.pt = {px, py};
+                        requests.push_back(req);
+
+                        px += stepX;
+                        if (px + stepX > listRect.right)
+                        {
+                            px = clientPt.x;
+                            py += stepY;
+                        }
                     }
+
+                    if (!requests.empty())
+                        DesktopIcons::PositionIconsByPath(requests);
                 }
             }
         }
     }
-    else if (dropTargetIndex >= 0 && dropTargetIndex != draggedIconIndex && dropTargetIndex < (int)GetActiveTab().Files.size())
+    else if (dropTargetIndex >= 0 && dropTargetIndex < (int)icons.size() &&
+             std::find(dragged.begin(), dragged.end(), dropTargetIndex) == dragged.end())
     {
-        // Reorder within corral
-        GetActiveTab().Files.erase(GetActiveTab().Files.begin() + draggedIconIndex);
-
-        int insertAt = dropTargetIndex;
-        if (draggedIconIndex < dropTargetIndex)
-        {
-            insertAt--;
-        }
-        if (insertAt < 0)
-            insertAt = 0;
-        if (insertAt > (int)GetActiveTab().Files.size())
-            insertAt = (int)GetActiveTab().Files.size();
-
-        GetActiveTab().Files.insert(GetActiveTab().Files.begin() + insertAt, draggedFile);
+        // Reorder within corral: the dragged block goes in front of the icon it
+        // was dropped on, keeping its own order.
+        std::string targetName = icons[dropTargetIndex].fileName;
+        removeDraggedFromTab();
+        auto insertAt = std::find(files.begin(), files.end(), targetName);
+        files.insert(insertAt, names.begin(), names.end());
 
         LoadFiles();
-        if (App::GetInstance())
+
+        // Indices changed with the reorder: keep the moved icons selected
+        if (names.size() > 1)
         {
-            App::GetInstance()->SaveConfig();
+            ClearSelection();
+            for (int i = 0; i < (int)icons.size(); i++)
+            {
+                if (std::find(names.begin(), names.end(), icons[i].fileName) != names.end())
+                    selection.insert(i);
+            }
+            if (!selection.empty())
+            {
+                selectedIcon = *selection.begin();
+                selectionAnchor = selectedIcon;
+            }
+        }
+
+        if (app)
+        {
+            app->SaveConfig();
         }
     }
 

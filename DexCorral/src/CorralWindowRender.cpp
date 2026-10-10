@@ -797,7 +797,7 @@ void CorralWindow::UpdateLayeredContent()
             }
 
             // Drop target indicator
-            if (isDraggingIcon && i == dropTargetIndex && i != draggedIconIndex)
+            if (isDraggingIcon && i == dropTargetIndex && !IsIconBeingDragged(i))
             {
                 DWORD dropPixel = (255 << 24) | (100 << 16) | (200 << 8) | 255;
                 int left = icon.rect.left - 2;
