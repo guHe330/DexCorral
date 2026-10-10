@@ -44,6 +44,8 @@ enum class Str
     // Tray icon / tray menu (App.cpp)
     Tray_Tooltip,                // "DexCorral - Double-click desktop to hide icons"
     Menu_About,                  // "About"
+    Menu_UserManual,             // "User Manual" (opens the manual in the browser)
+    Menu_OpenConfigFolder,       // "Open Config Folder"
     Menu_CreateNewCorral,        // "Create New Corral"
     Menu_NewVirtualCorral,       // "New Virtual Corral"
     Menu_ShowDesktopIcons,       // "Show Desktop Icons"

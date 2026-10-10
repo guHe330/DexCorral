@@ -1327,6 +1327,7 @@ void App::ShowTrayMenu()
 {
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, 3, Tr(Str::Menu_About));
+    AppendMenuW(menu, MF_STRING, 12, Tr(Str::Menu_UserManual));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 1, Tr(Str::Menu_CreateNewCorral));
     AppendMenuW(menu, MF_STRING, 5, Tr(Str::Menu_NewVirtualCorral));
@@ -1366,6 +1367,9 @@ void App::ShowTrayMenu()
     AppendMenuW(langMenu, MF_STRING, 11, L"Deutsch");
     CheckMenuRadioItem(langMenu, 10, 11, activeLang == L"de" ? 11 : 10, MF_BYCOMMAND);
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)langMenu, Tr(Str::Menu_Language));
+
+    // config.json, its backup and the debug logs: the folder a bug report asks for
+    AppendMenuW(menu, MF_STRING, 13, Tr(Str::Menu_OpenConfigFolder));
 
     POINT pt;
     GetCursorPos(&pt);
@@ -1437,6 +1441,20 @@ void App::ShowTrayMenu()
             }
         }
         break;
+    case 12:
+        // The manual on GitHub, rendered. Opened in the user's browser, on request only.
+        ShellExecuteW(nullptr, L"open", L"https://github.com/guHe330/DexCorral/blob/main/docs/USER_MANUAL.md",
+                      nullptr, nullptr, SW_SHOWNORMAL);
+        break;
+    case 13:
+    {
+        // GetConfigPath creates the folder if it is missing, so there is always something to open
+        std::wstring configPath = CorralWindow::Utf8ToWide(Config::GetConfigPath());
+        size_t slash = configPath.find_last_of(L"\\/");
+        if (slash != std::wstring::npos)
+            ShellExecuteW(nullptr, L"open", configPath.substr(0, slash).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        break;
+    }
     case 10:
         ApplyLanguage("en");
         break;

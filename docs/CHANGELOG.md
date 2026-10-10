@@ -18,6 +18,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ### Added
+- Tray menu: **User Manual** opens the manual in your browser, and **Open Config Folder** opens `%APPDATA%\DexCorral`, where `config.json`, its backup and the debug logs live. ([#49](https://github.com/guHe330/DexCorral/issues/49))
 - **Expand on Hover** in a Corral's context menu. Uncheck it and that Corral, when rolled up, stays rolled up until you double-click its title bar instead of opening whenever the mouse rests on it. On by default. ([#47](https://github.com/guHe330/DexCorral/issues/47))
 - An optional global hotkey for Quick-Hide, off by default. Switch it on with **Quick-Hide Hotkey** in the tray menu (Ctrl+Alt+H), or set your own combination as `QuickHideHotkey` in `config.json`. ([#45](https://github.com/guHe330/DexCorral/issues/45))
 - Keyboard: Ctrl+Tab and Ctrl+Shift+Tab (or Ctrl+PgDn / Ctrl+PgUp) switch tabs, and PageUp / PageDown scroll a Corral by a screenful. ([#45](https://github.com/guHe330/DexCorral/issues/45))

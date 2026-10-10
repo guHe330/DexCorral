@@ -49,6 +49,8 @@ const wchar_t *const kEnglish[] = {
     // Tray icon / tray menu
     /* Tray_Tooltip */             L"DexCorral - Double-click desktop to hide icons",
     /* Menu_About */               L"About",
+    /* Menu_UserManual */          L"User Manual",
+    /* Menu_OpenConfigFolder */    L"Open Config Folder",
     /* Menu_CreateNewCorral */     L"Create New Corral",
     /* Menu_NewVirtualCorral */    L"New Virtual Corral",
     /* Menu_ShowDesktopIcons */    L"Show Desktop Icons",
@@ -249,6 +251,8 @@ const wchar_t *const kGerman[] = {
     // Tray icon / tray menu
     /* Tray_Tooltip */             L"DexCorral - Doppelklick auf den Desktop blendet Symbole aus",
     /* Menu_About */               L"Info",
+    /* Menu_UserManual */          L"Benutzerhandbuch",
+    /* Menu_OpenConfigFolder */    L"Konfigurationsordner öffnen",
     /* Menu_CreateNewCorral */     L"Neues Corral erstellen",
     /* Menu_NewVirtualCorral */    L"Neues virtuelles Corral",
     /* Menu_ShowDesktopIcons */    L"Desktopsymbole anzeigen",
