@@ -4,6 +4,9 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+### Removed
+- The **Hide shortcut arrows** option. No menu led to it any more, so it could not be switched on or off, while the manual still asked you to turn it off before uninstalling. It changed a Windows-wide setting and restarted Explorer, neither of which is a desktop organizer's business. The manual says how to bring the arrows back by hand if an early version hid them. ([#31](https://github.com/guHe330/DexCorral/issues/31))
+
 ### Fixed
 - A `config.json` that could not be read, for example after a hand edit with a stray comma, used to be replaced by an empty configuration without a word, taking every Corral, tab and style with it. DexCorral now keeps a `config.bak` of the last configuration that loaded cleanly and falls back to it, sets the unreadable file aside as `config.corrupt.json`, and shows a tray notification. ([#29](https://github.com/guHe330/DexCorral/issues/29))
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.

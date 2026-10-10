@@ -83,11 +83,6 @@ const wchar_t *const kEnglish[] = {
                                    L"Website: https://dexcorral.com\n"
                                    L"GitHub: https://github.com/guHe330/DexCorral",
 
-    // Shortcut-arrow toggle
-    /* Arrow_HideConfirm */        L"This will hide shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?",
-    /* Arrow_RestoreConfirm */     L"This will restore shortcut arrows on desktop icons.\n\nExplorer will restart to apply the change. Continue?",
-    /* Arrow_ChangeFailed */       L"Failed to change shortcut arrow setting.\n\nThis may require administrator privileges.",
-
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral update available",
     /* Update_AvailableBody */     L"Version {0} is available. Click here to open the download page.",
@@ -279,11 +274,6 @@ const wchar_t *const kGerman[] = {
                                    L"Sie sollten ein Exemplar der GNU General Public License zusammen mit diesem Programm erhalten haben. Falls nicht, siehe https://www.gnu.org/licenses/\n\n"
                                    L"Website: https://dexcorral.com\n"
                                    L"GitHub: https://github.com/guHe330/DexCorral",
-
-    // Shortcut-arrow toggle
-    /* Arrow_HideConfirm */        L"Die Verknüpfungspfeile auf Desktopsymbolen werden ausgeblendet.\n\nDer Explorer wird neu gestartet, um die Änderung zu übernehmen. Fortfahren?",
-    /* Arrow_RestoreConfirm */     L"Die Verknüpfungspfeile auf Desktopsymbolen werden wiederhergestellt.\n\nDer Explorer wird neu gestartet, um die Änderung zu übernehmen. Fortfahren?",
-    /* Arrow_ChangeFailed */       L"Die Einstellung für Verknüpfungspfeile konnte nicht geändert werden.\n\nMöglicherweise sind Administratorrechte erforderlich.",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral-Update verfügbar",

@@ -112,18 +112,6 @@ public:
     /// Returns true if desktop icons are currently visible
     static bool AreIconsVisible();
 
-    /**
-     * Sets whether shortcut arrow overlay is hidden (requires Explorer restart).
-     * Returns true if setting was changed.
-     */
-    static bool SetShortcutArrowsHidden(bool hidden);
-
-    /// Returns true if shortcut arrows are hidden
-    static bool AreShortcutArrowsHidden();
-
-    /// Restarts Explorer.exe to apply certain settings (like shortcut arrow changes)
-    static void RestartExplorer();
-
     /// Returns the window handle of the desktop ListView
     static HWND GetDesktopListView();
 

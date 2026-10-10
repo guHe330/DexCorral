@@ -45,7 +45,7 @@ The uninstaller removes only what its own install mode created. Uninstalling a p
 
 After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
 
-The uninstaller removes every registry entry DexCorral created, with one exception: if you turned on **Hide shortcut arrows**, turn it off again before uninstalling, because it changes a Windows-wide setting that is not DexCorral's to restore afterwards. See [What DexCorral writes outside its own folder](#what-dexcorral-writes-outside-its-own-folder) for the full list.
+The uninstaller removes every registry entry DexCorral created. See [What DexCorral writes outside its own folder](#what-dexcorral-writes-outside-its-own-folder) for the full list.
 
 Removed the portable package by deleting its folder? That leaves the same entries behind. Run `DexCorral.exe --unregister` first, with the same `--scope` you registered with (as Administrator for `--scope=machine`); to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
 
@@ -207,9 +207,10 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `<root>\Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Second startup load path. No overlay is ever drawn. All-users installs only. | Yes |
-| `…\Explorer\Shell Icons` | `29` | Only if you turn on **Hide shortcut arrows**. This is a Windows-wide setting, not a DexCorral one. | **No**. Turn the option off before uninstalling, or the arrows stay hidden |
 
 The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes. They are the reason an all-users registration needs Administrator rights; a per-user registration writes only to `HKCU` and needs none. Nothing else on the system is touched.
+
+Early versions had a **Hide shortcut arrows** option, removed since. If you switched it on back then and want the arrows back, delete the value `29` under `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons` in `HKLM` or `HKCU`, whichever holds it, and restart Explorer.
 
 Versions up to 1.0.27 wrote the COM registration through `HKEY_CLASSES_ROOT` instead, with no per-user option. `DexCorral.exe --cleanup-legacy`, run once as Administrator, removes what those versions left behind; the installer does it for you.
 

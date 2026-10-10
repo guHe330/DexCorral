@@ -751,34 +751,6 @@ bool App::IsPointOnEmptyDesktop(POINT pt, bool checkIcons)
     return !checkIcons || !DesktopIcons::IsPointOnIcon(pt.x, pt.y);
 }
 
-void App::ToggleShortcutArrows()
-{
-    bool currentlyHidden = DesktopIcons::AreShortcutArrowsHidden();
-    bool newState = !currentlyHidden;
-
-    // Confirm with user since this requires Explorer restart
-    const wchar_t *message = newState
-                                 ? Tr(Str::Arrow_HideConfirm)
-                                 : Tr(Str::Arrow_RestoreConfirm);
-
-    int result = MessageBoxW(nullptr, message, Tr(Str::App_Name), MB_YESNO | MB_ICONQUESTION);
-    if (result != IDYES)
-    {
-        return;
-    }
-
-    if (DesktopIcons::SetShortcutArrowsHidden(newState))
-    {
-        config.HideShortcutArrows = newState;
-        SaveConfig();
-        DesktopIcons::RestartExplorer();
-    }
-    else
-    {
-        MessageBoxW(nullptr, Tr(Str::Arrow_ChangeFailed), Tr(Str::App_Name), MB_OK | MB_ICONWARNING);
-    }
-}
-
 // Resolve a desktop file name to its full path (user desktop first, then
 // public desktop; defaults to the user desktop path if neither exists)
 static std::wstring ResolveDesktopFilePath(const std::wstring &fileName)
