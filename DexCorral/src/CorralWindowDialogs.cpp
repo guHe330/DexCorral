@@ -29,6 +29,7 @@
  */
 
 #include "CorralWindow.h"
+#include "DialogTemplate.h"
 #include "App.h"
 #include "Constants.h"
 #include "Strings.h"
@@ -1021,38 +1022,6 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         return TRUE;
     }
     return FALSE;
-}
-
-// Helper to add a dialog item to the in-memory template
-static WORD *AddDlgItem(WORD *p, DWORD style, short x, short y, short cx, short cy, WORD id,
-                        WORD classHi, WORD classLo, const wchar_t *text)
-{
-    // Align to DWORD boundary
-    if ((ULONG_PTR)p % 4)
-        p++;
-
-    DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *)p;
-    item->style = style;
-    item->x = x;
-    item->y = y;
-    item->cx = cx;
-    item->cy = cy;
-    item->id = id;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF;
-    *p++ = classLo;
-    if (text)
-    {
-        size_t len = wcslen(text) + 1;
-        memcpy(p, text, len * sizeof(wchar_t));
-        p += len;
-    }
-    else
-    {
-        *p++ = 0;
-    }
-    *p++ = 0; // no creation data
-    return p;
 }
 
 // Helper to add a trackbar (custom class name)

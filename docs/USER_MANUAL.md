@@ -180,7 +180,7 @@ Double-click an empty spot on the desktop to hide everything at once: all native
 
 Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
-- **About**: version and license information.
+- **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
 - **Create New Corral** / **New Virtual Corral**.
 - **Show Desktop Icons**: toggle all native desktop icons.

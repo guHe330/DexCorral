@@ -41,6 +41,7 @@
 #include "Strings.h"
 #include "LayoutMath.h"
 #include "Hotkey.h"
+#include "DialogTemplate.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -1491,12 +1492,76 @@ void App::ShowCreationMenu(POINT pt)
     CreateCorralAt(pt, nullptr, true);
 }
 
+// About dialog control ids
+static const WORD IDC_ABOUT_ICON = 300;
+static const WORD IDC_ABOUT_WEBSITE = 301;
+static const WORD IDC_ABOUT_GITHUB = 302;
+static const WORD IDC_ABOUT_LICENSE = 303;
+
+static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_INITDIALOG:
+    {
+        HICON icon = (HICON)LoadImageW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON),
+                                       IMAGE_ICON, 32, 32, LR_SHARED);
+        if (icon)
+            SendDlgItemMessageW(hDlg, IDC_ABOUT_ICON, STM_SETICON, (WPARAM)icon, 0);
+        // Opened from the tray menu, with no owner window to bring it forward
+        SetForegroundWindow(hDlg);
+        return TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        // Fixed addresses, opened in the user's browser and only on a click
+        case IDC_ABOUT_WEBSITE:
+            ShellExecuteW(hDlg, L"open", L"https://dexcorral.com", nullptr, nullptr, SW_SHOWNORMAL);
+            return TRUE;
+        case IDC_ABOUT_GITHUB:
+            ShellExecuteW(hDlg, L"open", L"https://github.com/guHe330/DexCorral", nullptr, nullptr, SW_SHOWNORMAL);
+            return TRUE;
+        case IDC_ABOUT_LICENSE:
+            ShellExecuteW(hDlg, L"open", L"https://www.gnu.org/licenses/gpl-3.0.html", nullptr, nullptr, SW_SHOWNORMAL);
+            return TRUE;
+        case IDOK:
+        case IDCANCEL:
+            EndDialog(hDlg, IDOK);
+            return TRUE;
+        }
+        break;
+    }
+    return FALSE;
+}
+
 void App::ShowAbout()
 {
-    // Build the About message with GPL-3.0 license notice
+    // The tray menu stays reachable while the dialog is up; one About is enough
+    static bool showing = false;
+    if (showing)
+        return;
+    showing = true;
+
     std::wstring aboutText = TrFmt(Str::About_Body, DEXCORRAL_VERSION);
 
-    MessageBoxW(messageWindow, aboutText.c_str(), Tr(Str::Title_About), MB_OK | MB_ICONINFORMATION);
+    // Layout in dialog units: icon top-left, text beside it, one row of buttons
+    const short DLG_W = 240, DLG_H = 122, BTN_Y = 100, BTN_W = 50, BTN_H = 14;
+
+    WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
+    WORD *p = BeginDlgTemplate(dlgTemplate,
+                               DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
+                               6, DLG_W, DLG_H, Tr(Str::Title_About));
+
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_ICON, 10, 10, 20, 20, IDC_ABOUT_ICON, 0xFFFF, DLG_CLASS_STATIC, nullptr);
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX, 40, 10, 190, 86, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, aboutText.c_str());
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 10, BTN_Y, BTN_W, BTN_H, IDC_ABOUT_WEBSITE, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_Website));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 64, BTN_Y, BTN_W, BTN_H, IDC_ABOUT_GITHUB, 0xFFFF, DLG_CLASS_BUTTON, L"GitHub");
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 118, BTN_Y, BTN_W, BTN_H, IDC_ABOUT_LICENSE, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_License));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 180, BTN_Y, BTN_W, BTN_H, IDOK, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
+
+    DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr, AboutDlgProc, 0);
+    showing = false;
 }
 
 void App::StartUpdateCheck(bool userInitiated)
