@@ -109,10 +109,12 @@ enum class Str
     Menu_MoveToTab,              // "Move to Tab" (submenu listing the corral's other tabs)
 
     // Confirmations (CorralWindowCommands.cpp)
-    Confirm_CloseTabBody,        // "Close this tab?"
-    Confirm_CloseTabTitle,       // "Confirm Close"
-    Confirm_DeleteCorralBody,    // "Delete this corral?"
-    Confirm_DeleteCorralTitle,   // "Confirm Delete"
+    Confirm_CloseTabBody,        // {0} = tab title; icons return to the desktop
+    Confirm_CloseVirtualTabBody, // {0} = tab title; the folder is not touched
+    Confirm_CloseTabTitle,       // "Close Tab"
+    Confirm_DeleteCorralBody,    // icons return to the desktop
+    Confirm_DeleteVirtualCorralBody, // the folder is not touched
+    Confirm_DeleteCorralTitle,   // "Delete Corral"
 
     // Rename dialog / file rename (CorralWindowDialogs.cpp)
     Dlg_RenameCorral,            // "Rename Corral"

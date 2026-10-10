@@ -423,7 +423,10 @@ void CorralWindow::DeleteCorral()
     // If there are multiple tabs, just close the active tab
     if (config.Tabs.size() > 1)
     {
-        if (MessageBoxW(hwnd, Tr(Str::Confirm_CloseTabBody), Tr(Str::Confirm_CloseTabTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
+        // Say what happens to the contents: "close" must not read as "delete my files"
+        std::wstring body = TrFmt(GetActiveTab().IsVirtual ? Str::Confirm_CloseVirtualTabBody : Str::Confirm_CloseTabBody,
+                                  Utf8ToWide(GetActiveTab().Title));
+        if (MessageBoxW(hwnd, body.c_str(), Tr(Str::Confirm_CloseTabTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             config.Tabs.erase(config.Tabs.begin() + config.ActiveTabIndex);
             if (config.ActiveTabIndex >= (int)config.Tabs.size())
@@ -440,7 +443,8 @@ void CorralWindow::DeleteCorral()
     else
     {
         // Only one tab - delete the entire window
-        if (MessageBoxW(hwnd, Tr(Str::Confirm_DeleteCorralBody), Tr(Str::Confirm_DeleteCorralTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
+        const wchar_t *body = Tr(GetActiveTab().IsVirtual ? Str::Confirm_DeleteVirtualCorralBody : Str::Confirm_DeleteCorralBody);
+        if (MessageBoxW(hwnd, body, Tr(Str::Confirm_DeleteCorralTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             if (App::GetInstance())
             {

@@ -126,10 +126,12 @@ const wchar_t *const kEnglish[] = {
     /* Menu_MoveToTab */           L"Move to Tab",
 
     // Confirmations
-    /* Confirm_CloseTabBody */     L"Close this tab?",
-    /* Confirm_CloseTabTitle */    L"Confirm Close",
-    /* Confirm_DeleteCorralBody */ L"Delete this corral?",
-    /* Confirm_DeleteCorralTitle */L"Confirm Delete",
+    /* Confirm_CloseTabBody */     L"Close the tab \"{0}\"?\n\nIts icons go back to the desktop. No files are deleted.",
+    /* Confirm_CloseVirtualTabBody */ L"Close the tab \"{0}\"?\n\nThe folder it shows and the files in it are not touched.",
+    /* Confirm_CloseTabTitle */    L"Close Tab",
+    /* Confirm_DeleteCorralBody */ L"Delete this corral?\n\nIts icons go back to the desktop. No files are deleted.",
+    /* Confirm_DeleteVirtualCorralBody */ L"Delete this corral?\n\nThe folder it shows and the files in it are not touched.",
+    /* Confirm_DeleteCorralTitle */L"Delete Corral",
 
     // Rename dialog / file rename
     /* Dlg_RenameCorral */         L"Rename Corral",
@@ -319,10 +321,12 @@ const wchar_t *const kGerman[] = {
     /* Menu_MoveToTab */           L"In Tab verschieben",
 
     // Confirmations
-    /* Confirm_CloseTabBody */     L"Diesen Tab schließen?",
-    /* Confirm_CloseTabTitle */    L"Schließen bestätigen",
-    /* Confirm_DeleteCorralBody */ L"Dieses Corral löschen?",
-    /* Confirm_DeleteCorralTitle */L"Löschen bestätigen",
+    /* Confirm_CloseTabBody */     L"Den Tab „{0}“ schließen?\n\nSeine Symbole kehren auf den Desktop zurück. Es werden keine Dateien gelöscht.",
+    /* Confirm_CloseVirtualTabBody */ L"Den Tab „{0}“ schließen?\n\nDer angezeigte Ordner und seine Dateien bleiben unverändert.",
+    /* Confirm_CloseTabTitle */    L"Tab schließen",
+    /* Confirm_DeleteCorralBody */ L"Dieses Corral löschen?\n\nSeine Symbole kehren auf den Desktop zurück. Es werden keine Dateien gelöscht.",
+    /* Confirm_DeleteVirtualCorralBody */ L"Dieses Corral löschen?\n\nDer angezeigte Ordner und seine Dateien bleiben unverändert.",
+    /* Confirm_DeleteCorralTitle */L"Corral löschen",
 
     // Rename dialog / file rename
     /* Dlg_RenameCorral */         L"Corral umbenennen",
