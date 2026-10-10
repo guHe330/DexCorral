@@ -18,6 +18,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ### Added
+- **Reset to Defaults** in the Appearance dialog sets every setting back to the look a new Corral gets. ([#56](https://github.com/guHe330/DexCorral/issues/56))
 - Tray menu: **User Manual** opens the manual in your browser, and **Open Config Folder** opens `%APPDATA%\DexCorral`, where `config.json`, its backup and the debug logs live. ([#49](https://github.com/guHe330/DexCorral/issues/49))
 - **Expand on Hover** in a Corral's context menu. Uncheck it and that Corral, when rolled up, stays rolled up until you double-click its title bar instead of opening whenever the mouse rests on it. On by default. ([#47](https://github.com/guHe330/DexCorral/issues/47))
 - An optional global hotkey for Quick-Hide, off by default. Switch it on with **Quick-Hide Hotkey** in the tray menu (Ctrl+Alt+H), or set your own combination as `QuickHideHotkey` in `config.json`. ([#45](https://github.com/guHe330/DexCorral/issues/45))
@@ -26,6 +27,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Icons can be moved between tabs. Drag them onto a tab, in the same Corral or another one, or use the new **Move to Tab** submenu in the icon context menu. A drag from the desktop or an Explorer window that rests on a tab brings that tab forward, so a drop is no longer limited to the tab a Corral happens to be showing. ([#37](https://github.com/guHe330/DexCorral/issues/37))
 
 ### Changed
+- The three checkboxes at the bottom of the Appearance dialog say what they do: save the style as the default for new Corrals, apply only what you changed to all Corrals, or make all Corrals look like this one. ([#56](https://github.com/guHe330/DexCorral/issues/56))
 - **About** is a proper dialog now: icon, version, copyright, the license in one sentence, and buttons for the website, the GitHub project and the full GPL text. It was a message box with three paragraphs of license boilerplate and addresses you could not click. ([#54](https://github.com/guHe330/DexCorral/issues/54))
 - Double-clicking the tray icon now toggles Quick-Hide, the same as double-clicking the desktop. It used to toggle only the native desktop icons; that is still available as **Show Desktop Icons** in the menus. ([#52](https://github.com/guHe330/DexCorral/issues/52))
 - **Create New Corral** and **Add Tab** ask for the name right away instead of leaving a "New Corral" or "New Tab" to be renamed through the menu. Esc keeps the default name. The rename dialog is now titled "Rename Tab", which is what it does. ([#41](https://github.com/guHe330/DexCorral/issues/41))
