@@ -1499,6 +1499,177 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
 // CorralDropTarget - OLE IDropTarget implementation
 // ============================================================================
 
+namespace
+{
+    CLIPFORMAT ShellIdListFormat()
+    {
+        static const CLIPFORMAT cf = (CLIPFORMAT)RegisterClipboardFormatW(CFSTR_SHELLIDLIST);
+        return cf;
+    }
+
+    std::wstring ParentOf(const std::wstring &path)
+    {
+        size_t slash = path.find_last_of(L"\\/");
+        return (slash != std::wstring::npos) ? path.substr(0, slash) : L"";
+    }
+
+    std::wstring NameOf(const std::wstring &path)
+    {
+        size_t slash = path.find_last_of(L"\\/");
+        return (slash != std::wstring::npos) ? path.substr(slash + 1) : path;
+    }
+
+    /// Volume serial + file index of a directory; false if it cannot be opened.
+    bool DirectoryIdentity(const std::wstring &dir, BY_HANDLE_FILE_INFORMATION &info)
+    {
+        HANDLE h = CreateFileW(dir.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                               nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+        if (h == INVALID_HANDLE_VALUE)
+            return false;
+        bool ok = GetFileInformationByHandle(h, &info) != FALSE;
+        CloseHandle(h);
+        return ok;
+    }
+
+    /// Same folder, even when the two paths are spelled differently (8.3 names,
+    /// a redirected desktop reached through a junction).
+    bool IsSameDirectory(const std::wstring &a, const std::wstring &b)
+    {
+        if (a.empty() || b.empty())
+            return false;
+        if (lstrcmpiW(a.c_str(), b.c_str()) == 0)
+            return true;
+        BY_HANDLE_FILE_INFORMATION ia = {}, ib = {};
+        return DirectoryIdentity(a, ia) && DirectoryIdentity(b, ib) &&
+               ia.dwVolumeSerialNumber == ib.dwVolumeSerialNumber &&
+               ia.nFileIndexHigh == ib.nFileIndexHigh && ia.nFileIndexLow == ib.nFileIndexLow;
+    }
+
+    /// True if `path` names an item directly on the user or the public desktop.
+    bool IsDesktopItem(const std::wstring &path)
+    {
+        std::wstring parent = ParentOf(path);
+        return IsSameDirectory(parent, CorralWindow::GetDesktopPath()) ||
+               IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
+    }
+
+    /// True if at least one CF_HDROP file is, by name, a file on the desktop.
+    bool HdropHasDesktopFile(IDataObject *data)
+    {
+        FORMATETC fmt = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+        STGMEDIUM stg = {};
+        if (FAILED(data->GetData(&fmt, &stg)))
+            return false;
+
+        bool found = false;
+        if (HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal))
+        {
+            std::wstring desktop = CorralWindow::GetDesktopPath();
+            std::wstring publicDesktop = CorralWindow::GetPublicDesktopPath();
+            UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < count && !found; i++)
+            {
+                wchar_t filePath[MAX_PATH];
+                if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
+                    continue;
+                std::wstring name = NameOf(filePath);
+                found = GetFileAttributesW((desktop + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES ||
+                        GetFileAttributesW((publicDesktop + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES;
+            }
+            GlobalUnlock(stg.hGlobal);
+        }
+        ReleaseStgMedium(&stg);
+        return found;
+    }
+
+    /// "name.ext", then "name (2).ext" … — the first that is free on the desktop.
+    std::wstring UniqueDesktopName(const std::wstring &desktop, const std::wstring &base, const std::wstring &ext)
+    {
+        for (int n = 1; n < 100; n++)
+        {
+            std::wstring name = (n == 1) ? base + ext : base + L" (" + std::to_wstring(n) + L")" + ext;
+            if (GetFileAttributesW((desktop + L"\\" + name).c_str()) == INVALID_FILE_ATTRIBUTES)
+                return name;
+        }
+        return L"";
+    }
+
+    /**
+     * Puts a shortcut to `target` on the user desktop and returns its file name
+     * (empty on failure). A shortcut file dragged from elsewhere is copied as it
+     * is, so the result points at the real target rather than at another shortcut.
+     */
+    std::wstring CreateDesktopShortcut(const std::wstring &target, const std::wstring &displayName)
+    {
+        std::wstring desktop = CorralWindow::GetDesktopPath();
+        if (desktop.empty() || target.empty())
+            return L"";
+
+        // A drive root has no file name; fall back to what the shell calls it.
+        std::wstring base = NameOf(target);
+        if (base.empty())
+            base = displayName;
+        for (wchar_t &c : base)
+        {
+            if (wcschr(L"\\/:*?\"<>|", c))
+                c = L'_';
+        }
+        if (base.empty())
+            return L"";
+
+        const wchar_t *ext = PathFindExtensionW(base.c_str());
+        if (lstrcmpiW(ext, L".lnk") == 0 || lstrcmpiW(ext, L".url") == 0)
+        {
+            std::wstring extension = ext;
+            std::wstring name = UniqueDesktopName(desktop, base.substr(0, base.size() - extension.size()), extension);
+            if (name.empty() || !CopyFileW(target.c_str(), (desktop + L"\\" + name).c_str(), TRUE))
+                return L"";
+            return name;
+        }
+
+        std::wstring name = UniqueDesktopName(desktop, base, L".lnk");
+        if (name.empty())
+            return L"";
+
+        IShellLinkW *link = nullptr;
+        if (FAILED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&link))) || !link)
+            return L"";
+
+        bool saved = false;
+        if (SUCCEEDED(link->SetPath(target.c_str())))
+        {
+            std::wstring workDir = ParentOf(target);
+            if (!workDir.empty())
+                link->SetWorkingDirectory(workDir.c_str());
+
+            IPersistFile *file = nullptr;
+            if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&file))) && file)
+            {
+                saved = SUCCEEDED(file->Save((desktop + L"\\" + name).c_str(), TRUE));
+                file->Release();
+            }
+        }
+        link->Release();
+        return saved ? name : L"";
+    }
+
+    /// The shell's own drop target for a folder: what Explorer uses for a drop
+    /// into that folder's window (move/copy rules, modifier keys, right-drag menu).
+    IDropTarget *BindFolderDropTarget(const std::wstring &folder)
+    {
+        if (folder.empty())
+            return nullptr;
+        IShellItem *item = nullptr;
+        if (FAILED(SHCreateItemFromParsingName(folder.c_str(), nullptr, IID_PPV_ARGS(&item))) || !item)
+            return nullptr;
+        IDropTarget *target = nullptr;
+        if (FAILED(item->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&target))))
+            target = nullptr;
+        item->Release();
+        return target;
+    }
+} // namespace
+
 CorralDropTarget::CorralDropTarget(CorralWindow *owner)
     : refCount(1), owner(owner), hasDropData(false) {}
 
@@ -1523,41 +1694,110 @@ ULONG STDMETHODCALLTYPE CorralDropTarget::Release()
     return count;
 }
 
+void CorralDropTarget::ReleaseFolderTarget(bool notifyLeave)
+{
+    if (folderTarget)
+    {
+        if (notifyLeave)
+            folderTarget->DragLeave();
+        folderTarget->Release();
+        folderTarget = nullptr;
+    }
+    folderTargetPath.clear();
+}
+
+void CorralDropTarget::EndDragSession()
+{
+    ReleaseFolderTarget(true);
+    if (dragData)
+    {
+        dragData->Release();
+        dragData = nullptr;
+    }
+    hasDropData = false;
+}
+
+void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt)
+{
+    // The active tab can change while a drag is in flight, so the folder target
+    // follows whatever the corral is showing right now.
+    std::wstring wanted = owner->GetActiveTab().IsVirtual ? owner->GetVirtualCurrentPath() : L"";
+    if (folderTarget && lstrcmpiW(wanted.c_str(), folderTargetPath.c_str()) == 0)
+        return;
+
+    ReleaseFolderTarget(true);
+    if (wanted.empty() || !dragData)
+        return;
+
+    folderTarget = BindFolderDropTarget(wanted);
+    if (!folderTarget)
+        return; // Folder unavailable: nothing can be dropped here
+
+    DWORD effect = allowedEffects;
+    if (FAILED(folderTarget->DragEnter(dragData, grfKeyState, pt, &effect)))
+    {
+        ReleaseFolderTarget(false);
+        return;
+    }
+    folderTargetPath = wanted;
+}
+
+DWORD CorralDropTarget::EffectAt(DWORD grfKeyState, POINTL pt)
+{
+    // Over an icon the drop goes to that item (open with / move into folder),
+    // whatever kind of tab this is.
+    POINT clientPt = {pt.x, pt.y};
+    ScreenToClient(owner->hwnd, &clientPt);
+    if (owner->HitTestIcon(clientPt.x, clientPt.y) >= 0)
+        return DROPEFFECT_COPY;
+
+    if (owner->GetActiveTab().IsVirtual)
+    {
+        // A virtual tab is its folder: let the folder decide, so the cursor
+        // shows move/copy/link exactly as it would over an Explorer window.
+        SyncFolderTarget(grfKeyState, pt);
+        if (!folderTarget)
+            return DROPEFFECT_NONE;
+        DWORD effect = allowedEffects;
+        if (FAILED(folderTarget->DragOver(grfKeyState, pt, &effect)))
+            return DROPEFFECT_NONE;
+        return effect;
+    }
+
+    // Normal tab, empty space: the item joins the corral
+    return hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+}
+
 HRESULT STDMETHODCALLTYPE CorralDropTarget::DragEnter(IDataObject *pDataObj, DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
 {
-    // Accept drops that have either CF_HDROP (files) or CFSTR_SHELLIDLIST (shell items)
-    FORMATETC fmtHdrop = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
-    FORMATETC fmtShellIdList = {(CLIPFORMAT)RegisterClipboardFormatW(L"Shell IDList Array"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    EndDragSession(); // A previous session that never got its DragLeave/Drop
 
-    hasDropData = (pDataObj->QueryGetData(&fmtHdrop) == S_OK ||
-                   pDataObj->QueryGetData(&fmtShellIdList) == S_OK);
+    // A shell ID list can always be placed: desktop items join the corral, and
+    // anything else gets a desktop shortcut. A bare CF_HDROP (no ID list) only
+    // helps if it names something that is already on the desktop.
+    FORMATETC fmtShellIdList = {ShellIdListFormat(), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    hasDropData = (pDataObj->QueryGetData(&fmtShellIdList) == S_OK) || HdropHasDesktopFile(pDataObj);
 
-    *pdwEffect = hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
+    dragData = pDataObj;
+    dragData->AddRef();
+    allowedEffects = *pdwEffect;
+
+    *pdwEffect = EffectAt(grfKeyState, pt);
     LogCorralDrop(L"DragEnter: hasDropData=%d, effect=0x%X", hasDropData, *pdwEffect);
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CorralDropTarget::DragOver(DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
 {
-    if (!hasDropData)
-    {
-        *pdwEffect = DROPEFFECT_NONE;
-        return S_OK;
-    }
-
-    // Show DROPEFFECT_COPY when hovering over an icon (drop-on-icon = open with)
-    // Show DROPEFFECT_LINK when hovering over empty space (add to corral)
-    POINT clientPt = {pt.x, pt.y};
-    ScreenToClient(owner->hwnd, &clientPt);
-    int hit = owner->HitTestIcon(clientPt.x, clientPt.y);
-    *pdwEffect = (hit >= 0) ? DROPEFFECT_COPY : DROPEFFECT_LINK;
+    allowedEffects = *pdwEffect;
+    *pdwEffect = dragData ? EffectAt(grfKeyState, pt) : DROPEFFECT_NONE;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CorralDropTarget::DragLeave()
 {
     LogCorralDrop(L"DragLeave");
-    hasDropData = false;
+    EndDragSession();
     return S_OK;
 }
 
@@ -1577,21 +1817,49 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
         LogCorralDrop(L"Drop: on icon %d -> OnDropOnIcon", hit);
         owner->OnDropOnIcon(pDataObj, hit);
     }
-    else
+    else if (owner->GetActiveTab().IsVirtual)
+    {
+        allowedEffects = *pdwEffect;
+        SyncFolderTarget(grfKeyState, pt);
+        if (folderTarget)
+        {
+            LogCorralDrop(L"Drop: virtual tab -> folder drop target '%s'", folderTargetPath.c_str());
+            HRESULT hr = folderTarget->Drop(pDataObj, grfKeyState, pt, pdwEffect);
+            if (FAILED(hr))
+                *pdwEffect = DROPEFFECT_NONE;
+            // Drop ends the folder target's session; it must not get a DragLeave too.
+            ReleaseFolderTarget(false);
+            // The folder watcher would pick the new files up; this makes it immediate.
+            owner->LoadFiles();
+        }
+        else
+        {
+            *pdwEffect = DROPEFFECT_NONE;
+        }
+    }
+    else if (hasDropData)
     {
         *pdwEffect = DROPEFFECT_LINK;
         LogCorralDrop(L"Drop: on empty space -> OnDrop (add to corral)");
         owner->OnDrop(pDataObj);
     }
+    else
+    {
+        *pdwEffect = DROPEFFECT_NONE;
+    }
+
+    EndDragSession();
     return S_OK;
 }
 
 // ============================================================================
-// OnDrop - handles both regular files (CF_HDROP) and special shell items
+// OnDrop - adds the dropped items to the active (non-virtual) tab
 // ============================================================================
 
 void CorralWindow::OnDrop(IDataObject *pDataObj)
 {
+    // A virtual tab is a folder view: CorralDropTarget hands those drops to the
+    // folder's own drop target instead.
     if (GetActiveTab().IsVirtual)
         return;
 
@@ -1599,14 +1867,29 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
     std::wstring desktopPath = GetDesktopPath();
     std::wstring publicDesktopPath = GetPublicDesktopPath();
 
-    // Try CF_HDROP first for files dragged from Explorer windows.
-    // Note: the desktop shell resolves .lnk shortcuts in CF_HDROP (gives target path),
-    // so we verify each file exists on the desktop. Resolved shortcuts are handled below
-    // via CFSTR_SHELLIDLIST which preserves the actual .lnk filename.
+    auto addEntry = [&](const std::string &entryUtf8)
+    {
+        if (entryUtf8.empty())
+            return;
+        auto &files = GetActiveTab().Files;
+        if (std::find(files.begin(), files.end(), entryUtf8) != files.end())
+            return;
+        files.push_back(entryUtf8);
+        changed = true;
+        if (App::GetInstance())
+            App::GetInstance()->RemoveFileFromOtherCorrals(Utf8ToWide(entryUtf8), &GetActiveTab());
+    };
+
+    FORMATETC fmtShellIdList = {ShellIdListFormat(), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    bool hasShellIdList = (pDataObj->QueryGetData(&fmtShellIdList) == S_OK);
+
+    // CF_HDROP: only for a source that offers no shell ID list. It carries bare
+    // paths, and the desktop shell resolves .lnk shortcuts in it (it gives the
+    // target path), so all it can do is match names against the desktop.
     FORMATETC fmtHdrop = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
     STGMEDIUM stgHdrop = {};
 
-    if (SUCCEEDED(pDataObj->GetData(&fmtHdrop, &stgHdrop)))
+    if (!hasShellIdList && SUCCEEDED(pDataObj->GetData(&fmtHdrop, &stgHdrop)))
     {
         HDROP hDrop = (HDROP)GlobalLock(stgHdrop.hGlobal);
         if (hDrop)
@@ -1615,15 +1898,10 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
             for (UINT i = 0; i < fileCount; i++)
             {
                 wchar_t filePath[MAX_PATH];
-                DragQueryFileW(hDrop, i, filePath, MAX_PATH);
+                if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
+                    continue;
 
-                std::wstring fullPath(filePath);
-                size_t lastSlash = fullPath.find_last_of(L"\\/");
-                std::wstring fileName = (lastSlash != std::wstring::npos) ? fullPath.substr(lastSlash + 1) : fullPath;
-
-                // Verify the file actually exists on the desktop.
-                // If not, CF_HDROP resolved a .lnk shortcut to its target - skip it
-                // and let CFSTR_SHELLIDLIST handle it with the correct .lnk name.
+                std::wstring fileName = NameOf(filePath);
                 std::wstring userPath = desktopPath + L"\\" + fileName;
                 std::wstring pubPath = publicDesktopPath + L"\\" + fileName;
                 if (GetFileAttributesW(userPath.c_str()) == INVALID_FILE_ATTRIBUTES &&
@@ -1632,102 +1910,84 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
                     continue;
                 }
 
-                std::string fileNameUtf8 = WideToUtf8(fileName);
-
-                auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), fileNameUtf8);
-                if (it == GetActiveTab().Files.end())
-                {
-                    GetActiveTab().Files.push_back(fileNameUtf8);
-                    changed = true;
-
-                    if (App::GetInstance())
-                    {
-                        App::GetInstance()->RemoveFileFromOtherCorrals(fileName, &GetActiveTab());
-                    }
-                }
+                addEntry(WideToUtf8(fileName));
             }
             GlobalUnlock(stgHdrop.hGlobal);
         }
         ReleaseStgMedium(&stgHdrop);
     }
 
-    // Fallback: try CFSTR_SHELLIDLIST for special shell items (Recycle Bin, etc.)
-    // and for .lnk shortcuts whose names CF_HDROP resolved to the target.
-    if (!changed)
+    // Shell ID list: every item as the shell knows it, so it is the one to trust
+    // when present. Desktop shortcuts keep their .lnk name here, special items
+    // (Recycle Bin, This PC) come as ::{CLSID}, and a file from any other folder
+    // gets a desktop shortcut that joins the corral.
+    STGMEDIUM stgShellIdList = {};
+
+    if (hasShellIdList && SUCCEEDED(pDataObj->GetData(&fmtShellIdList, &stgShellIdList)))
     {
-        CLIPFORMAT cfShellIdList = (CLIPFORMAT)RegisterClipboardFormatW(L"Shell IDList Array");
-        FORMATETC fmtShellIdList = {cfShellIdList, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
-        STGMEDIUM stgShellIdList = {};
-
-        if (SUCCEEDED(pDataObj->GetData(&fmtShellIdList, &stgShellIdList)))
+        CIDA *pida = (CIDA *)GlobalLock(stgShellIdList.hGlobal);
+        if (pida && pida->cidl > 0)
         {
-            CIDA *pida = (CIDA *)GlobalLock(stgShellIdList.hGlobal);
-            if (pida && pida->cidl > 0)
+            LPCITEMIDLIST pidlParent = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[0]);
+
+            for (UINT i = 0; i < pida->cidl; i++)
             {
-                LPCITEMIDLIST pidlParent = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[0]);
+                LPCITEMIDLIST pidlChild = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[i + 1]);
 
-                for (UINT i = 0; i < pida->cidl; i++)
+                LPITEMIDLIST pidlAbsolute = ILCombine(pidlParent, pidlChild);
+                if (!pidlAbsolute)
+                    continue;
+
+                // SIGDN_FILESYSPATH gives the actual filesystem path (e.g.
+                // "C:\Users\...\Desktop\DexCorral-Register.lnk") without resolving
+                // through shortcuts like other SIGDN flags do.
+                PWSTR pszPath = nullptr;
+                if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_FILESYSPATH, &pszPath)) && pszPath)
                 {
-                    LPCITEMIDLIST pidlChild = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[i + 1]);
+                    std::wstring fsPath = pszPath;
+                    CoTaskMemFree(pszPath);
 
-                    LPITEMIDLIST pidlAbsolute = ILCombine(pidlParent, pidlChild);
-                    if (!pidlAbsolute)
-                        continue;
-
-                    std::string entryUtf8;
-
-                    // Try SIGDN_FILESYSPATH first - this gives the actual filesystem
-                    // path (e.g. "C:\Users\...\Desktop\DexCorral-Register.lnk")
-                    // without resolving through shortcuts like other SIGDN flags do.
-                    PWSTR pszPath = nullptr;
-                    if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_FILESYSPATH, &pszPath)) && pszPath)
+                    if (IsDesktopItem(fsPath))
                     {
-                        std::wstring fsPath = pszPath;
-                        size_t lastSlash = fsPath.find_last_of(L"\\/");
-                        std::wstring fileName = (lastSlash != std::wstring::npos) ? fsPath.substr(lastSlash + 1) : fsPath;
-                        if (!fileName.empty())
-                        {
-                            entryUtf8 = WideToUtf8(fileName);
-                        }
-                        CoTaskMemFree(pszPath);
+                        addEntry(WideToUtf8(NameOf(fsPath)));
                     }
                     else
                     {
-                        // No filesystem path - check for special shell item (::CLSID)
-                        PWSTR pszParsing = nullptr;
-                        if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_DESKTOPABSOLUTEPARSING, &pszParsing)) && pszParsing)
+                        std::wstring display;
+                        PWSTR pszDisplay = nullptr;
+                        if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_NORMALDISPLAY, &pszDisplay)) && pszDisplay)
                         {
-                            if (pszParsing[0] == L':' && pszParsing[1] == L':')
-                            {
-                                std::wstring clsid = pszParsing + 2;
-                                entryUtf8 = "shell:" + WideToUtf8(clsid);
-                            }
-                            CoTaskMemFree(pszParsing);
+                            display = pszDisplay;
+                            CoTaskMemFree(pszDisplay);
                         }
+
+                        std::wstring shortcut = CreateDesktopShortcut(fsPath, display);
+                        LogCorralDrop(L"OnDrop: '%s' is not on the desktop -> shortcut '%s'",
+                                      fsPath.c_str(), shortcut.c_str());
+                        addEntry(WideToUtf8(shortcut));
                     }
-
-                    if (!entryUtf8.empty())
-                    {
-                        auto it = std::find(GetActiveTab().Files.begin(), GetActiveTab().Files.end(), entryUtf8);
-                        if (it == GetActiveTab().Files.end())
-                        {
-                            GetActiveTab().Files.push_back(entryUtf8);
-                            changed = true;
-
-                            if (App::GetInstance())
-                            {
-                                std::wstring wName = Utf8ToWide(entryUtf8);
-                                App::GetInstance()->RemoveFileFromOtherCorrals(wName, &GetActiveTab());
-                            }
-                        }
-                    }
-
-                    CoTaskMemFree(pidlAbsolute);
                 }
+                else
+                {
+                    // No filesystem path - check for special shell item (::CLSID)
+                    PWSTR pszParsing = nullptr;
+                    if (SUCCEEDED(SHGetNameFromIDList(pidlAbsolute, SIGDN_DESKTOPABSOLUTEPARSING, &pszParsing)) && pszParsing)
+                    {
+                        if (pszParsing[0] == L':' && pszParsing[1] == L':')
+                        {
+                            std::wstring clsid = pszParsing + 2;
+                            addEntry("shell:" + WideToUtf8(clsid));
+                        }
+                        CoTaskMemFree(pszParsing);
+                    }
+                }
+
+                CoTaskMemFree(pidlAbsolute);
             }
-            GlobalUnlock(stgShellIdList.hGlobal);
-            ReleaseStgMedium(&stgShellIdList);
         }
+        if (pida)
+            GlobalUnlock(stgShellIdList.hGlobal);
+        ReleaseStgMedium(&stgShellIdList);
     }
 
     if (changed)
@@ -1739,7 +1999,6 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         }
     }
 }
-
 // ============================================================================
 // OnDropOnIcon - drop a file onto a corral icon (shell-execute / open with)
 // ============================================================================

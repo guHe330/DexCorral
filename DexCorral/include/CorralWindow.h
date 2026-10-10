@@ -69,9 +69,20 @@ public:
     HRESULT STDMETHODCALLTYPE Drop(IDataObject *pDataObj, DWORD grfKeyState, POINTL pt, DWORD *pdwEffect) override;
 
 private:
+    /// Effect to show at this point: per-icon, per-folder (virtual tab) or "join the corral"
+    DWORD EffectAt(DWORD grfKeyState, POINTL pt);
+    /// Binds (or rebinds) folderTarget to the folder the active virtual tab shows
+    void SyncFolderTarget(DWORD grfKeyState, POINTL pt);
+    void ReleaseFolderTarget(bool notifyLeave);
+    void EndDragSession();
+
     LONG refCount;
     CorralWindow *owner;
-    bool hasDropData;
+    bool hasDropData;                    /// The dragged data can join a normal tab
+    IDataObject *dragData = nullptr;     /// Data of the drag in flight (held for rebinding)
+    DWORD allowedEffects = 0;            /// Effects the drag source permits
+    IDropTarget *folderTarget = nullptr; /// The shell's drop target for a virtual tab's folder
+    std::wstring folderTargetPath;       /// Folder that folderTarget is bound to
 };
 
 /// Sync status for files in cloud storage providers (OneDrive, Google Drive, etc.)
@@ -228,6 +239,8 @@ public:
     // String conversion utilities (used across split implementation files and App)
     static std::string WideToUtf8(const std::wstring &wide);
     static std::wstring Utf8ToWide(const std::string &utf8);
+    static std::wstring GetDesktopPath();       // The user's desktop folder
+    static std::wstring GetPublicDesktopPath(); // The all-users desktop folder
 
 private:
     // Virtual corral support
@@ -422,8 +435,6 @@ private:
     void DoColumnResize(int x);
     void EndColumnResize();
 
-    static std::wstring GetDesktopPath();
-    static std::wstring GetPublicDesktopPath();
     static int GetDesktopIconSize();                          // Read from registry (logical pixels)
     void GetDesktopIconSpacing(int &spacingX, int &spacingY); // Query desktop ListView
 
