@@ -71,6 +71,7 @@ add_library(DexCorralHook SHARED
     src/IconUtils.cpp
     src/LayoutMath.cpp
     src/UpdateChecker.cpp
+    src/Hotkey.cpp
     src/Strings.cpp
 )
 
@@ -127,9 +128,11 @@ add_executable(DexCorralTests
     tests/test_icon_utils.cpp
     tests/test_chrome_alpha.cpp
     tests/test_strings.cpp
+    tests/test_hotkey.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
+    src/Hotkey.cpp
     src/Strings.cpp
 )
 

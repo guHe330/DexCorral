@@ -208,6 +208,35 @@ void CorralWindow::MoveFocusByDirection(int vk, bool extend, bool focusOnly)
     UpdateLayeredContent();
 }
 
+void CorralWindow::CycleTab(int direction)
+{
+    int count = (int)config.Tabs.size();
+    if (count < 2)
+        return;
+    SetActiveTab(((config.ActiveTabIndex + direction) % count + count) % count);
+    if (App::GetInstance())
+        App::GetInstance()->SaveConfig();
+}
+
+void CorralWindow::ScrollByPage(bool down)
+{
+    if (!NeedsScrollbar())
+        return;
+
+    // One screenful, less a row so the last visible row stays in view as context
+    int page = GetVisibleHeight() - GetIconAreaTop() - iconSpacingY;
+    if (page < iconSpacingY)
+        page = iconSpacingY;
+
+    scrollPosition += down ? page : -page;
+    ClampScrollPosition();
+    UpdateLayeredContent();
+
+    // Debounced reposition of real desktop icons, as for the mouse wheel
+    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+}
+
 void CorralWindow::ShowContextMenuForFocusedIcon()
 {
     if (selectedIcon >= 0 && selectedIcon < (int)icons.size())
@@ -314,6 +343,27 @@ bool CorralWindow::OnKeyDown(WPARAM vk)
     case VK_LEFT:
     case VK_RIGHT:
         MoveFocusByDirection((int)vk, shift, ctrl && !shift);
+        return true;
+
+    case VK_TAB:
+        // Ctrl+Tab / Ctrl+Shift+Tab: next / previous tab, as in a browser
+        if (ctrl && config.Tabs.size() > 1)
+        {
+            CycleTab(shift ? -1 : 1);
+            return true;
+        }
+        return false;
+
+    case VK_PRIOR:
+    case VK_NEXT:
+        if (ctrl)
+        {
+            // Ctrl+PgUp / Ctrl+PgDn: the other common pair for tabs
+            if (config.Tabs.size() > 1)
+                CycleTab(vk == VK_PRIOR ? -1 : 1);
+            return true;
+        }
+        ScrollByPage(vk == VK_NEXT);
         return true;
 
     case VK_HOME:

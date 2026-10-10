@@ -48,6 +48,7 @@ enum class Str
     Menu_NewVirtualCorral,       // "New Virtual Corral"
     Menu_ShowDesktopIcons,       // "Show Desktop Icons"
     Menu_QuickHideEverything,    // "Quick-Hide Everything"
+    Menu_QuickHideHotkey,        // "Quick-Hide Hotkey ({0})"  ({0} = combination)
     Menu_CheckUpdatesAuto,       // "Check for Updates Automatically"
     Menu_CheckUpdatesNow,        // "Check for Updates Now"
     Menu_Language,               // "Language" (submenu)
@@ -61,6 +62,10 @@ enum class Str
     Config_RestoredBody,         // where the unreadable file was kept
     Config_ResetTitle,           // no usable backup, fresh layout
     Config_ResetBody,            // where the unreadable file was kept
+
+    // Quick-hide hotkey could not be registered (App.cpp)
+    Hotkey_FailedTitle,          // "Hotkey not available"
+    Hotkey_FailedBody,           // {0} = combination
 
     // About dialog (App.cpp)
     Title_About,                 // "About DexCorral"
