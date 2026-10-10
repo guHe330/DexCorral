@@ -65,7 +65,7 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
 
 ### Virtual Corrals
-A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes. It is a live view: manage the files in the folder itself (drops onto a virtual tab are not accepted).
+A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes. It is a live view of that folder, so dropping files onto it does what dropping them into the folder's Explorer window would: they are moved or copied there, with the same cursor and the same Ctrl / Shift modifiers.
 
 ## Managing Corrals
 
@@ -134,7 +134,9 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 ## Working with Icons
 
 ### Adding
-- Drag any icon from the desktop (or files from an Explorer window) and drop it onto a Corral.
+- Drag any icon from the desktop and drop it onto a Corral.
+- Drag a file or folder from an Explorer window onto a Corral: DexCorral puts a shortcut to it on the desktop and adds that shortcut to the Corral. The original stays where it is.
+- If the cursor shows the no-drop sign, the Corral cannot take what you are dragging.
 - New desktop items land automatically in the Catch-All tab, if one is set.
 
 ### Using
