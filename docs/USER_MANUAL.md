@@ -132,6 +132,7 @@ Header opacity fades the title bar and tab strip independently of the Corral fil
 - Inactive tabs are derived from the header opacity automatically, always dimmer than the active tab, no second slider to keep in sync.
 - The slider stops short of fully transparent, because the header is the Corral's grab handle. Rolled-up Corrals are kept a little more visible than the setting; unrolling restores it exactly.
 - Hovering a Corral fades its header, border, icons and text up to full strength, and back when you leave.
+- DexCorral follows the Windows setting **Settings > Accessibility > Visual effects > Animation effects**. With it off, these fades, the unrolling of a rolled-up Corral and the Quick-Hide fade all switch instantly instead of animating.
 
 #### Text opacity
 The tab title and the icon labels fade on their own sliders, so text can be dialled back without touching what is behind it, or turned off entirely for a Corral that is just icons.
