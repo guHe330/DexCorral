@@ -83,6 +83,8 @@ private:
     DWORD allowedEffects = 0;            /// Effects the drag source permits
     IDropTarget *folderTarget = nullptr; /// The shell's drop target for a virtual tab's folder
     std::wstring folderTargetPath;       /// Folder that folderTarget is bound to
+    int springTab = -1;                  /// Inactive tab the drag is resting on, or -1
+    DWORD springStart = 0;               /// Tick count when the drag arrived on springTab
 };
 
 /// Sync status for files in cloud storage providers (OneDrive, Google Drive, etc.)
@@ -341,7 +343,12 @@ private:
     void OnIconDragEnd();
     std::vector<int> GetDraggedIconIndices() const; // Icons an icon drag carries: the selection, or just the one
     bool IsIconBeingDragged(int index) const;
-
+    /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
+    void AddFilesToTab(const std::vector<std::string> &names, int tabIndex);
+    /// Moves entries from the active tab to another (non-virtual) tab of this corral
+    void MoveEntriesToTab(const std::vector<std::string> &names, int tabIndex);
+    /// Config names a menu command on this icon acts on: the selection if the icon is part of one
+    std::vector<std::string> GetActionEntries(int iconIndex) const;
     // Icon rename
     RECT GetIconLabelRect(int iconIndex) const;
     bool HitTestIconLabel(int x, int y, int iconIndex) const;
@@ -534,6 +541,7 @@ private:
     // sliver of one on the way to another doesn't open it.
     static const UINT_PTR HOVER_DWELL_TIMER_ID = 9;
     static const int HOVER_DWELL_DELAY = 300; // ms
+    static const int TAB_SPRING_DELAY = 500;  // ms a drag rests on a tab before the tab comes forward
     bool mouseInsideWindow = false; // Track mouse presence
 
     // Opacity/tint hover animation state

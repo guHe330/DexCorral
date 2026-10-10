@@ -123,6 +123,7 @@ const wchar_t *const kEnglish[] = {
     /* Menu_CloseTab */            L"Close Tab",
     /* Menu_DeleteCorral */        L"Delete Corral",
     /* Menu_RemoveFromCorral */    L"Remove from Corral",
+    /* Menu_MoveToTab */           L"Move to Tab",
 
     // Confirmations
     /* Confirm_CloseTabBody */     L"Close this tab?",
@@ -315,6 +316,7 @@ const wchar_t *const kGerman[] = {
     /* Menu_CloseTab */            L"Tab schließen",
     /* Menu_DeleteCorral */        L"Corral löschen",
     /* Menu_RemoveFromCorral */    L"Aus dem Corral entfernen",
+    /* Menu_MoveToTab */           L"In Tab verschieben",
 
     // Confirmations
     /* Confirm_CloseTabBody */     L"Diesen Tab schließen?",
