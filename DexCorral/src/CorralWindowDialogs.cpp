@@ -539,6 +539,32 @@ static void AppearanceUpdateLivePreview(AppearanceDlgData *data, bool relayout =
         InvalidateRect(data->previewWindow, nullptr, FALSE);
 }
 
+// Control id of the Reset to Defaults button
+static const WORD IDC_APPEARANCE_RESET = 134;
+
+/// Moves a slider and runs the dialog's own WM_HSCROLL handling for it, so the
+/// label, the changed flag and the live preview follow exactly as for a drag.
+static void AppearanceSetSlider(HWND hDlg, int sliderId, int pos)
+{
+    HWND hSlider = GetDlgItem(hDlg, sliderId);
+    SendMessageW(hSlider, TBM_SETPOS, TRUE, pos);
+    SendMessageW(hDlg, WM_HSCROLL, MAKEWPARAM(TB_THUMBPOSITION, 0), (LPARAM)hSlider);
+}
+
+/// "#RRGGBB" or "#AARRGGBB" -> 0xAARRGGBB (alpha 0 for the short form); `fallback` if malformed
+static unsigned int ParseHexColor(const std::string &hex, unsigned int fallback)
+{
+    unsigned int value = fallback;
+    if (hex.size() >= 7 && hex[0] == '#')
+        sscanf_s(hex.c_str() + 1, "%x", &value);
+    return value;
+}
+
+static COLORREF RgbOf(unsigned int argb)
+{
+    return RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
+}
+
 static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     AppearanceDlgData *data = (AppearanceDlgData *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
@@ -814,6 +840,65 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             return TRUE;
         }
 
+        if (id == IDC_APPEARANCE_RESET)
+        { // Reset to Defaults: every control goes to the style a new corral would get
+            App *app = App::GetInstance();
+            if (!app)
+                return TRUE;
+            AppearanceSettings def = app->GetDefaultAppearance();
+
+            // Colours and font first. They have no slider to carry them, and the
+            // background slider below rebuilds the colour string from data->color.
+            unsigned int background = ParseHexColor(def.ColorHex, 0x99000000);
+            data->color = RgbOf(background);
+            data->colorChanged = true;
+            if (data->hBrush)
+                DeleteObject(data->hBrush);
+            data->hBrush = CreateSolidBrush(data->color);
+            InvalidateRect(GetDlgItem(hDlg, 105), nullptr, TRUE);
+
+            data->fontName = CorralWindow::Utf8ToWide(def.HeaderFontName);
+            data->fontSize = def.HeaderFontSize;
+            data->fontChanged = true;
+            SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
+
+            data->fontColor = RgbOf(ParseHexColor(def.HeaderFontColor, 0xFFFFFF));
+            data->fontColorChanged = true;
+            if (data->fontColorBrush)
+                DeleteObject(data->fontColorBrush);
+            data->fontColorBrush = CreateSolidBrush(data->fontColor);
+            InvalidateRect(GetDlgItem(hDlg, 114), nullptr, TRUE);
+
+            data->tintColor = RgbOf(ParseHexColor(def.IconTintColor, 0x000000));
+            data->tintChanged = true;
+            if (data->tintColorBrush)
+                DeleteObject(data->tintColorBrush);
+            data->tintColorBrush = CreateSolidBrush(data->tintColor);
+            InvalidateRect(GetDlgItem(hDlg, 118), nullptr, TRUE);
+
+            if (data->activeTabConfig)
+            {
+                data->activeTabConfig->HeaderFontName = def.HeaderFontName;
+                data->activeTabConfig->HeaderFontSize = def.HeaderFontSize;
+                data->activeTabConfig->HeaderFontColor = def.HeaderFontColor;
+            }
+            if (data->corralConfig)
+                data->corralConfig->IconTintColor = def.IconTintColor;
+
+            // Everything with a slider goes through the slider's own handler
+            AppearanceSetSlider(hDlg, 102, (background >> 24) & 0xFF);
+            AppearanceSetSlider(hDlg, 122, def.BorderOpacity);
+            AppearanceSetSlider(hDlg, 124, def.HeaderOpacity);
+            AppearanceSetSlider(hDlg, 126, def.HeaderFontOpacity);
+            AppearanceSetSlider(hDlg, 116, def.IconOpacity);
+            AppearanceSetSlider(hDlg, 128, def.IconLabelOpacity);
+            AppearanceSetSlider(hDlg, 120, def.IconTintStrength);
+            AppearanceSetSlider(hDlg, 130, def.IconSpacingXPercent);
+            AppearanceSetSlider(hDlg, 132, def.IconSpacingYPercent);
+            AppearanceSetSlider(hDlg, 110, def.TitleBarHeight); // last: it relayouts, picking up the font too
+            return TRUE;
+        }
+
         // Mutual exclusion: checking one "apply to all" unchecks the other
         if (id == 108 && HIWORD(wParam) == BN_CLICKED)
         {
@@ -1064,9 +1149,11 @@ void CorralWindow::ShowAppearanceDialog()
 
     const int DLG_WIDTH = 220;
     const int DLG_HEIGHT = 371;
-    const int ITEM_COUNT = 50;
+    const int ITEM_COUNT = 51;
 
-    WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
+    // Twice the usual buffer: 51 controls, eleven of them with a spelled-out
+    // class name, and translated texts of open-ended length
+    WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD *p = dlgTemplate;
 
     DLGTEMPLATE *dlg = (DLGTEMPLATE *)p;
@@ -1200,7 +1287,9 @@ void CorralWindow::ShowAppearanceDialog()
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 10, 337, 200, 12, 109, 0xFFFF, 0x0080, Tr(Str::Chk_CopyStyleToAll));
 
     // === Buttons ===
-    // 49-50.
+    // 49. Reset to Defaults, set apart on the left
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 5, 354, 98, 14, IDC_APPEARANCE_RESET, 0xFFFF, 0x0080, Tr(Str::Btn_ResetToDefaults));
+    // 50-51.
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 110, 354, 50, 14, IDOK, 0xFFFF, 0x0080, Tr(Str::Btn_OK));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 165, 354, 50, 14, IDCANCEL, 0xFFFF, 0x0080, Tr(Str::Btn_Cancel));
 

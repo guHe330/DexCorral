@@ -1651,8 +1651,32 @@ SIZE App::DefaultCorralSize(POINT nearPt)
     return s;
 }
 
-CorralWindowConfig App::MakeDefaultCorralConfig() const
+AppearanceSettings App::GetDefaultAppearance() const
 {
+    // Built from the same two functions that create a new corral, so "reset to
+    // defaults" can never drift from what "create new corral" produces.
+    CorralWindowConfig c = MakeDefaultCorralConfig();
+    CorralTabConfig t = MakeDefaultTabConfig("");
+
+    AppearanceSettings s;
+    s.ColorHex = t.ColorHex;
+    s.TitleBarHeight = c.TitleBarHeight;
+    s.HeaderOpacity = c.HeaderOpacity;
+    s.BorderOpacity = c.BorderOpacity;
+    s.HeaderFontName = t.HeaderFontName;
+    s.HeaderFontSize = t.HeaderFontSize;
+    s.HeaderFontColor = t.HeaderFontColor;
+    s.HeaderFontOpacity = t.HeaderFontOpacity;
+    s.IconOpacity = c.IconOpacity;
+    s.IconLabelOpacity = c.IconLabelOpacity;
+    s.IconTintColor = c.IconTintColor;
+    s.IconTintStrength = c.IconTintStrength;
+    s.IconSpacingXPercent = c.IconSpacingXPercent;
+    s.IconSpacingYPercent = c.IconSpacingYPercent;
+    return s;
+}
+
+CorralWindowConfig App::MakeDefaultCorralConfig() const{
     CorralWindowConfig c;
     c.TitleBarHeight = config.DefaultTitleBarHeight;
     c.HeaderOpacity = config.DefaultHeaderOpacity;

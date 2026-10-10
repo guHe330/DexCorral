@@ -167,9 +167,10 @@ const wchar_t *const kEnglish[] = {
     /* Grp_IconSpacing */          L"Icon Spacing",
     /* Lbl_Horiz */                L"Horiz",
     /* Lbl_Vert */                 L"Vert",
-    /* Chk_UseAsDefault */         L"Use as default for new corrals",
-    /* Chk_ApplyToAll */           L"Apply changes to all corrals",
-    /* Chk_CopyStyleToAll */       L"Copy full style to all corrals",
+    /* Chk_UseAsDefault */         L"Save this style as the default for new corrals",
+    /* Chk_ApplyToAll */           L"Apply only what I changed to all corrals",
+    /* Chk_CopyStyleToAll */       L"Make all corrals look like this one",
+    /* Btn_ResetToDefaults */      L"Reset to Defaults",
 
     // Details view column headers / sort menu
     /* Col_Name */                 L"Name",
@@ -371,9 +372,10 @@ const wchar_t *const kGerman[] = {
     /* Grp_IconSpacing */          L"Symbolabstand",
     /* Lbl_Horiz */                L"Horiz.",
     /* Lbl_Vert */                 L"Vert.",
-    /* Chk_UseAsDefault */         L"Als Standard für neue Corrals verwenden",
-    /* Chk_ApplyToAll */           L"Änderungen auf alle Corrals anwenden",
-    /* Chk_CopyStyleToAll */       L"Kompletten Stil auf alle Corrals kopieren",
+    /* Chk_UseAsDefault */         L"Diesen Stil als Standard für neue Corrals speichern",
+    /* Chk_ApplyToAll */           L"Nur hier Geändertes auf alle Corrals anwenden",
+    /* Chk_CopyStyleToAll */       L"Alle Corrals wie dieses aussehen lassen",
+    /* Btn_ResetToDefaults */      L"Auf Standard zurücksetzen",
 
     // Details view column headers / sort menu
     /* Col_Name */                 L"Name",

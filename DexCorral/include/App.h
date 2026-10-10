@@ -83,6 +83,9 @@ public:
      */
     void ToggleQuickHide();
 
+    /// The style a newly created corral gets (the saved "default for new corrals")
+    AppearanceSettings GetDefaultAppearance() const;
+
     /// (Re)registers the global quick-hide hotkey from config.QuickHideHotkey.
     /// Returns false if a hotkey is configured but could not be registered.
     bool ApplyQuickHideHotkey();

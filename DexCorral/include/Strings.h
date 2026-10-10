@@ -152,9 +152,10 @@ enum class Str
     Grp_IconSpacing,             // "Icon Spacing"
     Lbl_Horiz,                   // "Horiz"
     Lbl_Vert,                    // "Vert"
-    Chk_UseAsDefault,            // "Use as default for new corrals"
-    Chk_ApplyToAll,              // "Apply changes to all corrals"
-    Chk_CopyStyleToAll,          // "Copy full style to all corrals"
+    Chk_UseAsDefault,            // save this style as the default for new corrals
+    Chk_ApplyToAll,              // transfer only the settings touched in this session
+    Chk_CopyStyleToAll,          // overwrite every corral's style with this one
+    Btn_ResetToDefaults,         // "Reset to Defaults"
 
     // Details view column headers / sort menu (CorralWindowIcons.cpp, Commands)
     Col_Name,                    // "Name"
