@@ -42,7 +42,7 @@ enum class Str
     Btn_Cancel,                  // "Cancel"
 
     // Tray icon / tray menu (App.cpp)
-    Tray_Tooltip,                // "DexCorral - Double-click desktop to hide icons"
+    Tray_Tooltip,                // "DexCorral - double-click here or on the desktop to hide everything"
     Menu_About,                  // "About"
     Menu_UserManual,             // "User Manual" (opens the manual in the browser)
     Menu_OpenConfigFolder,       // "Open Config Folder"

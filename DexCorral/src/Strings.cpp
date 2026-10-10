@@ -47,7 +47,7 @@ const wchar_t *const kEnglish[] = {
     /* Btn_Cancel */               L"Cancel",
 
     // Tray icon / tray menu
-    /* Tray_Tooltip */             L"DexCorral - Double-click desktop to hide icons",
+    /* Tray_Tooltip */             L"DexCorral - double-click here or on the desktop to hide everything",
     /* Menu_About */               L"About",
     /* Menu_UserManual */          L"User Manual",
     /* Menu_OpenConfigFolder */    L"Open Config Folder",
@@ -249,7 +249,7 @@ const wchar_t *const kGerman[] = {
     /* Btn_Cancel */               L"Abbrechen",
 
     // Tray icon / tray menu
-    /* Tray_Tooltip */             L"DexCorral - Doppelklick auf den Desktop blendet Symbole aus",
+    /* Tray_Tooltip */             L"DexCorral - Doppelklick hier oder auf den Desktop blendet alles aus",
     /* Menu_About */               L"Info",
     /* Menu_UserManual */          L"Benutzerhandbuch",
     /* Menu_OpenConfigFolder */    L"Konfigurationsordner öffnen",
