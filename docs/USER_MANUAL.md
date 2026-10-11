@@ -66,8 +66,13 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
 
 ### Virtual Corrals
-A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes. It is a live view of that folder, so dropping files onto it does what dropping them into the folder's Explorer window would: they are moved or copied there, with the same cursor and the same Ctrl / Shift modifiers.
+A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes.
 
+It is a live view of that folder, and its icons are the real files, so dragging works as it does in the folder's own Explorer window:
+
+- **Dropping files onto it** moves or copies them into the folder, with the same cursor and the same Ctrl / Shift modifiers.
+- **Dragging files out of it**, to an Explorer window, the desktop or an application, moves or copies them by Explorer's usual rules. Several selected files travel together.
+- Dragged onto a **normal Corral**, a file stays where it is and gets a desktop shortcut in that Corral.
 ## Managing Corrals
 
 ### Creating
