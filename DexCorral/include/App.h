@@ -36,6 +36,7 @@
 #include <map>
 #include <string>
 #include "Config.h"
+#include "CorralHook.h"
 #include "DesktopIcons.h"
 #include "HookBridge.h"
 #include "MouseHook.h"
@@ -83,6 +84,11 @@ public:
      */
     void ToggleQuickHide();
 
+    /// False in standby: no corrals, no hidden icons, the layout in config.json left alone
+    bool IsDesktopActive() const { return desktopActive; }
+
+    /// Leaves standby on the user's request (tray menu): installs the hook and brings the corrals back
+    void ResumeFromStandby();
     /// The style a newly created corral gets (the saved "default for new corrals")
     AppearanceSettings GetDefaultAppearance() const;
 
@@ -245,6 +251,14 @@ private:
 
     // Quick-hide state
     bool quickHideActive = false;
+
+    // Standby (see CorralHook.h): decided by the hook before the app starts.
+    // desktopActive is the app's side of it and gates everything that shows
+    // corrals, hides icons or rewrites the corral list.
+    HookStandbyReason standbyReason = HookStandbyReason::None;
+    bool desktopActive = false;
+    void ActivateDesktop();             // Everything Initialize skips in standby
+    const wchar_t *TrayTooltip() const; // Normal or "paused" tooltip
     bool quickHideHotkeyRegistered = false;
     bool desktopIconsVisibleBeforeQuickHide = true; // Restored when quick-hide ends
 

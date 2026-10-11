@@ -55,9 +55,14 @@ enum class Str
     Menu_CheckUpdatesNow,        // "Check for Updates Now"
     Menu_Language,               // "Language" (submenu)
 
-    // Safe-mode notice (App.cpp)
-    SafeMode_Title,              // "DexCorral started in safe mode"
-    SafeMode_Body,               // explanation balloon text
+    // Standby: DexCorral deliberately not running (App.cpp)
+    Tray_TooltipPaused,          // tray tooltip while in standby
+    Menu_Resume,                 // "Resume DexCorral"
+    Standby_CrashStatus,         // greyed status line in the tray menu
+    SafeMode_Title,              // balloon title when standby was entered after crashes
+    SafeMode_Body,               // what standby means and how to leave it
+    Resume_FailedTitle,          // resume could not install the hook
+    Resume_FailedBody,           // ... try signing out and in
 
     // Unreadable config.json notice (App.cpp)
     Config_RestoredTitle,        // layout restored from config.bak

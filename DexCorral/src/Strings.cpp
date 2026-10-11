@@ -60,11 +60,17 @@ const wchar_t *const kEnglish[] = {
     /* Menu_CheckUpdatesNow */     L"Check for Updates Now",
     /* Menu_Language */            L"Language",
 
-    // Safe-mode notice
-    /* SafeMode_Title */           L"DexCorral started in safe mode",
-    /* SafeMode_Body */            L"Explorer restarted repeatedly while the desktop hook was active, so the "
-                                   L"hook is disabled for this session. Desktop icons stay visible. The hook "
-                                   L"will be re-enabled on the next start.",
+    // Standby: DexCorral deliberately not running
+    /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
+    /* Menu_Resume */              L"Resume DexCorral",
+    /* Standby_CrashStatus */      L"Paused: Explorer crashed repeatedly",
+    /* SafeMode_Title */           L"DexCorral is paused",
+    /* SafeMode_Body */            L"Explorer crashed repeatedly while DexCorral was starting, so DexCorral is "
+                                   L"standing aside. Your icons are all on the desktop and your Corrals are "
+                                   L"saved. To try again, right-click this icon and choose Resume DexCorral.",
+    /* Resume_FailedTitle */       L"DexCorral could not resume",
+    /* Resume_FailedBody */        L"The desktop was not ready. Sign out and back in, and DexCorral will start "
+                                   L"normally.",
 
     // Unreadable config.json notice
     /* Config_RestoredTitle */     L"DexCorral restored your layout from a backup",
@@ -263,11 +269,18 @@ const wchar_t *const kGerman[] = {
     /* Menu_CheckUpdatesNow */     L"Jetzt nach Updates suchen",
     /* Menu_Language */            L"Sprache",
 
-    // Safe-mode notice
-    /* SafeMode_Title */           L"DexCorral im abgesicherten Modus gestartet",
-    /* SafeMode_Body */            L"Der Explorer wurde wiederholt neu gestartet, während der Desktop-Hook aktiv "
-                                   L"war; der Hook ist daher für diese Sitzung deaktiviert. Desktopsymbole bleiben "
-                                   L"sichtbar. Beim nächsten Start wird der Hook wieder aktiviert.",
+    // Standby: DexCorral deliberately not running
+    /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
+    /* Menu_Resume */              L"DexCorral fortsetzen",
+    /* Standby_CrashStatus */      L"Pausiert: Der Explorer ist wiederholt abgestürzt",
+    /* SafeMode_Title */           L"DexCorral ist pausiert",
+    /* SafeMode_Body */            L"Der Explorer ist beim Start von DexCorral wiederholt abgestürzt, daher hält "
+                                   L"sich DexCorral zurück. Alle Symbole liegen auf dem Desktop, die Corrals sind "
+                                   L"gespeichert. Zum erneuten Versuch: Rechtsklick auf dieses Symbol, dann "
+                                   L"DexCorral fortsetzen.",
+    /* Resume_FailedTitle */       L"DexCorral konnte nicht fortgesetzt werden",
+    /* Resume_FailedBody */        L"Der Desktop war nicht bereit. Nach dem Ab- und Anmelden startet DexCorral "
+                                   L"normal.",
 
     // Unreadable config.json notice
     /* Config_RestoredTitle */     L"DexCorral hat das Layout aus einer Sicherung geladen",

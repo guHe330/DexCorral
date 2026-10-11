@@ -234,6 +234,63 @@ void App::Initialize()
     // Create monitor manager (before corrals)
     monitorManager = std::make_unique<MonitorManager>();
 
+    // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
+    // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
+    // injected into Explorer's process.
+    HICON icon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+    if (!icon)
+        icon = LoadIconW(nullptr, IDI_APPLICATION);
+    // Standby was decided by the hook before this thread started
+    standbyReason = GetCorralHookStandbyReason();
+    trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, TrayTooltip());
+    if (!trayIcon->IsVisible()) {
+        // Shell notification area not ready yet (we're loaded very early in Explorer startup).
+        // Start a retry timer; WM_TASKBARCREATED will also retry when Explorer is fully up.
+        DllLog(L"App::Initialize: tray NIM_ADD pending — starting retry timer");
+        SetTimer(messageWindow, TRAY_RETRY_TIMER, 500, nullptr);
+    } else {
+        DllLog(L"App::Initialize: tray icon added successfully");
+    }
+
+    // Standby after repeated Explorer deaths: tell the user why there are no
+    // corrals and how to get them back
+    if (standbyReason == HookStandbyReason::CrashGuard) {
+        DllLog(L"App::Initialize: STANDBY (crash guard) — no hook, no corrals, desktop icons stay visible");
+        s_SafeModeNoticePending = true;
+        ShowSafeModeNoticeIfPending(trayIcon.get());
+    }
+
+    // config.json was unreadable: say so rather than leaving the user to wonder
+    // where their corrals went
+    ShowConfigNoticeIfPending(trayIcon.get());
+
+    if (standbyReason != HookStandbyReason::None)
+    {
+        // Nothing that shows a corral, hides an icon or touches the desktop
+        // runs in standby. The tray icon, the config and the update check do.
+        StartUpdateCheck(false);
+        DllLog(L"App::Initialize: done (standby, reason %d)", (int)standbyReason);
+        return;
+    }
+
+    ActivateDesktop();
+
+    // Opt-in update check (no-op unless CheckForUpdates is enabled and the 24h
+    // throttle has elapsed). Async — never blocks startup.
+    StartUpdateCheck(false);
+
+    DllLog(L"App::Initialize: done");
+}
+
+const wchar_t *App::TrayTooltip() const
+{
+    return Tr(standbyReason != HookStandbyReason::None ? Str::Tray_TooltipPaused : Str::Tray_Tooltip);
+}
+
+void App::ActivateDesktop()
+{
+    desktopActive = true;
+
     // Setup mouse hook
     mouseHook = std::make_unique<MouseHook>();
     mouseHook->SetLeftButtonDownCallback([this](POINT pt)
@@ -253,34 +310,6 @@ void App::Initialize()
     foregroundHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
                                      nullptr, WinEventProc, 0, 0,
                                      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-
-    // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
-    // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
-    // injected into Explorer's process.
-    HICON icon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
-    if (!icon)
-        icon = LoadIconW(nullptr, IDI_APPLICATION);
-    trayIcon = std::make_unique<TrayIcon>(messageWindow, icon, Tr(Str::Tray_Tooltip));
-    if (!trayIcon->IsVisible()) {
-        // Shell notification area not ready yet (we're loaded very early in Explorer startup).
-        // Start a retry timer; WM_TASKBARCREATED will also retry when Explorer is fully up.
-        DllLog(L"App::Initialize: tray NIM_ADD pending — starting retry timer");
-        SetTimer(messageWindow, TRAY_RETRY_TIMER, 500, nullptr);
-    } else {
-        DllLog(L"App::Initialize: tray icon added successfully");
-    }
-
-    // Hook safe mode: the hook refused to install after repeated Explorer
-    // deaths — tell the user why their icons are not being hidden
-    if (IsCorralHookSafeMode()) {
-        DllLog(L"App::Initialize: hook is in SAFE MODE — desktop icons stay visible this session");
-        s_SafeModeNoticePending = true;
-        ShowSafeModeNoticeIfPending(trayIcon.get());
-    }
-
-    // config.json was unreadable: say so rather than leaving the user to wonder
-    // where their corrals went
-    ShowConfigNoticeIfPending(trayIcon.get());
 
     // Optional global quick-hide hotkey (off unless configured). A failure here
     // is only logged: the tray menu shows the hotkey as not active.
@@ -353,12 +382,28 @@ void App::Initialize()
     UpdateHookHiddenIcons();
     PositionHiddenIconsUnderCorrals();
     HookBridge::RefreshDesktop();
+}
 
-    // Opt-in update check (no-op unless CheckForUpdates is enabled and the 24h
-    // throttle has elapsed). Async — never blocks startup.
-    StartUpdateCheck(false);
+void App::ResumeFromStandby()
+{
+    // Only the crash guard can be resumed by hand; a conflict ends by itself
+    if (desktopActive || standbyReason != HookStandbyReason::CrashGuard)
+        return;
 
-    DllLog(L"App::Initialize: done");
+    if (!ResumeCorralHook())
+    {
+        // The recorded failures are cleared either way, so the next start is a normal one
+        if (trayIcon)
+            trayIcon->ShowBalloon(Tr(Str::Resume_FailedTitle), Tr(Str::Resume_FailedBody));
+        return;
+    }
+
+    DllLog(L"App::ResumeFromStandby: hook installed, activating the desktop");
+    standbyReason = HookStandbyReason::None;
+    s_SafeModeNoticePending = false;
+    if (trayIcon)
+        trayIcon->UpdateTooltip(TrayTooltip());
+    ActivateDesktop();
 }
 
 void App::Shutdown()
@@ -424,6 +469,15 @@ void App::LoadConfig()
 
 void App::SaveConfig()
 {
+    // Standby: there are no corral windows, so syncing from them would write an
+    // empty layout over the user's. Persist the settings that can still change
+    // (language, update check) and leave the corrals exactly as loaded.
+    if (!desktopActive)
+    {
+        Config::Save(config);
+        return;
+    }
+
     // Update desktop icons state. Quick-hide is a transient state — persist
     // the visibility the user will get back when quick-hide ends.
     config.DesktopIconsVisible = quickHideActive ? desktopIconsVisibleBeforeQuickHide
@@ -1330,6 +1384,19 @@ void App::ShowTrayMenu()
     AppendMenuW(menu, MF_STRING, 3, Tr(Str::Menu_About));
     AppendMenuW(menu, MF_STRING, 12, Tr(Str::Menu_UserManual));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+
+    if (!desktopActive)
+    {
+        // Standby: say why, offer the way out where there is one, and leave out
+        // everything that needs corrals or the hook
+        if (standbyReason == HookStandbyReason::CrashGuard)
+        {
+            AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, Tr(Str::Standby_CrashStatus));
+            AppendMenuW(menu, MF_STRING, 14, Tr(Str::Menu_Resume));
+        }
+    }
+    else
+    {
     AppendMenuW(menu, MF_STRING, 1, Tr(Str::Menu_CreateNewCorral));
     AppendMenuW(menu, MF_STRING, 5, Tr(Str::Menu_NewVirtualCorral));
 
@@ -1347,6 +1414,7 @@ void App::ShowTrayMenu()
         config.QuickHideHotkey.empty() ? std::string(DEFAULT_QUICK_HIDE_HOTKEY) : config.QuickHideHotkey);
     AppendMenuW(menu, MF_STRING | (quickHideHotkeyRegistered ? MF_CHECKED : MF_UNCHECKED), 9,
                 TrFmt(Str::Menu_QuickHideHotkey, hotkeyName).c_str());
+    }
 
     // Update check (opt-in)
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -1442,6 +1510,9 @@ void App::ShowTrayMenu()
             }
         }
         break;
+    case 14:
+        ResumeFromStandby();
+        break;
     case 12:
         // The manual on GitHub, rendered. Opened in the user's browser, on request only.
         ShellExecuteW(nullptr, L"open", L"https://github.com/guHe330/DexCorral/blob/main/docs/USER_MANUAL.md",
@@ -1482,7 +1553,7 @@ void App::ApplyLanguage(const std::string &langCode)
     // The tray tooltip and the corrals' layered surfaces cache their text, so
     // redraw those (header states, detail-view column headers, size units).
     if (trayIcon)
-        trayIcon->UpdateTooltip(Tr(Str::Tray_Tooltip));
+        trayIcon->UpdateTooltip(TrayTooltip());
     for (auto &corral : corrals)
         corral->RecalculateLayout();
 }
@@ -1901,8 +1972,9 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         if (lParam == WM_LBUTTONDBLCLK)
         {
             // Same gesture, same result as double-clicking the desktop. The
-            // narrower icons-only toggle stays in the menu.
-            app->ToggleQuickHide();
+            // narrower icons-only toggle stays in the menu. Nothing to hide in standby.
+            if (app->desktopActive)
+                app->ToggleQuickHide();
             return 0;
         }
         // User clicked the "update available" balloon — open the release page.
@@ -2003,7 +2075,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     // on the thread that owns `corrals`.
     if (uMsg == WM_CREATE_CORRAL_AT || uMsg == WM_CREATE_VIRTUAL_CORRAL_AT)
     {
-        if (app)
+        if (app && app->desktopActive) // the desktop menu entries are hidden in standby; this is the backstop
         {
             POINT pt = {(int)(LONG)wParam, (int)(LONG)lParam};
             if (uMsg == WM_CREATE_CORRAL_AT)
@@ -2028,7 +2100,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Hook retry thread succeeded — refresh hidden icon data now that the hook is active
-    if (app && uMsg == (WM_APP + 100))
+    if (app && uMsg == (WM_APP + 100) && app->desktopActive)
     {
         app->UpdateHookHiddenIcons();
         app->PositionHiddenIconsUnderCorrals();
