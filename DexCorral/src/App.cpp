@@ -42,6 +42,7 @@
 #include "LayoutMath.h"
 #include "Hotkey.h"
 #include "DialogTemplate.h"
+#include "Conflicts.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
@@ -64,6 +65,11 @@ static const UINT_PTR TRAY_RETRY_TIMER = 1;
 // firing while Explorer's inline rename edit box is open, killed once the
 // pending files have been adopted.
 static const UINT_PTR ADOPTION_TIMER = 2;
+
+// While active: watch for conflicting software being started in this Explorer
+// (see Conflicts.h). A module-handle lookup per tick, nothing more.
+static const UINT_PTR CONFLICT_POLL_TIMER = 4;
+static const UINT CONFLICT_POLL_MS = 15000;
 static const UINT ADOPTION_POLL_MS = 800;
 
 // Fires when the next transient hidden identity expires, so the hook's hidden
@@ -128,7 +134,8 @@ static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
 {
     if (!s_SafeModeNoticePending || !tray || !tray->IsVisible())
         return;
-    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(Str::SafeMode_Body)))
+    const bool conflict = (GetCorralHookStandbyReason() == HookStandbyReason::Conflict);
+    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(conflict ? Str::Conflict_StandbyBalloon : Str::SafeMode_Body)))
     {
         s_SafeModeNoticePending = false;
         DllLog(L"App: safe mode tray notice shown");
@@ -258,6 +265,25 @@ void App::Initialize()
 
     // Standby after repeated Explorer deaths: tell the user why there are no
     // corrals and how to get them back
+    if (standbyReason == HookStandbyReason::Conflict) {
+        DllLog(L"App::Initialize: STANDBY (conflict with %s) — no hook, no corrals, desktop icons stay visible",
+               GetCorralHookConflictProduct());
+        DWORD noticed = 0;
+        DWORD size = sizeof(noticed);
+        RegGetValueW(HKEY_CURRENT_USER, CONFLICT_REGKEY, CONFLICT_REGVAL_NOTICED, RRF_RT_REG_DWORD,
+                     nullptr, &noticed, &size);
+        if (!noticed) {
+            // First start with the conflict: explain it properly, once
+            PostMessageW(messageWindow, WM_STANDBY_DIALOG, 0, 0);
+            noticed = 1;
+            RegSetKeyValueW(HKEY_CURRENT_USER, CONFLICT_REGKEY, CONFLICT_REGVAL_NOTICED, REG_DWORD,
+                            &noticed, sizeof(noticed));
+        } else {
+            s_SafeModeNoticePending = true;
+            ShowSafeModeNoticeIfPending(trayIcon.get());
+        }
+    }
+
     if (standbyReason == HookStandbyReason::CrashGuard) {
         DllLog(L"App::Initialize: STANDBY (crash guard) — no hook, no corrals, desktop icons stay visible");
         if (WasCorralHookStandbyEnteredNow()) {
@@ -392,6 +418,22 @@ void App::ActivateDesktop()
     UpdateHookHiddenIcons();
     PositionHiddenIconsUnderCorrals();
     HookBridge::RefreshDesktop();
+
+    SetTimer(messageWindow, CONFLICT_POLL_TIMER, CONFLICT_POLL_MS, nullptr);
+}
+
+void App::ShowStandbyExplanation()
+{
+    if (standbyReason == HookStandbyReason::Conflict)
+    {
+        MessageBoxW(nullptr, TrFmt(Str::Conflict_StandbyBody, GetCorralHookConflictProduct()).c_str(),
+                    Tr(Str::SafeMode_Title), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+    }
+    else if (standbyReason == HookStandbyReason::CrashGuard)
+    {
+        MessageBoxW(nullptr, Tr(Str::Standby_CrashDialogBody), Tr(Str::SafeMode_Title),
+                    MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+    }
 }
 
 void App::ResumeFromStandby()
@@ -1402,7 +1444,14 @@ void App::ShowTrayMenu()
         if (standbyReason == HookStandbyReason::CrashGuard)
         {
             AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, Tr(Str::Standby_CrashStatus));
+            AppendMenuW(menu, MF_STRING, 15, Tr(Str::Menu_WhyPaused));
             AppendMenuW(menu, MF_STRING, 14, Tr(Str::Menu_Resume));
+        }
+        else if (standbyReason == HookStandbyReason::Conflict)
+        {
+            // No Resume: this ends by itself once the other program is uninstalled
+            AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, Tr(Str::Standby_ConflictStatus));
+            AppendMenuW(menu, MF_STRING, 15, Tr(Str::Menu_WhyPaused));
         }
     }
     else
@@ -1522,6 +1571,9 @@ void App::ShowTrayMenu()
         break;
     case 14:
         ResumeFromStandby();
+        break;
+    case 15:
+        ShowStandbyExplanation();
         break;
     case 12:
         // The manual on GitHub, rendered. Opened in the user's browser, on request only.
@@ -2002,8 +2054,22 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     if (app && uMsg == WM_STANDBY_DIALOG)
     {
-        MessageBoxW(nullptr, Tr(Str::Standby_CrashDialogBody), Tr(Str::SafeMode_Title),
-                    MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+        app->ShowStandbyExplanation();
+        return 0;
+    }
+
+    // Conflicting software started in this Explorer while DexCorral is active.
+    // Standing down mid-session is not possible yet, so say so, once.
+    if (app && uMsg == WM_TIMER && wParam == CONFLICT_POLL_TIMER)
+    {
+        if (IsConflictLoadedInThisProcess())
+        {
+            KillTimer(hwnd, CONFLICT_POLL_TIMER);
+            const ConflictInfo conflict = DetectConflictInThisProcess();
+            DllLog(L"App: conflicting software loaded mid-session: %s", conflict.product.c_str());
+            MessageBoxW(nullptr, TrFmt(Str::Conflict_LateBody, conflict.product).c_str(), Tr(Str::App_Name),
+                        MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+        }
         return 0;
     }
 

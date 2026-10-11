@@ -42,6 +42,10 @@ enum class HookStandbyReason
  */
 HookStandbyReason GetCorralHookStandbyReason();
 
+/// For a Conflict standby: the product to name in messages, e.g. "Stardock Fences 6.5.4.1".
+/// Empty otherwise. Valid for the lifetime of the process.
+const wchar_t* GetCorralHookConflictProduct();
+
 /// True if crash-guard standby began with this start, rather than being carried
 /// over from an earlier one. The app shows its explanation dialog only then.
 bool WasCorralHookStandbyEnteredNow();

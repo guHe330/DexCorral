@@ -79,6 +79,29 @@ const wchar_t *const kEnglish[] = {
     /* Resume_FailedTitle */       L"DexCorral could not resume",
     /* Resume_FailedBody */        L"The desktop was not ready. Sign out and back in, and DexCorral will start "
                                    L"normally.",
+    /* Menu_WhyPaused */           L"Why is DexCorral paused?",
+    /* Standby_ConflictStatus */   L"Paused: Stardock Fences is installed",
+    /* Conflict_StandbyBody */     L"DexCorral is paused because {0} is installed on this PC.\n\n"
+                                   L"Both programs take over the desktop icon view. With Fences running, the icons "
+                                   L"DexCorral hides become visible again and are drawn twice, so DexCorral stands "
+                                   L"aside.\n\n"
+                                   L"Nothing is lost. All your icons are on the desktop, and your Corrals and "
+                                   L"their settings are saved.\n\n"
+                                   L"Which of the two you use is your choice. DexCorral starts normally again at "
+                                   L"the first sign-in after Stardock Fences has been uninstalled. If you keep "
+                                   L"Fences, you can uninstall DexCorral.\n\n"
+                                   L"Stardock and Fences are trademarks of Stardock. DexCorral is not affiliated "
+                                   L"with Stardock.",
+    /* Conflict_StandbyBalloon */  L"DexCorral is paused because Stardock Fences is installed. Right-click this "
+                                   L"icon for details.",
+    /* Conflict_LateBody */        L"{0} has started while DexCorral is running.\n\n"
+                                   L"Both programs take over the desktop icon view. Until you sign out, icons "
+                                   L"that belong to your Corrals may reappear on the desktop and be drawn twice.\n\n"
+                                   L"DexCorral cannot step aside in a running session. At the next sign-in it "
+                                   L"checks again, and pauses itself for as long as Stardock Fences is installed. "
+                                   L"Your Corrals and their settings stay saved.\n\n"
+                                   L"Stardock and Fences are trademarks of Stardock. DexCorral is not affiliated "
+                                   L"with Stardock.",
 
     // Unreadable config.json notice
     /* Config_RestoredTitle */     L"DexCorral restored your layout from a backup",
@@ -309,6 +332,30 @@ const wchar_t *const kGerman[] = {
     /* Resume_FailedTitle */       L"DexCorral konnte nicht fortgesetzt werden",
     /* Resume_FailedBody */        L"Der Desktop war nicht bereit. Nach dem Ab- und Anmelden startet DexCorral "
                                    L"normal.",
+    /* Menu_WhyPaused */           L"Warum ist DexCorral pausiert?",
+    /* Standby_ConflictStatus */   L"Pausiert: Stardock Fences ist installiert",
+    /* Conflict_StandbyBody */     L"DexCorral ist pausiert, weil {0} auf diesem PC installiert ist.\n\n"
+                                   L"Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, "
+                                   L"werden die von DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt "
+                                   L"gezeichnet. DexCorral hält sich deshalb zurück.\n\n"
+                                   L"Es geht nichts verloren. Alle Symbole liegen auf dem Desktop, die Corrals "
+                                   L"und ihre Einstellungen sind gespeichert.\n\n"
+                                   L"Welches der beiden Sie nutzen, entscheiden Sie. DexCorral startet bei der "
+                                   L"ersten Anmeldung nach der Deinstallation von Stardock Fences wieder normal. "
+                                   L"Wenn Sie Fences behalten, können Sie DexCorral deinstallieren.\n\n"
+                                   L"Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner "
+                                   L"Verbindung zu Stardock.",
+    /* Conflict_StandbyBalloon */  L"DexCorral ist pausiert, weil Stardock Fences installiert ist. Rechtsklick auf "
+                                   L"dieses Symbol für Details.",
+    /* Conflict_LateBody */        L"{0} wurde gestartet, während DexCorral läuft.\n\n"
+                                   L"Beide Programme übernehmen die Symbolansicht des Desktops. Bis zur Abmeldung "
+                                   L"können Symbole Ihrer Corrals wieder auf dem Desktop erscheinen und doppelt "
+                                   L"gezeichnet werden.\n\n"
+                                   L"DexCorral kann sich in einer laufenden Sitzung nicht zurückziehen. Bei der "
+                                   L"nächsten Anmeldung prüft es erneut und pausiert, solange Stardock Fences "
+                                   L"installiert ist. Die Corrals und ihre Einstellungen bleiben gespeichert.\n\n"
+                                   L"Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner "
+                                   L"Verbindung zu Stardock.",
 
     // Unreadable config.json notice
     /* Config_RestoredTitle */     L"DexCorral hat das Layout aus einer Sicherung geladen",
