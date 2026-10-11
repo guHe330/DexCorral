@@ -56,9 +56,9 @@ User Interface
   an executable to open it).
 * Roll-up Interaction: Double-click title bars to collapse Corrals and save
   screen real estate.
-* Quick-Hide: Double-click an empty spot on the desktop to hide all icons and
-  Corrals at once, and again to restore them. Individual Corrals can be
-  exempted so they stay visible.
+* Quick-Hide: Double-click an empty spot on the desktop, or the tray icon, to
+  hide all icons and Corrals at once, and again to restore them. Individual
+  Corrals can be exempted so they stay visible.
 * View Modes: Small, medium, or large icon grids, or a details list with
   name, type, size, date, and cloud sync status.
 * Multi-Monitor Aware: Corral positions are remembered per monitor and per
@@ -100,6 +100,14 @@ INSTALLATION (PORTABLE)
    refuses with a message. Add --force to register anyway -- unsupported,
    untested, and not eligible for bug reports.
 
+   Not alongside Stardock Fences: both programs take over the desktop icon
+   view, and with Fences running the icons DexCorral hides are drawn twice.
+   --register therefore refuses (exit code 3) while Fences is installed,
+   and --force does not change that. Uninstall Fences first if you want to
+   use DexCorral. DexCorral never changes anything belonging to Fences.
+   (Stardock and Fences are trademarks of Stardock; DexCorral is not
+   affiliated with Stardock.)
+
 3. Restart Explorer or log out/in for the shell extension to load.
 
 To uninstall, run DexCorral.exe --unregister with the same --scope you
@@ -119,8 +127,14 @@ To also remove your settings:
 DexCorral writes nothing else outside its own folder. The registry entries are
 the shell extension's COM registration (removed by --unregister), which goes to
 HKCU with --scope=user and HKLM with --scope=machine, and, under
-HKCU\Software\DexCorral, your language choice and two safe-mode counters. The
+HKCU\Software\DexCorral, your language choice and the crash guard's memory. The
 full list is in the User Manual, "What DexCorral writes outside its own folder".
+
+IF DEXCORRAL PAUSES ITSELF: when Explorer crashes twice within two minutes
+while DexCorral is starting, DexCorral stops trying. All icons are back on the
+desktop, your layout is kept, and the tray icon says "DexCorral is paused".
+Right-click it and choose Resume DexCorral to try again, or run
+DexCorral.exe --reset-guard and sign in again.
 
 LANGUAGE: The UI is available in English (default) and German. Right-click the
 tray icon and choose Language to switch; the change is immediate and is saved
