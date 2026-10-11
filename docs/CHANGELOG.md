@@ -4,19 +4,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
-### Removed
-- The **Hide shortcut arrows** option. No menu led to it any more, so it could not be switched on or off, while the manual still asked you to turn it off before uninstalling. It changed a Windows-wide setting and restarted Explorer, neither of which is a desktop organizer's business. The manual says how to bring the arrows back by hand if an early version hid them. ([#31](https://github.com/guHe330/DexCorral/issues/31))
-
-### Fixed
-- Files in a virtual Corral could not be dragged out of it: the drag did nothing, whether aimed at an Explorer window, the desktop, an application or another Corral. They are now dragged like files from an Explorer window, a multi-selection as a whole. ([#62](https://github.com/guHe330/DexCorral/issues/62))
-- Dropping an icon on a Corral that was showing a virtual tab took it out of its own Corral and added it nowhere. That drop is now refused. ([#35](https://github.com/guHe330/DexCorral/issues/35))
-- Dragging one icon of a multi-selection moved only that icon. The whole selection now travels with it: to another Corral, out to the desktop (laid out side by side from the drop point), or to a new position in the same Corral. ([#35](https://github.com/guHe330/DexCorral/issues/35))
-- Dragging a file or folder from an Explorer window onto a Corral did nothing, although the cursor said it would. It now gets a shortcut on the desktop, and that shortcut joins the Corral; the original stays where it is. ([#33](https://github.com/guHe330/DexCorral/issues/33))
-- Virtual tabs ignored drops while showing an accepting cursor. A virtual tab now takes a drop the way its folder does in Explorer, moving or copying the files into it. ([#33](https://github.com/guHe330/DexCorral/issues/33))
-- A drag that mixed desktop files with desktop shortcuts added only the files. ([#33](https://github.com/guHe330/DexCorral/issues/33))
-- A drop the Corral cannot take now shows the no-drop cursor. ([#33](https://github.com/guHe330/DexCorral/issues/33))
-- A `config.json` that could not be read, for example after a hand edit with a stray comma, used to be replaced by an empty configuration without a word, taking every Corral, tab and style with it. DexCorral now keeps a `config.bak` of the last configuration that loaded cleanly and falls back to it, sets the unreadable file aside as `config.corrupt.json`, and shows a tray notification. ([#29](https://github.com/guHe330/DexCorral/issues/29))
-- The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
+## [1.1.0] - 2026-10-11
 
 ### Added
 - A DexCorral that is already installed now pauses itself when **Stardock Fences** is installed or loaded in Explorer at start: no Corrals, all icons on the desktop, the layout saved. It explains why, and starts normally again at the first sign-in after Fences has been uninstalled. If Fences is started while DexCorral is running, DexCorral says so once; it cannot step aside until the next sign-in. ([#70](https://github.com/guHe330/DexCorral/issues/70))
@@ -40,6 +28,20 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - **Create New Corral** and **Add Tab** ask for the name right away instead of leaving a "New Corral" or "New Tab" to be renamed through the menu. Esc keeps the default name. The rename dialog is now titled "Rename Tab", which is what it does. ([#41](https://github.com/guHe330/DexCorral/issues/41))
 - The **Close Tab** and **Delete Corral** confirmations now say what happens next: the icons go back to the desktop and no files are deleted, or, for a virtual tab, that its folder is left alone. Close Tab also names the tab. ([#39](https://github.com/guHe330/DexCorral/issues/39))
 - **Remove from Corral** acts on all selected icons when the one you right-clicked is part of a selection, and is no longer offered on virtual tabs, where it did nothing. ([#37](https://github.com/guHe330/DexCorral/issues/37))
+
+### Removed
+- The **Hide shortcut arrows** option. No menu led to it any more, so it could not be switched on or off, while the manual still asked you to turn it off before uninstalling. It changed a Windows-wide setting and restarted Explorer, neither of which is a desktop organizer's business. The manual says how to bring the arrows back by hand if an early version hid them. ([#31](https://github.com/guHe330/DexCorral/issues/31))
+
+### Fixed
+- Files in a virtual Corral could not be dragged out of it: the drag did nothing, whether aimed at an Explorer window, the desktop, an application or another Corral. They are now dragged like files from an Explorer window, a multi-selection as a whole. ([#62](https://github.com/guHe330/DexCorral/issues/62))
+- Dropping an icon on a Corral that was showing a virtual tab took it out of its own Corral and added it nowhere. That drop is now refused. ([#35](https://github.com/guHe330/DexCorral/issues/35))
+- Dragging one icon of a multi-selection moved only that icon. The whole selection now travels with it: to another Corral, out to the desktop (laid out side by side from the drop point), or to a new position in the same Corral. ([#35](https://github.com/guHe330/DexCorral/issues/35))
+- Dragging a file or folder from an Explorer window onto a Corral did nothing, although the cursor said it would. It now gets a shortcut on the desktop, and that shortcut joins the Corral; the original stays where it is. ([#33](https://github.com/guHe330/DexCorral/issues/33))
+- Virtual tabs ignored drops while showing an accepting cursor. A virtual tab now takes a drop the way its folder does in Explorer, moving or copying the files into it. ([#33](https://github.com/guHe330/DexCorral/issues/33))
+- A drag that mixed desktop files with desktop shortcuts added only the files. ([#33](https://github.com/guHe330/DexCorral/issues/33))
+- A drop the Corral cannot take now shows the no-drop cursor. ([#33](https://github.com/guHe330/DexCorral/issues/33))
+- A `config.json` that could not be read, for example after a hand edit with a stray comma, used to be replaced by an empty configuration without a word, taking every Corral, tab and style with it. DexCorral now keeps a `config.bak` of the last configuration that loaded cleanly and falls back to it, sets the unreadable file aside as `config.corrupt.json`, and shows a tray notification. ([#29](https://github.com/guHe330/DexCorral/issues/29))
+- The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ## [1.0.29] - 2026-09-27
 
