@@ -19,6 +19,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ### Added
+- DexCorral now declines to install next to **Stardock Fences**. The two programs both take over the desktop icon view; with Fences running, the icons DexCorral hides reappear and are drawn twice. Setup stops with an explanation before writing anything, `DexCorral.exe --register` refuses as well, and `--check-conflicts` reports the result as exit code 3. DexCorral never touches Fences itself. ([#68](https://github.com/guHe330/DexCorral/issues/68))
 - `DexCorral.exe --reset-guard` clears the crash guard's memory, for scripts and support. ([#66](https://github.com/guHe330/DexCorral/issues/66))
 - DexCorral now respects the Windows **Animation effects** setting (Settings > Accessibility > Visual effects). With it off, the hover fade, the unrolling of a rolled-up Corral and the Quick-Hide fade jump straight to their end state. ([#58](https://github.com/guHe330/DexCorral/issues/58))
 - **Reset to Defaults** in the Appearance dialog sets every setting back to the look a new Corral gets. ([#56](https://github.com/guHe330/DexCorral/issues/56))

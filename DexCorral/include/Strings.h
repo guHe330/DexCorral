@@ -197,6 +197,7 @@ enum class Str
     Reg_Usage,                   // command-line usage text
     Reg_NeedsWin11,              // {0} = required build, {1} = this build
     Reg_NeedsElevation,          // --scope=machine without admin rights
+    Conflict_Refuse,             // --register / --check-conflicts refusal; {0} = product, e.g. "Stardock Fences 6.5.4.1"
 
     _Count // sentinel — keep last
 };
