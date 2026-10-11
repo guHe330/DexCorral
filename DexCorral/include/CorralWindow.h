@@ -346,6 +346,7 @@ private:
     // Icon reordering
     void OnIconDrag(int x, int y);
     void OnIconDragEnd();
+    void StartShellDrag();                          // OLE drag of a virtual tab's files (blocks until dropped)
     std::vector<int> GetDraggedIconIndices() const; // Icons an icon drag carries: the selection, or just the one
     bool IsIconBeingDragged(int index) const;
     /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one

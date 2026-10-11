@@ -1012,6 +1012,14 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 int dy = y - window->iconDragStart.y;
                 if (!window->isDraggingIcon && (abs(dx) > window->Dpi(DRAG_THRESHOLD) || abs(dy) > window->Dpi(DRAG_THRESHOLD)))
                 {
+                    // A virtual tab shows real files in a real folder: hand the drag
+                    // to the shell, so every drop target on the system can take it.
+                    // StartShellDrag only returns once the drag is over.
+                    if (window->GetActiveTab().IsVirtual)
+                    {
+                        window->StartShellDrag();
+                        return 0;
+                    }
                     window->isDraggingIcon = true;
                 }
                 if (window->isDraggingIcon)

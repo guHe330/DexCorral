@@ -2181,6 +2181,85 @@ void CorralWindow::OnIconDrag(int x, int y)
     iconDragOutside = !PtInRect(&clientRect, clientPt);
 }
 
+// ============================================================================
+// Shell drag out of a virtual tab
+// ============================================================================
+
+void CorralWindow::StartShellDrag()
+{
+    std::vector<int> dragged = GetDraggedIconIndices();
+
+    // The shell's drag loop takes over the mouse from here: the button-up never
+    // reaches this window, so end our own click/drag tracking first.
+    draggedIconIndex = -1;
+    dropTargetIndex = -1;
+    isDraggingIcon = false;
+    iconDragOutside = false;
+    ReleaseCapture();
+
+    if (dragged.empty() || !GetActiveTab().IsVirtual)
+        return;
+
+    // One data object for the whole selection. Every file of a virtual tab is a
+    // child of the folder it shows, which is what GetUIObjectOf requires.
+    std::vector<LPITEMIDLIST> fullPidls;
+    for (int i : dragged)
+    {
+        LPITEMIDLIST pidl = nullptr;
+        if (!icons[i].fullPath.empty() &&
+            SUCCEEDED(SHParseDisplayName(icons[i].fullPath.c_str(), nullptr, &pidl, 0, nullptr)) && pidl)
+        {
+            fullPidls.push_back(pidl);
+        }
+    }
+
+    IDataObject *dataObject = nullptr;
+    if (!fullPidls.empty())
+    {
+        LPITEMIDLIST parentPidl = ILClone(fullPidls[0]);
+        if (parentPidl)
+        {
+            ILRemoveLastID(parentPidl);
+
+            IShellFolder *folder = nullptr;
+            if (SUCCEEDED(SHBindToObject(nullptr, parentPidl, nullptr, IID_IShellFolder, (void **)&folder)) && folder)
+            {
+                std::vector<LPCITEMIDLIST> children;
+                for (LPITEMIDLIST pidl : fullPidls)
+                    children.push_back(ILFindLastID(pidl));
+
+                if (FAILED(folder->GetUIObjectOf(hwnd, (UINT)children.size(), children.data(),
+                                                 IID_IDataObject, nullptr, (void **)&dataObject)))
+                {
+                    dataObject = nullptr;
+                }
+                folder->Release();
+            }
+            CoTaskMemFree(parentPidl);
+        }
+    }
+
+    if (dataObject)
+    {
+        // SHDoDragDrop supplies the drop source and the drag image, and runs the
+        // modal drag loop. Move, copy and link are all offered; the drop target
+        // and the modifier keys pick one, as for a drag out of an Explorer window.
+        DWORD effect = DROPEFFECT_NONE;
+        HRESULT hr = SHDoDragDrop(hwnd, dataObject, nullptr,
+                                  DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, &effect);
+        LogCorralDrop(L"StartShellDrag: %zu item(s), hr=0x%08X effect=0x%X", fullPidls.size(), hr, effect);
+        dataObject->Release();
+    }
+
+    for (LPITEMIDLIST pidl : fullPidls)
+        CoTaskMemFree(pidl);
+
+    // The drag loop can leave the corral above other windows, and a move has
+    // taken files out of the folder. The watcher would catch up; this is immediate.
+    PinToBandTop();
+    LoadFiles();
+}
+
 std::vector<int> CorralWindow::GetDraggedIconIndices() const
 {
     if (draggedIconIndex < 0 || draggedIconIndex >= (int)icons.size())
