@@ -6,6 +6,8 @@ DexCorral organizes your Windows desktop icons into shaded, customizable areas c
 
 DexCorral requires **Windows 11** (build 22000 or newer). Windows 10 is end of life and is neither tested nor supported; both the installer and `DexCorral.exe --register` refuse to run on it.
 
+DexCorral cannot be installed on a PC that has **Stardock Fences** installed. Both programs take over the desktop icon view; see [Stardock Fences](#stardock-fences) for what happens and what to do.
+
 ### Installer (recommended)
 
 1. Download `DexCorral_<version>_Setup.exe` from the [Releases](https://github.com/guHe330/DexCorral/releases) page.
@@ -269,6 +271,23 @@ The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register
 Early versions had a **Hide shortcut arrows** option, removed since. If you switched it on back then and want the arrows back, delete the value `29` under `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons` in `HKLM` or `HKCU`, whichever holds it, and restart Explorer.
 
 Versions up to 1.0.27 wrote the COM registration through `HKEY_CLASSES_ROOT` instead, with no per-user option. `DexCorral.exe --cleanup-legacy`, run once as Administrator, removes what those versions left behind; the installer does it for you.
+
+## Stardock Fences
+
+DexCorral and Stardock Fences cannot share a desktop. Each one takes over the desktop icon view, and the two do not know about each other. Observed with Fences 6.5.4.1: while Fences is running, the icons DexCorral hides become visible again and are drawn twice.
+
+So DexCorral declines to run next to it:
+
+- **Setup** stops with a message, before installing anything, if Stardock Fences is installed on the PC.
+- **`DexCorral.exe --register`** refuses for the same reason (exit code 3), which covers the portable package. `--check-conflicts` reports the same result without doing anything else.
+
+This applies whenever Fences is installed, also if it is switched off: DexCorral cannot tell when it will be switched on again. There is no override.
+
+Which of the two you use is your choice. To use DexCorral, uninstall Stardock Fences first, then run Setup again. DexCorral never changes, stops or removes anything belonging to Fences.
+
+Fences is recognised by its entry in Windows' list of installed programs and by its desktop module being loaded in Explorer, checked against that file's own company and product description.
+
+*Stardock and Fences are trademarks of Stardock. DexCorral is not affiliated with Stardock.*
 
 ## Known Limitations
 

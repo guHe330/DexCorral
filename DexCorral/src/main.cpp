@@ -26,6 +26,7 @@
 #include <string>
 #include "Strings.h"
 #include "CrashGuard.h"
+#include "Conflicts.h"
 
 // DexCorral Registration Tool
 // The actual application runs as a shell extension (DexCorralHook.dll) loaded by Explorer.
@@ -35,6 +36,10 @@
 // Explorer integration here is tested on it, so registration refuses to run
 // below this build unless --force is passed.
 static const DWORD kMinWindowsBuild = 22000;  // Windows 11 21H2
+
+// Exit code of --check-conflicts and --register when incompatible software is
+// installed. Distinct from the general failure code 1 so Setup can tell them apart.
+static const int kExitConflict = 3;
 
 // GetVersionEx and the VersionHelpers macros are capped by the application
 // manifest and report an old version on newer Windows, so ask the kernel.
@@ -185,6 +190,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     bool doStartup     = false;
     bool doCleanupOld  = false;
     bool doResetGuard  = false;
+    bool doCheckConflicts = false;
     bool silent        = false;
     bool force         = false;
     int  scope         = -1;   // -1 = not given, infer from the exe's location
@@ -198,6 +204,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         else if (_wcsicmp(argv[i], L"--force")      == 0 || _wcsicmp(argv[i], L"-force")      == 0) force        = true;
         else if (_wcsicmp(argv[i], L"--cleanup-legacy") == 0)                                       doCleanupOld = true;
         else if (_wcsicmp(argv[i], L"--reset-guard")    == 0)                                       doResetGuard = true;
+        else if (_wcsicmp(argv[i], L"--check-conflicts") == 0)                                      doCheckConflicts = true;
         else if (_wcsicmp(argv[i], L"--scope=user")     == 0)                                       scope        = kScopeUser;
         else if (_wcsicmp(argv[i], L"--scope=machine")  == 0)                                       scope        = kScopeMachine;
     }
@@ -229,6 +236,27 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         for (const wchar_t *value : values)
             RegDeleteKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, value);
         if (!doRegister && !doUnregister && !doStartup && !doCleanupOld)
+            return 0;
+    }
+
+    // ── Incompatible software (see Conflicts.h) ───────────────────────────────
+    // --check-conflicts only reports; Setup runs it before writing anything.
+    // --register refuses outright, which is what covers the portable package.
+    // There is deliberately no override: the two programs fight over the same
+    // desktop view, and --force is about unsupported Windows versions only.
+    // --unregister and --startup are not gated: an existing install must stay
+    // removable, and a DexCorral that is started anyway puts itself in standby.
+    if (doCheckConflicts || doRegister)
+    {
+        const ConflictInfo conflict = DetectConflictInShell();
+        if (conflict.found)
+        {
+            if (!silent)
+                MessageBoxW(nullptr, TrFmt(Str::Conflict_Refuse, conflict.product).c_str(),
+                            Tr(Str::App_Name), MB_ICONERROR);
+            return kExitConflict;
+        }
+        if (doCheckConflicts && !doRegister && !doUnregister && !doStartup && !doCleanupOld)
             return 0;
     }
 

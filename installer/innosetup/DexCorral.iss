@@ -479,6 +479,45 @@ begin
   end;
 end;
 
+// Refuse to install next to software DexCorral cannot share the desktop with.
+// The test itself lives in DexCorral.exe (--check-conflicts, see Conflicts.h):
+// it has to look at the modules of the 64-bit Explorer process, which this
+// 32-bit Setup cannot do, and one implementation serves Setup, --register and
+// the running app alike. Runs first, before any page, so nothing is written.
+function InitializeSetup: Boolean;
+var
+  ResultCode: Integer;
+  Msg: String;
+begin
+  Result := True;
+  ExtractTemporaryFile('DexCorral.exe');
+  if not Exec(ExpandConstant('{tmp}\DexCorral.exe'), '--check-conflicts --silent', '',
+              SW_HIDE, ewWaitUntilTerminated, ResultCode) then begin
+    Log('Conflict check could not be run - continuing');
+    Exit;
+  end;
+  Log('Conflict check exit code: ' + IntToStr(ResultCode));
+  if ResultCode <> 3 then
+    Exit;
+
+  if ActiveLanguage = 'german' then
+    Msg := 'DexCorral kann nicht installiert werden, solange Stardock Fences auf diesem PC installiert ist.' + #13#10 + #13#10 +
+           'Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, werden die von ' +
+           'DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt gezeichnet.' + #13#10 + #13#10 +
+           'Welches der beiden du nutzt, entscheidest du: Stardock Fences deinstallieren und Setup erneut ' +
+           'starten, oder Fences behalten und auf DexCorral verzichten.' + #13#10 + #13#10 +
+           'Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner Verbindung zu Stardock.'
+  else
+    Msg := 'DexCorral cannot be installed while Stardock Fences is installed on this PC.' + #13#10 + #13#10 +
+           'Both programs take over the desktop icon view. With Fences running, the icons DexCorral ' +
+           'hides become visible again and are drawn twice.' + #13#10 + #13#10 +
+           'Which of the two you use is your choice: uninstall Stardock Fences and run Setup again, ' +
+           'or keep Fences and leave DexCorral out.' + #13#10 + #13#10 +
+           'Stardock and Fences are trademarks of Stardock. DexCorral is not affiliated with Stardock.';
+  SuppressibleMsgBox(Msg, mbCriticalError, MB_OK, IDOK);
+  Result := False;
+end;
+
 // Upgrade support: check for a conflicting install in the other mode, then
 // unregister the old shell extension and rename its DLL aside so the new copy
 // lands on a free name. Explorer keeps running here on purpose -- restarting it

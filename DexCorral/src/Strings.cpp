@@ -229,6 +229,7 @@ const wchar_t *const kEnglish[] = {
                                    L"  DexCorral.exe --startup      Inject into Explorer and start (used by Run key)\n"
                                    L"  DexCorral.exe --silent       Suppress message dialogs\n"
                                    L"  DexCorral.exe --reset-guard  End a crash-guard pause (see the manual)\n"
+                                   L"  DexCorral.exe --check-conflicts  Exit code 3 if incompatible software is installed\n"
                                    L"  DexCorral.exe --force        Register on an unsupported Windows version\n\n"
                                    L"Scope (applies to --register and --unregister):\n"
                                    L"  --scope=user      This user only, HKCU, no admin rights needed\n"
@@ -250,6 +251,13 @@ const wchar_t *const kEnglish[] = {
                                    L"Run this command from an elevated prompt, or install DexCorral for "
                                    L"your account only:\n"
                                    L"  DexCorral.exe --register --scope=user",
+    /* Conflict_Refuse */          L"DexCorral cannot be set up while {0} is installed on this PC.\n\n"
+                                   L"Both programs take over the desktop icon view. With Fences running, the "
+                                   L"icons DexCorral hides become visible again and are drawn twice.\n\n"
+                                   L"Which of the two you use is your choice: uninstall Stardock Fences and run "
+                                   L"this again, or keep Fences and leave DexCorral out.\n\n"
+                                   L"Stardock and Fences are trademarks of Stardock. DexCorral is not affiliated "
+                                   L"with Stardock.",
 };
 
 static_assert(sizeof(kEnglish) / sizeof(kEnglish[0]) == (size_t)Str::_Count,
@@ -453,6 +461,7 @@ const wchar_t *const kGerman[] = {
                                    L"  DexCorral.exe --startup      In den Explorer injizieren und starten (vom Run-Schlüssel verwendet)\n"
                                    L"  DexCorral.exe --silent       Meldungsdialoge unterdrücken\n"
                                    L"  DexCorral.exe --reset-guard  Eine Absturzschutz-Pause beenden (siehe Handbuch)\n"
+                                   L"  DexCorral.exe --check-conflicts  Exitcode 3, wenn unverträgliche Software installiert ist\n"
                                    L"  DexCorral.exe --force        Auf einer nicht unterstützten Windows-Version registrieren\n\n"
                                    L"Gültigkeitsbereich (für --register und --unregister):\n"
                                    L"  --scope=user      Nur dieser Benutzer, HKCU, keine Administratorrechte nötig\n"
@@ -474,6 +483,15 @@ const wchar_t *const kGerman[] = {
                                    L"Führe den Befehl in einer Eingabeaufforderung als Administrator aus, "
                                    L"oder installiere DexCorral nur für dein Konto:\n"
                                    L"  DexCorral.exe --register --scope=user",
+    /* Conflict_Refuse */          L"DexCorral kann nicht eingerichtet werden, solange {0} auf diesem PC "
+                                   L"installiert ist.\n\n"
+                                   L"Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, "
+                                   L"werden die von DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt "
+                                   L"gezeichnet.\n\n"
+                                   L"Welches der beiden du nutzt, entscheidest du: Stardock Fences deinstallieren "
+                                   L"und dies erneut ausführen, oder Fences behalten und auf DexCorral verzichten.\n\n"
+                                   L"Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner "
+                                   L"Verbindung zu Stardock.",
 };
 
 static_assert(sizeof(kGerman) / sizeof(kGerman[0]) == (size_t)Str::_Count,

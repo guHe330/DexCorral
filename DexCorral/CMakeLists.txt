@@ -24,6 +24,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # Registration tool (minimal EXE)
 add_executable(DexCorral WIN32
     src/main.cpp
+    src/Conflicts.cpp
     src/Strings.cpp
     DexCorral.rc
 )
@@ -35,6 +36,8 @@ target_compile_definitions(DexCorral PRIVATE UNICODE _UNICODE)
 target_link_libraries(DexCorral PRIVATE
     shell32
     user32
+    advapi32
+    version
 )
 
 set_target_properties(DexCorral PROPERTIES
@@ -73,6 +76,7 @@ add_library(DexCorralHook SHARED
     src/UpdateChecker.cpp
     src/Hotkey.cpp
     src/CrashGuard.cpp
+    src/Conflicts.cpp
     src/Strings.cpp
 )
 
@@ -93,6 +97,7 @@ target_link_libraries(DexCorralHook PRIVATE
     psapi
     shlwapi
     winhttp
+    version
 )
 
 target_compile_definitions(DexCorralHook PRIVATE UNICODE _UNICODE NOMINMAX)
@@ -131,16 +136,18 @@ add_executable(DexCorralTests
     tests/test_strings.cpp
     tests/test_hotkey.cpp
     tests/test_crash_guard.cpp
+    tests/test_conflicts.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
     src/Hotkey.cpp
     src/CrashGuard.cpp
+    src/Conflicts.cpp
     src/Strings.cpp
 )
 
 target_include_directories(DexCorralTests PRIVATE include)
-target_link_libraries(DexCorralTests PRIVATE GTest::gtest_main shell32)
+target_link_libraries(DexCorralTests PRIVATE GTest::gtest_main shell32 advapi32 version)
 target_compile_definitions(DexCorralTests PRIVATE UNICODE _UNICODE NOMINMAX)
 set_property(TARGET DexCorralTests PROPERTY MSVC_RUNTIME_LIBRARY
     "MultiThreaded$<$<CONFIG:Debug>:Debug>")

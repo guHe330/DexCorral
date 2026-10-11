@@ -81,6 +81,7 @@ Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 
 - Windows 11 (build 22000 or newer)
 - Windows 10 is unsupported
+- Not alongside Stardock Fences: both take over the desktop icon view, so Setup declines to install while Fences is installed. See the [User Manual](docs/USER_MANUAL.md#stardock-fences).
 
 ## Installation
 
