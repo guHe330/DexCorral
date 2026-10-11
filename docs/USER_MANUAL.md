@@ -209,7 +209,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 DexCorral runs inside Windows Explorer, so a fault in it can take the desktop down with it. Windows then restarts Explorer, DexCorral loads again, and without a brake that repeats. The brake is the **crash guard**: if Explorer crashes **twice within two minutes** while DexCorral is starting, DexCorral stops trying and goes into **standby**.
 
-A dialog tells you when that happens. In standby:
+Standby is also what DexCorral does when [Stardock Fences](#stardock-fences) is installed. A dialog tells you when either happens. In standby:
 
 - All your icons are ordinary desktop icons again. No Corrals are shown.
 - Your layout is safe. `config.json` is not changed, and everything comes back as it was.
@@ -217,7 +217,7 @@ A dialog tells you when that happens. In standby:
 - The desktop right-click menu does not offer "New DexCorral".
 - It stays that way across restarts. DexCorral does not quietly try again at the next login.
 
-To leave standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. Installing a different DexCorral version also ends it, since a new build deserves a fresh attempt.
+To leave a crash-guard standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. Installing a different DexCorral version also ends it, since a new build deserves a fresh attempt.
 
 What counts as a crash: Explorer ending within a minute of DexCorral's start, without a clean shutdown. That includes Explorer being ended from Task Manager or a script, which is why a single one is only noted and forgotten again if nothing follows.
 
@@ -260,6 +260,7 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
 | `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the tray menu's **Language** submenu. | Yes |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
+| `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | Yes |
 | `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
 | `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
 | `<root>\Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
@@ -280,6 +281,9 @@ So DexCorral declines to run next to it:
 
 - **Setup** stops with a message, before installing anything, if Stardock Fences is installed on the PC.
 - **`DexCorral.exe --register`** refuses for the same reason (exit code 3), which covers the portable package. `--check-conflicts` reports the same result without doing anything else.
+
+- **A DexCorral that is already installed pauses itself.** If Stardock Fences is installed, or already loaded in Explorer, when DexCorral starts, DexCorral goes into [standby](#when-dexcorral-pauses-itself): no Corrals, all icons on the desktop, your layout saved and untouched. A dialog explains it the first time, a tray notification reminds you after that, and **Why is DexCorral paused?** in the tray menu shows the explanation again. There is no Resume for this: DexCorral starts normally at the first sign-in after Fences has been uninstalled.
+- **If Fences is started while DexCorral is running**, for instance right after you install it, DexCorral tells you once. It cannot step aside in a session that is already running, so until you sign out the doubled icons may appear. At the next sign-in it pauses as described above.
 
 This applies whenever Fences is installed, also if it is switched off: DexCorral cannot tell when it will be switched on again. There is no override.
 

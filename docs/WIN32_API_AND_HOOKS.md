@@ -235,6 +235,9 @@ The table has one row per function name. `A`/`W` suffixes and unsuffixed names a
 | Processes | `GetThreadId` | Starts threads and retrieves process or thread IDs and handles. | [dllmain.cpp](../DexCorral/ShellExtension/src/dllmain.cpp) |
 | Processes | `GetCurrentProcess` | Starts threads and retrieves process or thread IDs and handles. | [main.cpp](../DexCorral/src/main.cpp) |
 | Processes | `GetCurrentProcessId` | Starts threads and retrieves process or thread IDs and handles. | [dllmain.cpp](../DexCorral/ShellExtension/src/dllmain.cpp) |
+| Processes | `CreateToolhelp32Snapshot` | Lists the modules of the shell's Explorer process to recognise incompatible software (DexCorral.exe only). | [Conflicts.cpp](../DexCorral/src/Conflicts.cpp) |
+| Processes | `Module32FirstW`, `Module32NextW` | Lists the modules of the shell's Explorer process to recognise incompatible software (DexCorral.exe only). | [Conflicts.cpp](../DexCorral/src/Conflicts.cpp) |
+| Version info | `GetFileVersionInfoSizeW`, `GetFileVersionInfoW`, `VerQueryValueW` | Reads the company name, description and version from a module's version resource to confirm its identity. | [Conflicts.cpp](../DexCorral/src/Conflicts.cpp) |
 | Processes | `OpenProcess` | Starts threads and retrieves process or thread IDs and handles. | [DesktopIcons.cpp](../DexCorral/src/DesktopIcons.cpp) |
 | Process memory | `VirtualAllocEx` | Allocates or frees memory in the target process and transfers desktop ListView data. | [DesktopIcons.cpp](../DexCorral/src/DesktopIcons.cpp), [DesktopIcons.h](../DexCorral/include/DesktopIcons.h) |
 | Process memory | `VirtualFreeEx` | Allocates or frees memory in the target process and transfers desktop ListView data. | [DesktopIcons.cpp](../DexCorral/src/DesktopIcons.cpp) |

@@ -64,6 +64,11 @@ enum class Str
     Standby_CrashDialogBody,     // dialog at the start that enters standby: the full explanation
     Resume_FailedTitle,          // resume could not install the hook
     Resume_FailedBody,           // ... try signing out and in
+    Menu_WhyPaused,              // "Why is DexCorral paused?" (shows the explanation again)
+    Standby_ConflictStatus,      // greyed status line in the tray menu
+    Conflict_StandbyBody,        // dialog: paused because of the conflict; {0} = product
+    Conflict_StandbyBalloon,     // reminder balloon at later starts
+    Conflict_LateBody,           // dialog: the conflicting program started mid-session; {0} = product
 
     // Unreadable config.json notice (App.cpp)
     Config_RestoredTitle,        // layout restored from config.bak

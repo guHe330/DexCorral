@@ -9,6 +9,7 @@
 
 #include "CorralHook.h"
 #include "CrashGuard.h"
+#include "Conflicts.h"
 #include "Version.h"
 #include "HookBridge.h"
 #include <Windows.h>
@@ -369,6 +370,34 @@ static void MarkHookSessionStable(const wchar_t* reason) {
 static void CALLBACK StabilityTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
     KillTimer(hwnd, STABILITY_TIMER_ID);
     MarkHookSessionStable(L"stability window elapsed");
+}
+
+// Conflict standby: software DexCorral cannot share the desktop with is
+// installed, or already loaded in this Explorer (see Conflicts.h). Decided once
+// per session, before the crash guard, whose state it leaves alone: the hook is
+// never installed, so nothing is armed and nothing can be counted as a failure.
+static bool g_ConflictEvaluated = false;
+static bool g_ConflictStandby = false;
+static std::wstring g_ConflictProduct;
+
+static bool EvaluateConflict() {
+    if (g_ConflictEvaluated) return !g_ConflictStandby;
+    g_ConflictEvaluated = true;
+
+    ConflictInfo conflict = DetectConflictInThisProcess();
+    if (conflict.found) {
+        g_ConflictStandby = true;
+        g_ConflictProduct = conflict.product;
+        GuardLog(L"STANDBY (conflict): %s is %s%s%s. The hook is not installed.",
+                 conflict.product.c_str(),
+                 conflict.installed ? L"installed" : L"",
+                 (conflict.installed && conflict.loaded) ? L" and " : L"",
+                 conflict.loaded ? L"loaded in Explorer" : L"");
+    } else {
+        // Gone again (or never there): the next conflict gets its full explanation
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, CONFLICT_REGKEY, CONFLICT_REGVAL_NOTICED);
+    }
+    return !g_ConflictStandby;
 }
 
 // Returns true when the hook may be installed; false => standby this session.
@@ -2100,7 +2129,7 @@ bool InitializeCorralHook() {
     // Safe mode: if recent sessions kept dying with the hook installed, skip
     // installation entirely for this session. Returning true stops the retry
     // thread; the app still runs, with all desktop icons left visible.
-    if (!EvaluateSafeMode()) {
+    if (!EvaluateConflict() || !EvaluateSafeMode()) {
         return true;
     }
 
@@ -2237,8 +2266,11 @@ void CleanupCorralHook() {
 bool IsCorralHookActive() { return g_HookActive; }
 
 HookStandbyReason GetCorralHookStandbyReason() {
+    if (g_ConflictStandby) return HookStandbyReason::Conflict;
     return g_SafeMode ? HookStandbyReason::CrashGuard : HookStandbyReason::None;
 }
+
+const wchar_t* GetCorralHookConflictProduct() { return g_ConflictProduct.c_str(); }
 
 bool WasCorralHookStandbyEnteredNow() { return g_StandbyEnteredNow; }
 

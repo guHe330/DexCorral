@@ -89,6 +89,9 @@ public:
 
     /// Leaves standby on the user's request (tray menu): installs the hook and brings the corrals back
     void ResumeFromStandby();
+
+    /// The dialog that explains the current standby (crash guard or conflict)
+    void ShowStandbyExplanation();
     /// The style a newly created corral gets (the saved "default for new corrals")
     AppearanceSettings GetDefaultAppearance() const;
 

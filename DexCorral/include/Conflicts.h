@@ -41,6 +41,12 @@
 #pragma once
 #include <string>
 
+// HKCU\Software\DexCorral value: set once the conflict dialog has been shown, so
+// later starts only remind with a balloon. Removed by the hook at the first
+// start that finds no conflict, so a later conflict is explained in full again.
+constexpr const wchar_t *CONFLICT_REGKEY = L"Software\\DexCorral";
+constexpr const wchar_t *CONFLICT_REGVAL_NOTICED = L"ConflictNoticeShown"; // REG_DWORD
+
 /// What was found. `found` is `installed || loaded`.
 struct ConflictInfo
 {
