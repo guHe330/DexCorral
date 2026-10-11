@@ -27,10 +27,25 @@ void CleanupCorralHook();
  */
 bool IsCorralHookActive();
 
+/// Why the hook was deliberately not installed at start ("standby")
+enum class HookStandbyReason
+{
+    None = 0,       /// Not in standby: the hook is, or will be, installed
+    CrashGuard = 1, /// Explorer died repeatedly with the hook installed
+    Conflict = 2    /// An incompatible program manages the desktop icon view
+};
+
 /**
- * Returns true if the hook was deliberately not installed this session because
- * Explorer died repeatedly while the hook was active (safe mode). The app
- * should inform the user via a tray notice. The failure counter is reset on
- * entering safe mode, so the next session attempts the hook again.
+ * Returns why the hook was not installed, or None. Decided once, by the first
+ * InitializeCorralHook call, which happens before the app thread starts. In
+ * standby the app shows no corrals and hides no icons, and says so in the tray.
  */
-bool IsCorralHookSafeMode();
+HookStandbyReason GetCorralHookStandbyReason();
+
+/**
+ * Leaves crash-guard standby on the user's request: forgets the recorded
+ * failures and installs the hook now. Returns true if the hook is active
+ * afterwards. Does nothing for a Conflict standby, which ends by itself at a
+ * start where the conflict is gone.
+ */
+bool ResumeCorralHook();

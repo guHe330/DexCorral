@@ -2141,4 +2141,25 @@ void CleanupCorralHook() {
 
 bool IsCorralHookActive() { return g_HookActive; }
 
-bool IsCorralHookSafeMode() { return g_SafeMode; }
+HookStandbyReason GetCorralHookStandbyReason() {
+    return g_SafeMode ? HookStandbyReason::CrashGuard : HookStandbyReason::None;
+}
+
+bool ResumeCorralHook() {
+    if (g_HookActive) return true;
+    if (!g_SafeMode) return false;
+
+    // The user asked for another attempt: start from a clean slate, exactly as
+    // a session that had never failed would.
+    WriteSafeModeValue(REGVAL_HOOK_PENDING, 0);
+    WriteSafeModeValue(REGVAL_HOOK_FAILURES, 0);
+    g_SafeMode = false;
+    g_SafeModeEvaluated = true;
+
+    // Same call the retry thread makes when the desktop was not ready at start
+    bool ok = InitializeCorralHook();
+    if (!ok)
+        g_SafeMode = true; // Still in standby for this session; Resume can be tried again
+    DllLog(L"ResumeCorralHook: user resumed from standby — hook %s", ok ? L"installed" : L"NOT installed (desktop ListView not found)");
+    return ok;
+}

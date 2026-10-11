@@ -1,6 +1,7 @@
 #include "ShellExtension.h"
 #include "Guids.h"
 #include "HookBridge.h"
+#include "CorralHook.h"
 #include <strsafe.h>
 
 // Defined in dllmain.cpp (same DLL) — gated by the DebugLogging config flag
@@ -84,6 +85,10 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::QueryContextMenu(HMENU hmenu, UINT 
 
     // Don't add items if Explorer is asking for default verb only
     if (uFlags & CMF_DEFAULTONLY)
+        return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 0);
+
+    // In standby there are no corrals and nothing may create one
+    if (GetCorralHookStandbyReason() != HookStandbyReason::None)
         return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 0);
 
     // Add "New Corral" submenu
