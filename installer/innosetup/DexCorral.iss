@@ -464,6 +464,12 @@ begin
   else
     Log('RestartExplorer: could not resolve session id - killing without a session filter');
 
+  // This restart is Setup's own doing. Clear the crash guard's "hook just
+  // installed" flag first, or a DexCorral that started less than a minute ago
+  // would count the kill as an Explorer crash. Best effort: under an elevated
+  // Setup started by a different account this is that account's HKCU.
+  RegDeleteValue(HKEY_CURRENT_USER, 'Software\DexCorral', 'HookStartPending');
+
   Exec('taskkill', '/F /IM explorer.exe' + Filter, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   WaitForWindowGone('Progman', 40, 250);   // up to 10 s
   if not WaitForWindow('Progman', 20, 500) then begin

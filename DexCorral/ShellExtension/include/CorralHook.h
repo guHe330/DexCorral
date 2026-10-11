@@ -42,6 +42,10 @@ enum class HookStandbyReason
  */
 HookStandbyReason GetCorralHookStandbyReason();
 
+/// True if crash-guard standby began with this start, rather than being carried
+/// over from an earlier one. The app shows its explanation dialog only then.
+bool WasCorralHookStandbyEnteredNow();
+
 /**
  * Leaves crash-guard standby on the user's request: forgets the recorded
  * failures and installs the hook now. Returns true if the hook is active

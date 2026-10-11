@@ -19,6 +19,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The configuration file is now opened by its Unicode path when loading, as it already was when saving. Loading went through the ANSI code page, which cannot represent every profile path, so an account with such a name could start from a default layout on every login.
 
 ### Added
+- `DexCorral.exe --reset-guard` clears the crash guard's memory, for scripts and support. ([#66](https://github.com/guHe330/DexCorral/issues/66))
 - DexCorral now respects the Windows **Animation effects** setting (Settings > Accessibility > Visual effects). With it off, the hover fade, the unrolling of a rolled-up Corral and the Quick-Hide fade jump straight to their end state. ([#58](https://github.com/guHe330/DexCorral/issues/58))
 - **Reset to Defaults** in the Appearance dialog sets every setting back to the look a new Corral gets. ([#56](https://github.com/guHe330/DexCorral/issues/56))
 - Tray menu: **User Manual** opens the manual in your browser, and **Open Config Folder** opens `%APPDATA%\DexCorral`, where `config.json`, its backup and the debug logs live. ([#49](https://github.com/guHe330/DexCorral/issues/49))
@@ -29,6 +30,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Icons can be moved between tabs. Drag them onto a tab, in the same Corral or another one, or use the new **Move to Tab** submenu in the icon context menu. A drag from the desktop or an Explorer window that rests on a tab brings that tab forward, so a drop is no longer limited to the tab a Corral happens to be showing. ([#37](https://github.com/guHe330/DexCorral/issues/37))
 
 ### Changed
+- The crash guard is stricter and no longer gives up on its own. Two Explorer crashes within two minutes of DexCorral starting now pause it (it took three before), and it stays paused across restarts until you choose **Resume DexCorral**; it used to try again by itself after one login, which could repeat the crashes indefinitely. A dialog explains what happened, and the guard's decisions are logged to `guard.log`. ([#66](https://github.com/guHe330/DexCorral/issues/66))
 - After repeated Explorer crashes DexCorral now goes into a real **standby** instead of the old safe mode: no Corrals are shown, every icon is back on the desktop, and the saved layout is left untouched. The old safe mode kept the Corrals on screen with their icons doubled on the desktop. **Resume DexCorral** in the tray menu brings everything back without signing out. ([#64](https://github.com/guHe330/DexCorral/issues/64))
 - The three checkboxes at the bottom of the Appearance dialog say what they do: save the style as the default for new Corrals, apply only what you changed to all Corrals, or make all Corrals look like this one. ([#56](https://github.com/guHe330/DexCorral/issues/56))
 - **About** is a proper dialog now: icon, version, copyright, the license in one sentence, and buttons for the website, the GitHub project and the full GPL text. It was a message box with three paragraphs of license boilerplate and addresses you could not click. ([#54](https://github.com/guHe330/DexCorral/issues/54))

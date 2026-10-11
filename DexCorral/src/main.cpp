@@ -25,6 +25,7 @@
 #include <strsafe.h>
 #include <string>
 #include "Strings.h"
+#include "CrashGuard.h"
 
 // DexCorral Registration Tool
 // The actual application runs as a shell extension (DexCorralHook.dll) loaded by Explorer.
@@ -183,6 +184,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     bool doUnregister  = false;
     bool doStartup     = false;
     bool doCleanupOld  = false;
+    bool doResetGuard  = false;
     bool silent        = false;
     bool force         = false;
     int  scope         = -1;   // -1 = not given, infer from the exe's location
@@ -195,6 +197,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         else if (_wcsicmp(argv[i], L"--silent")     == 0 || _wcsicmp(argv[i], L"-silent")     == 0) silent       = true;
         else if (_wcsicmp(argv[i], L"--force")      == 0 || _wcsicmp(argv[i], L"-force")      == 0) force        = true;
         else if (_wcsicmp(argv[i], L"--cleanup-legacy") == 0)                                       doCleanupOld = true;
+        else if (_wcsicmp(argv[i], L"--reset-guard")    == 0)                                       doResetGuard = true;
         else if (_wcsicmp(argv[i], L"--scope=user")     == 0)                                       scope        = kScopeUser;
         else if (_wcsicmp(argv[i], L"--scope=machine")  == 0)                                       scope        = kScopeMachine;
     }
@@ -212,6 +215,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
     if (scope < 0)
         scope = InferScopeFromExePath(exePath);
+
+    // ── --reset-guard: forget the crash guard's history ───────────────────────
+    // For scripts and support: the same clean slate as "Resume DexCorral" in the
+    // tray menu, without needing the app to be running. It takes effect at the
+    // next start; a DexCorral that is already paused stays paused until then.
+    // Per-user by nature (HKCU), so it needs no elevation and no scope.
+    if (doResetGuard)
+    {
+        const wchar_t *values[] = { CRASH_GUARD_REGVAL_PENDING, CRASH_GUARD_REGVAL_LAST_FAILURE,
+                                    CRASH_GUARD_REGVAL_STANDBY, CRASH_GUARD_REGVAL_VERSION,
+                                    CRASH_GUARD_REGVAL_LEGACY_COUNT };
+        for (const wchar_t *value : values)
+            RegDeleteKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, value);
+        if (!doRegister && !doUnregister && !doStartup && !doCleanupOld)
+            return 0;
+    }
 
     // ── --startup: inject into Explorer and exit ──────────────────────────────
     if (doStartup)

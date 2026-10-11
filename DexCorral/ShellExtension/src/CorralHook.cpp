@@ -8,6 +8,8 @@
  */
 
 #include "CorralHook.h"
+#include "CrashGuard.h"
+#include "Version.h"
 #include "HookBridge.h"
 #include <Windows.h>
 #include <windowsx.h>
@@ -227,46 +229,141 @@ static LRESULT GuardedSubclassCall(SubclassProcImpl impl, WNDPROC original, cons
 }
 
 // ============================================================================
-// Safe mode — crash sentinel for an explorer.exe-resident hook.
+// Crash guard — standby for an explorer.exe-resident hook.
 //
 // A "session pending" registry flag is armed immediately before the subclass
 // procs are installed and cleared once Explorer survives a stability window
-// (or shuts down cleanly). If Explorer dies while the flag is armed, the next
-// session increments a failure counter; after N consecutive failures the hook
-// stays disabled for one session (safe mode) and the counters reset so the
-// session after that gets a fresh attempt.
+// (or shuts down cleanly). A start that finds the flag still armed follows a
+// session in which Explorer died with the hook freshly installed. What that
+// means for this session is decided by EvaluateCrashGuard (CrashGuard.h): two
+// such failures within two minutes put DexCorral into standby, and it stays
+// there until the user resumes or a different version is installed.
 // ============================================================================
 
-static const wchar_t* SAFEMODE_REGKEY = L"Software\\DexCorral";
-static const wchar_t* REGVAL_HOOK_PENDING = L"HookStartPending";
-static const wchar_t* REGVAL_HOOK_FAILURES = L"HookFailureCount";
-static const DWORD SAFEMODE_FAILURE_THRESHOLD = 3;
 static const UINT_PTR STABILITY_TIMER_ID = 9905;
 static const DWORD STABILITY_DELAY_MS = 60000; // Explorer alive this long => stable
 
-static bool g_SafeMode = false;
+static bool g_SafeMode = false;           // In crash-guard standby this session
+static bool g_StandbyEnteredNow = false;  // ...and it began with this very start
 static bool g_SafeModeEvaluated = false;
 static bool g_CrashSentinelArmed = false;
 
-static DWORD ReadSafeModeValue(const wchar_t* name) {
-    DWORD value = 0;
-    DWORD size = sizeof(value);
-    RegGetValueW(HKEY_CURRENT_USER, SAFEMODE_REGKEY, name, RRF_RT_REG_DWORD,
-                 nullptr, &value, &size);
-    return value;
+static unsigned long long GuardNowSeconds() {
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    ULARGE_INTEGER t;
+    t.LowPart = ft.dwLowDateTime;
+    t.HighPart = ft.dwHighDateTime;
+    return t.QuadPart / 10000000ULL; // 100 ns ticks -> seconds
 }
 
-static void WriteSafeModeValue(const wchar_t* name, DWORD value) {
-    RegSetKeyValueW(HKEY_CURRENT_USER, SAFEMODE_REGKEY, name, REG_DWORD,
-                    &value, sizeof(value));
+static CrashGuardState ReadGuardState() {
+    CrashGuardState state;
+
+    DWORD dw = 0;
+    DWORD size = sizeof(dw);
+    if (RegGetValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_PENDING,
+                     RRF_RT_REG_DWORD, nullptr, &dw, &size) == ERROR_SUCCESS)
+        state.pending = (dw != 0);
+
+    dw = 0;
+    size = sizeof(dw);
+    if (RegGetValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_STANDBY,
+                     RRF_RT_REG_DWORD, nullptr, &dw, &size) == ERROR_SUCCESS)
+        state.standby = (dw != 0);
+
+    ULONGLONG qw = 0;
+    size = sizeof(qw);
+    if (RegGetValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_LAST_FAILURE,
+                     RRF_RT_REG_QWORD, nullptr, &qw, &size) == ERROR_SUCCESS)
+        state.lastFailureTime = qw;
+
+    wchar_t version[32] = {};
+    size = sizeof(version);
+    if (RegGetValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_VERSION,
+                     RRF_RT_REG_SZ, nullptr, version, &size) == ERROR_SUCCESS)
+        state.version = version;
+
+    return state;
+}
+
+static void WriteGuardState(const CrashGuardState& state) {
+    DWORD pending = state.pending ? 1 : 0;
+    DWORD standby = state.standby ? 1 : 0;
+    ULONGLONG lastFailure = state.lastFailureTime;
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_PENDING,
+                    REG_DWORD, &pending, sizeof(pending));
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_STANDBY,
+                    REG_DWORD, &standby, sizeof(standby));
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_LAST_FAILURE,
+                    REG_QWORD, &lastFailure, sizeof(lastFailure));
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_VERSION,
+                    REG_SZ, state.version.c_str(),
+                    (DWORD)((state.version.size() + 1) * sizeof(wchar_t)));
+}
+
+// The guard's own log: %APPDATA%\DexCorral\guard.log, written whether or not
+// debug logging is on. These few lines are what a bug report about "DexCorral
+// paused itself" needs, and by then it is too late to switch logging on.
+static void GuardLog(const wchar_t* format, ...) {
+    wchar_t message[512];
+    va_list args;
+    va_start(args, format);
+    vswprintf_s(message, format, args);
+    va_end(args);
+
+    DllLog(L"CrashGuard: %s", message);
+
+    wchar_t* appData = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)) || !appData)
+        return;
+    wchar_t dir[MAX_PATH];
+    wchar_t path[MAX_PATH];
+    swprintf_s(dir, L"%s\\DexCorral", appData);
+    swprintf_s(path, L"%s\\guard.log", dir);
+    CoTaskMemFree(appData);
+    CreateDirectoryW(dir, nullptr);
+
+    // Keep it small: start over once it passes 64 KB
+    WIN32_FILE_ATTRIBUTE_DATA info = {};
+    bool startOver = GetFileAttributesExW(path, GetFileExInfoStandard, &info) &&
+                     (info.nFileSizeHigh != 0 || info.nFileSizeLow > 64 * 1024);
+
+    HANDLE hFile = CreateFileW(path, startOver ? GENERIC_WRITE : FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+                               startOver ? CREATE_ALWAYS : OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return;
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    wchar_t line[640];
+    swprintf_s(line, L"%04d-%02d-%02d %02d:%02d:%02d  %s  %s\r\n",
+               st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, DEXCORRAL_VERSION, message);
+
+    char utf8[1280];
+    int len = WideCharToMultiByte(CP_UTF8, 0, line, -1, utf8, sizeof(utf8), nullptr, nullptr);
+    if (len > 1) {
+        DWORD written;
+        WriteFile(hFile, utf8, (DWORD)(len - 1), &written, nullptr);
+    }
+    CloseHandle(hFile);
+}
+
+static void ArmCrashSentinel() {
+    DWORD pending = 1;
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_PENDING,
+                    REG_DWORD, &pending, sizeof(pending));
+    g_CrashSentinelArmed = true;
 }
 
 static void MarkHookSessionStable(const wchar_t* reason) {
     if (!g_CrashSentinelArmed) return;
     g_CrashSentinelArmed = false;
-    WriteSafeModeValue(REGVAL_HOOK_PENDING, 0);
-    WriteSafeModeValue(REGVAL_HOOK_FAILURES, 0);
-    DllLog(L"MarkHookSessionStable: %s — crash sentinel cleared, failure count reset", reason);
+    CrashGuardState before = ReadGuardState();
+    WriteGuardState(CrashGuardAfterStableSession(before));
+    if (before.lastFailureTime != 0)
+        GuardLog(L"session stable (%s): the earlier failure is forgotten", reason);
+    DllLog(L"MarkHookSessionStable: %s — crash sentinel cleared", reason);
 }
 
 static void CALLBACK StabilityTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
@@ -274,34 +371,33 @@ static void CALLBACK StabilityTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, 
     MarkHookSessionStable(L"stability window elapsed");
 }
 
-// Returns true when the hook may be installed; false => safe mode this session.
+// Returns true when the hook may be installed; false => standby this session.
 // Evaluated once per session, before the first installation attempt.
 static bool EvaluateSafeMode() {
     if (g_SafeModeEvaluated) return !g_SafeMode;
     g_SafeModeEvaluated = true;
 
-    DWORD pending = ReadSafeModeValue(REGVAL_HOOK_PENDING);
-    DWORD failures = ReadSafeModeValue(REGVAL_HOOK_FAILURES);
+    // The counter of the old three-strikes safe mode has no meaning any more
+    RegDeleteKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, CRASH_GUARD_REGVAL_LEGACY_COUNT);
 
-    if (pending) {
-        // Last session armed the sentinel and never confirmed stability —
-        // Explorer most likely died with our hook installed
-        failures++;
-        WriteSafeModeValue(REGVAL_HOOK_FAILURES, failures);
-        WriteSafeModeValue(REGVAL_HOOK_PENDING, 0);
-        DllLog(L"EvaluateSafeMode: previous session did not confirm hook stability — consecutive failures: %u", failures);
-    }
+    CrashGuardState state = ReadGuardState();
+    CrashGuardVerdict verdict = EvaluateCrashGuard(state, GuardNowSeconds(), DEXCORRAL_VERSION);
+    WriteGuardState(verdict.next);
 
-    if (failures >= SAFEMODE_FAILURE_THRESHOLD) {
-        g_SafeMode = true;
-        // Reset so the next session attempts the hook again
-        WriteSafeModeValue(REGVAL_HOOK_FAILURES, 0);
-        DllLog(L"EvaluateSafeMode: SAFE MODE — hook disabled for this session after %u consecutive failures", failures);
-        return false;
-    }
-    return true;
+    g_SafeMode = verdict.standby;
+    g_StandbyEnteredNow = verdict.enteredNow;
+
+    if (verdict.enteredNow)
+        GuardLog(L"STANDBY entered: second failure within %llu s of the first. The hook is not installed until the user resumes.",
+                 CRASH_GUARD_WINDOW_SECONDS);
+    else if (verdict.standby)
+        GuardLog(L"standby still in force: waiting for the user to resume");
+    else if (verdict.failureNoted)
+        GuardLog(L"failure noted: the previous session ended with the hook not yet confirmed stable. One more within %llu s enters standby.",
+                 CRASH_GUARD_WINDOW_SECONDS);
+
+    return !verdict.standby;
 }
-
 // ============================================================================
 // Hidden icon cache - refreshed from HookBridge (in-process, no kernel calls)
 // ============================================================================
@@ -2023,8 +2119,7 @@ bool InitializeCorralHook() {
     // Arm the crash sentinel before touching Explorer's window procs. Cleared
     // by the stability timer below or by a clean shutdown; if Explorer dies
     // first, the next session counts it as a hook failure.
-    WriteSafeModeValue(REGVAL_HOOK_PENDING, 1);
-    g_CrashSentinelArmed = true;
+    ArmCrashSentinel();
 
     // Subclass SHELLDLL_DefView for NM_CUSTOMDRAW (icon hiding)
     g_OriginalShellDefViewProc = (WNDPROC)SetWindowLongPtrW(
@@ -2145,15 +2240,20 @@ HookStandbyReason GetCorralHookStandbyReason() {
     return g_SafeMode ? HookStandbyReason::CrashGuard : HookStandbyReason::None;
 }
 
+bool WasCorralHookStandbyEnteredNow() { return g_StandbyEnteredNow; }
+
 bool ResumeCorralHook() {
     if (g_HookActive) return true;
     if (!g_SafeMode) return false;
 
     // The user asked for another attempt: start from a clean slate, exactly as
     // a session that had never failed would.
-    WriteSafeModeValue(REGVAL_HOOK_PENDING, 0);
-    WriteSafeModeValue(REGVAL_HOOK_FAILURES, 0);
+    CrashGuardState fresh = ResumeCrashGuard();
+    fresh.version = DEXCORRAL_VERSION;
+    WriteGuardState(fresh);
+    GuardLog(L"resumed by the user: standby ended, history cleared");
     g_SafeMode = false;
+    g_StandbyEnteredNow = false;
     g_SafeModeEvaluated = true;
 
     // Same call the retry thread makes when the desktop was not ready at start
