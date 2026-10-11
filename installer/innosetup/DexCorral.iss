@@ -99,7 +99,7 @@ Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
 ; GetInstallerLanguage() reads HKCU first and falls back to HKLM, so an
 ; all-users install sets the default for every account with one value.
 ; uninsdeletekey, not uninsdeletevalue: --register writes InstallDir/InstallScope/
-; Version here and the hook writes HookStartPending/HookFailureCount at runtime,
+; Version here and the crash guard writes its values at runtime (CrashGuard.h),
 ; so deleting only Language would leave the key behind. Nothing here needs to
 ; survive an uninstall.
 Root: HKA; Subkey: "Software\DexCorral"; \
@@ -463,6 +463,12 @@ begin
     Filter := ' /FI "SESSION eq ' + IntToStr(SessionId) + '"'
   else
     Log('RestartExplorer: could not resolve session id - killing without a session filter');
+
+  // This restart is Setup's own doing. Clear the crash guard's "hook just
+  // installed" flag first, or a DexCorral that started less than a minute ago
+  // would count the kill as an Explorer crash. Best effort: under an elevated
+  // Setup started by a different account this is that account's HKCU.
+  RegDeleteValue(HKEY_CURRENT_USER, 'Software\DexCorral', 'HookStartPending');
 
   Exec('taskkill', '/F /IM explorer.exe' + Filter, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   WaitForWindowGone('Progman', 40, 250);   // up to 10 s

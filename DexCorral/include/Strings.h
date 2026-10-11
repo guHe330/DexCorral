@@ -59,8 +59,9 @@ enum class Str
     Tray_TooltipPaused,          // tray tooltip while in standby
     Menu_Resume,                 // "Resume DexCorral"
     Standby_CrashStatus,         // greyed status line in the tray menu
-    SafeMode_Title,              // balloon title when standby was entered after crashes
-    SafeMode_Body,               // what standby means and how to leave it
+    SafeMode_Title,              // title of the standby dialog and of the reminder balloon
+    SafeMode_Body,               // reminder balloon at later starts: still paused, how to resume
+    Standby_CrashDialogBody,     // dialog at the start that enters standby: the full explanation
     Resume_FailedTitle,          // resume could not install the hook
     Resume_FailedBody,           // ... try signing out and in
 

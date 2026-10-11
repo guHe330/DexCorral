@@ -205,17 +205,23 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 ## When DexCorral pauses itself
 
-DexCorral runs inside Windows Explorer, so a fault in it can take the desktop down with it. If Explorer crashes repeatedly while DexCorral is starting, DexCorral stops trying and goes into **standby** rather than repeating the crash at every login.
+DexCorral runs inside Windows Explorer, so a fault in it can take the desktop down with it. Windows then restarts Explorer, DexCorral loads again, and without a brake that repeats. The brake is the **crash guard**: if Explorer crashes **twice within two minutes** while DexCorral is starting, DexCorral stops trying and goes into **standby**.
 
-In standby:
+A dialog tells you when that happens. In standby:
 
 - All your icons are ordinary desktop icons again. No Corrals are shown.
 - Your layout is safe. `config.json` is not changed, and everything comes back as it was.
 - The tray icon stays, with the tooltip "DexCorral is paused". Its menu shows why, and keeps About, User Manual, the update check, Language and Open Config Folder.
 - The desktop right-click menu does not offer "New DexCorral".
+- It stays that way across restarts. DexCorral does not quietly try again at the next login.
 
-To leave standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. If Explorer crashes again afterwards, please file a bug report and attach `config.json`.
+To leave standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. Installing a different DexCorral version also ends it, since a new build deserves a fresh attempt.
 
+What counts as a crash: Explorer ending within a minute of DexCorral's start, without a clean shutdown. That includes Explorer being ended from Task Manager or a script, which is why a single one is only noted and forgotten again if nothing follows.
+
+Every decision the guard makes is written to `guard.log` in `%APPDATA%\DexCorral`, whether or not debug logging is on. If DexCorral paused itself and you do not know why, attach that file and `config.json` to a bug report.
+
+For scripts: `DexCorral.exe --reset-guard` clears the guard's memory, the same as **Resume**, effective at the next start.
 ## Desktop Integration
 
 Because DexCorral hooks Explorer's desktop directly:
@@ -252,7 +258,7 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
 | `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the tray menu's **Language** submenu. | Yes |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
-| `HKCU\Software\DexCorral` | `HookStartPending`, `HookFailureCount` | Crash-guard counters. If Explorer dies three times in a row while DexCorral is loading, DexCorral goes into standby rather than repeating the crash (see [When DexCorral pauses itself](#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
+| `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
 | `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
 | `<root>\Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |

@@ -63,11 +63,19 @@ const wchar_t *const kEnglish[] = {
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
     /* Menu_Resume */              L"Resume DexCorral",
-    /* Standby_CrashStatus */      L"Paused: Explorer crashed repeatedly",
+    /* Standby_CrashStatus */      L"Paused: Explorer crashed twice in a row",
     /* SafeMode_Title */           L"DexCorral is paused",
-    /* SafeMode_Body */            L"Explorer crashed repeatedly while DexCorral was starting, so DexCorral is "
-                                   L"standing aside. Your icons are all on the desktop and your Corrals are "
-                                   L"saved. To try again, right-click this icon and choose Resume DexCorral.",
+    /* SafeMode_Body */            L"DexCorral is still paused after Explorer crashed twice in a row. Your icons "
+                                   L"are on the desktop and your Corrals are saved. To try again, right-click "
+                                   L"this icon and choose Resume DexCorral.",
+    /* Standby_CrashDialogBody */  L"Windows Explorer crashed twice within two minutes while DexCorral was starting, "
+                                   L"so DexCorral has paused itself instead of trying again.\n\n"
+                                   L"Nothing is lost. All your icons are back on the desktop, and your Corrals "
+                                   L"and their settings are saved.\n\n"
+                                   L"DexCorral stays paused, also after a restart, until you right-click its "
+                                   L"tray icon and choose \"Resume DexCorral\".\n\n"
+                                   L"If it happens again, please report it. \"Open Config Folder\" in the same "
+                                   L"menu shows guard.log and config.json, which are what a report needs.",
     /* Resume_FailedTitle */       L"DexCorral could not resume",
     /* Resume_FailedBody */        L"The desktop was not ready. Sign out and back in, and DexCorral will start "
                                    L"normally.",
@@ -220,6 +228,7 @@ const wchar_t *const kEnglish[] = {
                                    L"  DexCorral.exe --unregister   Unregister shell extension\n"
                                    L"  DexCorral.exe --startup      Inject into Explorer and start (used by Run key)\n"
                                    L"  DexCorral.exe --silent       Suppress message dialogs\n"
+                                   L"  DexCorral.exe --reset-guard  End a crash-guard pause (see the manual)\n"
                                    L"  DexCorral.exe --force        Register on an unsupported Windows version\n\n"
                                    L"Scope (applies to --register and --unregister):\n"
                                    L"  --scope=user      This user only, HKCU, no admin rights needed\n"
@@ -272,12 +281,23 @@ const wchar_t *const kGerman[] = {
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
     /* Menu_Resume */              L"DexCorral fortsetzen",
-    /* Standby_CrashStatus */      L"Pausiert: Der Explorer ist wiederholt abgestürzt",
+    /* Standby_CrashStatus */      L"Pausiert: Der Explorer ist zweimal abgestürzt",
     /* SafeMode_Title */           L"DexCorral ist pausiert",
-    /* SafeMode_Body */            L"Der Explorer ist beim Start von DexCorral wiederholt abgestürzt, daher hält "
-                                   L"sich DexCorral zurück. Alle Symbole liegen auf dem Desktop, die Corrals sind "
+    /* SafeMode_Body */            L"DexCorral ist weiterhin pausiert, nachdem der Explorer zweimal hintereinander "
+                                   L"abgestürzt ist. Die Symbole liegen auf dem Desktop, die Corrals sind "
                                    L"gespeichert. Zum erneuten Versuch: Rechtsklick auf dieses Symbol, dann "
                                    L"DexCorral fortsetzen.",
+    /* Standby_CrashDialogBody */  L"Der Windows-Explorer ist beim Start von DexCorral zweimal innerhalb von zwei "
+                                   L"Minuten abgestürzt. DexCorral hat sich deshalb pausiert, statt es erneut zu "
+                                   L"versuchen.\n\n"
+                                   L"Es geht nichts verloren. Alle Symbole liegen wieder auf dem Desktop, die "
+                                   L"Corrals und ihre Einstellungen sind gespeichert.\n\n"
+                                   L"DexCorral bleibt pausiert, auch nach einem Neustart, bis Sie mit der rechten "
+                                   L"Maustaste auf das Symbol im Infobereich klicken und \"DexCorral fortsetzen\" "
+                                   L"wählen.\n\n"
+                                   L"Sollte es erneut passieren, melden Sie es bitte. \"Konfigurationsordner "
+                                   L"öffnen\" im selben Menü zeigt guard.log und config.json, die für eine Meldung "
+                                   L"gebraucht werden.",
     /* Resume_FailedTitle */       L"DexCorral konnte nicht fortgesetzt werden",
     /* Resume_FailedBody */        L"Der Desktop war nicht bereit. Nach dem Ab- und Anmelden startet DexCorral "
                                    L"normal.",
@@ -432,6 +452,7 @@ const wchar_t *const kGerman[] = {
                                    L"  DexCorral.exe --unregister   Shell-Erweiterung deregistrieren\n"
                                    L"  DexCorral.exe --startup      In den Explorer injizieren und starten (vom Run-Schlüssel verwendet)\n"
                                    L"  DexCorral.exe --silent       Meldungsdialoge unterdrücken\n"
+                                   L"  DexCorral.exe --reset-guard  Eine Absturzschutz-Pause beenden (siehe Handbuch)\n"
                                    L"  DexCorral.exe --force        Auf einer nicht unterstützten Windows-Version registrieren\n\n"
                                    L"Gültigkeitsbereich (für --register und --unregister):\n"
                                    L"  --scope=user      Nur dieser Benutzer, HKCU, keine Administratorrechte nötig\n"

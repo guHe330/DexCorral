@@ -107,6 +107,10 @@ static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
 // which belongs to Explorer's UI thread — and deadlocks both threads, hanging Explorer.
 // s_RepinPending coalesces bursts of foreground changes into a single repin.
 static const UINT WM_REPIN_CORRALS = WM_APP + 108;
+
+// Posted to self at the start that enters crash-guard standby: show the
+// explanation once the message loop is running, not from inside Initialize.
+static const UINT WM_STANDBY_DIALOG = WM_APP + 109;
 static volatile LONG s_RepinPending = 0;
 
 // Id of the one global hotkey the message window registers (quick-hide toggle)
@@ -256,8 +260,14 @@ void App::Initialize()
     // corrals and how to get them back
     if (standbyReason == HookStandbyReason::CrashGuard) {
         DllLog(L"App::Initialize: STANDBY (crash guard) — no hook, no corrals, desktop icons stay visible");
-        s_SafeModeNoticePending = true;
-        ShowSafeModeNoticeIfPending(trayIcon.get());
+        if (WasCorralHookStandbyEnteredNow()) {
+            // The moment it happens deserves more than a balloon that is gone in seconds
+            PostMessageW(messageWindow, WM_STANDBY_DIALOG, 0, 0);
+        } else {
+            // Carried over from an earlier start: a reminder is enough
+            s_SafeModeNoticePending = true;
+            ShowSafeModeNoticeIfPending(trayIcon.get());
+        }
     }
 
     // config.json was unreadable: say so rather than leaving the user to wonder
@@ -1988,6 +1998,13 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             }
             return 0;
         }
+    }
+
+    if (app && uMsg == WM_STANDBY_DIALOG)
+    {
+        MessageBoxW(nullptr, Tr(Str::Standby_CrashDialogBody), Tr(Str::SafeMode_Title),
+                    MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+        return 0;
     }
 
     if (app && uMsg == WM_HOTKEY && wParam == QUICK_HIDE_HOTKEY_ID)

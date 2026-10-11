@@ -92,7 +92,7 @@ InstallScope InferInstallScope(const wchar_t* modulePath) {
 // Records where this install lives so the installer can detect the other scope
 // and refuse a conflicting install. Written on register, removed on unregister.
 // Only these three values are touched: Software\DexCorral also holds Language
-// and the hook's runtime HookStartPending/HookFailureCount, which must survive.
+// and the crash guard's values (CrashGuard.h), which must survive.
 static HRESULT WriteInstallMarker(HKEY root, const wchar_t* dllPath, InstallScope scope) {
     wchar_t dir[MAX_PATH];
     StringCchCopyW(dir, MAX_PATH, dllPath);
