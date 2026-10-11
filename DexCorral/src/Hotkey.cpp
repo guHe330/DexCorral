@@ -95,3 +95,25 @@ bool ParseHotkey(const std::string &text, HotkeySpec &out)
     out = spec;
     return true;
 }
+
+std::wstring FormatHotkey(const HotkeySpec &spec, const std::wstring &ctrlName, const std::wstring &shiftName)
+{
+    std::wstring key;
+    if ((spec.vk >= 'A' && spec.vk <= 'Z') || (spec.vk >= '0' && spec.vk <= '9'))
+        key = std::wstring(1, (wchar_t)spec.vk);
+    else if (spec.vk >= VK_F1 && spec.vk <= VK_F24)
+        key = L"F" + std::to_wstring(spec.vk - VK_F1 + 1);
+    else
+        return L"";
+
+    std::wstring text;
+    if (spec.modifiers & MOD_CONTROL)
+        text += ctrlName + L"+";
+    if (spec.modifiers & MOD_ALT)
+        text += L"Alt+";
+    if (spec.modifiers & MOD_SHIFT)
+        text += shiftName + L"+";
+    if (spec.modifiers & MOD_WIN)
+        text += L"Win+";
+    return text + key;
+}

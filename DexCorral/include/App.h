@@ -37,6 +37,7 @@
 #include <string>
 #include "Config.h"
 #include "CorralHook.h"
+#include "Hotkey.h"
 #include "DesktopIcons.h"
 #include "HookBridge.h"
 #include "MouseHook.h"
@@ -263,6 +264,7 @@ private:
     void ActivateDesktop();             // Everything Initialize skips in standby
     const wchar_t *TrayTooltip() const; // Normal or "paused" tooltip
     bool quickHideHotkeyRegistered = false;
+    HotkeySpec quickHideHotkeySpec; // The registered combination, for the menu
     bool desktopIconsVisibleBeforeQuickHide = true; // Restored when quick-hide ends
 
     // Double-click detection for the low-level mouse hook (WH_MOUSE_LL delivers

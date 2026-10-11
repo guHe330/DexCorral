@@ -347,9 +347,13 @@ void App::ActivateDesktop()
                                      nullptr, WinEventProc, 0, 0,
                                      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
-    // Optional global quick-hide hotkey (off unless configured). A failure here
-    // is only logged: the tray menu shows the hotkey as not active.
-    ApplyQuickHideHotkey();
+    // Optional global quick-hide hotkey, set as QuickHideHotkey in config.json
+    // and off without it. A combination that is not valid, or that Windows or
+    // another program already holds, is worth a notice: the user typed it into
+    // a file and would otherwise just find that nothing happens.
+    if (!ApplyQuickHideHotkey() && trayIcon)
+        trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
+                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
 
     // Restore corrals
     RestoreCorrals();
@@ -830,10 +834,12 @@ bool App::ApplyQuickHideHotkey()
     }
 
     quickHideHotkeyRegistered = true;
+    quickHideHotkeySpec = spec;
     return true;
 }
 
-void App::ToggleQuickHide(){
+void App::ToggleQuickHide()
+{
     quickHideActive = !quickHideActive;
 
     if (quickHideActive)
@@ -1465,14 +1471,17 @@ void App::ShowTrayMenu()
 
     // Quick-hide toggle (same as double-clicking an empty desktop spot)
     UINT quickHideFlags = quickHideActive ? MF_CHECKED : MF_UNCHECKED;
-    AppendMenuW(menu, MF_STRING | quickHideFlags, 6, Tr(Str::Menu_QuickHideEverything));
-
-    // Global hotkey for the same toggle. Checked only while it is really
-    // registered; the label names the combination it is, or would be.
-    std::wstring hotkeyName = CorralWindow::Utf8ToWide(
-        config.QuickHideHotkey.empty() ? std::string(DEFAULT_QUICK_HIDE_HOTKEY) : config.QuickHideHotkey);
-    AppendMenuW(menu, MF_STRING | (quickHideHotkeyRegistered ? MF_CHECKED : MF_UNCHECKED), 9,
-                TrFmt(Str::Menu_QuickHideHotkey, hotkeyName).c_str());
+    // The global hotkey for it, when one is active, goes on the same line the way
+    // menus show shortcuts (text after a tab is right-aligned). Only while it is
+    // really registered: a menu must not advertise keys that do nothing.
+    std::wstring quickHideLabel = Tr(Str::Menu_QuickHideEverything);
+    if (quickHideHotkeyRegistered)
+    {
+        std::wstring keys = FormatHotkey(quickHideHotkeySpec, Tr(Str::Key_Ctrl), Tr(Str::Key_Shift));
+        if (!keys.empty())
+            quickHideLabel += L"\t" + keys;
+    }
+    AppendMenuW(menu, MF_STRING | quickHideFlags, 6, quickHideLabel.c_str());
     }
 
     // Update check (opt-in)
@@ -1542,33 +1551,7 @@ void App::ShowTrayMenu()
     case 8:
         StartUpdateCheck(true);
         break;
-    case 9:
-        if (quickHideHotkeyRegistered)
-        {
-            // Switch off
-            config.QuickHideHotkey.clear();
-            ApplyQuickHideHotkey();
-            SaveConfig();
-        }
-        else
-        {
-            // Switch on: the configured combination if there is one, else the default
-            if (config.QuickHideHotkey.empty())
-                config.QuickHideHotkey = DEFAULT_QUICK_HIDE_HOTKEY;
-            if (ApplyQuickHideHotkey())
-            {
-                SaveConfig();
-            }
-            else
-            {
-                std::wstring tried = CorralWindow::Utf8ToWide(config.QuickHideHotkey);
-                config.QuickHideHotkey.clear();
-                SaveConfig();
-                if (trayIcon)
-                    trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle), TrFmt(Str::Hotkey_FailedBody, tried));
-            }
-        }
-        break;
+
     case 14:
         ResumeFromStandby();
         break;
