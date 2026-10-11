@@ -99,7 +99,7 @@ Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
 ; GetInstallerLanguage() reads HKCU first and falls back to HKLM, so an
 ; all-users install sets the default for every account with one value.
 ; uninsdeletekey, not uninsdeletevalue: --register writes InstallDir/InstallScope/
-; Version here and the hook writes HookStartPending/HookFailureCount at runtime,
+; Version here and the crash guard writes its values at runtime (CrashGuard.h),
 ; so deleting only Language would leave the key behind. Nothing here needs to
 ; survive an uninstall.
 Root: HKA; Subkey: "Software\DexCorral"; \
