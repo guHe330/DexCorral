@@ -189,7 +189,8 @@ Double-click an empty spot on the desktop to hide everything at once: all native
 - Corrals can opt out: right-click a corral and check **Exclude from Quick-Hide** to keep it visible while everything else hides.
 - Double-clicking the **tray icon** does the same, and so does the tray menu's **Quick-Hide Everything** entry.
 - Quick-hide is temporary: restarting DexCorral always restores your normal desktop.
-- For a keyboard shortcut, switch on **Quick-Hide Hotkey** in the tray menu. It is off by default, and its combination is Ctrl+Alt+H. To use another one, set `QuickHideHotkey` in `config.json` to something like `"Ctrl+Shift+F9"` or `"Win+Alt+D"`: at least one of Ctrl, Alt, Shift, Win, plus one letter, digit or function key. If the combination is already taken, DexCorral says so and leaves the hotkey off.
+- For a keyboard shortcut, set `QuickHideHotkey` in `config.json`, for example `"QuickHideHotkey": "Ctrl+Alt+H"`, then sign out and back in. There is none by default. The combination needs at least one of Ctrl, Alt, Shift, Win, plus one letter, digit or function key: `"Ctrl+Shift+F9"` and `"Win+Alt+D"` work too. Once active, the tray menu shows it on the **Quick-Hide Everything** line. If the combination is not valid or already taken, DexCorral says so at start and runs without a hotkey. Ctrl+Alt is the same as AltGr, so avoid a letter you type with AltGr on your keyboard.
+
 ## Tray Icon
 
 Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
@@ -198,8 +199,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 - **User Manual**: opens this manual on GitHub in your browser.
 - **Create New Corral** / **New Virtual Corral**.
 - **Show Desktop Icons**: toggle all native desktop icons.
-- **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop).
-- **Quick-Hide Hotkey**: switch a global keyboard shortcut for the same toggle on or off (see [Quick-Hide](#quick-hide)).
+- **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
 - **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API once every 24 hours whether a newer version exists and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
 - **Check for Updates Now**: run that check once, right now, without switching the automatic one on.
 - **Language**: switch the interface between English and German. The change takes effect immediately, no restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.

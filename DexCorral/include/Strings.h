@@ -50,7 +50,8 @@ enum class Str
     Menu_NewVirtualCorral,       // "New Virtual Corral"
     Menu_ShowDesktopIcons,       // "Show Desktop Icons"
     Menu_QuickHideEverything,    // "Quick-Hide Everything"
-    Menu_QuickHideHotkey,        // "Quick-Hide Hotkey ({0})"  ({0} = combination)
+    Key_Ctrl,                    // "Ctrl" as the keyboard labels it (German: "Strg")
+    Key_Shift,                   // "Shift" (German: "Umschalt")
     Menu_CheckUpdatesAuto,       // "Check for Updates Automatically"
     Menu_CheckUpdatesNow,        // "Check for Updates Now"
     Menu_Language,               // "Language" (submenu)

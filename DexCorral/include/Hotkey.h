@@ -36,8 +36,6 @@ struct HotkeySpec
     unsigned vk = 0;        /// Virtual-key code
 };
 
-/// The combination the tray menu's Quick-Hide hotkey toggle switches on
-constexpr const char *DEFAULT_QUICK_HIDE_HOTKEY = "Ctrl+Alt+H";
 
 /**
  * Parses a hotkey such as "Ctrl+Alt+H", "ctrl + shift + F9" or "Win+Alt+D".
@@ -48,3 +46,14 @@ constexpr const char *DEFAULT_QUICK_HIDE_HOTKEY = "Ctrl+Alt+H";
  * Returns false, leaving `out` untouched, for anything else.
  */
 bool ParseHotkey(const std::string &text, HotkeySpec &out);
+
+/**
+ * The hotkey as a menu shows it: "Ctrl+Alt+H".
+ *
+ * Modifiers come in the fixed order Ctrl, Alt, Shift, Win, whatever order the
+ * config named them in, and the key is written as on the keycap (a capital
+ * letter names the key, not the character it types). Ctrl and Shift are
+ * labelled differently on German keyboards ("Strg", "Umschalt"), so the caller
+ * passes the names for the interface language. Empty for a spec without a key.
+ */
+std::wstring FormatHotkey(const HotkeySpec &spec, const std::wstring &ctrlName, const std::wstring &shiftName);
