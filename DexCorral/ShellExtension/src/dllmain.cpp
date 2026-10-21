@@ -1,6 +1,7 @@
 #include <Windows.h>
 #include <CommCtrl.h>
 #include <ShlObj.h>
+#include <Shlwapi.h>
 #include <stdio.h>
 #include <new>
 #include "CorralHook.h"
@@ -84,7 +85,13 @@ static bool IsRunningInsideExplorer() {
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     wchar_t* lastSlash = wcsrchr(exePath, L'\\');
     const wchar_t* exeName = lastSlash ? lastSlash + 1 : exePath;
-    return _wcsicmp(exeName, L"explorer.exe") == 0;
+    if (_wcsicmp(exeName, L"explorer.exe") != 0) return false;
+
+    // COM-launched helper Explorers ("explorer.exe /factory,{...} -Embedding", spawned for
+    // ShellExecute from other apps or "separate process" folder windows) load us too.
+    // Only the shell Explorer may run the App: a helper would add its own tray icon and,
+    // exiting without a clean shutdown, trip the crash guard for the real one.
+    return !StrStrIW(GetCommandLineW(), L"/factory,") && !StrStrIW(GetCommandLineW(), L"-Embedding");
 }
 
 // Worker thread: runs the App message loop (corral windows, tray icon, config, etc.)
