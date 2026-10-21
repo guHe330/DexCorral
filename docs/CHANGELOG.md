@@ -4,6 +4,11 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-21
+
+### Fixed
+- Opening a file from another program, such as Ctrl+clicking a file link in a terminal, could start an extra copy of DexCorral in a helper Explorer process. Each copy added its own tray icon, and when it ended the crash guard took it for a crash and paused DexCorral. Only the Explorer that runs the desktop starts DexCorral now. ([#79](https://github.com/guHe330/DexCorral/issues/79))
+
 ## [1.1.0] - 2026-10-11
 
 ### Added
