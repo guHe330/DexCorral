@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time. DexCorral is alpha software — bug reports are genuinely useful.
+        Thanks for taking the time. Bug reports are genuinely useful.
 
         A short report is fine. If you only fill in "what happened", that is still worth posting.
 

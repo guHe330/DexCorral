@@ -1,5 +1,5 @@
 ================================================================================
-                              DexCorral (Alpha)
+                                   DexCorral
 ================================================================================
 
 DexCorral is a high-performance, native C++ desktop organization tool for
@@ -8,14 +8,11 @@ customizable areas called "Corrals". Corrals can also act as virtual
 folders -- point one at a directory and its contents appear directly on
 your desktop, neatly contained within the Corral.
 
-NOTE: This is an alpha release. Expect breaking changes, missing features,
-and rough edges.
-
 ================================================================================
 KEY INFORMATION
 ================================================================================
 
-Status:         Alpha
+Status:         Stable
 Version:        C++ Native (Win32)
 Binary Size:    ~1 MB (exe + dll)
 Platform:       Windows 11

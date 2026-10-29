@@ -1,6 +1,4 @@
-## DexCorral ${VERSION} (Alpha)
-
-> This is an alpha release. Expect breaking changes and rough edges.
+## DexCorral ${VERSION}
 
 ### Downloads
 

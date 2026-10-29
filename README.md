@@ -13,8 +13,6 @@ A lightweight native Windows desktop organizer. DexCorral groups desktop icons i
 
 It runs as a small DLL inside Explorer instead of faking a desktop window, so Corrals are drawn as part of the shell and stay transparent over animated wallpapers such as [Lively](https://github.com/rocksdanister/lively).
 
-> **Alpha software.** DexCorral is a personal project developed around my own workflow. Expect bugs and occasional breaking changes.
-
 > **Private by design.** No ads, telemetry, or user tracking. Network access is limited to an optional update check, disabled by default. Details in the [Privacy notes](docs/PRIVACY.md).
 
 ## Features
