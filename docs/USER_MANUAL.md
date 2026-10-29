@@ -1,6 +1,6 @@
 # DexCorral User Manual
 
-DexCorral organizes your Windows desktop icons into shaded, customizable areas called **Corrals**. Icons stay real desktop icons: DexCorral integrates with Explorer through a shell extension, so drag-and-drop, context menus, and file operations keep working exactly as they always have.
+DexCorral organizes your Windows desktop icons into shaded, customizable areas called **Corrals**. Icons stay real desktop icons: DexCorral integrates with Explorer through a shell extension, so drag-and-drop, context menus, and file operations work as before.
 
 ## Installation
 
@@ -23,7 +23,7 @@ Setup's first page asks which one you want. Both give you the same DexCorral; th
 - **Install for all users**: goes to `C:\Program Files\DexCorral` and registers in `HKLM`. Needs Administrator rights, so Windows shows a UAC prompt. Every account on the PC gets DexCorral, and an administrator updates it once for everybody. Choose this on a shared or family PC.
 - **Install for me only**: goes to `%LOCALAPPDATA%\Programs\DexCorral` and registers in `HKCU`. No Administrator rights and no UAC prompt, which makes it the option on a work PC where you do not have admin. Only your account gets DexCorral, and you update your own copy. Other users on the PC are unaffected.
 
-**The two cannot be installed side by side.** They register the same shell extension, and a per-user install would quietly take precedence over a machine-wide one for your account, leaving you on a different version than everyone else with nothing on screen to say so. Setup checks for the other kind before it writes anything: installing just for yourself over an existing all-users install offers to remove that one first, and installing for all users warns you about any per-user installs it can see (only the owner of one can remove it).
+The two cannot be installed side by side. They register the same shell extension, and a per-user install would quietly take precedence over a machine-wide one for your account, leaving you on a different version than everyone else with nothing on screen to say so. Setup checks for the other kind before it writes anything: installing just for yourself over an existing all-users install offers to remove that one first, and installing for all users warns you about any per-user installs it can see (only the owner of one can remove it).
 
 If you are not sure, pick **all users**. It has one extra load path into Explorer, so it recovers on its own if Explorer crashes mid-session, where a per-user install waits until your next login or your next right-click on the desktop.
 
@@ -64,6 +64,7 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 **Reordering tabs:** hover a tab to reveal a grip handle ("⠿") on its left edge, then drag it left or right.
 
 **Moving icons between tabs:** drag the icons onto the tab you want them in, in the same Corral or in another one, or right-click an icon and pick the tab from **Move to Tab**. When you drag something in from the desktop or an Explorer window, resting on a tab for half a second brings that tab forward, and dropping straight onto a tab works too.
+
 ### Catch-All
 One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
 
@@ -75,6 +76,7 @@ It is a live view of that folder, and its icons are the real files, so dragging 
 - **Dropping files onto it** moves or copies them into the folder, with the same cursor and the same Ctrl / Shift modifiers.
 - **Dragging files out of it**, to an Explorer window, the desktop or an application, moves or copies them by Explorer's usual rules. Several selected files travel together.
 - Dragged onto a **normal Corral**, a file stays where it is and gets a desktop shortcut in that Corral.
+
 ## Managing Corrals
 
 ### Creating
@@ -89,12 +91,13 @@ It is a live view of that folder, and its icons are the real files, so dragging 
 ### Lock Position
 Right-click a Corral and choose **Lock Position** to freeze it where it is. A locked Corral cannot be moved or resized with the mouse, and a small padlock appears in its title bar. Everything else keeps working: tabs still switch, double-clicking the title bar still rolls it up, and positions are still restored per monitor and resolution. Choose **Lock Position** again to unlock.
 
-Worth doing for a Corral that sits where you drop files all day. An accidental drag does not just move the Corral, it pushes the desktop icons underneath it out of the way, and there is no undo for that.
+Lock any Corral that sits where you drop files all day. An accidental drag moves the Corral and also pushes the desktop icons underneath it out of the way, and that cannot be undone.
 
 ### Roll-Up
 Double-click the title bar to **roll up** a Corral so only the title bar remains visible. Double-click again to expand it.
 
 A rolled-up Corral also opens by itself while the mouse rests on it, and closes again when the mouse leaves. If one sits where your mouse often passes and keeps popping open, right-click it and uncheck **Expand on Hover**; it then only opens on a double-click.
+
 ### Multi-Monitor
 Corral positions are remembered **per monitor and per resolution**. Moving a Corral to another monitor or changing display resolution restores the layout you used there last.
 
@@ -136,7 +139,7 @@ Three checkboxes at the bottom decide where the style goes when you press OK:
 #### Header opacity and tabs
 Header opacity fades the title bar and tab strip independently of the Corral fill.
 
-- Inactive tabs are derived from the header opacity automatically, always dimmer than the active tab, no second slider to keep in sync.
+- Inactive tabs take their opacity from the header setting and are always dimmer than the active tab, so there is no second slider.
 - The slider stops short of fully transparent, because the header is the Corral's grab handle. Rolled-up Corrals are kept a little more visible than the setting; unrolling restores it exactly.
 - Hovering a Corral fades its header, border, icons and text up to full strength, and back when you leave.
 - DexCorral follows the Windows setting **Settings > Accessibility > Visual effects > Animation effects**. With it off, these fades, the unrolling of a rolled-up Corral and the Quick-Hide fade all switch instantly instead of animating.
@@ -179,6 +182,7 @@ Click a Corral to give it the keyboard. It then behaves like an Explorer window:
 | F5 | Reload |
 | Menu key | Context menu |
 | Backspace | Up one folder (virtual tabs) |
+
 ### Right-Click Menu
 Right-clicking an icon shows the standard Windows context menu (Open, Cut, Copy, Delete, Properties, ...) plus two DexCorral entries: **Move to Tab**, when the Corral has other tabs, and **Remove from Corral**, which returns the icon to the regular desktop without deleting anything. Both act on every selected icon if the one you clicked is part of a selection. Virtual tabs show neither: their icons are the files of a folder.
 
@@ -224,6 +228,7 @@ What counts as a crash: Explorer ending within a minute of DexCorral's start, wi
 Every decision the guard makes is written to `guard.log` in `%APPDATA%\DexCorral`, whether or not debug logging is on. If DexCorral paused itself and you do not know why, attach that file and `config.json` to a bug report.
 
 For scripts: `DexCorral.exe --reset-guard` clears the guard's memory, the same as **Resume**, effective at the next start.
+
 ## Desktop Integration
 
 Because DexCorral hooks Explorer's desktop directly:

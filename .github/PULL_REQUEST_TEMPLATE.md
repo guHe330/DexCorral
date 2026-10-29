@@ -1,5 +1,5 @@
-<!-- Thanks for contributing! Please read docs/CONTRIBUTING.md first — it sets honest
-     expectations about scope and review timelines, and explains the CLA (three lines,
+<!-- Thanks for contributing! Please read docs/CONTRIBUTING.md first. It explains
+     scope, review timelines and the CLA (three lines,
      GPLv3, you keep your copyright).
 
      DexCorral is a personal tool with a deliberately narrow scope. For anything

@@ -71,7 +71,7 @@ Installs before 1.0.28 had no notion of scope and registered through `HKEY_CLASS
 
 ## Upgrade and uninstall sequence
 
-Unchanged in shape from earlier versions, now scope-aware:
+Each step runs in the install's own scope:
 
 1. `PrepareToInstall`: conflict check, kill any `DexCorral.exe`, `--unregister` the old copy in the same scope (falling back to deleting the keys directly), rename `DexCorralHook.dll` aside so the new copy lands on a free name.
 2. `ssPostInstall`: `--register` in the chosen scope, restart Explorer if this was an upgrade, `--startup` to inject into the running Explorer, then delete the renamed-aside DLL.

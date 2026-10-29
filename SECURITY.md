@@ -16,6 +16,6 @@ Only the latest release gets security fixes.
 
 ## Before you report
 
-DexCorral injects `DexCorralHook.dll` into `explorer.exe` and manipulates the desktop ListView across processes. That is how the product works, not a vulnerability in itself, though antivirus heuristics sometimes read it that way. Findings about how that injection could be abused by a third party are very much in scope.
+DexCorral injects `DexCorralHook.dll` into `explorer.exe` and manipulates the desktop ListView across processes. That is how the product works, not a vulnerability in itself, though antivirus heuristics sometimes read it that way. Findings about how a third party could abuse that injection are in scope.
 
 Out of scope: anything requiring an attacker who already runs code as the same user, SmartScreen warnings on unsigned builds (known, code signing is planned), and self-built or modified binaries.

@@ -284,7 +284,7 @@ The table has one row per function name. `A`/`W` suffixes and unsuffixed names a
 
 ## COM Interfaces and Callback Contracts
 
-COM methods are distinct from standalone Win32 functions. They are included to describe the Windows integration fully; implemented entry points are identified accordingly.
+COM methods are not standalone Win32 functions. They are listed so the inventory covers the whole Windows integration, and entry points that DexCorral implements are marked as such.
 
 | Interface / Methods | Short description | Source |
 | --- | --- | --- |

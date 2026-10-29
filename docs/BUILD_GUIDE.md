@@ -67,7 +67,7 @@ Win32-dependent behaviour (Explorer hook, drag-drop, DPI scaling, multi-monitor,
 
 | File | Description |
 |------|-------------|
-| `build/DexCorralHook.dll` | Monolith shell extension: all app logic + Explorer hook. |
+| `build/DexCorralHook.dll` | The shell extension. Holds all app logic and the Explorer hook. |
 | `build/DexCorral.exe` | Registration tool (run once as admin to install the shell extension). |
 | `build/DexCorralTests.exe` | Unit test runner. |
 | `build/DexCorral_<version>.zip` | Release archive containing the two distributable binaries, named after the version in `Version.h`. |
@@ -86,7 +86,7 @@ After the first registration, rebuilding the DLL only requires Explorer to reloa
 
 ## Unlock the DLL manually
 
-If the build fails because `DexCorralHook.dll` is locked by Explorer and the script's automatic unlock doesn't work:
+If the build fails because Explorer has `DexCorralHook.dll` locked and the script's automatic unlock doesn't help:
 
 ```powershell
 Stop-Process -Name explorer -Force; Start-Sleep 3; Start-Process explorer.exe
@@ -94,7 +94,7 @@ Stop-Process -Name explorer -Force; Start-Sleep 3; Start-Process explorer.exe
 
 ## Dependencies
 
-| Dependency | How it's included |
-|------------|-------------------|
-| [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Single header checked into `DexCorral/include/nlohmann/json.hpp` |
-| [Google Test](https://github.com/google/googletest) 1.14.0 | Downloaded by CMake `FetchContent` on first build; cached in the build tree |
+| Dependency | License | How it's included |
+|------------|---------|-------------------|
+| [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | [MIT](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT) | Single header checked into `DexCorral/include/nlohmann/json.hpp`, shipped in the binaries |
+| [Google Test](https://github.com/google/googletest) 1.14.0 | [BSD-3-Clause](https://github.com/google/googletest/blob/main/LICENSE) | Downloaded by CMake `FetchContent` on first build; cached in the build tree. Tests only, not shipped |

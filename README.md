@@ -1,30 +1,17 @@
 <h1 align="center">DexCorral</h1>
 
-<p align="center">
-  <img alt="Desktop organized with DexCorral" src="docs/assets/screenshots/desktop-after.png" width="700" />
-</p>
+![DexCorral: group your desktop icons into transparent, tabbed Corrals. A desktop with several Corrals holding system icons, programs, work files, a project folder and games.](docs/assets/banner.png)
 
 [![Build and Release](https://github.com/guHe330/DexCorral/actions/workflows/build-release.yml/badge.svg)](https://github.com/guHe330/DexCorral/actions/workflows/build-release.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/guHe330/DexCorral?include_prereleases)](https://github.com/guHe330/DexCorral/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078d4.svg)](#requirements)
 
-## Contents
-
-- [About](#about)
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Documentation](#documentation)
-- [Issues](#issues)
-- [Project Scope](#project-scope)
-- [License](#license)
-
 ## About
 
 A lightweight native Windows desktop organizer. DexCorral groups desktop icons into customizable areas called Corrals, with tabs, real per-pixel transparency, virtual folders, and multi-monitor support.
 
-It runs as a small DLL inside Explorer instead of faking a desktop window, so Corrals draw as part of the shell and stay truly transparent over animated wallpapers such as [Lively](https://github.com/rocksdanister/lively).
+It runs as a small DLL inside Explorer instead of faking a desktop window, so Corrals are drawn as part of the shell and stay transparent over animated wallpapers such as [Lively](https://github.com/rocksdanister/lively).
 
 > **Alpha software.** DexCorral is a personal project developed around my own workflow. Expect bugs and occasional breaking changes.
 
@@ -68,7 +55,7 @@ Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 - Appearance changes apply as you drag, with no dialog round-trip.
 - Settings can be applied to one Corral or to all of them.
 
-### More Features
+### More features
 
 - Organize desktop icons into movable, resizable Corrals.
 - Per-Corral position lock against accidental moves.
@@ -100,16 +87,9 @@ The two modes register the same shell extension and cannot be installed side by 
 
 The binaries are currently unsigned, so Windows SmartScreen warns and reports the publisher as unknown. Every release publishes SHA-256 checksums and a GitHub build provenance attestation, so you can verify a download before running it.
 
-### Portable / Manual
+### Portable
 
-Place `DexCorral.exe` and `DexCorralHook.dll` in the same directory, then register for yourself:
-
-```powershell
-DexCorral.exe --register --scope=user
-DexCorral.exe --startup
-```
-
-Use `--scope=machine` from an Administrator prompt to register for every account instead. Without `--scope`, DexCorral picks machine scope if the folder is under `Program Files` and user scope otherwise.
+Extract the zip to any folder and register it once from a command prompt, either just for you or, as Administrator, for every account. The commands are in the [User Manual](docs/USER_MANUAL.md#portable-package).
 
 The portable package is unsigned too, and the same checksums and attestation on the release page cover it.
 
@@ -139,10 +119,6 @@ Please open an issue before implementing larger changes.
 
 Forks are welcome; that's what the GPL is for.
 
-## Third-Party Libraries
-
-- [nlohmann/json](https://github.com/nlohmann/json) 3.12.0, [MIT](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT)
-
 ## License
 
-DexCorral is licensed under the [GPLv3](LICENSE).
+DexCorral is licensed under the [GPLv3](LICENSE). It includes [nlohmann/json](https://github.com/nlohmann/json) under the MIT license; third-party components are listed in the [Build Guide](docs/BUILD_GUIDE.md#dependencies).

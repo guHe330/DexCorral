@@ -9,10 +9,10 @@ Everything stays on your PC.
 | What | Where |
 |---|---|
 | Your configuration | `%AppData%\DexCorral\config.json` |
-| Install location, language, autostart, shell-extension registration | Registry — full table under [Configuration](USER_MANUAL.md#configuration) in the User Manual |
+| Install location, language, autostart, shell-extension registration | Registry; full table under [Configuration](USER_MANUAL.md#configuration) in the User Manual |
 | Debug logs, written only while **Debug Logging** is on | `%AppData%\DexCorral\*.log` |
 
-One thing about `config.json` is worth knowing: alongside your corral names, positions and tab settings, **it holds the full path of every file you have organized into a corral**. That is how corrals survive a restart. It never leaves your PC on its own, but it is also the file [CONTRIBUTING.md](CONTRIBUTING.md) asks for in bug reports, so read it over and redact before attaching it to a public issue.
+Alongside your corral names, positions and tab settings, `config.json` **holds the full path of every file you have organized into a corral**. That is how corrals survive a restart. It never leaves your PC on its own, but it is also the file [CONTRIBUTING.md](CONTRIBUTING.md) asks for in bug reports, so read it over and redact before attaching it to a public issue.
 
 ## The update check
 
@@ -26,7 +26,7 @@ request:
 GET https://api.github.com/repos/guHe330/DexCorral/releases/latest
 ```
 
-- It **sends nothing about you or your machine** — no version, no identifier, no
+- It **sends nothing about you or your machine**: no version, no identifier, no
   configuration. The request carries `DexCorral-UpdateCheck` as its user agent and
   nothing else.
 - GitHub necessarily sees your IP address and the time, exactly as if you had opened the
@@ -37,13 +37,13 @@ GET https://api.github.com/repos/guHe330/DexCorral/releases/latest
 
 With the setting off, DexCorral makes no network connections at all.
 
-## Enforced, not just promised
+## What CI enforces
 
 Two of the claims above are checked by
 [security-guards.yml](../.github/workflows/security-guards.yml) on every push and pull
 request, so undoing them breaks the build:
 
-- The update check must use WinHTTP's default certificate validation — no TLS
+- The update check must use WinHTTP's default certificate validation, with no TLS
   validation overrides.
 - The release URL arrives over the network and is handed to `ShellExecuteW`, so it must
   stay behind the `IsTrustedReleaseUrl` allowlist.
