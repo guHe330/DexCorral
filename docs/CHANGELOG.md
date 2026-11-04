@@ -4,6 +4,9 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- Dragging an icon on the desktop could crash Explorer, for example after moving an icon out of a Corral and back in. DexCorral registered its desktop drop handler from a background thread of Explorer, and once that thread ended the next drag crashed. The handler is now always registered on the desktop's own thread. ([#81](https://github.com/guHe330/DexCorral/issues/81))
+
 ## [1.1.1] - 2026-10-21
 
 ### Fixed

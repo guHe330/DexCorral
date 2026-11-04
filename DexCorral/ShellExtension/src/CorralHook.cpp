@@ -1216,8 +1216,15 @@ static void CALLBACK AutoSortTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, D
 // or to produce an identity snapshot of all desktop icons
 static UINT g_PositionIconsMsg = 0;
 static UINT g_IconSnapshotMsg = 0;
+static UINT g_InstallDropTargetMsg = 0;  // Hands the drop-target install to the desktop thread
+static void InstallDropTargetHook();
 
 static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    if (g_InstallDropTargetMsg != 0 && uMsg == g_InstallDropTargetMsg) {
+        InstallDropTargetHook();
+        return 1;
+    }
+
     // App-requested identity-based positioning (runs here, on the UI thread)
     if (g_PositionIconsMsg != 0 && uMsg == g_PositionIconsMsg) {
         std::vector<IconPositionRequest> requests;
@@ -2070,6 +2077,17 @@ static void InstallDropTargetHook() {
         return;
     }
 
+    // RegisterDragDrop binds the wrapper to the calling thread's COM apartment.
+    // Called from a shell worker thread (GetOverlayInfo, HookRetryThread) it
+    // outlives that thread, and the next desktop drag crashes Explorer in
+    // combase. Re-run on the thread that owns the desktop window instead.
+    if (GetWindowThreadProcessId(g_hDesktopListView, nullptr) != GetCurrentThreadId()) {
+        LogDT(L"InstallDropTargetHook: wrong thread (%lu), posting to the desktop thread", GetCurrentThreadId());
+        if (!PostMessageW(g_hDesktopListView, g_InstallDropTargetMsg, 0, 0))
+            DllLog(L"CorralHook: drop-target install post FAILED, GetLastError=%lu", GetLastError());
+        return;
+    }
+
     bool installed = TryInstallDropTargetHook();
     if (!installed) {
         LogDT(L"InstallDropTargetHook: drop target not registered yet — deferring to maintenance timer");
@@ -2177,6 +2195,7 @@ bool InitializeCorralHook() {
     // Registered messages for identity-based icon positioning and snapshots
     g_PositionIconsMsg = RegisterWindowMessageW(L"DexCorral_PositionIconsByPath");
     g_IconSnapshotMsg = RegisterWindowMessageW(L"DexCorral_GetIconSnapshot");
+    g_InstallDropTargetMsg = RegisterWindowMessageW(L"DexCorral_InstallDropTarget");
 
     // Force initial read from HookBridge
     g_LastVersion = 0;
