@@ -67,7 +67,7 @@ The zip contains:
 <!-- Per-release, not cumulative: list only the changes since the last tag.
      Emptied after each release ships. -->
 
-- Opening a file from another program (for example Ctrl+clicking a file link in a terminal) no longer adds extra DexCorral icons to the tray or pauses DexCorral as if Explorer had crashed.
+- Dragging an icon on the desktop, for example out of a Corral and back in, no longer crashes Explorer.
 
 The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blob/main/docs/CHANGELOG.md).
 
