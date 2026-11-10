@@ -372,6 +372,14 @@ bool CorralWindow::LoadSpecialIcon(CorralIcon &ci, const std::string &fileName, 
     }
 
     CoTaskMemFree(pidl);
+
+    // The caller discards `ci` when this fails, and CorralIcon does not own its
+    // handles: a small icon loaded without a large one would be leaked.
+    if (!ci.hIcon && ci.hIconSmall)
+    {
+        DestroyIcon(ci.hIconSmall);
+        ci.hIconSmall = nullptr;
+    }
     return ci.hIcon != nullptr;
 }
 
