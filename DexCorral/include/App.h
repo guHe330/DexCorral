@@ -277,7 +277,8 @@ private:
 
     // Desktop monitoring callbacks
     void EnsureCatchAllCorral();
-    CorralWindow *GetCatchAllCorral();
+    /// The corral holding the catch-all tab and that tab's index, or nullptr when catch-all is off
+    CorralWindow *GetCatchAllCorral(int &tabIndex);
     void OnDesktopFileAdded(const std::wstring &fileName);
     void OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName);
     void OnDesktopFileDeleted(const std::wstring &fileName);

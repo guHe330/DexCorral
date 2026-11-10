@@ -9,6 +9,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Fixed
 - Renaming an icon inside a Corral could rename a different file when the folder changed while the name was being edited, for example a download finishing in a virtual Corral. The rename now always applies to the file whose name was being edited, and a failed rename shows its message once instead of twice. ([#84](https://github.com/guHe330/DexCorral/issues/84))
+- New desktop files went into whichever tab of the catch-all Corral happened to be in front, and were lost to the catch-all entirely when that tab was a virtual folder. They now always go into the catch-all tab. With catch-all switched off, new files stay on the desktop instead of being pulled into the first Corral. ([#86](https://github.com/guHe330/DexCorral/issues/86))
 
 ## [1.1.2] - 2026-11-04
 

@@ -155,8 +155,8 @@ public:
     /// Synchronizes corral window state back to the configuration object
     void SyncConfigFromWindow();
 
-    /// Adds a single file to the corral (added to active tab)
-    void AddFile(const std::string &fileName);
+    /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
+    void AddFilesToTab(const std::vector<std::string> &names, int tabIndex);
 
     /// Helper to detect if entry is a special shell icon (format: "shell:{CLSID}")
     static bool IsSpecialIconEntry(const std::string &fileName);
@@ -349,8 +349,6 @@ private:
     void StartShellDrag();                          // OLE drag of the dragged icons' files (blocks until dropped)
     std::vector<int> GetDraggedIconIndices() const; // Icons an icon drag carries: the selection, or just the one
     bool IsIconBeingDragged(int index) const;
-    /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
-    void AddFilesToTab(const std::vector<std::string> &names, int tabIndex);
     /// Moves entries from the active tab to another (non-virtual) tab of this corral
     void MoveEntriesToTab(const std::vector<std::string> &names, int tabIndex);
     /// Config names a menu command on this icon acts on: the selection if the icon is part of one
