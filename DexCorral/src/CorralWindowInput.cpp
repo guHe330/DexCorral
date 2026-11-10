@@ -1067,15 +1067,12 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
             return;
         }
 
-        // Clicked on the label of the one selected icon: defer the rename by the
-        // system double-click time. If a double-click (open) follows, it cancels this
-        // and opens instead — so click-to-select-then-double-click won't rename.
+        // Pressed on the label of the one selected icon: a rename candidate. It is
+        // only armed when the button comes up again without a drag (OnLeftButtonUp),
+        // as in Explorer. Arming it here, on the press, made the edit box open under
+        // a held button and left the icon impossible to drag by its label.
         if (hit == selectedIcon && selection.size() == 1 && HitTestIconLabel(x, y, hit))
-        {
             pendingRenameIcon = hit;
-            SetTimer(hwnd, RENAME_TIMER_ID, GetDoubleClickTime(), nullptr);
-            return;
-        }
 
         // Clicking inside an existing multi-selection keeps it (so a drag can carry
         // it); it collapses to this icon on button-up if no drag happened.
@@ -1248,6 +1245,11 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
 
 void CorralWindow::OnLeftButtonUp(int x, int y)
 {
+    // Rename candidate from the press (see OnLeftButtonDown). Only the plain
+    // click below re-arms it; a drag or any other operation drops it.
+    int renameCandidate = pendingRenameIcon;
+    pendingRenameIcon = -1;
+
     if (isDraggingTab)
     {
         isDraggingTab = false;
@@ -1289,6 +1291,13 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
         {
             SelectSingle(draggedIconIndex);
             UpdateLayeredContent();
+        }
+        // A click on the selected icon's label: rename after the double-click
+        // time. A double-click (open) arriving first cancels it.
+        if (renameCandidate >= 0 && renameCandidate == draggedIconIndex)
+        {
+            pendingRenameIcon = renameCandidate;
+            SetTimer(hwnd, RENAME_TIMER_ID, GetDoubleClickTime(), nullptr);
         }
         draggedIconIndex = -1;
         ReleaseCapture();

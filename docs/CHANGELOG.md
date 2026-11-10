@@ -22,6 +22,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - A Corral dragged to a monitor with a different display scaling kept the icon size and spacing of the old monitor, under a header that had already changed size. The Corral now adapts completely: its size, icons, spacing and text follow the new scaling. ([#100](https://github.com/guHe330/DexCorral/issues/100))
 - DexCorral now stays loaded in Explorer for as long as Explorer runs. In a "just me" install Windows was free to unload it again after the start, which would have frozen the desktop for several seconds and could crash Explorer. Closing Explorer no longer does work that is unsafe while a program exits. ([#104](https://github.com/guHe330/DexCorral/issues/104))
 - A file in a Corral dropped out of it when a program replaced the file instead of changing it: an installer rewriting its desktop shortcut, or an editor that saves by writing a new file and renaming it into place. The file ended up loose on the desktop or in the catch-all. It now keeps its Corral, tab and position. ([#106](https://github.com/guHe330/DexCorral/issues/106))
+- A selected icon could not be dragged by its label: pressing the mouse button there did nothing, and the rename box opened after a moment even while the button was still held. The icon can now be dragged from its label like from its picture, and the slow second click that renames only counts once the button has been released without a drag. ([#114](https://github.com/guHe330/DexCorral/issues/114))
 
 ## [1.1.2] - 2026-11-04
 
