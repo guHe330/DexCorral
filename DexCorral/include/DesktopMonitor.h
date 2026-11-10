@@ -45,7 +45,7 @@ public:
 
 private:
     void MonitorThread(const std::wstring &path);
-    void ProcessNotification(BYTE *buffer, DWORD bytesReturned);
+    void ProcessNotification(BYTE *buffer, DWORD bytesReturned, std::wstring &pendingOldName);
 
     static std::wstring GetDesktopPath();
     static std::wstring GetPublicDesktopPath();
@@ -59,7 +59,4 @@ private:
     std::thread publicDesktopThread;
     HANDLE userStopEvent = nullptr;
     HANDLE publicStopEvent = nullptr;
-
-    // For tracking renames (old name is stored until new name arrives)
-    std::wstring pendingOldName;
 };

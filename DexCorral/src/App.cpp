@@ -2549,6 +2549,14 @@ void App::ProcessPendingAdoptions()
             continue;
 
         // Add to catch-all corral
+        // A file that was replaced (deleted, then written again) goes back
+        // to the slot it had, not to the catch-all
+        if (RestoreToLeftSlot(fileNameStr))
+        {
+            changed = true;
+            continue;
+        }
+
         // Into the catch-all tab itself, which need not be the tab in front
         int catchAllTab = -1;
         CorralWindow *catchAll = GetCatchAllCorral(catchAllTab);
@@ -2591,19 +2599,37 @@ void App::OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &
 
     // Update in all corrals
     bool changed = false;
+    bool newNameTracked = false;
     for (auto &corral : corrals)
     {
-        for (auto &tab : corral->GetConfig().Tabs)
+        auto &tabs = corral->GetConfig().Tabs;
+        for (size_t t = 0; t < tabs.size(); t++)
         {
-            auto &files = tab.Files;
+            auto &files = tabs[t].Files;
+            if (std::find(files.begin(), files.end(), newNameStr) != files.end())
+                newNameTracked = true;
             auto it = std::find(files.begin(), files.end(), oldNameStr);
             if (it != files.end())
             {
+                // The old name may come back in a moment (save by rename);
+                // remember where it sat. See RecentlyLeft.h.
+                recentlyLeft.Remember(oldNameStr, corral.get(), (int)t, (size_t)(it - files.begin()), GetTickCount());
                 *it = newNameStr;
                 corral->LoadFiles();
                 changed = true;
             }
         }
+    }
+
+    // Something untracked was renamed onto a name that left a corral a moment
+    // ago: the second half of a save by rename. Put it back where it was.
+    if (!changed && !newNameTracked && RestoreToLeftSlot(newNameStr))
+    {
+        SaveConfig();
+        UpdateHookHiddenIcons();
+        PositionHiddenIconsUnderCorrals();
+        HookBridge::RefreshDesktop();
+        return;
     }
 
     if (changed)
@@ -2629,8 +2655,48 @@ void App::OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &
     }
 }
 
+bool App::RestoreToLeftSlot(const std::string &fileName)
+{
+    LeftSlot slot;
+    if (!recentlyLeft.Take(fileName, GetTickCount(), slot))
+        return false;
+
+    for (auto &corral : corrals)
+    {
+        if (corral.get() != slot.corral)
+            continue; // (a corral deleted in the meantime simply is not found)
+
+        auto &tabs = corral->GetConfig().Tabs;
+        if (slot.tabIndex < 0 || slot.tabIndex >= (int)tabs.size() || tabs[slot.tabIndex].IsVirtual)
+            return false;
+
+        auto &files = tabs[slot.tabIndex].Files;
+        if (std::find(files.begin(), files.end(), fileName) == files.end())
+            files.insert(files.begin() + (std::min)(slot.index, files.size()), fileName);
+        if (slot.tabIndex == corral->GetConfig().ActiveTabIndex)
+            corral->LoadFiles();
+        return true;
+    }
+    return false;
+}
+
 void App::OnDesktopFileDeleted(const std::wstring &fileName)
 {
+    // A name that exists again by the time this runs was replaced, not removed:
+    // the delete and the create arrive together, and this message is handled
+    // after both. Leave the file where it is, and leave a queued adoption alone
+    // (it finds the file still tracked and does nothing).
+    if (GetFileAttributesW(ResolveDesktopFilePath(fileName).c_str()) != INVALID_FILE_ATTRIBUTES)
+    {
+        for (auto &corral : corrals)
+        {
+            const auto &files = corral->GetActiveTab().Files;
+            if (std::find(files.begin(), files.end(), CorralWindow::WideToUtf8(fileName)) != files.end())
+                corral->LoadFiles(); // new file, possibly a new icon
+        }
+        return;
+    }
+
     // Drop the file from the pending adoption queue if it never got adopted
     {
         std::lock_guard<std::mutex> lock(pendingAdoptionsLock);
@@ -2648,12 +2714,15 @@ void App::OnDesktopFileDeleted(const std::wstring &fileName)
     bool changed = false;
     for (auto &corral : corrals)
     {
-        for (auto &tab : corral->GetConfig().Tabs)
+        auto &tabs = corral->GetConfig().Tabs;
+        for (size_t t = 0; t < tabs.size(); t++)
         {
-            auto &files = tab.Files;
+            auto &files = tabs[t].Files;
             auto it = std::find(files.begin(), files.end(), fileNameStr);
             if (it != files.end())
             {
+                // If the same name is created again shortly, it returns here
+                recentlyLeft.Remember(fileNameStr, corral.get(), (int)t, (size_t)(it - files.begin()), GetTickCount());
                 files.erase(it);
                 corral->LoadFiles();
                 changed = true;
