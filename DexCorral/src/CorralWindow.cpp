@@ -1025,6 +1025,14 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 if (window->isDraggingIcon)
                 {
                     window->OnIconDrag(x, y);
+
+                    // Over a window that is neither a corral nor the desktop: only
+                    // a shell drag lets that window take the files.
+                    POINT screenPt;
+                    GetCursorPos(&screenPt);
+                    App *app = App::GetInstance();
+                    if (app && !app->IsPointOnCorralOrDesktop(screenPt))
+                        window->StartShellDrag();
                 }
             }
             else if (window->isDragging)

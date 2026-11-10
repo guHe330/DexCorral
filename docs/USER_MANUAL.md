@@ -165,6 +165,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 - **Drop a file onto an icon** inside a Corral to invoke its target, e.g. drop a document onto an application's icon to open it with that app.
 - **Double-click an icon's label** to rename it in place.
 - **Select several icons** with Ctrl+click, Shift+click, Ctrl+A or by dragging a rectangle over them. Dragging one of the selected icons carries all of them: to another Corral, back out to the desktop, or to a new place in the same Corral.
+- **Drag an icon into another application or an Explorer window** and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it. Moving it into another folder takes the file off the desktop, and so out of the Corral.
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
 
 ### Keyboard

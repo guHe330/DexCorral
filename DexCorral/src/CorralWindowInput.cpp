@@ -2182,12 +2182,68 @@ void CorralWindow::OnIconDrag(int x, int y)
 }
 
 // ============================================================================
-// Shell drag out of a virtual tab
+// Shell drag out of a corral
 // ============================================================================
+
+namespace
+{
+    /// Drop source for a drag out of a normal tab. A release over a corral or the
+    /// desktop is cancelled as an OLE drop: OnIconDragEnd handles those (reorder,
+    /// other corral, back to the desktop), and Explorer must not act on them too.
+    class CorralDropSource : public IDropSource
+    {
+    public:
+        bool releasedAtHome = false;
+
+        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override
+        {
+            if (riid == IID_IUnknown || riid == IID_IDropSource)
+            {
+                *ppvObject = static_cast<IDropSource *>(this);
+                AddRef();
+                return S_OK;
+            }
+            *ppvObject = nullptr;
+            return E_NOINTERFACE;
+        }
+        ULONG STDMETHODCALLTYPE AddRef() override { return InterlockedIncrement(&refCount); }
+        ULONG STDMETHODCALLTYPE Release() override
+        {
+            LONG count = InterlockedDecrement(&refCount);
+            if (count == 0)
+                delete this;
+            return count;
+        }
+
+        HRESULT STDMETHODCALLTYPE QueryContinueDrag(BOOL escapePressed, DWORD keyState) override
+        {
+            if (escapePressed)
+                return DRAGDROP_S_CANCEL;
+            if (keyState & MK_LBUTTON)
+                return S_OK;
+
+            POINT pt;
+            GetCursorPos(&pt);
+            App *app = App::GetInstance();
+            if (app && app->IsPointOnCorralOrDesktop(pt))
+            {
+                releasedAtHome = true;
+                return DRAGDROP_S_CANCEL;
+            }
+            return DRAGDROP_S_DROP;
+        }
+        HRESULT STDMETHODCALLTYPE GiveFeedback(DWORD) override { return DRAGDROP_S_USEDEFAULTCURSORS; }
+
+    private:
+        LONG refCount = 1;
+    };
+} // namespace
 
 void CorralWindow::StartShellDrag()
 {
     std::vector<int> dragged = GetDraggedIconIndices();
+    int draggedIndex = draggedIconIndex;
+    bool isVirtual = GetActiveTab().IsVirtual;
 
     // The shell's drag loop takes over the mouse from here: the button-up never
     // reaches this window, so end our own click/drag tracking first.
@@ -2197,11 +2253,11 @@ void CorralWindow::StartShellDrag()
     iconDragOutside = false;
     ReleaseCapture();
 
-    if (dragged.empty() || !GetActiveTab().IsVirtual)
+    if (dragged.empty())
         return;
 
-    // One data object for the whole selection. Every file of a virtual tab is a
-    // child of the folder it shows, which is what GetUIObjectOf requires.
+    // One data object for the whole selection. An item array, because a normal
+    // tab mixes parents: the user's desktop, the public desktop, special items.
     std::vector<LPITEMIDLIST> fullPidls;
     for (int i : dragged)
     {
@@ -2216,47 +2272,57 @@ void CorralWindow::StartShellDrag()
     IDataObject *dataObject = nullptr;
     if (!fullPidls.empty())
     {
-        LPITEMIDLIST parentPidl = ILClone(fullPidls[0]);
-        if (parentPidl)
+        IShellItemArray *items = nullptr;
+        if (SUCCEEDED(SHCreateShellItemArrayFromIDLists((UINT)fullPidls.size(),
+                                                        (LPCITEMIDLIST *)fullPidls.data(), &items)) && items)
         {
-            ILRemoveLastID(parentPidl);
-
-            IShellFolder *folder = nullptr;
-            if (SUCCEEDED(SHBindToObject(nullptr, parentPidl, nullptr, IID_IShellFolder, (void **)&folder)) && folder)
-            {
-                std::vector<LPCITEMIDLIST> children;
-                for (LPITEMIDLIST pidl : fullPidls)
-                    children.push_back(ILFindLastID(pidl));
-
-                if (FAILED(folder->GetUIObjectOf(hwnd, (UINT)children.size(), children.data(),
-                                                 IID_IDataObject, nullptr, (void **)&dataObject)))
-                {
-                    dataObject = nullptr;
-                }
-                folder->Release();
-            }
-            CoTaskMemFree(parentPidl);
+            if (FAILED(items->BindToHandler(nullptr, BHID_DataObject, IID_PPV_ARGS(&dataObject))))
+                dataObject = nullptr;
+            items->Release();
         }
     }
 
+    bool releasedAtHome = false;
     if (dataObject)
     {
-        // SHDoDragDrop supplies the drop source and the drag image, and runs the
-        // modal drag loop. Move, copy and link are all offered; the drop target
-        // and the modifier keys pick one, as for a drag out of an Explorer window.
+        // SHDoDragDrop supplies the drag image (and, for a virtual tab, the drop
+        // source) and runs the modal drag loop. Move, copy and link are all
+        // offered; the drop target and the modifier keys pick one, as for a drag
+        // out of an Explorer window.
+        CorralDropSource *source = isVirtual ? nullptr : new CorralDropSource();
         DWORD effect = DROPEFFECT_NONE;
-        HRESULT hr = SHDoDragDrop(hwnd, dataObject, nullptr,
+        HRESULT hr = SHDoDragDrop(hwnd, dataObject, source,
                                   DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, &effect);
         LogCorralDrop(L"StartShellDrag: %zu item(s), hr=0x%08X effect=0x%X", fullPidls.size(), hr, effect);
+        if (source)
+        {
+            releasedAtHome = source->releasedAtHome;
+            source->Release();
+        }
         dataObject->Release();
     }
 
     for (LPITEMIDLIST pidl : fullPidls)
         CoTaskMemFree(pidl);
 
-    // The drag loop can leave the corral above other windows, and a move has
-    // taken files out of the folder. The watcher would catch up; this is immediate.
+    // The drag loop can leave the corral above other windows
     PinToBandTop();
+
+    if (releasedAtHome)
+    {
+        // Back over a corral or the desktop: finish as the internal drag it began as
+        POINT pt;
+        GetCursorPos(&pt);
+        ScreenToClient(hwnd, &pt);
+        draggedIconIndex = draggedIndex;
+        isDraggingIcon = true;
+        OnIconDrag(pt.x, pt.y);
+        OnIconDragEnd();
+        return;
+    }
+
+    // A move has taken files out of the folder (or off the desktop). The watcher
+    // would catch up; this is immediate.
     LoadFiles();
 }
 
