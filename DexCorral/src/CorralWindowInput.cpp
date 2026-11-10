@@ -1863,6 +1863,7 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::DragEnter(IDataObject *pDataObj, DWO
     dragData = pDataObj;
     dragData->AddRef();
     allowedEffects = *pdwEffect;
+    dragKeyState = grfKeyState;
 
     *pdwEffect = EffectAt(grfKeyState, pt);
     LogCorralDrop(L"DragEnter: hasDropData=%d, effect=0x%X", hasDropData, *pdwEffect);
@@ -1872,6 +1873,7 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::DragEnter(IDataObject *pDataObj, DWO
 HRESULT STDMETHODCALLTYPE CorralDropTarget::DragOver(DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
 {
     allowedEffects = *pdwEffect;
+    dragKeyState = grfKeyState;
     *pdwEffect = dragData ? EffectAt(grfKeyState, pt) : DROPEFFECT_NONE;
     return S_OK;
 }
@@ -1901,9 +1903,13 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
 
     if (hit >= 0)
     {
+        // dragKeyState is from the last DragOver, so it still has the mouse
+        // button in it; by the time Drop is called the button is up, and the
+        // icon's own drop target needs it to tell a right-drag from a left one.
+        DWORD allowed = *pdwEffect;
         *pdwEffect = DROPEFFECT_COPY;
         LogCorralDrop(L"Drop: on icon %d -> OnDropOnIcon", hit);
-        owner->OnDropOnIcon(pDataObj, hit);
+        owner->OnDropOnIcon(pDataObj, hit, dragKeyState, grfKeyState, pt, allowed);
     }
     else if (owner->GetActiveTab().IsVirtual)
     {
@@ -2091,8 +2097,13 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
 // OnDropOnIcon - drop a file onto a corral icon (shell-execute / open with)
 // ============================================================================
 
-void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex)
+void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
+                                DWORD dropKeyState, POINTL pt, DWORD allowedEffects)
 {
+    // What the drag source permits; a source that says nothing gets the usual three
+    if (allowedEffects == DROPEFFECT_NONE)
+        allowedEffects = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
+
     if (iconIndex < 0 || iconIndex >= (int)icons.size())
         return;
 
@@ -2124,11 +2135,14 @@ void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex)
         if (SUCCEEDED(hr) && pDropTarget)
         {
             LogCorralDrop(L"OnDropOnIcon: got IDropTarget, forwarding drop");
-            POINTL ptl = {0, 0};
-            DWORD dwEffect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
-            pDropTarget->DragEnter(pDataObj, MK_LBUTTON, ptl, &dwEffect);
-            dwEffect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
-            pDropTarget->Drop(pDataObj, MK_LBUTTON, ptl, &dwEffect);
+            // Hand the icon's drop target the real keys and position, as the
+            // desktop would: Ctrl copies, Shift moves, Ctrl+Shift links, and a
+            // right-drag gets its menu, at the pointer. A fixed MK_LBUTTON at
+            // (0,0) ignored all of that.
+            DWORD dwEffect = allowedEffects;
+            pDropTarget->DragEnter(pDataObj, enterKeyState, pt, &dwEffect);
+            dwEffect = allowedEffects;
+            pDropTarget->Drop(pDataObj, dropKeyState, pt, &dwEffect);
             pDropTarget->Release();
             LogCorralDrop(L"OnDropOnIcon: drop forwarded, effect=0x%X", dwEffect);
         }
