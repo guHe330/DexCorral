@@ -21,9 +21,33 @@
 
 #include "LayoutMath.h"
 #include <algorithm>
+#include <cmath>
 
 namespace LayoutMath
 {
+
+    ScaledRect RescaleToMonitor(int left, int top, int width, int height,
+                                int refWidth, int refHeight, int newWidth, int newHeight)
+    {
+        ScaledRect r = {left, top, width, height};
+        if (refWidth > 0 && refHeight > 0)
+        {
+            r.left = (int)std::lround((double)left * newWidth / refWidth);
+            r.top = (int)std::lround((double)top * newHeight / refHeight);
+            r.width = (int)std::lround((double)width * newWidth / refWidth);
+            r.height = (int)std::lround((double)height * newHeight / refHeight);
+        }
+
+        if (r.left + r.width > newWidth)
+            r.left = newWidth - r.width;
+        if (r.top + r.height > newHeight)
+            r.top = newHeight - r.height;
+        if (r.left < 0)
+            r.left = 0;
+        if (r.top < 0)
+            r.top = 0;
+        return r;
+    }
 
     int FindNeighbor(const std::vector<IconCell> &cells, int current, NavDirection dir)
     {

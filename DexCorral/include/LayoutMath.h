@@ -41,6 +41,24 @@ namespace LayoutMath
         RECT iconRect; ///< Icon image rect within the cell
     };
 
+    /// A window rectangle relative to its monitor's origin
+    struct ScaledRect
+    {
+        int left, top, width, height;
+    };
+
+    /**
+     * Carries a monitor-relative rectangle saved on a monitor of refWidth x
+     * refHeight over to one of newWidth x newHeight: same proportions, rounded
+     * to the nearest pixel, then moved (not shrunk) so that it lies inside the
+     * new monitor where it fits.
+     *
+     * A reference size of zero or less (a damaged config) leaves the rectangle
+     * unscaled instead of dividing by it.
+     */
+    ScaledRect RescaleToMonitor(int left, int top, int width, int height,
+                                int refWidth, int refHeight, int newWidth, int newHeight);
+
     /// Direction for keyboard navigation between icon cells.
     enum class NavDirection
     {

@@ -71,6 +71,10 @@ static const UINT_PTR ADOPTION_TIMER = 2;
 // (see Conflicts.h). A module-handle lookup per tick, nothing more.
 static const UINT_PTR CONFLICT_POLL_TIMER = 4;
 
+// Settling time after WM_DISPLAYCHANGE before corrals are repositioned
+static const UINT_PTR DISPLAY_CHANGE_TIMER = 6;
+static const UINT DISPLAY_CHANGE_SETTLE_MS = 1500;
+
 // One retry of a failed automatic update check
 static const UINT_PTR UPDATE_RETRY_TIMER = 5;
 static const UINT UPDATE_RETRY_MS = 5 * 60 * 1000;
@@ -205,14 +209,17 @@ void App::Initialize()
     wc.lpszClassName = MESSAGE_WINDOW_CLASS;
     RegisterClassExW(&wc);
 
-    // Create hidden message window
+    // Create the hidden message window. A top-level window that is never shown,
+    // not a message-only one (HWND_MESSAGE): message-only windows are left out
+    // of broadcasts, so WM_DISPLAYCHANGE, "TaskbarCreated" and WM_QUERYENDSESSION,
+    // all handled below, never arrived.
     messageWindow = CreateWindowExW(
-        0,
+        WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         MESSAGE_WINDOW_CLASS,
         L"DexCorral Message Window",
-        0,
+        WS_POPUP,
         0, 0, 0, 0,
-        HWND_MESSAGE, nullptr,
+        nullptr, nullptr,
         GetModuleHandleW(nullptr), this);
 
     // Register with HookBridge so the hook can post notifications here
@@ -2028,8 +2035,23 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    // Being top-level, the window can be sent WM_CLOSE by tools that close
+    // "all windows". It must outlive that: everything else posts to it.
+    if (uMsg == WM_CLOSE)
+        return 0;
+
+    // Display changes come in bursts, and while a monitor wakes up or a mode is
+    // being switched Windows can report a transient resolution in between. Act
+    // once things have been quiet for a moment, on the layout that stayed.
     if (app && uMsg == WM_DISPLAYCHANGE)
     {
+        SetTimer(hwnd, DISPLAY_CHANGE_TIMER, DISPLAY_CHANGE_SETTLE_MS, nullptr);
+        return 0;
+    }
+
+    if (app && uMsg == WM_TIMER && wParam == DISPLAY_CHANGE_TIMER)
+    {
+        KillTimer(hwnd, DISPLAY_CHANGE_TIMER);
         app->OnDisplayChange();
         return 0;
     }
@@ -2362,32 +2384,14 @@ void App::UpdateCorralPositions()
                 // Check if resolution changed
                 if (stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
                 {
-                    // Scale position and size based on percentage (stored positions are relative to monitor)
-                    double xPercent = (double)stored.Left / stored.RefWidth;
-                    double yPercent = (double)stored.Top / stored.RefHeight;
-                    double wPercent = (double)stored.Width / stored.RefWidth;
-                    double hPercent = (double)stored.Height / stored.RefHeight;
-
-                    // Calculate new relative position on monitor
-                    int newRelLeft = (int)(xPercent * targetMon->width);
-                    int newRelTop = (int)(yPercent * targetMon->height);
-                    int newWidth = (int)(wPercent * targetMon->width);
-                    int newHeight = (int)(hPercent * targetMon->height);
-
-                    // Clamp relative position to monitor bounds
-                    if (newRelLeft + newWidth > targetMon->width)
-                    {
-                        newRelLeft = targetMon->width - newWidth;
-                    }
-                    if (newRelTop + newHeight > targetMon->height)
-                    {
-                        newRelTop = targetMon->height - newHeight;
-                    }
-                    if (newRelLeft < 0)
-                        newRelLeft = 0;
-                    if (newRelTop < 0)
-                        newRelTop = 0;
-
+                    // Scale position and size proportionally and keep the corral on the monitor
+                    LayoutMath::ScaledRect scaled = LayoutMath::RescaleToMonitor(
+                        stored.Left, stored.Top, stored.Width, stored.Height,
+                        stored.RefWidth, stored.RefHeight, targetMon->width, targetMon->height);
+                    int newRelLeft = scaled.left;
+                    int newRelTop = scaled.top;
+                    int newWidth = scaled.width;
+                    int newHeight = scaled.height;
                     // Convert to screen coordinates
                     int screenLeft = targetMon->bounds.left + newRelLeft;
                     int screenTop = targetMon->bounds.top + newRelTop;
@@ -2423,32 +2427,14 @@ void App::UpdateCorralPositions()
             {
                 MonitorPosition &stored = it->second;
 
-                // Calculate percentages from original relative position
-                double xPercent = (double)stored.Left / stored.RefWidth;
-                double yPercent = (double)stored.Top / stored.RefHeight;
-                double wPercent = (double)stored.Width / stored.RefWidth;
-                double hPercent = (double)stored.Height / stored.RefHeight;
-
-                // Apply to primary monitor (calculate relative position first)
-                int newRelLeft = (int)(xPercent * primaryMon->width);
-                int newRelTop = (int)(yPercent * primaryMon->height);
-                int newWidth = (int)(wPercent * primaryMon->width);
-                int newHeight = (int)(hPercent * primaryMon->height);
-
-                // Clamp relative position to primary monitor bounds
-                if (newRelLeft + newWidth > primaryMon->width)
-                {
-                    newRelLeft = primaryMon->width - newWidth;
-                }
-                if (newRelTop + newHeight > primaryMon->height)
-                {
-                    newRelTop = primaryMon->height - newHeight;
-                }
-                if (newRelLeft < 0)
-                    newRelLeft = 0;
-                if (newRelTop < 0)
-                    newRelTop = 0;
-
+                // Same proportional placement, on the primary monitor
+                LayoutMath::ScaledRect scaled = LayoutMath::RescaleToMonitor(
+                    stored.Left, stored.Top, stored.Width, stored.Height,
+                    stored.RefWidth, stored.RefHeight, primaryMon->width, primaryMon->height);
+                int newRelLeft = scaled.left;
+                int newRelTop = scaled.top;
+                int newWidth = scaled.width;
+                int newHeight = scaled.height;
                 // Convert to screen coordinates
                 int screenLeft = primaryMon->bounds.left + newRelLeft;
                 int screenTop = primaryMon->bounds.top + newRelTop;
