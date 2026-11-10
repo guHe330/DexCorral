@@ -1376,5 +1376,9 @@ void CorralWindow::OnSize()
 void CorralWindow::OnMove()
 {
     SyncConfigFromWindow();
-    UpdateLayeredContent();
+    // A move changes no pixel, so there is nothing to render: this runs for
+    // every step of a title-bar drag. The one exception is landing on a monitor
+    // with another scale factor, where the DPI-dependent chrome has to be redrawn.
+    if (GetDpiForWindow(hwnd) != lastRenderDpi)
+        UpdateLayeredContent();
 }
