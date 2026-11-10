@@ -20,7 +20,8 @@ Alongside your corral names, positions and tab settings, `config.json` **holds t
 **Check for Updates Now** runs a single check without turning anything on.
 
 While enabled, at startup and at most once every 24 hours, DexCorral makes one HTTPS
-request:
+request. If that request fails, for example because the network is not up yet, it is
+repeated once five minutes later:
 
 ```
 GET https://api.github.com/repos/guHe330/DexCorral/releases/latest

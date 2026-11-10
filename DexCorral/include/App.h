@@ -237,6 +237,7 @@ private:
     // bypasses the 24h throttle and surfaces "up to date" / "couldn't check".
     void StartUpdateCheck(bool userInitiated);
     std::wstring pendingUpdateUrl; // Release page opened when the update balloon is clicked
+    bool updateRetryUsed = false;  // A failed automatic check is retried once per session
     void ShowCreationMenu(POINT pt);
 
     /// Appearance defaults for a brand-new corral / tab. Single source of truth
