@@ -2283,6 +2283,10 @@ void CleanupCorralHook() {
     Log(L"CleanupCorralHook: Hook cleaned up");
 }
 
+void MarkCorralHookCleanExit() {
+    MarkHookSessionStable(L"clean shutdown");
+}
+
 bool IsCorralHookActive() { return g_HookActive; }
 
 HookStandbyReason GetCorralHookStandbyReason() {

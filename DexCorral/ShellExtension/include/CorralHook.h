@@ -22,6 +22,10 @@ bool InitializeCorralHook();
  */
 void CleanupCorralHook();
 
+// Explorer is exiting normally: clear the crash guard's sentinel and nothing
+// else. Safe from DllMain during process termination, unlike CleanupCorralHook.
+void MarkCorralHookCleanExit();
+
 /**
  * Returns true if the hook is currently active and subclassing the desktop ListView.
  */
