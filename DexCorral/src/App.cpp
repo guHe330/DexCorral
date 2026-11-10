@@ -34,6 +34,7 @@
 #include "IconUtils.h"
 #include "DesktopMonitor.h"
 #include "HookBridge.h"
+#include "AppMessages.h"
 #include "CorralHook.h"
 #include "Version.h"
 #include "../resources/resource.h"
@@ -105,8 +106,7 @@ static const UINT WM_DESKTOP_FILE_DELETED = WM_APP + 105;
 // It must not call CreateCorralAt/CreateVirtualCorralAt itself: those read/mutate
 // App::corrals (and create a new window), which belong to this thread. The click
 // point rides along as (wParam, lParam) so the corral appears where the user asked.
-static const UINT WM_CREATE_CORRAL_AT = WM_APP + 106;
-static const UINT WM_CREATE_VIRTUAL_CORRAL_AT = WM_APP + 107;
+// WM_CREATE_CORRAL_AT / WM_CREATE_VIRTUAL_CORRAL_AT are defined in AppMessages.h.
 
 // Posted by WinEventProc (the system-wide EVENT_SYSTEM_FOREGROUND hook) to re-pin
 // every corral to the bottom of the z-order. The hook callback must NOT do this
@@ -229,7 +229,7 @@ void App::Initialize()
         messageWindow,
         SHCNRF_ShellLevel | SHCNRF_NewDelivery,
         SHCNE_UPDATEIMAGE,
-        WM_APP + 101, // custom message
+        WM_SHELL_IMAGE_CHANGED,
         1, &shcnentry);
 
     // Load configuration
@@ -335,10 +335,6 @@ void App::ActivateDesktop()
     mouseHook = std::make_unique<MouseHook>();
     mouseHook->SetLeftButtonDownCallback([this](POINT pt)
                                          { OnLeftButtonDown(pt); });
-    mouseHook->SetLeftButtonUpCallback([this](POINT pt)
-                                       { OnLeftButtonUp(pt); });
-    mouseHook->SetMouseMoveCallback([this](POINT pt)
-                                    { OnMouseMove(pt); });
     // Note: Mousewheel events are NOT hooked - they pass through naturally to windows
     mouseHook->Start();
 
@@ -650,9 +646,7 @@ void App::EndHoverExpand(CorralWindow *corral)
 
 void App::RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab)
 {
-    int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string fileNameStr(size - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
+    std::string fileNameStr = CorralWindow::WideToUtf8(fileName);
 
     bool changed = false;
     for (auto &corral : corrals)
@@ -1440,17 +1434,6 @@ void CALLBACK App::WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
     }
 }
 
-void App::OnLeftButtonUp(POINT pt)
-{
-    // Global mouse up - could be used for drag-end if needed
-    // But currently CorralWindow handles its own drag
-}
-
-void App::OnMouseMove(POINT pt)
-{
-    // Handle mouse move if needed
-}
-
 void App::ShowTrayMenu()
 {
     HMENU menu = CreatePopupMenu();
@@ -1947,13 +1930,8 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     std::wstring folderName = (lastSlash != std::wstring::npos) ? folderPath.substr(lastSlash + 1) : folderPath;
 
     // Convert wide string to UTF-8
-    int size = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), (int)folderPath.size(), nullptr, 0, nullptr, nullptr);
-    std::string utf8Path(size, 0);
-    WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), (int)folderPath.size(), &utf8Path[0], size, nullptr, nullptr);
-
-    size = WideCharToMultiByte(CP_UTF8, 0, folderName.c_str(), (int)folderName.size(), nullptr, 0, nullptr, nullptr);
-    std::string utf8Name(size, 0);
-    WideCharToMultiByte(CP_UTF8, 0, folderName.c_str(), (int)folderName.size(), &utf8Name[0], size, nullptr, nullptr);
+    std::string utf8Path = CorralWindow::WideToUtf8(folderPath);
+    std::string utf8Name = CorralWindow::WideToUtf8(folderName);
 
     // Create config
     CorralWindowConfig newConfig = MakeDefaultCorralConfig();
@@ -1976,35 +1954,6 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     corral->Show();
     corrals.push_back(std::move(corral));
     SaveConfig();
-}
-
-bool App::IsDesktopUnderMouse(POINT pt)
-{
-    HWND hwnd = WindowFromPoint(pt);
-    if (!hwnd)
-        return false;
-
-    wchar_t className[256];
-    while (hwnd)
-    {
-        GetClassNameW(hwnd, className, 256);
-        std::wstring classStr(className);
-
-        if (classStr == L"Progman" || classStr == L"WorkerW")
-        {
-            return true;
-        }
-
-        HWND shellWindow = GetShellWindow();
-        if (hwnd == shellWindow)
-        {
-            return true;
-        }
-
-        hwnd = GetParent(hwnd);
-    }
-
-    return false;
 }
 
 LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -2196,7 +2145,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Hook retry thread succeeded — refresh hidden icon data now that the hook is active
-    if (app && uMsg == (WM_APP + 100) && app->desktopActive)
+    if (app && uMsg == WM_HOOK_READY && app->desktopActive)
     {
         app->UpdateHookHiddenIcons();
         app->PositionHiddenIconsUnderCorrals();
@@ -2205,7 +2154,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Shell image list changed (e.g. Recycle Bin emptied/filled)
-    if (app && uMsg == (WM_APP + 101))
+    if (app && uMsg == WM_SHELL_IMAGE_CHANGED)
     {
         // Free the PIDL list delivered with SHCNRF_NewDelivery
         LONG lEvent = 0;
@@ -2564,9 +2513,7 @@ void App::ProcessPendingAdoptions()
             continue;
 
         // Convert to UTF-8
-        int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        std::string fileNameStr(size - 1, 0);
-        WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
+        std::string fileNameStr = CorralWindow::WideToUtf8(fileName);
 
         // Skip if the file vanished while pending (deleted, moved away)
         std::wstring fullPath = ResolveDesktopFilePath(fileName);
@@ -2625,13 +2572,9 @@ void App::ProcessPendingAdoptions()
 void App::OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName)
 {
     // Convert to UTF-8
-    int oldSize = WideCharToMultiByte(CP_UTF8, 0, oldName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string oldNameStr(oldSize - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, oldName.c_str(), -1, &oldNameStr[0], oldSize, nullptr, nullptr);
+    std::string oldNameStr = CorralWindow::WideToUtf8(oldName);
 
-    int newSize = WideCharToMultiByte(CP_UTF8, 0, newName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string newNameStr(newSize - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, newName.c_str(), -1, &newNameStr[0], newSize, nullptr, nullptr);
+    std::string newNameStr = CorralWindow::WideToUtf8(newName);
 
     // Follow renames in the pending adoption queue (e.g. user typing the name
     // of a freshly created "New Text Document")
@@ -2699,9 +2642,7 @@ void App::OnDesktopFileDeleted(const std::wstring &fileName)
     }
 
     // Convert to UTF-8
-    int size = WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string fileNameStr(size - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, fileName.c_str(), -1, &fileNameStr[0], size, nullptr, nullptr);
+    std::string fileNameStr = CorralWindow::WideToUtf8(fileName);
 
     // Remove from all corrals
     bool changed = false;

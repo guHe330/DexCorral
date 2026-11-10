@@ -12,6 +12,7 @@
 #include "Conflicts.h"
 #include "Version.h"
 #include "HookBridge.h"
+#include "AppMessages.h"
 #include <Windows.h>
 #include <windowsx.h>
 #include <CommCtrl.h>
@@ -449,7 +450,7 @@ static void CALLBACK RevalidateTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent,
 
         HWND appWnd = HookBridge::GetAppMessageWindow();
         if (appWnd) {
-            PostMessage(appWnd, WM_APP + 100, 0, 0);
+            PostMessage(appWnd, WM_HOOK_READY, 0, 0);
         }
         Log(L"RevalidateTimer: pass %d — memo dropped, repainted, repark posted", g_RevalidatePass);
 
@@ -1031,7 +1032,7 @@ static void CALLBACK SortFixupTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, 
         // acting as mouse-over or drop targets at incorrect desktop positions.
         HWND appWnd = HookBridge::GetAppMessageWindow();
         if (appWnd) {
-            PostMessage(appWnd, WM_APP + 100, 0, 0);
+            PostMessage(appWnd, WM_HOOK_READY, 0, 0);
             Log(L"SortFixupTimer: Posted repark notification to app");
         }
     } __except (exCode = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) {

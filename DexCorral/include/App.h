@@ -244,7 +244,6 @@ private:
     /// for every creation path — geometry is the caller's business.
     CorralWindowConfig MakeDefaultCorralConfig() const;
     CorralTabConfig MakeDefaultTabConfig(const std::string &title) const;
-    bool IsDesktopUnderMouse(POINT pt);
 
     /**
      * Returns true if the point is on an empty spot of the desktop: the window
@@ -254,8 +253,6 @@ private:
     bool IsPointOnEmptyDesktop(POINT pt, bool checkIcons);
 
     void OnLeftButtonDown(POINT pt);
-    void OnLeftButtonUp(POINT pt);
-    void OnMouseMove(POINT pt);
 
     // Quick-hide state
     bool quickHideActive = false;
@@ -318,7 +315,6 @@ private:
     ULONG shellNotifyId = 0;   // SHChangeNotifyRegister token
     HWINEVENTHOOK foregroundHook = nullptr;
     AppConfig config;
-    std::string configPath;
     std::unique_ptr<MouseHook> mouseHook;
     std::unique_ptr<TrayIcon> trayIcon;
     std::unique_ptr<DesktopMonitor> desktopMonitor;

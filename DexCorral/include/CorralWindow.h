@@ -452,7 +452,6 @@ private:
     void GetDesktopIconSpacing(int &spacingX, int &spacingY); // Query desktop ListView
 
     // DPI scaling - applies monitor DPI factor to logical pixel values.
-    // Controlled by s_enableDpiScaling flag for easy toggling.
     int Dpi(int logicalPixels) const;
     static bool s_enableDpiScaling;
 

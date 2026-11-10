@@ -6,6 +6,7 @@
 #include <new>
 #include "CorralHook.h"
 #include "HookBridge.h"
+#include "AppMessages.h"
 #include "ClassFactory.h"
 #include "Registration.h"
 #include "Guids.h"
@@ -117,7 +118,7 @@ static DWORD WINAPI AppWorkerThread(LPVOID param) {
 }
 
 // Custom message to tell the App to refresh hidden icons after deferred hook init
-static const UINT WM_HOOK_READY = WM_APP + 100;
+// WM_HOOK_READY is defined in AppMessages.h
 
 // Retry thread: periodically attempts InitializeCorralHook() when the desktop
 // ListView isn't available yet (e.g., Explorer still starting up after PC restart).
