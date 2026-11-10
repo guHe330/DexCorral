@@ -23,6 +23,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - DexCorral now stays loaded in Explorer for as long as Explorer runs. In a "just me" install Windows was free to unload it again after the start, which would have frozen the desktop for several seconds and could crash Explorer. Closing Explorer no longer does work that is unsafe while a program exits. ([#104](https://github.com/guHe330/DexCorral/issues/104))
 - A file in a Corral dropped out of it when a program replaced the file instead of changing it: an installer rewriting its desktop shortcut, or an editor that saves by writing a new file and renaming it into place. The file ended up loose on the desktop or in the catch-all. It now keeps its Corral, tab and position. ([#106](https://github.com/guHe330/DexCorral/issues/106))
 - A selected icon could not be dragged by its label: pressing the mouse button there did nothing, and the rename box opened after a moment even while the button was still held. The icon can now be dragged from its label like from its picture, and the slow second click that renames only counts once the button has been released without a drag. ([#114](https://github.com/guHe330/DexCorral/issues/114))
+- **Auto arrange icons** in the desktop's View menu did not survive a restart of Explorer or a sign-out: DexCorral handles that setting itself and kept it only in memory. It is now remembered. ([#116](https://github.com/guHe330/DexCorral/issues/116))
 
 ## [1.1.2] - 2026-11-04
 
