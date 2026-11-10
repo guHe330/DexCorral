@@ -2169,13 +2169,23 @@ bool InitializeCorralHook() {
     // first, the next session counts it as a hook failure.
     ArmCrashSentinel();
 
+    // This usually runs on a shell worker thread or the retry thread, not on
+    // the desktop's UI thread, so the new procs can be called the instant they
+    // are set. Record the original first: assigning it from SetWindowLongPtr's
+    // return value left a moment in which a message was forwarded to nullptr.
+    // The value returned by the swap wins if someone subclassed in between.
+
     // Subclass SHELLDLL_DefView for NM_CUSTOMDRAW (icon hiding)
-    g_OriginalShellDefViewProc = (WNDPROC)SetWindowLongPtrW(
+    g_OriginalShellDefViewProc = (WNDPROC)GetWindowLongPtrW(g_hShellDefView, GWLP_WNDPROC);
+    WNDPROC previousProc = (WNDPROC)SetWindowLongPtrW(
         g_hShellDefView, GWLP_WNDPROC, (LONG_PTR)ShellDefViewSubclassProc);
+    if (previousProc) g_OriginalShellDefViewProc = previousProc;
 
     // Subclass SysListView32 for input filtering on hidden icons
-    g_OriginalListViewProc = (WNDPROC)SetWindowLongPtrW(
+    g_OriginalListViewProc = (WNDPROC)GetWindowLongPtrW(g_hDesktopListView, GWLP_WNDPROC);
+    previousProc = (WNDPROC)SetWindowLongPtrW(
         g_hDesktopListView, GWLP_WNDPROC, (LONG_PTR)ListViewSubclassProc);
+    if (previousProc) g_OriginalListViewProc = previousProc;
 
     g_HookActive = true;
 
@@ -2198,9 +2208,16 @@ bool InitializeCorralHook() {
     g_IconSnapshotMsg = RegisterWindowMessageW(L"DexCorral_GetIconSnapshot");
     g_InstallDropTargetMsg = RegisterWindowMessageW(L"DexCorral_InstallDropTarget");
 
-    // Force initial read from HookBridge
+    // Force initial read from HookBridge. g_HiddenIcons belongs to the desktop
+    // thread: the subclass is live by now and a paint there rebuilds the list,
+    // so filling it from this thread as well would have two threads assigning
+    // the same vector. Off-thread, only reset the version; the repaint below
+    // makes the desktop thread read the list itself.
     g_LastVersion = 0;
-    RefreshHiddenIconCache();
+    const bool onDesktopThread =
+        GetWindowThreadProcessId(g_hDesktopListView, nullptr) == GetCurrentThreadId();
+    if (onDesktopThread)
+        RefreshHiddenIconCache();
 
     // Hook IDropTarget to intercept OLE drag-drop on hidden icons
     InstallDropTargetHook();
@@ -2208,7 +2225,7 @@ bool InitializeCorralHook() {
     // Trigger repaint so hidden icons disappear
     RedrawWindow(g_hDesktopListView, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 
-    Log(L"InitializeCorralHook: Hook active, %d icons to hide", (int)g_HiddenIcons.size());
+    Log(L"InitializeCorralHook: Hook active (installed %s the desktop thread)", onDesktopThread ? L"on" : L"off");
     return true;
 }
 
