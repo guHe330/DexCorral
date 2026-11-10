@@ -22,6 +22,8 @@
 #pragma once
 #include <Windows.h>
 #include <functional>
+#include <thread>
+#include <atomic>
 
 class MouseHook
 {
@@ -34,6 +36,8 @@ public:
     void Start();
     void Stop();
 
+    /// The callback runs on the hook's own thread, inside the hook procedure:
+    /// it must be quick and must not touch state owned by another thread.
     void SetLeftButtonDownCallback(MouseEventCallback callback);
 
 private:
@@ -41,5 +45,7 @@ private:
     static MouseHook *instance;
 
     HHOOK hookHandle;
+    std::thread hookThread; // Installs the hook and pumps its messages; see Start()
+    std::atomic<DWORD> hookThreadId;
     MouseEventCallback leftButtonDownCallback;
 };

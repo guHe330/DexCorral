@@ -31,7 +31,7 @@
 
 MouseHook *MouseHook::instance = nullptr;
 
-MouseHook::MouseHook() : hookHandle(nullptr)
+MouseHook::MouseHook() : hookHandle(nullptr), hookThreadId(0)
 {
     instance = this;
 }
@@ -44,19 +44,50 @@ MouseHook::~MouseHook()
 
 void MouseHook::Start()
 {
-    if (hookHandle == nullptr)
-    {
+    if (hookThread.joinable())
+        return;
+
+    // A low-level hook is called on the thread that installed it, through that
+    // thread's message loop, and every mouse event in the system waits for the
+    // answer. So it gets a thread that does nothing else: on the app thread, a
+    // slow config save or a reload of a big folder held up the whole mouse, and
+    // Windows silently removes a hook that keeps answering late.
+    HANDLE ready = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    hookThread = std::thread([this, ready]()
+                             {
+        MSG msg;
+        PeekMessageW(&msg, nullptr, WM_USER, WM_USER, PM_NOREMOVE); // create the queue for Stop()
+        hookThreadId = GetCurrentThreadId();
         hookHandle = SetWindowsHookExW(WH_MOUSE_LL, MouseProc, GetModuleHandleW(nullptr), 0);
+        if (ready)
+            SetEvent(ready);
+
+        while (GetMessageW(&msg, nullptr, 0, 0) > 0)
+        {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+
+        if (hookHandle != nullptr)
+        {
+            UnhookWindowsHookEx(hookHandle);
+            hookHandle = nullptr;
+        } });
+
+    if (ready)
+    {
+        WaitForSingleObject(ready, 2000);
+        CloseHandle(ready);
     }
 }
 
 void MouseHook::Stop()
 {
-    if (hookHandle != nullptr)
-    {
-        UnhookWindowsHookEx(hookHandle);
-        hookHandle = nullptr;
-    }
+    if (!hookThread.joinable())
+        return;
+    PostThreadMessageW(hookThreadId, WM_QUIT, 0, 0);
+    hookThread.join();
+    hookThreadId = 0;
 }
 
 void MouseHook::SetLeftButtonDownCallback(MouseEventCallback callback)
@@ -91,8 +122,10 @@ LRESULT CALLBACK MouseHook::MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                 GetClassNameW(hwndUnder, className, _countof(className));
                 if (wcscmp(className, L"DexCorralWindowClass") == 0)
                 {
+                    // Posted, not sent: the corral scrolls and repaints on its
+                    // own thread while the mouse carries on.
                     int delta = (short)HIWORD(mouseInfo->mouseData);
-                    SendMessageW(hwndUnder, WM_MOUSEWHEEL, MAKEWPARAM(0, delta), MAKELPARAM(pt.x, pt.y));
+                    PostMessageW(hwndUnder, WM_MOUSEWHEEL, MAKEWPARAM(0, delta), MAKELPARAM(pt.x, pt.y));
                     return 1;
                 }
             }
