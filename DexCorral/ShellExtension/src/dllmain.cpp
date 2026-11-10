@@ -28,57 +28,19 @@ extern "C" int RunApp(HANDLE hStopEvent);
 // config.json on first use, so startup failures that happen before the App
 // reads the config are still captured when DebugLogging is enabled.
 // Non-static so ShellExtension.cpp (same DLL) can call it via forward declaration.
-static wchar_t g_DllMainLogPath[MAX_PATH] = {};
-
-static void InitDllLogPath() {
-    if (g_DllMainLogPath[0]) return;
-    wchar_t* appData = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData))) {
-        wchar_t dir[MAX_PATH];
-        swprintf_s(dir, L"%s\\DexCorral", appData);
-        CreateDirectoryW(dir, nullptr);
-        swprintf_s(g_DllMainLogPath, L"%s\\dllmain.log", dir);
-        CoTaskMemFree(appData);
-    } else {
-        GetTempPathW(MAX_PATH, g_DllMainLogPath);
-        wcscat_s(g_DllMainLogPath, L"dllmain.log");
-    }
-}
-
 void DllLog(const wchar_t* format, ...) {
-    if (!HookBridge::IsDebugLogging()) return;
-    InitDllLogPath();
-
-    wchar_t message[1024];
     va_list args;
     va_start(args, format);
-    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
+    HookBridge::WriteDebugLog(L"dllmain.log", format, args);
     va_end(args);
-
-    HANDLE hFile = CreateFileW(g_DllMainLogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
-                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile != INVALID_HANDLE_VALUE) {
-        SYSTEMTIME st;
-        GetLocalTime(&st);
-        wchar_t buffer[1200];
-        swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] %s\r\n",
-                   st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
-
-        DWORD written;
-        WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
-        CloseHandle(hFile);
-    }
 }
 
 // Kept as alias so internal callers don't all need renaming
 static void Log(const wchar_t* format, ...) {
-    if (!HookBridge::IsDebugLogging()) return;
-    wchar_t message[1024];
     va_list args;
     va_start(args, format);
-    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
+    HookBridge::WriteDebugLog(L"dllmain.log", format, args);
     va_end(args);
-    DllLog(L"%s", message);
 }
 
 static bool IsRunningInsideExplorer() {

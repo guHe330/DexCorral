@@ -9,6 +9,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Changed
 - Dragging a Corral, unrolling a rolled-up one and the Quick-Hide fade use less CPU: a Corral was redrawn completely on every step although nothing in it had changed, in places twice. ([#98](https://github.com/guHe330/DexCorral/issues/98))
+- Debug logs no longer grow without limit. With `DebugLogging` left on, each log file is started again once it passes 2 MB, and the previous one is kept as `<name>.log.old`. ([#122](https://github.com/guHe330/DexCorral/issues/122))
 
 ### Fixed
 - While DexCorral was busy, for example saving its configuration on a slow or OneDrive desktop or reloading a large virtual Corral, the mouse could stutter everywhere in Windows. If that happened often enough, Windows switched off DexCorral's mouse handling without notice, and scrolling in Corrals and double-click Quick-Hide stopped working until Explorer was restarted. The mouse handling now runs separately and no longer waits for anything. ([#108](https://github.com/guHe330/DexCorral/issues/108))
