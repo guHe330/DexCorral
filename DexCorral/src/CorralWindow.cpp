@@ -880,6 +880,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         case WM_MOVE:
             window->OnMove();
             return 0;
+        case WM_DPICHANGED:
+            window->OnDpiChanged(HIWORD(wParam), (const RECT *)lParam);
+            return 0;
         case WM_LBUTTONDOWN:
             window->OnLeftButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
@@ -1371,6 +1374,29 @@ void CorralWindow::OnSize()
     SyncConfigFromWindow();
     CalculateIconLayout();
     UpdateLayeredContent();
+}
+
+void CorralWindow::OnDpiChanged(UINT newDpi, const RECT *suggested)
+{
+    // The suggested rect is the current window scaled to the new DPI. For a
+    // rolled-up corral that is only the title bar, so the height it unrolls
+    // to has to be scaled here.
+    if (config.IsRolledUp && lastRenderDpi != 0 && newDpi != lastRenderDpi)
+    {
+        savedHeight = MulDiv((int)savedHeight, newDpi, lastRenderDpi);
+        config.Height = savedHeight;
+    }
+
+    if (suggested)
+    {
+        SetWindowPos(hwnd, nullptr, suggested->left, suggested->top,
+                     suggested->right - suggested->left, suggested->bottom - suggested->top,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Icon size, grid spacing and the resolution of the loaded icon images are
+    // all fixed at load time, so a relayout alone would leave them at the old scale.
+    LoadFiles();
 }
 
 void CorralWindow::OnMove()
