@@ -7,6 +7,9 @@ All notable changes to DexCorral will be documented in this file. Format follows
 ### Added
 - Icons in a normal Corral can be dragged into other applications and Explorer windows, as from the desktop: drop one on a terminal to paste its path, or on an editor to open it. A multi-selection travels as a whole. Dropping on the desktop, on another Corral or on a tab works as before. ([#83](https://github.com/guHe330/DexCorral/issues/83))
 
+### Fixed
+- Renaming an icon inside a Corral could rename a different file when the folder changed while the name was being edited, for example a download finishing in a virtual Corral. The rename now always applies to the file whose name was being edited, and a failed rename shows its message once instead of twice. ([#84](https://github.com/guHe330/DexCorral/issues/84))
+
 ## [1.1.2] - 2026-11-04
 
 ### Fixed
