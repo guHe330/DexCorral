@@ -70,8 +70,9 @@ ULONG STDMETHODCALLTYPE DexCorralShellExt::Release() {
 
 HRESULT STDMETHODCALLTYPE DexCorralShellExt::Initialize(PCIDLIST_ABSOLUTE pidlFolder,
     IDataObject* pdtobj, HKEY hkeyProgID) {
-    // Called when user right-clicks the desktop background
-    // We don't need the folder info — we always add our menu items
+    // Called when the user right-clicks the desktop background. The handler is
+    // registered under DesktopBackground, so no other folder gets here and the
+    // folder info is not needed.
     return S_OK;
 }
 

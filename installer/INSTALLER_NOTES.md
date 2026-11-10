@@ -54,7 +54,7 @@ They exist for the cross-mode conflict detection above. The rest of `Software\De
 | Key | Value | Scope | Purpose |
 |---|---|---|---|
 | `<root>\Software\Classes\CLSID\{7A3B9E42-…}\InprocServer32` | (default), `ThreadingModel` | both | COM registration for `DexCorralHook.dll` |
-| `<root>\Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | both | desktop right-click menu, and a load vector when the menu is opened |
+| `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | both | desktop right-click menu, and a load vector when the menu is opened |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | both | install marker, see above |
 | `<root>\Software\DexCorral` | `Language` | both | UI language, written by Setup, not by `--register` |
 | `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | both | login injection, written by Setup, not by `--register` |

@@ -424,6 +424,9 @@ begin
   // Current layout, this scope
   RegDeleteKeyIncludingSubkeys(Root, 'Software\Classes\CLSID\' + DexCorralClsid);
   RegDeleteKeyIncludingSubkeys(Root,
+    'Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral');
+  // Where versions up to 1.1.2 registered the menu
+  RegDeleteKeyIncludingSubkeys(Root,
     'Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral');
   RegDeleteValue(Root, MarkerKey, 'InstallDir');
   RegDeleteValue(Root, MarkerKey, 'InstallScope');
