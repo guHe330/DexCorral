@@ -21,6 +21,7 @@
 
 #include "UpdateChecker.h"
 #include "Version.h"
+#include "UpdateLogic.h"
 
 #include <winhttp.h>
 #include <nlohmann/json.hpp>
@@ -43,80 +44,9 @@ namespace
     const wchar_t *kApiPath = L"/repos/guHe330/DexCorral/releases/latest";
     const wchar_t *kUserAgent = L"DexCorral-UpdateCheck";
 
-    // Any release URL we hand to ShellExecuteW must sit under this prefix. The
-    // API response is attacker-controlled if the transport or the API is ever
-    // compromised, and ShellExecuteW on an arbitrary string is a powerful
-    // primitive (file:, UNC, registered protocol handlers).
-    const char *kReleaseUrlPrefix = "https://github.com/guHe330/DexCorral/";
     const wchar_t *kReleasesPageUrl = L"https://github.com/guHe330/DexCorral/releases/latest";
 
-    struct Version
-    {
-        int major = 0, minor = 0, patch = 0;
-    };
-
-    /// Parses "vX.Y.Z" / "X.Y.Z" (extra suffixes ignored) into a Version.
-    Version ParseVersion(const std::string &s)
-    {
-        Version v;
-        size_t i = 0;
-        if (i < s.size() && (s[i] == 'v' || s[i] == 'V'))
-            ++i;
-        int *parts[3] = {&v.major, &v.minor, &v.patch};
-        for (int p = 0; p < 3 && i < s.size(); ++p)
-        {
-            int value = 0;
-            bool any = false;
-            while (i < s.size() && s[i] >= '0' && s[i] <= '9')
-            {
-                value = value * 10 + (s[i] - '0');
-                any = true;
-                ++i;
-            }
-            if (!any)
-                break;
-            *parts[p] = value;
-            if (i < s.size() && s[i] == '.')
-                ++i;
-            else
-                break;
-        }
-        return v;
-    }
-
-    /// True if `a` represents a strictly newer release than `b`.
-    bool IsNewer(const Version &a, const Version &b)
-    {
-        if (a.major != b.major)
-            return a.major > b.major;
-        if (a.minor != b.minor)
-            return a.minor > b.minor;
-        return a.patch > b.patch;
-    }
-
-    /// True only for URLs under the project's own GitHub repository. The scheme
-    /// and host are matched case-insensitively (they are case-insensitive per
-    /// RFC 3986); the path is matched exactly. A userinfo trick such as
-    /// "https://github.com@evil/" fails because the prefix requires '/' right
-    /// after the host.
-    bool IsTrustedReleaseUrl(const std::string &url)
-    {
-        const size_t prefixLen = strlen(kReleaseUrlPrefix);
-        if (url.size() <= prefixLen)
-            return false;
-        if (_strnicmp(url.c_str(), kReleaseUrlPrefix, prefixLen) != 0)
-            return false;
-        if (url.find("..") != std::string::npos)
-            return false;
-        // Reject control characters and anything non-ASCII; a legitimate
-        // release URL has neither.
-        for (unsigned char c : url)
-        {
-            if (c < 0x21 || c > 0x7E)
-                return false;
-        }
-        return true;
-    }
+    using namespace UpdateLogic;
 
     const size_t kMaxBodyBytes = 1024 * 1024;
 
