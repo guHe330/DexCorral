@@ -539,6 +539,35 @@ static bool IsExistingDirectory(const std::wstring &p)
 
 void CorralWindow::LoadVirtualFolderIcons()
 {
+    // Set the loaded entries aside, by path. Whatever is not taken back in
+    // the loop below is destroyed when this function returns.
+    struct SetAside
+    {
+        std::map<std::wstring, CorralIcon> byPath;
+        ~SetAside()
+        {
+            for (auto &entry : byPath)
+            {
+                if (entry.second.hIcon)
+                    DestroyIcon(entry.second.hIcon);
+                if (entry.second.hIconSmall)
+                    DestroyIcon(entry.second.hIconSmall);
+            }
+        }
+    } previous;
+    if (reuseUnchangedIcons)
+    {
+        for (auto &icon : icons)
+        {
+            if (previous.byPath.try_emplace(icon.fullPath, icon).second)
+            {
+                // The handles now belong to the copy; ClearIcons must not destroy them
+                icon.hIcon = nullptr;
+                icon.hIconSmall = nullptr;
+            }
+        }
+    }
+
     ClearIcons();
     virtualFolderMissing = false;
 
@@ -606,6 +635,23 @@ void CorralWindow::LoadVirtualFolderIcons()
         ci.fileName = WideToUtf8(ci.wFileName);
         ci.fullPath = folderPath + L"\\" + ci.wFileName;
         ci.isFolder = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+        IconStamp stamp;
+        stamp.writeTime = findData.ftLastWriteTime;
+        stamp.size = ((ULONGLONG)findData.nFileSizeHigh << 32) | findData.nFileSizeLow;
+        stamp.attributes = findData.dwFileAttributes;
+        stamp.iconSize = iconSize;
+        stamp.details = isDetailsView;
+
+        // Unchanged since the last load: take the entry back as it is
+        auto kept = previous.byPath.find(ci.fullPath);
+        if (kept != previous.byPath.end() && kept->second.stamp == stamp)
+        {
+            icons.push_back(std::move(kept->second));
+            previous.byPath.erase(kept);
+            continue;
+        }
+        ci.stamp = stamp;
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
         // for known file types" and strips .lnk
@@ -857,7 +903,11 @@ void CorralWindow::InitializeFolderWatcher()
 
 void CorralWindow::OnFolderContentsChanged()
 {
+    // Usually one file changed: the others keep their icons. Every other
+    // reload (view mode, navigation, shell icon change) loads everything.
+    reuseUnchangedIcons = true;
     LoadFiles();
+    reuseUnchangedIcons = false;
 }
 
 // ============================================================================

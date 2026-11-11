@@ -140,6 +140,7 @@ add_executable(DexCorralTests
     tests/test_update_logic.cpp
     tests/test_recently_left.cpp
     tests/test_name_diff.cpp
+    tests/test_icon_stamp.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
