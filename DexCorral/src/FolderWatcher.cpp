@@ -130,20 +130,22 @@ void FolderWatcher::MonitorThread()
 
         if (waitResult == WAIT_OBJECT_0)
         {
-            if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE))
+            // Report every change, including a completion that carries none
+            // (the buffer overflowed): the receiver reloads the whole folder
+            // either way. Coalescing a burst is the receiver's job (a
+            // restarted timer), so the last event is never lost.
+            GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE);
+            if (changeCallback)
             {
-                // Report every change. Coalescing a burst is the receiver's
-                // job (a restarted timer), so the last event is never lost.
-                if (changeCallback)
-                {
-                    changeCallback();
-                }
+                changeCallback();
             }
             ResetEvent(overlapped.hEvent);
         }
         else
         {
+            // The request still points at this stack frame: wait until it is really gone
             CancelIo(hDir);
+            GetOverlappedResult(hDir, &overlapped, &bytesReturned, TRUE);
             break;
         }
     }

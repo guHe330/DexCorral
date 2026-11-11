@@ -139,6 +139,7 @@ add_executable(DexCorralTests
     tests/test_conflicts.cpp
     tests/test_update_logic.cpp
     tests/test_recently_left.cpp
+    tests/test_name_diff.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
