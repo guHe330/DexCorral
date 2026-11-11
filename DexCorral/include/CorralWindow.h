@@ -81,6 +81,7 @@ private:
     bool hasDropData;                    /// The dragged data can join a normal tab
     IDataObject *dragData = nullptr;     /// Data of the drag in flight (held for rebinding)
     DWORD allowedEffects = 0;            /// Effects the drag source permits
+    DWORD dragKeyState = 0;              /// Keys and buttons at the last DragEnter/DragOver
     IDropTarget *folderTarget = nullptr; /// The shell's drop target for a virtual tab's folder
     std::wstring folderTargetPath;       /// Folder that folderTarget is bound to
     int springTab = -1;                  /// Inactive tab the drag is resting on, or -1
@@ -311,7 +312,9 @@ private:
     void OnLeftButtonDblClick(int x, int y);
     void OnRightButtonDown(int x, int y);
     void OnDrop(IDataObject *pDataObj);                      // OLE drop handler (replaces OnDropFiles)
-    void OnDropOnIcon(IDataObject *pDataObj, int iconIndex); // Drop file onto a corral icon (shell-execute)
+    /// Drop onto a corral icon: forwarded to that item's own shell drop target
+    void OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
+                      DWORD dropKeyState, POINTL pt, DWORD allowedEffects);
 
     friend class CorralDropTarget;
 
