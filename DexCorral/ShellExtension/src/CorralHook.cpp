@@ -83,6 +83,25 @@ static bool g_AutoSortTimerActive = false;
 static bool g_InsideCustomSort = false;     // Re-entrancy guard
 static bool g_CompactionPending = false;    // True while waiting for Explorer to finish sorting
 static bool g_OurAutoArrange = false;       // Our own auto-arrange state (Explorer's is always OFF)
+
+// The user's auto-arrange choice, kept across sessions. In the registry next to
+// the crash guard's values: the hook has no access to config.json.
+static const wchar_t* const AUTO_ARRANGE_REGVAL = L"AutoArrange"; // REG_DWORD
+
+static bool LoadOurAutoArrange(bool& value) {
+    DWORD data = 0, size = sizeof(data);
+    if (RegGetValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, AUTO_ARRANGE_REGVAL,
+                     RRF_RT_REG_DWORD, nullptr, &data, &size) != ERROR_SUCCESS)
+        return false;
+    value = data != 0;
+    return true;
+}
+
+static void SaveOurAutoArrange() {
+    DWORD data = g_OurAutoArrange ? 1 : 0;
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, AUTO_ARRANGE_REGVAL,
+                    REG_DWORD, &data, sizeof(data));
+}
 static DesktopSortMode g_LastSortMode = DesktopSortMode::PositionOrder; // Last sort the user applied
 
 
@@ -1091,6 +1110,7 @@ static LRESULT CALLBACK AutoSortPopupProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
         if (LOWORD(wParam) == IDC_DISABLE_BTN) {
             Log(L"AutoSortPopup: User chose DISABLE");
             g_OurAutoArrange = false;
+            SaveOurAutoArrange();
             // Restore icon to where user dropped it
             if (g_PendingMoveIconIndex >= 0 && g_hDesktopListView) {
                 POINT pt = g_PendingMoveDropPos;
@@ -1572,6 +1592,7 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
         // Auto-arrange: we own this — swallow the command, toggle our flag
         if (cmdId == g_CmdAutoArrange) {
             g_OurAutoArrange = !g_OurAutoArrange;
+            SaveOurAutoArrange();
             Log(L"  Auto arrange toggled to %s (ours, Explorer not notified)", g_OurAutoArrange ? L"ON" : L"OFF");
             if (g_OurAutoArrange) {
                 // Turning ON: compact immediately
@@ -2192,13 +2213,25 @@ bool InitializeCorralHook() {
     // Explorer surviving this long with our hooks installed counts as stable
     SetTimer(g_hDesktopListView, STABILITY_TIMER_ID, STABILITY_DELAY_MS, StabilityTimerProc);
 
-    // Take over auto-arrange: capture Explorer's current state, then disable it
+    // Take over auto-arrange. Explorer's own flag is switched off for as long as
+    // the hook lives, and Explorer never hears of a toggle (the command is
+    // swallowed), so its flag says nothing about what the user chose last
+    // session. Our stored choice decides; Explorer's state only seeds it the
+    // first time.
     LONG_PTR lvStyle = GetWindowLongPtrW(g_hDesktopListView, GWL_STYLE);
-    g_OurAutoArrange = (lvStyle & LVS_AUTOARRANGE) != 0;
-    if (g_OurAutoArrange) {
+    const bool explorerAutoArrange = (lvStyle & LVS_AUTOARRANGE) != 0;
+    bool stored = false;
+    if (LoadOurAutoArrange(stored)) {
+        g_OurAutoArrange = stored;
+    } else {
+        g_OurAutoArrange = explorerAutoArrange;
+        SaveOurAutoArrange();
+    }
+    if (explorerAutoArrange) {
         SetWindowLongPtrW(g_hDesktopListView, GWL_STYLE, lvStyle & ~LVS_AUTOARRANGE);
     }
-    Log(L"InitializeCorralHook: Took over auto-arrange (was %s)", g_OurAutoArrange ? L"ON" : L"OFF");
+    Log(L"InitializeCorralHook: Took over auto-arrange (ours %s, Explorer's was %s)",
+        g_OurAutoArrange ? L"ON" : L"OFF", explorerAutoArrange ? L"ON" : L"OFF");
 
     // Register popup window class for auto-sort dialog
     RegisterAutoSortPopupClass();
