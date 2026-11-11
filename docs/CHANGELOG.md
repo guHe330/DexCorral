@@ -13,6 +13,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - A virtual Corral could miss files when several arrived at once, for example when an archive was extracted into its folder: it showed the first and ignored the rest until something else changed. It now reloads once the folder has been quiet for a moment and shows all of them. ([#88](https://github.com/guHe330/DexCorral/issues/88))
 - The automatic update check counted a failed attempt as the day's check. Because it runs at sign-in, often before the network is up, a PC that is started once a day could go without a successful check indefinitely. A failed automatic check is now retried once after five minutes, and only a successful one starts the 24-hour wait. ([#90](https://github.com/guHe330/DexCorral/issues/90))
 - With `DebugLogging` on, a desktop item with a very long name or path could end Explorer: the log line did not fit its buffer, and Windows treats that as a fatal error. Log lines that are too long are now cut off instead. ([#92](https://github.com/guHe330/DexCorral/issues/92))
+- **New DexCorral** and **New Virtual DexCorral** appeared in the right-click menu of every folder window and of the Open and Save dialogs of other programs, where they did nothing useful. They are now offered on the desktop only, and DexCorral is no longer loaded into other programs for it. ([#94](https://github.com/guHe330/DexCorral/issues/94))
 
 ## [1.1.2] - 2026-11-04
 

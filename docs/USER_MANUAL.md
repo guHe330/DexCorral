@@ -269,7 +269,7 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | Yes |
 | `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
 | `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
-| `<root>\Software\Classes\Directory\Background\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
+| `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Second startup load path. No overlay is ever drawn. All-users installs only. | Yes |
 

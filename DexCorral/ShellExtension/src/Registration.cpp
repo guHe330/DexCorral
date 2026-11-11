@@ -18,7 +18,11 @@ static const wchar_t* EXTENSION_NAME = L"DexCorral";
 // exists there and in HKCU otherwise, which is exactly the ambiguity the two
 // scopes exist to remove.
 static const wchar_t* SUBKEY_CLASSES     = L"Software\\Classes";
-static const wchar_t* SUBKEY_CONTEXTMENU = L"Software\\Classes\\Directory\\Background\\ShellEx\\ContextMenuHandlers\\DexCorral";
+// DesktopBackground is the desktop's own background menu. Directory\Background,
+// used up to 1.1.2, is the background of every folder: it put the entries into
+// each Explorer window and loaded this DLL into every program's Open/Save dialog.
+static const wchar_t* SUBKEY_CONTEXTMENU = L"Software\\Classes\\DesktopBackground\\ShellEx\\ContextMenuHandlers\\DexCorral";
+static const wchar_t* SUBKEY_CONTEXTMENU_OLD = L"Software\\Classes\\Directory\\Background\\ShellEx\\ContextMenuHandlers\\DexCorral";
 static const wchar_t* SUBKEY_MARKER      = L"Software\\DexCorral";
 
 // Machine-scope-only load vectors. Explorer reads both from HKLM only; there is
@@ -133,6 +137,7 @@ HRESULT RegisterShellExtension(const wchar_t* dllPath, InstallScope scope) {
     //    A real feature, not a load vector, so both scopes register it.
     hr = SetRegistryValue(root, SUBKEY_CONTEXTMENU, nullptr, CLSID_STRING);
     if (FAILED(hr)) return hr;
+    DeleteRegistryKey(root, SUBKEY_CONTEXTMENU_OLD); // An upgrade from 1.1.2 or older
 
     // 3. Machine scope only: the two auto-load vectors Explorer reads from HKLM.
     if (scope == InstallScope::Machine) {
@@ -166,8 +171,9 @@ HRESULT UnregisterShellExtension(InstallScope scope) {
     wchar_t keyPath[512];
     const HKEY root = ScopeRoot(scope);
 
-    // Context menu handler
+    // Context menu handler, and where versions up to 1.1.2 put it
     DeleteRegistryKey(root, SUBKEY_CONTEXTMENU);
+    DeleteRegistryKey(root, SUBKEY_CONTEXTMENU_OLD);
 
     // Machine-only load vectors. A user-scope uninstall must leave these alone:
     // they may belong to a machine-wide install that other users still rely on.
