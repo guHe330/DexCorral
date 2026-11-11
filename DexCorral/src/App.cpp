@@ -2450,8 +2450,10 @@ void App::UpdateCorralPositions()
                     cfg.Width = newWidth;
                     cfg.Height = newHeight;
 
+                    // A rolled-up Corral keeps its rolled-up window height
                     SetWindowPos(corral->GetHWND(), nullptr,
-                                 screenLeft, screenTop, newWidth, newHeight,
+                                 screenLeft, screenTop, newWidth,
+                                 cfg.IsRolledUp ? (int)(now.bottom - now.top) : newHeight,
                                  SWP_NOZORDER | SWP_NOACTIVATE);
 
                     configChanged = true;
@@ -2485,8 +2487,12 @@ void App::UpdateCorralPositions()
                 cfg.Width = newWidth;
                 cfg.Height = newHeight;
 
+                // A rolled-up Corral keeps its rolled-up window height
+                RECT now;
+                GetWindowRect(corral->GetHWND(), &now);
                 SetWindowPos(corral->GetHWND(), nullptr,
-                             screenLeft, screenTop, newWidth, newHeight,
+                             screenLeft, screenTop, newWidth,
+                             cfg.IsRolledUp ? (int)(now.bottom - now.top) : newHeight,
                              SWP_NOZORDER | SWP_NOACTIVATE);
 
                 configChanged = true;
