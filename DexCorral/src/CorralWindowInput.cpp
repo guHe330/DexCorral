@@ -83,7 +83,8 @@ static void LogCorralDrop(const wchar_t *fmt, ...)
 
         va_list args;
         va_start(args, fmt);
-        vswprintf_s(buffer + offset, _countof(buffer) - offset, fmt, args);
+        // Truncating, and leaving room for the line end appended below
+        _vsnwprintf_s(buffer + offset, _countof(buffer) - offset - 2, _TRUNCATE, fmt, args);
         va_end(args);
 
         wcscat_s(buffer, L"\r\n");

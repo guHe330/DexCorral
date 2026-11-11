@@ -12,6 +12,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - New desktop files went into whichever tab of the catch-all Corral happened to be in front, and were lost to the catch-all entirely when that tab was a virtual folder. They now always go into the catch-all tab. With catch-all switched off, new files stay on the desktop instead of being pulled into the first Corral. ([#86](https://github.com/guHe330/DexCorral/issues/86))
 - A virtual Corral could miss files when several arrived at once, for example when an archive was extracted into its folder: it showed the first and ignored the rest until something else changed. It now reloads once the folder has been quiet for a moment and shows all of them. ([#88](https://github.com/guHe330/DexCorral/issues/88))
 - The automatic update check counted a failed attempt as the day's check. Because it runs at sign-in, often before the network is up, a PC that is started once a day could go without a successful check indefinitely. A failed automatic check is now retried once after five minutes, and only a successful one starts the 24-hour wait. ([#90](https://github.com/guHe330/DexCorral/issues/90))
+- With `DebugLogging` on, a desktop item with a very long name or path could end Explorer: the log line did not fit its buffer, and Windows treats that as a fatal error. Log lines that are too long are now cut off instead. ([#92](https://github.com/guHe330/DexCorral/issues/92))
 
 ## [1.1.2] - 2026-11-04
 

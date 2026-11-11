@@ -116,7 +116,7 @@ static void Log(const wchar_t* format, ...) {
     va_list args;
     va_start(args, format);
     wchar_t message[512];
-    vswprintf_s(message, format, args);
+    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
     va_end(args);
 
     HANDLE hFile = CreateFileW(g_LogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
@@ -310,7 +310,7 @@ static void GuardLog(const wchar_t* format, ...) {
     wchar_t message[512];
     va_list args;
     va_start(args, format);
-    vswprintf_s(message, format, args);
+    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
     va_end(args);
 
     DllLog(L"CrashGuard: %s", message);
@@ -1708,7 +1708,7 @@ static void LogDT(const wchar_t* format, ...) {
     va_list args;
     va_start(args, format);
     wchar_t message[512];
-    vswprintf_s(message, format, args);
+    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
     va_end(args);
 
     HANDLE hFile = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,

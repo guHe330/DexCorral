@@ -51,7 +51,7 @@ void DllLog(const wchar_t* format, ...) {
     wchar_t message[1024];
     va_list args;
     va_start(args, format);
-    vswprintf_s(message, format, args);
+    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
     va_end(args);
 
     HANDLE hFile = CreateFileW(g_DllMainLogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
@@ -75,7 +75,7 @@ static void Log(const wchar_t* format, ...) {
     wchar_t message[1024];
     va_list args;
     va_start(args, format);
-    vswprintf_s(message, format, args);
+    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
     va_end(args);
     DllLog(L"%s", message);
 }
