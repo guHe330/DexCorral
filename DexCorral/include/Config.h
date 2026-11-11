@@ -237,11 +237,12 @@ public:
      * (config.bak) is used instead. `status` reports which of those happened.
      */
     static AppConfig Load(ConfigLoadStatus *status = nullptr);
-    static void Save(const AppConfig &config);
+    /// False when the file could not be written; the previous file is left intact
+    static bool Save(const AppConfig &config);
 
     /// Load/Save against an explicit path (the unit tests use a temp folder)
     static AppConfig LoadFrom(const std::wstring &path, ConfigLoadStatus *status = nullptr);
-    static void SaveTo(const std::wstring &path, const AppConfig &config);
+    static bool SaveTo(const std::wstring &path, const AppConfig &config);
 
     /// "config.bak" / "config.corrupt.json" next to the given config file
     static std::wstring GetBackupPath(const std::wstring &configPath);
