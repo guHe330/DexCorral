@@ -588,6 +588,11 @@ private:
     int quickHideStartAlpha = 255;
     int quickHideAlpha = 255; // Current animated whole-window alpha (used by render)
 
+    // Render bookkeeping: lets callers see whether a call they made already
+    // rendered (WM_SIZE does), and whether the window's DPI changed since.
+    unsigned renderCount = 0;
+    UINT lastRenderDpi = 0;
+
     // Icon dragging for reordering
     bool isDraggingIcon = false;
     int draggedIconIndex = -1;

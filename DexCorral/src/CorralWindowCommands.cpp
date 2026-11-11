@@ -790,12 +790,17 @@ void CorralWindow::OnAnimationTimer()
     int currentHeight = animationStartHeight + (int)((animationTargetHeight - animationStartHeight) * easedProgress);
     int currentTop = animationStartTop + (int)((animationTargetTop - animationStartTop) * easedProgress);
 
+    // A size change already lays out and renders through WM_SIZE (OnSize).
+    // Only do it here when that did not happen, so a tick renders once, not twice.
+    unsigned rendersBefore = renderCount;
     SetWindowPos(hwnd, nullptr, (int)config.Left, currentTop, (int)config.Width, currentHeight,
                  SWP_NOZORDER | SWP_NOACTIVATE);
 
-    // Recalculate layout and redraw
-    CalculateIconLayout();
-    UpdateLayeredContent();
+    if (renderCount == rendersBefore)
+    {
+        CalculateIconLayout();
+        UpdateLayeredContent();
+    }
 }
 
 void CorralWindow::OnHoverCheckTimer()
@@ -976,5 +981,12 @@ void CorralWindow::OnQuickHideAnimationTimer()
         }
     }
 
-    UpdateLayeredContent();
+    // Only the whole-window alpha changes during the fade, so hand Windows the
+    // new alpha and keep the bitmap it already has instead of rebuilding it.
+    BLENDFUNCTION blend = {};
+    blend.BlendOp = AC_SRC_OVER;
+    blend.SourceConstantAlpha = (BYTE)quickHideAlpha;
+    blend.AlphaFormat = AC_SRC_ALPHA;
+    if (!UpdateLayeredWindow(hwnd, nullptr, nullptr, nullptr, nullptr, nullptr, 0, &blend, ULW_ALPHA))
+        UpdateLayeredContent();
 }

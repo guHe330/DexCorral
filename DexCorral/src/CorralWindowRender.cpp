@@ -121,6 +121,9 @@ void CorralWindow::UpdateLayeredContent()
     if (w <= 0 || h <= 0)
         return;
 
+    renderCount++;
+    lastRenderDpi = GetDpiForWindow(hwnd);
+
     // Create a 32-bit DIB for per-pixel alpha
     BITMAPINFO bmi = {};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
