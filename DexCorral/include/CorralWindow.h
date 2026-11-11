@@ -615,6 +615,7 @@ private:
     // Icon rename state
     bool isRenamingIcon = false;
     int renamingIconIndex = -1;
+    std::wstring renamingIconPath; // Identity of the icon being renamed; the index goes stale on a reload
     HWND hEditControl = nullptr;
     HFONT hEditFont = nullptr;
     std::wstring originalName;

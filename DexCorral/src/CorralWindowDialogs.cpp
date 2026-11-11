@@ -56,6 +56,7 @@ void CorralWindow::StartIconRename(int iconIndex)
 
     isRenamingIcon = true;
     renamingIconIndex = iconIndex;
+    renamingIconPath = icons[iconIndex].fullPath;
     originalName = icons[iconIndex].displayName;
 
     // Get the label rect in client coordinates
@@ -122,7 +123,25 @@ void CorralWindow::EndIconRename(bool save)
         return;
     }
 
-    if (save && renamingIconIndex >= 0 && renamingIconIndex < (int)icons.size())
+    // Re-entrancy guard: the failure message box below and DestroyWindow both
+    // take the focus from the edit, and its WM_KILLFOCUS calls back in here.
+    isRenamingIcon = false;
+
+    // The icon list can be rebuilt while the edit is open (a folder change
+    // reloads a virtual tab, a desktop event reloads a normal one), so the
+    // index from StartIconRename may now name a different file. Find the file
+    // again by its path; if it is gone, there is nothing to rename.
+    renamingIconIndex = -1;
+    for (size_t i = 0; i < icons.size(); i++)
+    {
+        if (!renamingIconPath.empty() && _wcsicmp(icons[i].fullPath.c_str(), renamingIconPath.c_str()) == 0)
+        {
+            renamingIconIndex = (int)i;
+            break;
+        }
+    }
+
+    if (save && renamingIconIndex >= 0)
     {
         // Get the new name from edit control
         int len = GetWindowTextLengthW(hEditControl);
@@ -226,6 +245,7 @@ void CorralWindow::EndIconRename(bool save)
     hEditControl = nullptr;
     isRenamingIcon = false;
     renamingIconIndex = -1;
+    renamingIconPath.clear();
     originalName.clear();
 
     if (editToDestroy)
