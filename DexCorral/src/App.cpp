@@ -1384,7 +1384,9 @@ void App::PushDesktopIconsFromCorrals()
 
 void App::OnLeftButtonDown(POINT pt)
 {
-    // Runs inside the WH_MOUSE_LL callback — keep it cheap. Pair consecutive
+    // Runs inside the WH_MOUSE_LL callback, on the mouse hook's own thread —
+    // keep it cheap, and touch nothing but lastClickTick/lastClickPt (used only
+    // here) and messageWindow (set before the hook starts). Pair consecutive
     // clicks into a double-click here; the expensive empty-desktop validation
     // happens on the app thread (WM_QUICKHIDE_DBLCLK handler).
     DWORD now = GetTickCount();
