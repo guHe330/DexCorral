@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "IconStamp.h"
 #include <memory>
 #include <set>
 #include "Config.h"
@@ -122,6 +123,8 @@ struct CorralIcon
     ULONGLONG fileSize = 0;                   /// File size in bytes
     FILETIME modifiedTime = {};               /// Last modified time
     SyncStatus syncStatus = SyncStatus::None; /// Cloud storage sync status
+
+    IconStamp stamp; /// Virtual corrals: what this entry was loaded from
 };
 
 /**
@@ -635,6 +638,7 @@ private:
     // Virtual corral support
     std::unique_ptr<FolderWatcher> folderWatcher;
     std::unique_ptr<FolderWatcher> parentWatcher; // Watches parent dir to catch rename/delete of current folder
+    bool reuseUnchangedIcons = false;             // Set for a reload after a folder change only
     bool virtualFolderMissing = false;            // Root folder unavailable (deleted/renamed/moved)
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
