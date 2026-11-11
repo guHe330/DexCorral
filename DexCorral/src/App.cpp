@@ -69,6 +69,10 @@ static const UINT_PTR ADOPTION_TIMER = 2;
 // While active: watch for conflicting software being started in this Explorer
 // (see Conflicts.h). A module-handle lookup per tick, nothing more.
 static const UINT_PTR CONFLICT_POLL_TIMER = 4;
+
+// One retry of a failed automatic update check
+static const UINT_PTR UPDATE_RETRY_TIMER = 5;
+static const UINT UPDATE_RETRY_MS = 5 * 60 * 1000;
 static const UINT CONFLICT_POLL_MS = 15000;
 static const UINT ADOPTION_POLL_MS = 800;
 
@@ -1702,8 +1706,8 @@ void App::StartUpdateCheck(bool userInitiated)
         const long long kDaySeconds = 24LL * 60 * 60;
         if (config.LastUpdateCheckEpoch != 0 && now - config.LastUpdateCheckEpoch < kDaySeconds)
             return;
-        config.LastUpdateCheckEpoch = now;
-        SaveConfig();
+        // The 24h stamp is written when the answer arrives (WM_UPDATE_CHECK_DONE),
+        // so a check that failed does not count as the day's check.
     }
 
     UpdateChecker::StartAsyncCheck(messageWindow, WM_UPDATE_CHECK_DONE, userInitiated);
@@ -2096,6 +2100,21 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     if (app && uMsg == WM_UPDATE_CHECK_DONE)
     {
         std::unique_ptr<UpdateCheckResult> result((UpdateCheckResult *)lParam);
+        if (result && !result->UserInitiated)
+        {
+            if (result->Success)
+            {
+                app->config.LastUpdateCheckEpoch = (long long)time(nullptr);
+                app->SaveConfig();
+            }
+            else if (!app->updateRetryUsed)
+            {
+                // The automatic check runs at sign-in, often before the network
+                // is up. Try once more a little later instead of waiting a day.
+                app->updateRetryUsed = true;
+                SetTimer(hwnd, UPDATE_RETRY_TIMER, UPDATE_RETRY_MS, nullptr);
+            }
+        }
         if (result && app->trayIcon)
         {
             if (result->Success && result->UpdateAvailable)
@@ -2201,6 +2220,13 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Deferred catch-all adoption — waits out Explorer's inline rename
+    if (app && uMsg == WM_TIMER && wParam == UPDATE_RETRY_TIMER)
+    {
+        KillTimer(hwnd, UPDATE_RETRY_TIMER);
+        app->StartUpdateCheck(false);
+        return 0;
+    }
+
     if (app && uMsg == WM_TIMER && wParam == ADOPTION_TIMER)
     {
         app->ProcessPendingAdoptions();

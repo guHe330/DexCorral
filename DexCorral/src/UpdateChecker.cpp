@@ -118,6 +118,8 @@ namespace
         return true;
     }
 
+    const size_t kMaxBodyBytes = 1024 * 1024;
+
     std::wstring Utf8ToWide(const std::string &s)
     {
         if (s.empty())
@@ -190,6 +192,14 @@ namespace
                         break;
                     chunk.resize(read);
                     body += chunk;
+                    // A release document is a few KB. Anything far beyond that
+                    // is not one, and this runs inside Explorer.
+                    if (body.size() > kMaxBodyBytes)
+                    {
+                        DllLog(L"UpdateChecker: response too large, giving up");
+                        body.clear();
+                        break;
+                    }
                 } while (avail > 0);
                 ok = !body.empty();
             }
