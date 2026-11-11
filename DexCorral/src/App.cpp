@@ -2322,29 +2322,21 @@ void App::EnsureCatchAllCorral()
     // files simply won't be auto-collected until the user enables a catch-all.
 }
 
-CorralWindow *App::GetCatchAllCorral()
+CorralWindow *App::GetCatchAllCorral(int &tabIndex)
 {
     for (auto &corral : corrals)
     {
-        for (auto &tab : corral->GetConfig().Tabs)
+        const auto &tabs = corral->GetConfig().Tabs;
+        for (size_t i = 0; i < tabs.size(); i++)
         {
-            if (tab.IsCatchAll && !tab.IsVirtual)
+            if (tabs[i].IsCatchAll && !tabs[i].IsVirtual)
             {
+                tabIndex = (int)i;
                 return corral.get();
             }
         }
     }
-    // Fallback to first non-virtual corral if no catch-all defined
-    for (auto &corral : corrals)
-    {
-        for (auto &tab : corral->GetConfig().Tabs)
-        {
-            if (!tab.IsVirtual)
-            {
-                return corral.get();
-            }
-        }
-    }
+    // No catch-all tab: new desktop files stay on the desktop (see EnsureCatchAllCorral)
     return nullptr;
 }
 
@@ -2584,10 +2576,12 @@ void App::ProcessPendingAdoptions()
             continue;
 
         // Add to catch-all corral
-        CorralWindow *catchAll = GetCatchAllCorral();
+        // Into the catch-all tab itself, which need not be the tab in front
+        int catchAllTab = -1;
+        CorralWindow *catchAll = GetCatchAllCorral(catchAllTab);
         if (catchAll)
         {
-            catchAll->AddFile(fileNameStr);
+            catchAll->AddFilesToTab({fileNameStr}, catchAllTab);
             changed = true;
         }
     }

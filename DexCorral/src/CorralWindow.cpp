@@ -423,25 +423,6 @@ void CorralWindow::LoadFiles()
     UpdateLayeredContent();
 }
 
-void CorralWindow::AddFile(const std::string &fileName)
-{
-    if (fileName.empty())
-        return;
-
-    // Virtual tabs don't accept manual file additions
-    if (GetActiveTab().IsVirtual)
-        return;
-
-    // Check if already in this corral (active tab)
-    auto &files = GetActiveTab().Files;
-    auto it = std::find(files.begin(), files.end(), fileName);
-    if (it == files.end())
-    {
-        files.push_back(fileName);
-        LoadFiles();
-    }
-}
-
 // ============================================================================
 // Tab Management
 // ============================================================================
