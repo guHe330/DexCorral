@@ -2415,8 +2415,14 @@ void App::UpdateCorralPositions()
             {
                 MonitorPosition &stored = it->second;
 
+                // Parked on another monitor while this one was away (by us
+                // below, or by Windows): bring it back to where it was
+                RECT now;
+                GetWindowRect(corral->GetHWND(), &now);
+                bool away = monitorManager->FindMonitorForRect(now) != targetMon;
+
                 // Check if resolution changed
-                if (stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
+                if (away || stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
                 {
                     // Scale position and size proportionally and keep the corral on the monitor
                     LayoutMath::ScaledRect scaled = LayoutMath::RescaleToMonitor(
@@ -2444,8 +2450,10 @@ void App::UpdateCorralPositions()
                     cfg.Width = newWidth;
                     cfg.Height = newHeight;
 
+                    // A rolled-up Corral keeps its rolled-up window height
                     SetWindowPos(corral->GetHWND(), nullptr,
-                                 screenLeft, screenTop, newWidth, newHeight,
+                                 screenLeft, screenTop, newWidth,
+                                 cfg.IsRolledUp ? (int)(now.bottom - now.top) : newHeight,
                                  SWP_NOZORDER | SWP_NOACTIVATE);
 
                     configChanged = true;
@@ -2479,8 +2487,12 @@ void App::UpdateCorralPositions()
                 cfg.Width = newWidth;
                 cfg.Height = newHeight;
 
+                // A rolled-up Corral keeps its rolled-up window height
+                RECT now;
+                GetWindowRect(corral->GetHWND(), &now);
                 SetWindowPos(corral->GetHWND(), nullptr,
-                             screenLeft, screenTop, newWidth, newHeight,
+                             screenLeft, screenTop, newWidth,
+                             cfg.IsRolledUp ? (int)(now.bottom - now.top) : newHeight,
                              SWP_NOZORDER | SWP_NOACTIVATE);
 
                 configChanged = true;

@@ -368,7 +368,7 @@ void CorralWindow::Hide()
     }
 }
 
-void CorralWindow::SyncConfigFromWindow()
+void CorralWindow::SyncConfigFromWindow(bool userPlaced)
 {
     if (hwnd)
     {
@@ -391,7 +391,11 @@ void CorralWindow::SyncConfigFromWindow()
         {
             MonitorManager *monMgr = app->GetMonitorManager();
             const MonitorInfo *mon = monMgr->FindMonitorForRect(rect);
-            if (mon)
+            // The home monitor only changes when the user puts the Corral
+            // somewhere. A move made for it, because its monitor went away,
+            // must not count, or the Corral could never return there.
+            bool atHome = mon && (config.TargetMonitorId.empty() || config.TargetMonitorId == mon->deviceId);
+            if (mon && (atHome || userPlaced || isDragging || isResizing))
             {
                 // Update target monitor ID
                 config.TargetMonitorId = mon->deviceId;

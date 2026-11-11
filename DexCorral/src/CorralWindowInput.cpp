@@ -355,7 +355,7 @@ void CorralWindow::EndResize()
         isResizing = false;
         StopCursorTracking();
         ReleaseCapture();
-        SyncConfigFromWindow();
+        SyncConfigFromWindow(true);
         CalculateIconLayout();
         UpdateLayeredContent();
         if (App::GetInstance())
@@ -1190,7 +1190,7 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         isDragging = false;
         StopCursorTracking();
         ReleaseCapture();
-        SyncConfigFromWindow();
+        SyncConfigFromWindow(true);
         if (App::GetInstance())
         {
             App::GetInstance()->CacheDesktopIconPositions();
@@ -1291,7 +1291,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
             }
         }
 
-        SyncConfigFromWindow();
+        SyncConfigFromWindow(true);
         if (App::GetInstance())
         {
             // Final push at resting position: fast moves can coalesce WM_MOUSEMOVE
