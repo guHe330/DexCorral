@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <cstdarg>
 #include "DesktopIcons.h"
 
 // One hidden desktop icon as communicated from the app to the hook.
@@ -96,6 +97,15 @@ public:
     // Debug logging flag — set from config after load, read by dllmain/CorralHook Log()
     static void SetDebugLogging(bool enable);
     static bool IsDebugLogging();
+
+    /**
+     * The one debug logger. Appends a timestamped line to `fileName` in
+     * %APPDATA%\DexCorral when DebugLogging is on, and does nothing otherwise.
+     * Over-long lines are cut off. A file that passes 2 MB is renamed to
+     * "<name>.old" (replacing the previous one) and started again, so logging
+     * left on cannot fill the disk.
+     */
+    static void WriteDebugLog(const wchar_t *fileName, const wchar_t *format, va_list args);
 
     // This DLL's own module handle, set once from DllMain(DLL_PROCESS_ATTACH).
     // App.cpp/CorralWindow.cpp run injected into Explorer, so GetModuleHandleW(nullptr)

@@ -110,47 +110,11 @@ static DesktopSortMode g_LastSortMode = DesktopSortMode::PositionOrder; // Last 
 // %APPDATA%/DexCorral/CorralHook.log
 // ============================================================================
 
-static wchar_t g_LogPath[MAX_PATH] = {};
-
-static void InitLogPath() {
-    if (g_LogPath[0]) return;
-    wchar_t* appData = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData))) {
-        // Ensure DexCorral directory exists
-        wchar_t dir[MAX_PATH];
-        swprintf_s(dir, L"%s\\DexCorral", appData);
-        CreateDirectoryW(dir, nullptr);
-        swprintf_s(g_LogPath, L"%s\\CorralHook.log", dir);
-        CoTaskMemFree(appData);
-    } else {
-        // Fallback to temp
-        GetTempPathW(MAX_PATH, g_LogPath);
-        wcscat_s(g_LogPath, L"CorralHook.log");
-    }
-}
-
 static void Log(const wchar_t* format, ...) {
-    if (!HookBridge::IsDebugLogging()) return;
-    InitLogPath();
-
     va_list args;
     va_start(args, format);
-    wchar_t message[512];
-    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
+    HookBridge::WriteDebugLog(L"CorralHook.log", format, args);
     va_end(args);
-
-    HANDLE hFile = CreateFileW(g_LogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
-                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile != INVALID_HANDLE_VALUE) {
-        SYSTEMTIME st;
-        GetLocalTime(&st);
-        wchar_t buffer[600];
-        swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] %s\r\n",
-                   st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
-        DWORD written;
-        WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
-        CloseHandle(hFile);
-    }
 }
 
 // Debug log defined in dllmain.cpp (same DLL) — gated by the DebugLogging
@@ -1716,35 +1680,10 @@ static IDropTarget* g_pOriginalDropTarget = nullptr;
 // at mouse-move frequency during any desktop drag, and an open/write/close per
 // tick is far too expensive to leave on in release builds.
 static void LogDT(const wchar_t* format, ...) {
-    if (!HookBridge::IsDebugLogging()) return;
-    // Reuse same directory as main log
-    InitLogPath();
-    wchar_t path[MAX_PATH];
-    wcscpy_s(path, g_LogPath);
-    // Replace CorralHook.log -> CorralHook_DropTarget.log
-    wchar_t* dot = wcsrchr(path, L'.');
-    if (dot) {
-        wcscpy_s(dot, MAX_PATH - (dot - path), L"_DropTarget.log");
-    }
-
     va_list args;
     va_start(args, format);
-    wchar_t message[512];
-    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args); // truncates; vswprintf_s would end Explorer on overflow
+    HookBridge::WriteDebugLog(L"CorralHook_DropTarget.log", format, args);
     va_end(args);
-
-    HANDLE hFile = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
-                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile != INVALID_HANDLE_VALUE) {
-        SYSTEMTIME st;
-        GetLocalTime(&st);
-        wchar_t buffer[600];
-        swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] %s\r\n",
-                   st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
-        DWORD written;
-        WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
-        CloseHandle(hFile);
-    }
 }
 
 // Check if a screen-space point is over a hidden icon

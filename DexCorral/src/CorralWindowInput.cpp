@@ -46,52 +46,12 @@
 // Gated by the DebugLogging config flag like every other log file.
 // ============================================================================
 
-static wchar_t g_CorralDropLogPath[MAX_PATH] = {};
-
 static void LogCorralDrop(const wchar_t *fmt, ...)
 {
-    if (!HookBridge::IsDebugLogging())
-        return;
-
-    if (!g_CorralDropLogPath[0])
-    {
-        wchar_t *appData = nullptr;
-        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)))
-        {
-            wchar_t dir[MAX_PATH];
-            swprintf_s(dir, L"%s\\DexCorral", appData);
-            CreateDirectoryW(dir, nullptr);
-            swprintf_s(g_CorralDropLogPath, L"%s\\CorralDrop.log", dir);
-            CoTaskMemFree(appData);
-        }
-        else
-        {
-            GetTempPathW(MAX_PATH, g_CorralDropLogPath);
-            wcscat_s(g_CorralDropLogPath, L"CorralDrop.log");
-        }
-    }
-
-    HANDLE hFile = CreateFileW(g_CorralDropLogPath, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
-                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile != INVALID_HANDLE_VALUE)
-    {
-        SYSTEMTIME st;
-        GetLocalTime(&st);
-        wchar_t buffer[1024];
-        int offset = swprintf_s(buffer, L"[%02d:%02d:%02d.%03d] ",
-                                st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-
-        va_list args;
-        va_start(args, fmt);
-        // Truncating, and leaving room for the line end appended below
-        _vsnwprintf_s(buffer + offset, _countof(buffer) - offset - 2, _TRUNCATE, fmt, args);
-        va_end(args);
-
-        wcscat_s(buffer, L"\r\n");
-        DWORD written;
-        WriteFile(hFile, buffer, (DWORD)(wcslen(buffer) * sizeof(wchar_t)), &written, nullptr);
-        CloseHandle(hFile);
-    }
+    va_list args;
+    va_start(args, fmt);
+    HookBridge::WriteDebugLog(L"CorralDrop.log", fmt, args);
+    va_end(args);
 }
 
 // ============================================================================

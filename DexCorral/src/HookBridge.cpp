@@ -234,3 +234,65 @@ void HookBridge::RefreshDesktop()
         RedrawWindow(hListView, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
     }
 }
+
+// ----------------------------------------------------------------------------
+// Debug log
+// ----------------------------------------------------------------------------
+
+namespace
+{
+    const DWORD kMaxDebugLogBytes = 2 * 1024 * 1024;
+
+    /// "%APPDATA%\DexCorral\" (created if missing), or the temp folder if that fails
+    std::wstring ResolveLogFolder()
+    {
+        wchar_t *appData = nullptr;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)) && appData)
+        {
+            std::wstring dir = std::wstring(appData) + L"\\DexCorral";
+            CoTaskMemFree(appData);
+            CreateDirectoryW(dir.c_str(), nullptr);
+            return dir + L"\\";
+        }
+        wchar_t temp[MAX_PATH] = {};
+        GetTempPathW(MAX_PATH, temp);
+        return temp;
+    }
+} // namespace
+
+void HookBridge::WriteDebugLog(const wchar_t *fileName, const wchar_t *format, va_list args)
+{
+    if (!IsDebugLogging())
+        return;
+
+    // _TRUNCATE: the secure formatters without it end the process on overflow,
+    // and the process is Explorer.
+    wchar_t message[1024];
+    _vsnwprintf_s(message, _countof(message), _TRUNCATE, format, args);
+
+    static const std::wstring folder = ResolveLogFolder();
+    const std::wstring path = folder + fileName;
+
+    WIN32_FILE_ATTRIBUTE_DATA info = {};
+    if (GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info) &&
+        (info.nFileSizeHigh != 0 || info.nFileSizeLow > kMaxDebugLogBytes))
+    {
+        MoveFileExW(path.c_str(), (path + L".old").c_str(), MOVEFILE_REPLACE_EXISTING);
+    }
+
+    // Shared for writing: hook, app and watcher threads log concurrently, and
+    // FILE_APPEND_DATA makes each write land at the end.
+    HANDLE hFile = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return;
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    wchar_t line[1100];
+    _snwprintf_s(line, _countof(line), _TRUNCATE, L"[%02d:%02d:%02d.%03d] %s\r\n",
+                 st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
+    DWORD written;
+    WriteFile(hFile, line, (DWORD)(wcslen(line) * sizeof(wchar_t)), &written, nullptr);
+    CloseHandle(hFile);
+}

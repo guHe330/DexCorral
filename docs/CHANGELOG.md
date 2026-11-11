@@ -8,6 +8,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Icons in a normal Corral can be dragged into other applications and Explorer windows, as from the desktop: drop one on a terminal to paste its path, or on an editor to open it. A multi-selection travels as a whole. Dropping on the desktop, on another Corral or on a tab works as before. ([#83](https://github.com/guHe330/DexCorral/issues/83))
 
 ### Changed
+- Debug logs no longer grow without limit. With `DebugLogging` left on, each log file is started again once it passes 2 MB, and the previous one is kept as `<name>.log.old`. ([#122](https://github.com/guHe330/DexCorral/issues/122))
 - Dragging a Corral, unrolling a rolled-up one and the Quick-Hide fade use less CPU: a Corral was redrawn completely on every step although nothing in it had changed, in places twice. ([#98](https://github.com/guHe330/DexCorral/issues/98))
 
 ### Fixed
