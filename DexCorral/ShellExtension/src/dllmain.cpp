@@ -161,25 +161,31 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         HookBridge::Initialize();
         HookBridge::SetDllModule(hModule);
 
-        {
-            wchar_t exePath[MAX_PATH] = {};
-            GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-            Log(L"CorralHook: DLL_PROCESS_ATTACH — host=%s insideExplorer=%d pid=%lu",
-                exePath, g_bInsideExplorer, GetCurrentProcessId());
-        }
-
-        // Do NOT start threads here. The loader lock is held during DllMain — starting
-        // threads that call OleInitialize() or load DLLs risks a deadlock, causing
-        // Explorer to silently abort the load when loaded via SharedTaskScheduler.
-        // Actual startup is deferred to StartAppIfNeeded(), called from Exec() (the
-        // SharedTaskScheduler path) or overlay handler methods (GetPriority/IsMemberOf).
-        Log(L"CorralHook: DLL_PROCESS_ATTACH done — waiting for deferred StartAppIfNeeded");
+        // Do NOT start threads here, and do not log either. The loader lock is held
+        // during DllMain: starting threads that call OleInitialize() or load DLLs
+        // risks a deadlock, causing Explorer to silently abort the load when loaded
+        // via SharedTaskScheduler, and the first log call reads config.json and asks
+        // the shell for a folder path. Actual startup is deferred to StartAppIfNeeded(),
+        // called from Exec() (the SharedTaskScheduler path) or overlay handler methods
+        // (GetPriority/IsMemberOf); the host process is logged there.
         break;
 
     case DLL_PROCESS_DETACH:
-        Log(L"CorralHook: DLL_PROCESS_DETACH (appStarted=%d)", g_AppStarted);
-
         if (!g_bInsideExplorer || !g_AppStarted) break;  // Nothing to clean up
+
+        if (lpReserved != nullptr) {
+            // Explorer is exiting. Every other thread has already been ended and
+            // COM is being torn down, so there is nobody to wait for and nothing
+            // of Explorer's that may still be touched. The one thing that matters
+            // is telling the crash guard that this was not a crash.
+            MarkCorralHookCleanExit();
+            break;
+        }
+
+        // FreeLibrary while Explorer keeps running. StartAppIfNeeded pins the
+        // module, so this is only reachable if pinning failed. It cannot be done
+        // well from here (the waits below hold the loader lock the threads need
+        // to exit), but leaving threads running in unmapped code would be worse.
 
         // Signal worker thread to stop
         if (g_hStopEvent) {
@@ -227,7 +233,20 @@ void StartAppIfNeeded(const wchar_t* caller) {
         return;
     }
 
-    DllLog(L"StartAppIfNeeded [%s]: FIRST CALL — launching hook + App threads", caller);
+    // Keep this DLL loaded for as long as Explorer lives. DllCanUnloadNow only
+    // stops COM from freeing it; the per-user start injects it with a window
+    // hook, and once DexCorral.exe removes that hook Windows is free to unload
+    // the module from under the hook procs, the app thread and its windows.
+    HMODULE pinned = nullptr;
+    BOOL pinOk = GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                                    (LPCWSTR)&StartAppIfNeeded, &pinned);
+
+    {
+        wchar_t exePath[MAX_PATH] = {};
+        GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+        DllLog(L"StartAppIfNeeded [%s]: FIRST CALL — host=%s pid=%lu pinned=%d, launching hook + App threads",
+               caller, exePath, GetCurrentProcessId(), pinOk);
+    }
 
     g_hStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     if (!g_hStopEvent) {

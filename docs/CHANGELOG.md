@@ -19,6 +19,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - **New DexCorral** and **New Virtual DexCorral** appeared in the right-click menu of every folder window and of the Open and Save dialogs of other programs, where they did nothing useful. They are now offered on the desktop only, and DexCorral is no longer loaded into other programs for it. ([#94](https://github.com/guHe330/DexCorral/issues/94))
 - A colour in a hand-edited `config.json` that is not a valid hex value (for example `#zz0000`) made a Corral paint in an arbitrary colour. Such a value is now replaced by the default when the file is loaded. ([#96](https://github.com/guHe330/DexCorral/issues/96))
 - A Corral dragged to a monitor with a different display scaling kept the icon size and spacing of the old monitor, under a header that had already changed size. The Corral now adapts completely: its size, icons, spacing and text follow the new scaling. ([#100](https://github.com/guHe330/DexCorral/issues/100))
+- DexCorral now stays loaded in Explorer for as long as Explorer runs. In a "just me" install Windows was free to unload it again after the start, which would have frozen the desktop for several seconds and could crash Explorer. Closing Explorer no longer does work that is unsafe while a program exits. ([#104](https://github.com/guHe330/DexCorral/issues/104))
 
 ## [1.1.2] - 2026-11-04
 
