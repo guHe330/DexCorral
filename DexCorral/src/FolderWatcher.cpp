@@ -21,6 +21,9 @@
 
 #include "FolderWatcher.h"
 
+// Debug log (dllmain.cpp); a no-op unless DebugLogging is on
+void DllLog(const wchar_t *format, ...);
+
 FolderWatcher::FolderWatcher() : running(false)
 {
 }
@@ -92,6 +95,7 @@ void FolderWatcher::MonitorThread()
 
     if (hDir == INVALID_HANDLE_VALUE)
     {
+        DllLog(L"Folder watch: cannot open '%s' (error %lu), not watching it", watchPath.c_str(), GetLastError());
         return;
     }
 
@@ -115,6 +119,9 @@ void FolderWatcher::MonitorThread()
 
         if (!success)
         {
+            // The folder was removed, renamed or unmounted. Nothing restarts the
+            // watch, so at least leave a trace of why changes stopped arriving.
+            DllLog(L"Folder watch: '%s' ended (error %lu)", watchPath.c_str(), GetLastError());
             break;
         }
 

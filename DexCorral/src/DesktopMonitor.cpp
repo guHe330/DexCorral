@@ -20,6 +20,9 @@
  */
 
 #include "DesktopMonitor.h"
+
+// Debug log (dllmain.cpp); a no-op unless DebugLogging is on
+void DllLog(const wchar_t *format, ...);
 #include <ShlObj.h>
 
 DesktopMonitor::DesktopMonitor() : running(false)
@@ -126,6 +129,7 @@ void DesktopMonitor::MonitorThread(const std::wstring &path)
 
     if (hDir == INVALID_HANDLE_VALUE)
     {
+        DllLog(L"Folder watch: cannot open '%s' (error %lu), not watching it", path.c_str(), GetLastError());
         return;
     }
 
@@ -154,6 +158,9 @@ void DesktopMonitor::MonitorThread(const std::wstring &path)
 
         if (!success)
         {
+            // The folder was removed, renamed or unmounted. Nothing restarts the
+            // watch, so at least leave a trace of why changes stopped arriving.
+            DllLog(L"Folder watch: '%s' ended (error %lu)", path.c_str(), GetLastError());
             break;
         }
 
@@ -185,7 +192,12 @@ void DesktopMonitor::MonitorThread(const std::wstring &path)
 void DesktopMonitor::ProcessNotification(BYTE *buffer, DWORD bytesReturned, std::wstring &pendingOldName)
 {
     if (bytesReturned == 0)
+    {
+        // The change buffer overflowed: Windows reports nothing rather than a
+        // partial list, so these changes are lost to the corrals.
+        DllLog(L"Desktop watch: change buffer overflowed, some desktop changes were missed");
         return;
+    }
 
     FILE_NOTIFY_INFORMATION *info = (FILE_NOTIFY_INFORMATION *)buffer;
 
