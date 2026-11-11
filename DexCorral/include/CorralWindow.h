@@ -305,6 +305,7 @@ private:
     void UpdateLayeredContent(); // True per-pixel transparency rendering
     void OnSize();
     void OnMove();
+    void OnDpiChanged(UINT newDpi, const RECT *suggested); // Moved to a monitor with another scale factor
     void OnLeftButtonDown(int x, int y);
     void OnLeftButtonUp(int x, int y); // Added for drag-end detection
     void OnLeftButtonDblClick(int x, int y);
