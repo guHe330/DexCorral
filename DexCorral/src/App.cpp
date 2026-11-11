@@ -908,6 +908,17 @@ bool App::IsPointOnEmptyDesktop(POINT pt, bool checkIcons)
     return !checkIcons || !DesktopIcons::IsPointOnIcon(pt.x, pt.y);
 }
 
+bool App::IsPointOnCorralOrDesktop(POINT pt)
+{
+    HWND root = GetAncestor(WindowFromPoint(pt), GA_ROOT);
+    for (const auto &corral : corrals)
+    {
+        if (corral->GetHWND() == root)
+            return true;
+    }
+    return IsPointOnEmptyDesktop(pt, false);
+}
+
 // Resolve a desktop file name to its full path (user desktop first, then
 // public desktop; defaults to the user desktop path if neither exists)
 static std::wstring ResolveDesktopFilePath(const std::wstring &fileName)

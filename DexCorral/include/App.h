@@ -178,6 +178,9 @@ public:
     /// Returns const reference to the list of all active corrals
     const std::vector<std::unique_ptr<CorralWindow>> &GetCorrals() const { return corrals; }
 
+    /// True if the topmost window at pt (screen coordinates) is a corral or the desktop
+    bool IsPointOnCorralOrDesktop(POINT pt);
+
     /// Called when display configuration changes (monitors added/removed/resolution changed)
     void OnDisplayChange();
 
