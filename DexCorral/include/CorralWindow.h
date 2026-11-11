@@ -154,7 +154,8 @@ public:
     void LoadFiles();
 
     /// Synchronizes corral window state back to the configuration object
-    void SyncConfigFromWindow();
+    /// userPlaced: the user put the Corral here (end of a drag or resize)
+    void SyncConfigFromWindow(bool userPlaced = false);
 
     /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
     void AddFilesToTab(const std::vector<std::string> &names, int tabIndex);

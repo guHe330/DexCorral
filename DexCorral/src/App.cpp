@@ -2415,8 +2415,14 @@ void App::UpdateCorralPositions()
             {
                 MonitorPosition &stored = it->second;
 
+                // Parked on another monitor while this one was away (by us
+                // below, or by Windows): bring it back to where it was
+                RECT now;
+                GetWindowRect(corral->GetHWND(), &now);
+                bool away = monitorManager->FindMonitorForRect(now) != targetMon;
+
                 // Check if resolution changed
-                if (stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
+                if (away || stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
                 {
                     // Scale position and size proportionally and keep the corral on the monitor
                     LayoutMath::ScaledRect scaled = LayoutMath::RescaleToMonitor(
