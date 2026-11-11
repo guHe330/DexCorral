@@ -137,6 +137,7 @@ add_executable(DexCorralTests
     tests/test_hotkey.cpp
     tests/test_crash_guard.cpp
     tests/test_conflicts.cpp
+    tests/test_update_logic.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
