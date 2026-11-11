@@ -139,54 +139,6 @@ bool DesktopIcons::IsPointOnIcon(int screenX, int screenY)
     return index != -1;
 }
 
-int DesktopIcons::GetSelectedCount()
-{
-    HWND hListView = GetDesktopListView();
-    if (hListView == nullptr)
-        return 0;
-    return (int)SendMessageW(hListView, LVM_GETSELECTEDCOUNT, 0, 0);
-}
-
-void DesktopIcons::RefreshDesktop()
-{
-    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
-}
-
-void DesktopIcons::PositionIcon(const std::wstring &fileName, int x, int y)
-{
-    AppIconMoveScope moveScope;
-
-    HWND hListView = GetDesktopListView();
-    if (hListView == nullptr)
-        return;
-
-    int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
-
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr)
-        return;
-
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
-    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
-
-    for (int i = 0; i < count; i++)
-    {
-        std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
-
-        if (_wcsicmp(text.c_str(), fileName.c_str()) == 0)
-        {
-            LPARAM pos = MAKELPARAM(x & 0xFFFF, y);
-            SendMessageW(hListView, LVM_SETITEMPOSITION, i, pos);
-            break;
-        }
-    }
-
-    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
-}
-
 void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions)
 {
     if (iconPositions.empty())

@@ -182,8 +182,3 @@ const MonitorInfo *MonitorManager::GetPrimaryMonitor() const
     // Fallback to first monitor
     return monitors.empty() ? nullptr : &monitors[0];
 }
-
-bool MonitorManager::IsMonitorActive(const std::string &deviceId) const
-{
-    return FindMonitor(deviceId) != nullptr;
-}

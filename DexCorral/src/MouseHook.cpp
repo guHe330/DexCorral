@@ -64,23 +64,6 @@ void MouseHook::SetLeftButtonDownCallback(MouseEventCallback callback)
     leftButtonDownCallback = callback;
 }
 
-void MouseHook::SetLeftButtonUpCallback(MouseEventCallback callback)
-{
-    leftButtonUpCallback = callback;
-}
-
-void MouseHook::SetMouseMoveCallback(MouseEventCallback callback)
-{
-    mouseMoveCallback = callback;
-}
-
-/// Dead code: Mousewheel callback mechanism was replaced with direct handling in MouseProc.
-/// The hook proc now directly routes WM_MOUSEWHEEL to the window under the cursor,
-/// making the callback approach unnecessary. Kept for historical reference.
-// void MouseHook::SetMouseWheelCallback(MouseWheelCallback callback) {
-//     mouseWheelCallback = callback;
-// }
-
 LRESULT CALLBACK MouseHook::MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
     if (nCode >= 0 && instance != nullptr)
@@ -94,18 +77,6 @@ LRESULT CALLBACK MouseHook::MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
             if (instance->leftButtonDownCallback)
             {
                 instance->leftButtonDownCallback(pt);
-            }
-            break;
-        case WM_LBUTTONUP:
-            if (instance->leftButtonUpCallback)
-            {
-                instance->leftButtonUpCallback(pt);
-            }
-            break;
-        case WM_MOUSEMOVE:
-            if (instance->mouseMoveCallback)
-            {
-                instance->mouseMoveCallback(pt);
             }
             break;
         case WM_MOUSEWHEEL:

@@ -217,7 +217,7 @@ bool CorralWindow::s_enableDpiScaling = true;
 
 int CorralWindow::Dpi(int logicalPixels) const
 {
-    if (!s_enableDpiScaling || !hwnd)
+    if (!hwnd)
         return logicalPixels;
     int dpi = (int)GetDpiForWindow(hwnd);
     if (dpi <= 0)

@@ -59,9 +59,6 @@ public:
     // Get primary monitor
     const MonitorInfo *GetPrimaryMonitor() const;
 
-    // Check if a monitor ID is currently active
-    bool IsMonitorActive(const std::string &deviceId) const;
-
     // Get hardware ID from HMONITOR
     static std::string GetMonitorDeviceId(HMONITOR hMon);
 

@@ -77,15 +77,6 @@ public:
     /// Returns true if the specified screen point is over a desktop icon
     static bool IsPointOnIcon(int screenX, int screenY);
 
-    /// Returns the number of selected icons on the desktop
-    static int GetSelectedCount();
-
-    /// Forces a desktop refresh (F5 equivalent)
-    static void RefreshDesktop();
-
-    /// Positions a single icon at the specified screen coordinates
-    static void PositionIcon(const std::wstring &fileName, int x, int y);
-
     /// Positions multiple icons according to the provided map of name->position
     static void PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions);
 

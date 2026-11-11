@@ -1,6 +1,7 @@
 #include "ShellExtension.h"
 #include "Guids.h"
 #include "HookBridge.h"
+#include "AppMessages.h"
 #include "CorralHook.h"
 #include <strsafe.h>
 
@@ -131,10 +132,10 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::InvokeCommand(CMINVOKECOMMANDINFO* 
     UINT msg;
     switch (LOWORD(pici->lpVerb)) {
     case IDM_NEW_CORRAL:
-        msg = WM_APP + 106; // WM_CREATE_CORRAL_AT
+        msg = WM_CREATE_CORRAL_AT;
         break;
     case IDM_NEW_VIRTUAL_CORRAL:
-        msg = WM_APP + 107; // WM_CREATE_VIRTUAL_CORRAL_AT
+        msg = WM_CREATE_VIRTUAL_CORRAL_AT;
         break;
     default:
         return E_INVALIDARG;

@@ -521,7 +521,7 @@ void CorralWindow::DoColumnResize(int x)
 
     CorralTabConfig &tab = GetActiveTab();
 
-    int dpi = (s_enableDpiScaling && hwnd) ? (int)GetDpiForWindow(hwnd) : 96;
+    int dpi = hwnd ? (int)GetDpiForWindow(hwnd) : 96;
     if (dpi <= 0)
         dpi = 96;
 

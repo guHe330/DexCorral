@@ -397,6 +397,42 @@ TEST(Normalize, ClampsHandEditedHeaderOpacity) {
     EXPECT_EQ(cfg.DefaultBorderOpacity, 0);
 }
 
+TEST(Normalize, ReplacesMalformedColors) {
+    // The renderers sscanf these into uninitialised locals; a colour that does
+    // not parse must never reach them.
+    AppConfig cfg;
+    CorralWindowConfig corral;
+    CorralTabConfig tab;
+    tab.ColorHex = "#zz000000";
+    tab.HeaderFontColor = "FFFFFF";
+    corral.IconTintColor = "#12";
+    corral.Tabs.push_back(tab);
+    cfg.Corrals.push_back(corral);
+    cfg.DefaultColorHex = "";
+
+    Config::Normalize(cfg);
+
+    EXPECT_EQ(cfg.Corrals[0].Tabs[0].ColorHex, CorralTabConfig().ColorHex);
+    EXPECT_EQ(cfg.Corrals[0].Tabs[0].HeaderFontColor, CorralTabConfig().HeaderFontColor);
+    EXPECT_EQ(cfg.Corrals[0].IconTintColor, CorralWindowConfig().IconTintColor);
+    EXPECT_EQ(cfg.DefaultColorHex, AppConfig().DefaultColorHex);
+}
+
+TEST(Normalize, KeepsValidColors) {
+    AppConfig cfg;
+    CorralWindowConfig corral;
+    CorralTabConfig tab;
+    tab.ColorHex = "#7F00ff00";
+    tab.HeaderFontColor = "#abcDEF";
+    corral.Tabs.push_back(tab);
+    cfg.Corrals.push_back(corral);
+
+    Config::Normalize(cfg);
+
+    EXPECT_EQ(cfg.Corrals[0].Tabs[0].ColorHex, "#7F00ff00");
+    EXPECT_EQ(cfg.Corrals[0].Tabs[0].HeaderFontColor, "#abcDEF");
+}
+
 TEST(Normalize, LeavesValidValuesAlone) {
     AppConfig cfg;
     CorralWindowConfig corral;
