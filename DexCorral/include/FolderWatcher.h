@@ -51,8 +51,4 @@ private:
     std::atomic<bool> running;
     std::thread monitorThread;
     HANDLE stopEvent = nullptr;
-
-    // Debouncing
-    std::atomic<DWORD> lastChangeTime;
-    static const DWORD DEBOUNCE_MS = 500;
 };

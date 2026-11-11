@@ -1139,6 +1139,12 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 }
                 return 0;
             }
+            if (wParam == FOLDER_RELOAD_TIMER_ID)
+            {
+                KillTimer(hwnd, FOLDER_RELOAD_TIMER_ID);
+                window->OnFolderContentsChanged();
+                return 0;
+            }
             if (wParam == TYPEAHEAD_TIMER_ID)
             {
                 window->OnTypeAheadTimeout();
@@ -1162,7 +1168,10 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             break;
         case WM_FOLDER_CHANGED:
-            window->OnFolderContentsChanged();
+            // Reload once the folder has been quiet for a moment: restarting
+            // the timer on every event turns a burst (an archive being
+            // extracted) into one reload that sees all of it.
+            SetTimer(hwnd, FOLDER_RELOAD_TIMER_ID, FOLDER_RELOAD_DELAY_MS, nullptr);
             return 0;
         case WM_DEFERRED_LOAD:
             // Deferred icon loading for virtual corrals (keeps UI responsive)
@@ -1232,6 +1241,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             KillTimer(hwnd, HOVER_DWELL_TIMER_ID);
             KillTimer(hwnd, OPACITY_TIMER_ID);
             KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+            KillTimer(hwnd, FOLDER_RELOAD_TIMER_ID);
             window->StopCursorTracking();
             return 0;
         }

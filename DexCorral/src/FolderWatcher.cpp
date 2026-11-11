@@ -21,7 +21,7 @@
 
 #include "FolderWatcher.h"
 
-FolderWatcher::FolderWatcher() : running(false), lastChangeTime(0)
+FolderWatcher::FolderWatcher() : running(false)
 {
 }
 
@@ -125,17 +125,11 @@ void FolderWatcher::MonitorThread()
         {
             if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE))
             {
-                // Debounce: only fire callback if enough time has passed
-                DWORD now = GetTickCount();
-                DWORD lastTime = lastChangeTime.load();
-
-                if (now - lastTime >= DEBOUNCE_MS)
+                // Report every change. Coalescing a burst is the receiver's
+                // job (a restarted timer), so the last event is never lost.
+                if (changeCallback)
                 {
-                    lastChangeTime.store(now);
-                    if (changeCallback)
-                    {
-                        changeCallback();
-                    }
+                    changeCallback();
                 }
             }
             ResetEvent(overlapped.hEvent);

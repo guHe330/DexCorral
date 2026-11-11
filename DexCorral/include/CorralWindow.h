@@ -629,6 +629,8 @@ private:
     bool virtualFolderMissing = false;            // Root folder unavailable (deleted/renamed/moved)
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
+    static const UINT_PTR FOLDER_RELOAD_TIMER_ID = 10;
+    static const UINT FOLDER_RELOAD_DELAY_MS = 300; // Quiet time after the last folder change
 
     // Details-view column resize state
     bool isResizingColumn = false;
