@@ -133,6 +133,11 @@ void DesktopMonitor::MonitorThread(const std::wstring &path)
     OVERLAPPED overlapped = {};
     overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
+    // Old name of a rename until its new name arrives. Per thread: the user and
+    // the public desktop are watched by two threads, and a shared member let
+    // one pair up with the other's half.
+    std::wstring pendingOldName;
+
     while (running)
     {
         DWORD bytesReturned = 0;
@@ -161,7 +166,7 @@ void DesktopMonitor::MonitorThread(const std::wstring &path)
             // Directory change occurred
             if (GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE))
             {
-                ProcessNotification(buffer, bytesReturned);
+                ProcessNotification(buffer, bytesReturned, pendingOldName);
             }
             ResetEvent(overlapped.hEvent);
         }
@@ -177,7 +182,7 @@ void DesktopMonitor::MonitorThread(const std::wstring &path)
     CloseHandle(hDir);
 }
 
-void DesktopMonitor::ProcessNotification(BYTE *buffer, DWORD bytesReturned)
+void DesktopMonitor::ProcessNotification(BYTE *buffer, DWORD bytesReturned, std::wstring &pendingOldName)
 {
     if (bytesReturned == 0)
         return;

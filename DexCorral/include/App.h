@@ -44,6 +44,7 @@
 #include "TrayIcon.h"
 #include "DesktopMonitor.h"
 #include "MonitorManager.h"
+#include "RecentlyLeft.h"
 
 class CorralWindow;
 
@@ -280,6 +281,11 @@ private:
     void OnDesktopFileAdded(const std::wstring &fileName);
     void OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName);
     void OnDesktopFileDeleted(const std::wstring &fileName);
+
+    // Slots that desktop events just emptied, so a replaced file can return to
+    // its place instead of dropping out of its corral (see RecentlyLeft.h)
+    RecentlyLeft recentlyLeft;
+    bool RestoreToLeftSlot(const std::string &fileName);
 
     // Deferred catch-all adoption: new desktop files are queued and only
     // adopted once Explorer's inline rename (New > ... edit box) has finished
