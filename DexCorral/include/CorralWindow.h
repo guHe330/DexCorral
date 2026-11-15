@@ -469,6 +469,12 @@ private:
     POINT dragStart;
     RECT dragStartRect;
 
+    // A press on the header or an edge only becomes a move or resize once the
+    // pointer has left the system drag rectangle: a click or double-click
+    // must not count as the user placing the Corral.
+    bool dragMoved = false;
+    bool PastDragThreshold(POINT start, int screenX, int screenY);
+
     // Resize state
     bool isResizing = false;
     int resizeMode = 0; // HTRIGHT, HTBOTTOM, HTBOTTOMRIGHT
