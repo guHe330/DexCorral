@@ -2421,13 +2421,18 @@ void App::UpdateCorralPositions()
                 GetWindowRect(corral->GetHWND(), &now);
                 bool away = monitorManager->FindMonitorForRect(now) != targetMon;
 
-                // Check if resolution changed
-                if (away || stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height)
+                bool resized = stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height;
+                if (away || resized)
                 {
-                    // Scale position and size proportionally and keep the corral on the monitor
-                    LayoutMath::ScaledRect scaled = LayoutMath::RescaleToMonitor(
-                        stored.Left, stored.Top, stored.Width, stored.Height,
-                        stored.RefWidth, stored.RefHeight, targetMon->width, targetMon->height);
+                    // Back on its monitor: exactly where it was. Pulling it
+                    // onto the monitor here made a Corral that hangs over an
+                    // edge creep a step further with every round trip.
+                    LayoutMath::ScaledRect scaled = {stored.Left, stored.Top, stored.Width, stored.Height};
+                    // Resolution changed: scale position and size proportionally and keep the corral on the monitor
+                    if (resized)
+                        scaled = LayoutMath::RescaleToMonitor(
+                            stored.Left, stored.Top, stored.Width, stored.Height,
+                            stored.RefWidth, stored.RefHeight, targetMon->width, targetMon->height);
                     int newRelLeft = scaled.left;
                     int newRelTop = scaled.top;
                     int newWidth = scaled.width;
@@ -2469,23 +2474,23 @@ void App::UpdateCorralPositions()
             {
                 MonitorPosition &stored = it->second;
 
-                // Same proportional placement, on the primary monitor
-                LayoutMath::ScaledRect scaled = LayoutMath::RescaleToMonitor(
-                    stored.Left, stored.Top, stored.Width, stored.Height,
-                    stored.RefWidth, stored.RefHeight, primaryMon->width, primaryMon->height);
-                int newRelLeft = scaled.left;
-                int newRelTop = scaled.top;
-                int newWidth = scaled.width;
-                int newHeight = scaled.height;
-                // Convert to screen coordinates
-                int screenLeft = primaryMon->bounds.left + newRelLeft;
-                int screenTop = primaryMon->bounds.top + newRelTop;
+                // Same relative place in the primary monitor's work area. The
+                // size stays as it is: a Corral does not grow with the
+                // resolution, and Windows has already converted it for the
+                // DPI of the monitor it moved the window to.
+                const RECT &work = primaryMon->workArea;
+                int newWidth = (int)cfg.Width;
+                int newHeight = (int)cfg.Height;
+                int screenLeft = work.left + LayoutMath::RepositionOnAxis(
+                                                 stored.Left, stored.Width, stored.RefWidth,
+                                                 newWidth, work.right - work.left);
+                int screenTop = work.top + LayoutMath::RepositionOnAxis(
+                                               stored.Top, stored.Height, stored.RefHeight,
+                                               newHeight, work.bottom - work.top);
 
                 // Update current position (but keep TargetMonitorId unchanged so it returns when monitor reconnects)
                 cfg.Left = screenLeft;
                 cfg.Top = screenTop;
-                cfg.Width = newWidth;
-                cfg.Height = newHeight;
 
                 // A rolled-up Corral keeps its rolled-up window height
                 RECT now;

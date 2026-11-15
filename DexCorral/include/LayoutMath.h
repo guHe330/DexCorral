@@ -59,6 +59,17 @@ namespace LayoutMath
     ScaledRect RescaleToMonitor(int left, int top, int width, int height,
                                 int refWidth, int refHeight, int newWidth, int newHeight);
 
+    /**
+     * One axis of carrying a rectangle over to another area without scaling
+     * it: `pos` is where a span of `size` began on an extent of `extent`, the
+     * result is where a span of `newSize` begins on one of `newExtent`.
+     *
+     * The free room on either side keeps its proportion, so a span that
+     * touched an edge touches the same edge again. The result always lies
+     * inside the new extent; a span that does not fit starts at 0.
+     */
+    int RepositionOnAxis(int pos, int size, int extent, int newSize, int newExtent);
+
     /// Direction for keyboard navigation between icon cells.
     enum class NavDirection
     {

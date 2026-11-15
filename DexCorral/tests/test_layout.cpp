@@ -318,6 +318,37 @@ TEST(Placement, ExcludedRectsAreSimplyAbsent) {
 }
 
 // ---------------------------------------------------------------------------
+// RepositionOnAxis: carrying a corral over to another monitor, size kept
+// ---------------------------------------------------------------------------
+
+TEST(RepositionOnAxis, KeepsTheProportionOfTheFreeRoom) {
+    // 300 wide in the middle of 1920 lands in the middle of 3840
+    EXPECT_EQ(RepositionOnAxis(810, 300, 1920, 300, 3840), 1770);
+    // Same extent and size: unchanged
+    EXPECT_EQ(RepositionOnAxis(46, 966, 1920, 966, 1920), 46);
+}
+
+TEST(RepositionOnAxis, EdgesStayEdges) {
+    EXPECT_EQ(RepositionOnAxis(0, 300, 1920, 300, 3840), 0);
+    EXPECT_EQ(RepositionOnAxis(1620, 300, 1920, 300, 3840), 3540);
+    // Also when the size changes with it (another DPI)
+    EXPECT_EQ(RepositionOnAxis(1620, 300, 1920, 450, 3840), 3390);
+}
+
+TEST(RepositionOnAxis, StaysInsideTheNewExtent) {
+    // Hung over the old edges
+    EXPECT_EQ(RepositionOnAxis(-50, 300, 1920, 300, 3840), 0);
+    EXPECT_EQ(RepositionOnAxis(1800, 300, 1920, 300, 3840), 3540);
+    // Does not fit the new extent: starts at its origin
+    EXPECT_EQ(RepositionOnAxis(500, 848, 2160, 848, 720), 0);
+    // Was larger than its old extent (848 on a 720 screen): no proportion to keep
+    EXPECT_EQ(RepositionOnAxis(-100, 848, 720, 848, 2160), 0);
+    EXPECT_EQ(RepositionOnAxis(5000, 848, 720, 848, 2160), 1312);
+    // Damaged config
+    EXPECT_EQ(RepositionOnAxis(100, 300, 0, 300, 1920), 100);
+}
+
+// ---------------------------------------------------------------------------
 // RescaleToMonitor: carrying a corral over to another resolution
 // ---------------------------------------------------------------------------
 
