@@ -25,6 +25,7 @@
 #include <functional>
 #include <thread>
 #include <atomic>
+#include "NameDiff.h"
 
 class DesktopMonitor
 {
@@ -44,8 +45,13 @@ public:
     void Stop();
 
 private:
-    void MonitorThread(const std::wstring &path);
-    void ProcessNotification(BYTE *buffer, DWORD bytesReturned, std::wstring &pendingOldName);
+    void MonitorThread(bool publicDesktop);
+    /// Watches one opened folder until it fails, moves or the monitor stops
+    void WatchFolder(HANDLE hDir, const std::wstring &path, bool publicDesktop, HANDLE stopEvent,
+                     NameSet &known, bool &haveKnown);
+    void ProcessNotification(BYTE *buffer, DWORD bytesReturned, std::wstring &pendingOldName, NameSet &known);
+    /// Lists the folder and reports what differs from `known` as added/deleted
+    void Reconcile(const std::wstring &path, NameSet &known, bool &haveKnown);
 
     static std::wstring GetDesktopPath();
     static std::wstring GetPublicDesktopPath();
