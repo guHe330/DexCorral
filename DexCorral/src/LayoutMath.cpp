@@ -49,6 +49,18 @@ namespace LayoutMath
         return r;
     }
 
+    int RepositionOnAxis(int pos, int size, int extent, int newSize, int newExtent)
+    {
+        int room = extent - size;
+        int newRoom = newExtent - newSize;
+        if (newRoom <= 0)
+            return 0;
+        // No room to take a proportion of (larger than its old area, or a damaged config)
+        if (room > 0)
+            pos = (int)std::lround((double)pos * newRoom / room);
+        return (std::max)(0, (std::min)(pos, newRoom));
+    }
+
     int FindNeighbor(const std::vector<IconCell> &cells, int current, NavDirection dir)
     {
         if (current < 0 || current >= (int)cells.size())
