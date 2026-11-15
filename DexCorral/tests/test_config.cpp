@@ -507,8 +507,13 @@ TEST_F(ConfigFiles, MissingFile_GivesDefaultsAndWritesNothing) {
     EXPECT_FALSE(Exists(Config::GetCorruptPath(path)));
 }
 
+TEST_F(ConfigFiles, SaveReportsFailure_AndLeavesTheFileAlone) {
+    EXPECT_FALSE(Config::SaveTo(path + L"/no-such-folder/config.json", OneCorral(1)));
+    EXPECT_FALSE(Exists(path));
+}
+
 TEST_F(ConfigFiles, SaveThenLoad_RoundTripsAndKeepsBackup) {
-    Config::SaveTo(path, OneCorral(444));
+    EXPECT_TRUE(Config::SaveTo(path, OneCorral(444)));
 
     ConfigLoadStatus status = ConfigLoadStatus::Missing;
     AppConfig c = Config::LoadFrom(path, &status);

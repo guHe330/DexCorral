@@ -75,6 +75,10 @@ static const UINT_PTR CONFLICT_POLL_TIMER = 4;
 static const UINT_PTR DISPLAY_CHANGE_TIMER = 6;
 static const UINT DISPLAY_CHANGE_SETTLE_MS = 1500;
 
+// Coalesces a burst of SaveConfig calls into one write of config.json
+static const UINT_PTR CONFIG_WRITE_TIMER = 7;
+static const UINT CONFIG_WRITE_DELAY_MS = 500;
+
 // One retry of a failed automatic update check
 static const UINT_PTR UPDATE_RETRY_TIMER = 5;
 static const UINT UPDATE_RETRY_MS = 5 * 60 * 1000;
@@ -498,6 +502,7 @@ void App::Shutdown()
 
     // Save config before exit
     SaveConfig();
+    FlushConfigWrite();
 
     // Clear hidden icons so hook stops hiding them
     HookBridge::ClearHiddenIcons();
@@ -537,7 +542,7 @@ void App::SaveConfig()
     // (language, update check) and leave the corrals exactly as loaded.
     if (!desktopActive)
     {
-        Config::Save(config);
+        ScheduleConfigWrite();
         return;
     }
 
@@ -553,12 +558,32 @@ void App::SaveConfig()
         corral->SyncConfigFromWindow();
         config.Corrals.push_back(corral->GetConfig());
     }
-    Config::Save(config);
+    ScheduleConfigWrite();
 
     // Update hook hidden icons (hook is always active in shell extension mode)
     UpdateHookHiddenIcons();
     PositionHiddenIconsUnderCorrals();
     HookBridge::RefreshDesktop();
+}
+
+void App::ScheduleConfigWrite()
+{
+    // The hidden-icon sync in SaveConfig stays immediate; only the file write
+    // waits, so a column drag or a run of tab switches costs one write.
+    configWritePending = true;
+    if (!messageWindow || !SetTimer(messageWindow, CONFIG_WRITE_TIMER, CONFIG_WRITE_DELAY_MS, nullptr))
+        FlushConfigWrite();
+}
+
+void App::FlushConfigWrite()
+{
+    if (!configWritePending)
+        return;
+    configWritePending = false;
+    if (messageWindow)
+        KillTimer(messageWindow, CONFIG_WRITE_TIMER);
+    if (!Config::Save(config))
+        DllLog(L"App: config.json could not be written (error %lu); the change is not saved", GetLastError());
 }
 
 void App::RestoreCorrals()
@@ -2193,6 +2218,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Deferred catch-all adoption — waits out Explorer's inline rename
+    if (app && uMsg == WM_TIMER && wParam == CONFIG_WRITE_TIMER)
+    {
+        app->FlushConfigWrite();
+        return 0;
+    }
+
     if (app && uMsg == WM_TIMER && wParam == UPDATE_RETRY_TIMER)
     {
         KillTimer(hwnd, UPDATE_RETRY_TIMER);
@@ -2240,9 +2271,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     }
 
     // Handle Windows shutdown/logoff
-    if (uMsg == WM_QUERYENDSESSION)
+    if (uMsg == WM_QUERYENDSESSION || uMsg == WM_ENDSESSION)
     {
-        return TRUE;
+        // Sign-out or shutdown: nothing may still be waiting for the write timer
+        if (app)
+            app->FlushConfigWrite();
+        return uMsg == WM_QUERYENDSESSION ? TRUE : 0;
     }
 
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);

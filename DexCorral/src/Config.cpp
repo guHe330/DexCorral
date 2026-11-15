@@ -210,12 +210,12 @@ AppConfig Config::LoadFrom(const std::wstring &path, ConfigLoadStatus *status)
     return AppConfig();
 }
 
-void Config::Save(const AppConfig &config)
+bool Config::Save(const AppConfig &config)
 {
-    SaveTo(Utf8ToWide(GetConfigPath()), config);
+    return SaveTo(Utf8ToWide(GetConfigPath()), config);
 }
 
-void Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
+bool Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
 {
     std::wstring wTmp = wPath + L".tmp";
 
@@ -231,13 +231,13 @@ void Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
             std::ofstream file(wTmp.c_str(), std::ios::binary | std::ios::trunc);
             if (!file.is_open())
             {
-                return;
+                return false;
             }
             file << data;
             file.flush();
             if (!file.good())
             {
-                return; // Don't replace good config with a bad write
+                return false; // Don't replace good config with a bad write
             }
         } // close the stream before renaming
 
@@ -245,10 +245,13 @@ void Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
                          MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
         {
             DeleteFileW(wTmp.c_str()); // leave the existing config intact
+            return false;
         }
+        return true;
     }
     catch (...)
     {
         DeleteFileW(wTmp.c_str());
+        return false;
     }
 }

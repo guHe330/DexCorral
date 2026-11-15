@@ -9,6 +9,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Changed
 - Debug logs no longer grow without limit. With `DebugLogging` left on, each log file is started again once it passes 2 MB, and the previous one is kept as `<name>.log.old`. ([#122](https://github.com/guHe330/DexCorral/issues/122))
+- The configuration file is written once after a burst of changes, such as dragging a column edge or switching tabs repeatedly, instead of once per step. It is still written before sign-out and shutdown. A write that fails, for example because `config.json` is read-only, now leaves a line in the debug log instead of being lost silently. ([#130](https://github.com/guHe330/DexCorral/issues/130))
 - Dragging a Corral, unrolling a rolled-up one and the Quick-Hide fade use less CPU: a Corral was redrawn completely on every step although nothing in it had changed, in places twice. ([#98](https://github.com/guHe330/DexCorral/issues/98))
 - DexCorral never noticed a change of the display setup while it was running: a new resolution, a monitor added or removed. Corrals kept their old pixel positions, the list of monitors stayed as it was at sign-in, and the tray icon was not restored when the taskbar was recreated. These notifications now arrive. After a resolution change a Corral keeps its relative place and size on its monitor, and a Corral whose monitor is gone moves to the primary one. ([#112](https://github.com/guHe330/DexCorral/issues/112))
 

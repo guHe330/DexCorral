@@ -226,6 +226,9 @@ private:
     void Initialize();
     void Shutdown();
     void LoadConfig();
+    void ScheduleConfigWrite();
+    void FlushConfigWrite();
+    bool configWritePending = false;
     void RestoreCorrals();
     void ShowTrayMenu();
     void ShowAbout();
