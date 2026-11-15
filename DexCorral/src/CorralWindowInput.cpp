@@ -275,9 +275,19 @@ int CorralWindow::HitTestResizeAllowingTabs(int x, int y)
     return hit;
 }
 
+bool CorralWindow::PastDragThreshold(POINT start, int screenX, int screenY)
+{
+    // Latches: once the drag has begun, the pointer may come back to the start
+    if (!dragMoved)
+        dragMoved = abs(screenX - start.x) > GetSystemMetrics(SM_CXDRAG) ||
+                    abs(screenY - start.y) > GetSystemMetrics(SM_CYDRAG);
+    return dragMoved;
+}
+
 void CorralWindow::StartResize(int hitTest, int x, int y)
 {
     isResizing = true;
+    dragMoved = false;
     resizeMode = hitTest;
     GetCursorPos(&resizeStart);
     GetWindowRect(hwnd, &resizeStartRect);
@@ -287,7 +297,7 @@ void CorralWindow::StartResize(int hitTest, int x, int y)
 
 void CorralWindow::DoResize(int screenX, int screenY)
 {
-    if (!isResizing)
+    if (!isResizing || !PastDragThreshold(resizeStart, screenX, screenY))
         return;
 
     int dx = screenX - resizeStart.x;
@@ -355,7 +365,7 @@ void CorralWindow::EndResize()
         isResizing = false;
         StopCursorTracking();
         ReleaseCapture();
-        SyncConfigFromWindow(true);
+        SyncConfigFromWindow(dragMoved);
         CalculateIconLayout();
         UpdateLayeredContent();
         if (App::GetInstance())
@@ -371,7 +381,7 @@ void CorralWindow::EndResize()
 
 void CorralWindow::DoWindowDrag(int screenX, int screenY)
 {
-    if (!isDragging)
+    if (!isDragging || !PastDragThreshold(dragStart, screenX, screenY))
         return;
 
     int newLeft = screenX - (dragStart.x - dragStartRect.left);
@@ -995,6 +1005,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         if (!config.IsLocked)
         {
             isDragging = true;
+            dragMoved = false;
             GetCursorPos(&dragStart);
             GetWindowRect(hwnd, &dragStartRect);
 
@@ -1075,6 +1086,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
     if (y < GetTitleBarHeight() && !config.IsLocked)
     {
         isDragging = true;
+        dragMoved = false;
         GetCursorPos(&dragStart);
         GetWindowRect(hwnd, &dragStartRect);
 
@@ -1190,7 +1202,7 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         isDragging = false;
         StopCursorTracking();
         ReleaseCapture();
-        SyncConfigFromWindow(true);
+        SyncConfigFromWindow(dragMoved);
         if (App::GetInstance())
         {
             App::GetInstance()->CacheDesktopIconPositions();
@@ -1268,11 +1280,12 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
         StopCursorTracking();
         ReleaseCapture();
 
-        // Check for merge with another corral
+        // Check for merge with another corral. Only a drag merges: a click on
+        // a header that happens to lie over another Corral's header does not.
         POINT pt;
         GetCursorPos(&pt);
         App *app = App::GetInstance();
-        if (app)
+        if (app && dragMoved)
         {
             for (const auto &other : app->GetCorrals())
             {
@@ -1291,7 +1304,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
             }
         }
 
-        SyncConfigFromWindow(true);
+        SyncConfigFromWindow(dragMoved);
         if (App::GetInstance())
         {
             // Final push at resting position: fast moves can coalesce WM_MOUSEMOVE

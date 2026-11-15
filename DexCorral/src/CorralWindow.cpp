@@ -395,7 +395,7 @@ void CorralWindow::SyncConfigFromWindow(bool userPlaced)
             // somewhere. A move made for it, because its monitor went away,
             // must not count, or the Corral could never return there.
             bool atHome = mon && (config.TargetMonitorId.empty() || config.TargetMonitorId == mon->deviceId);
-            if (mon && (atHome || userPlaced || isDragging || isResizing))
+            if (mon && (atHome || userPlaced || ((isDragging || isResizing) && dragMoved)))
             {
                 // Update target monitor ID
                 config.TargetMonitorId = mon->deviceId;
