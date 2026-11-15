@@ -20,6 +20,7 @@
  */
 
 #include "MonitorManager.h"
+#include "LayoutMath.h"
 #include <algorithm>
 
 // Need to link with user32.lib for QueryDisplayConfig
@@ -135,6 +136,14 @@ std::string MonitorManager::GetMonitorDeviceId(HMONITOR hMon)
     }
 
     return "";
+}
+
+std::string MonitorManager::GetTopologyKey() const
+{
+    std::vector<std::string> keys;
+    for (const auto &mon : monitors)
+        keys.push_back(LayoutMath::MonitorKey(mon.deviceId, mon.width, mon.height));
+    return LayoutMath::TopologyKey(keys);
 }
 
 const MonitorInfo *MonitorManager::FindMonitor(const std::string &deviceId) const

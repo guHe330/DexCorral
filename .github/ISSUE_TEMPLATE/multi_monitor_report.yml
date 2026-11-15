@@ -76,8 +76,8 @@ body:
     attributes:
       label: config.json
       description: >
-        The most valuable attachment for this kind of report — `TargetMonitorId` and `MonitorPositions`
-        are the ground truth for what got stored per monitor. Attach `%AppData%\DexCorral\config.json`
+        The most valuable attachment for this kind of report — the `Layouts` of each corral
+        are the ground truth for what got stored per set of monitors. Attach `%AppData%\DexCorral\config.json`
         (rename to `.txt` if GitHub refuses the upload). It lists your corral names, positions and the
         paths of the files you have organized — please look it over and redact anything you would
         rather not publish.

@@ -42,17 +42,19 @@ enum class ViewMode : int
     Details = 3      /// List view with columns (name, type, size, modified date, sync status)
 };
 
-/// Position snapshot for a specific monitor at a specific resolution
+/// Where a corral sits on one monitor at one resolution
 struct MonitorPosition
 {
-    int Left = 0;         /// Window left edge
-    int Top = 0;          /// Window top edge
+    int Left = 0;         /// Window left edge, relative to the monitor's origin
+    int Top = 0;          /// Window top edge, relative to the monitor's origin
     int Width = 300;      /// Window width
-    int Height = 200;     /// Window height
+    int Height = 200;     /// Window height (unrolled)
     int RefWidth = 1920;  /// Reference monitor width when position was saved
     int RefHeight = 1080; /// Reference monitor height when position was saved
+    std::string MonitorId; /// Hardware ID of that monitor (Layouts only)
+    int Dpi = 0;           /// DPI the size was saved at; 0 = unknown, the size is used as it is
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MonitorPosition, Left, Top, Width, Height, RefWidth, RefHeight)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MonitorPosition, Left, Top, Width, Height, RefWidth, RefHeight, MonitorId, Dpi)
 };
 
 /// Configuration for a single tab within a corral window
@@ -100,9 +102,14 @@ struct CorralWindowConfig
     std::vector<CorralTabConfig> Tabs;
     int ActiveTabIndex = 0;
 
-    // Multi-monitor support
-    std::string TargetMonitorId;                             // Hardware ID of the monitor this corral belongs to
-    std::map<std::string, MonitorPosition> MonitorPositions; // Position per monitor
+    // Multi-monitor support: where the user put the corral, once per set of
+    // connected monitors. The key is LayoutMath::TopologyKey. Left/Top/Width/
+    // Height above are only where the window is right now.
+    std::map<std::string, MonitorPosition> Layouts;
+
+    // Up to 1.1.x: one position per monitor. Read once by Config::MigrateLayouts, then left empty.
+    std::string TargetMonitorId;
+    std::map<std::string, MonitorPosition> MonitorPositions;
 
     // Appearance settings (per-corral)
     int TitleBarHeight = 32;               // Header height in pixels (20-64), applies to all tabs
@@ -115,7 +122,7 @@ struct CorralWindowConfig
     int IconSpacingXPercent = 100;         // Horizontal icon spacing (50-200%)
     int IconSpacingYPercent = 100;         // Vertical icon spacing (50-200%)
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, IsLocked, ExpandOnHover, Tabs, ActiveTabIndex, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, IsLocked, ExpandOnHover, Tabs, ActiveTabIndex, Layouts, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
 struct AppConfig
@@ -256,4 +263,23 @@ public:
      * *and* undraggable, with no way back through the UI.
      */
     static void Normalize(AppConfig &config);
+
+    /**
+     * Records where the user put a corral while the monitors of `topologyKey`
+     * are connected. Only that arrangement changes.
+     *
+     * The exception is a corral moved to another monitor of the same set: the
+     * places it had while some of these monitors were away were found for its
+     * old monitor and are forgotten, so it stays where it was put.
+     */
+    static void StoreLayout(CorralWindowConfig &corral, const std::string &topologyKey,
+                            const MonitorPosition &layout);
+
+    /**
+     * Turns the per-monitor positions of a 1.1.x config into layouts. The
+     * position on the corral's own monitor becomes its layout for
+     * `topologyKey`, the monitors connected now, if that monitor is among
+     * them. Every other position becomes the layout for that monitor alone.
+     */
+    static void MigrateLayouts(CorralWindowConfig &corral, const std::string &topologyKey);
 };

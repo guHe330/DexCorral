@@ -157,8 +157,13 @@ public:
     void LoadFiles();
 
     /// Synchronizes corral window state back to the configuration object
-    /// userPlaced: the user put the Corral here (end of a drag or resize)
+    /// userPlaced: the user put the Corral here (end of a drag or resize);
+    /// only then is the place remembered for the connected set of monitors
     void SyncConfigFromWindow(bool userPlaced = false);
+
+    /// Puts the Corral at a screen rectangle chosen for it after a display
+    /// change. `height` is the unrolled height; a rolled-up Corral stays rolled up.
+    void MoveTo(int left, int top, int width, int height);
 
     /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
     void AddFilesToTab(const std::vector<std::string> &names, int tabIndex);
@@ -474,6 +479,10 @@ private:
     // must not count as the user placing the Corral.
     bool dragMoved = false;
     bool PastDragThreshold(POINT start, int screenX, int screenY);
+
+    bool isBeingPlaced = false; // Inside MoveTo
+    /// Gives a rolled-up Corral the title bar height of the monitor it is on
+    void FitRolledUpHeight();
 
     // Resize state
     bool isResizing = false;

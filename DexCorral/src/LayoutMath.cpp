@@ -22,32 +22,10 @@
 #include "LayoutMath.h"
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace LayoutMath
 {
-
-    ScaledRect RescaleToMonitor(int left, int top, int width, int height,
-                                int refWidth, int refHeight, int newWidth, int newHeight)
-    {
-        ScaledRect r = {left, top, width, height};
-        if (refWidth > 0 && refHeight > 0)
-        {
-            r.left = (int)std::lround((double)left * newWidth / refWidth);
-            r.top = (int)std::lround((double)top * newHeight / refHeight);
-            r.width = (int)std::lround((double)width * newWidth / refWidth);
-            r.height = (int)std::lround((double)height * newHeight / refHeight);
-        }
-
-        if (r.left + r.width > newWidth)
-            r.left = newWidth - r.width;
-        if (r.top + r.height > newHeight)
-            r.top = newHeight - r.height;
-        if (r.left < 0)
-            r.left = 0;
-        if (r.top < 0)
-            r.top = 0;
-        return r;
-    }
 
     int RepositionOnAxis(int pos, int size, int extent, int newSize, int newExtent)
     {
@@ -59,6 +37,61 @@ namespace LayoutMath
         if (room > 0)
             pos = (int)std::lround((double)pos * newRoom / room);
         return (std::max)(0, (std::min)(pos, newRoom));
+    }
+
+    std::string MonitorKey(const std::string &deviceId, int width, int height)
+    {
+        return deviceId + "@" + std::to_string(width) + "x" + std::to_string(height);
+    }
+
+    std::string TopologyKey(std::vector<std::string> monitorKeys)
+    {
+        std::sort(monitorKeys.begin(), monitorKeys.end());
+        std::string key;
+        for (const auto &monitor : monitorKeys)
+            key += (key.empty() ? "" : "|") + monitor;
+        return key;
+    }
+
+    std::vector<std::string> TopologyMonitorIds(const std::string &topologyKey)
+    {
+        std::vector<std::string> ids;
+        size_t start = 0;
+        while (start <= topologyKey.size())
+        {
+            size_t end = topologyKey.find('|', start);
+            if (end == std::string::npos)
+                end = topologyKey.size();
+            std::string monitor = topologyKey.substr(start, end - start);
+            ids.push_back(monitor.substr(0, monitor.rfind('@'))); // No '@': the whole entry
+            start = end + 1;
+        }
+        std::sort(ids.begin(), ids.end());
+        return ids;
+    }
+
+    std::string ClosestTopology(const std::vector<std::string> &keys, const std::string &current)
+    {
+        const std::vector<std::string> wanted = TopologyMonitorIds(current);
+        std::string best;
+        size_t bestShared = 0, bestOthers = 0;
+        for (const auto &key : keys)
+        {
+            const std::vector<std::string> ids = TopologyMonitorIds(key);
+            std::vector<std::string> common;
+            std::set_intersection(ids.begin(), ids.end(), wanted.begin(), wanted.end(),
+                                  std::back_inserter(common));
+            size_t shared = common.size();
+            size_t others = ids.size() - shared;
+            if (best.empty() || shared > bestShared ||
+                (shared == bestShared && (others < bestOthers || (others == bestOthers && key < best))))
+            {
+                best = key;
+                bestShared = shared;
+                bestOthers = others;
+            }
+        }
+        return best;
     }
 
     int FindNeighbor(const std::vector<IconCell> &cells, int current, NavDirection dir)

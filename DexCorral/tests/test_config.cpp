@@ -325,6 +325,112 @@ TEST(MonitorPositions, TwoMonitorsRoundTrip) {
 }
 
 // ---------------------------------------------------------------------------
+// Layouts: one arrangement per set of connected monitors
+// ---------------------------------------------------------------------------
+
+namespace {
+MonitorPosition layoutOn(const std::string &monitor, int left) {
+    MonitorPosition p = { left, 35, 966, 628, 1920, 720 };
+    p.MonitorId = monitor;
+    p.Dpi = 144;
+    return p;
+}
+const char *BOTH = "BNQ@3840x2160|RTD@1920x720";
+const char *BENQ_ONLY = "BNQ@3840x2160";
+}
+
+TEST(Layouts, RoundTrip) {
+    CorralWindowConfig cfg;
+    cfg.Layouts[BOTH] = layoutOn("RTD", 46);
+
+    auto back = toJson(cfg).get<CorralWindowConfig>();
+    ASSERT_EQ(back.Layouts.count(BOTH), 1u);
+    EXPECT_EQ(back.Layouts.at(BOTH).MonitorId, "RTD");
+    EXPECT_EQ(back.Layouts.at(BOTH).Left, 46);
+    EXPECT_EQ(back.Layouts.at(BOTH).Dpi, 144);
+}
+
+TEST(Layouts, ArrangingParkedCorralKeepsItsHome) {
+    CorralWindowConfig cfg;
+    Config::StoreLayout(cfg, BOTH, layoutOn("RTD", 46));
+    // Second monitor unplugged, the user tidies up the parked Corral
+    Config::StoreLayout(cfg, BENQ_ONLY, layoutOn("BNQ", 500));
+
+    ASSERT_EQ(cfg.Layouts.size(), 2u);
+    EXPECT_EQ(cfg.Layouts.at(BOTH).MonitorId, "RTD");
+    EXPECT_EQ(cfg.Layouts.at(BOTH).Left, 46);
+    EXPECT_EQ(cfg.Layouts.at(BENQ_ONLY).Left, 500);
+}
+
+TEST(Layouts, MovingWithinAMonitorKeepsOtherArrangements) {
+    CorralWindowConfig cfg;
+    Config::StoreLayout(cfg, BOTH, layoutOn("RTD", 46));
+    Config::StoreLayout(cfg, BENQ_ONLY, layoutOn("BNQ", 500));
+    Config::StoreLayout(cfg, BOTH, layoutOn("RTD", 99));
+
+    EXPECT_EQ(cfg.Layouts.at(BOTH).Left, 99);
+    EXPECT_EQ(cfg.Layouts.count(BENQ_ONLY), 1u);
+}
+
+TEST(Layouts, NewHomeForgetsPlacesFoundForTheOldOne) {
+    CorralWindowConfig cfg;
+    Config::StoreLayout(cfg, BOTH, layoutOn("RTD", 46));
+    Config::StoreLayout(cfg, BENQ_ONLY, layoutOn("BNQ", 500));
+    Config::StoreLayout(cfg, "BNQ@1920x1080|RTD@1920x720", layoutOn("RTD", 7));
+    // Dragged over to the BenQ while both are connected
+    Config::StoreLayout(cfg, BOTH, layoutOn("BNQ", 1200));
+
+    EXPECT_EQ(cfg.Layouts.at(BOTH).MonitorId, "BNQ");
+    EXPECT_EQ(cfg.Layouts.count(BENQ_ONLY), 0u);
+    // Same monitors at another resolution: an arrangement of its own
+    EXPECT_EQ(cfg.Layouts.count("BNQ@1920x1080|RTD@1920x720"), 1u);
+}
+
+TEST(Layouts, MigratesHomeToTheCurrentMonitorSet) {
+    CorralWindowConfig cfg;
+    cfg.TargetMonitorId = "RTD";
+    cfg.MonitorPositions["RTD"] = { 46, 35, 966, 628, 1920, 720 };
+    cfg.MonitorPositions["BNQ"] = { 100, 200, 900, 600, 3840, 2160 };
+
+    Config::MigrateLayouts(cfg, BOTH);
+
+    ASSERT_EQ(cfg.Layouts.size(), 2u);
+    EXPECT_EQ(cfg.Layouts.at(BOTH).MonitorId, "RTD");
+    EXPECT_EQ(cfg.Layouts.at(BOTH).Left, 46);
+    EXPECT_EQ(cfg.Layouts.at(BOTH).Dpi, 0);
+    // The other monitor's position: the arrangement for that monitor alone
+    EXPECT_EQ(cfg.Layouts.at(BENQ_ONLY).MonitorId, "BNQ");
+    EXPECT_EQ(cfg.Layouts.at(BENQ_ONLY).Left, 100);
+    EXPECT_TRUE(cfg.TargetMonitorId.empty());
+    EXPECT_TRUE(cfg.MonitorPositions.empty());
+}
+
+TEST(Layouts, MigratesWhileTheHomeMonitorIsAway) {
+    CorralWindowConfig cfg;
+    cfg.TargetMonitorId = "RTD";
+    cfg.MonitorPositions["RTD"] = { 46, 35, 966, 628, 1920, 720 };
+
+    Config::MigrateLayouts(cfg, BENQ_ONLY);
+
+    // Not an arrangement for the BenQ alone: the Corral is only parked there
+    ASSERT_EQ(cfg.Layouts.size(), 1u);
+    EXPECT_EQ(cfg.Layouts.at("RTD@1920x720").MonitorId, "RTD");
+}
+
+TEST(Layouts, MigrationLeavesExistingLayoutsAlone) {
+    CorralWindowConfig cfg;
+    cfg.Layouts[BOTH] = layoutOn("RTD", 46);
+    cfg.TargetMonitorId = "BNQ";
+    cfg.MonitorPositions["BNQ"] = { 100, 200, 900, 600, 3840, 2160 };
+
+    Config::MigrateLayouts(cfg, BOTH);
+
+    ASSERT_EQ(cfg.Layouts.size(), 1u);
+    EXPECT_EQ(cfg.Layouts.at(BOTH).MonitorId, "RTD");
+    EXPECT_TRUE(cfg.MonitorPositions.empty());
+}
+
+// ---------------------------------------------------------------------------
 // Files vector round-trip
 // ---------------------------------------------------------------------------
 

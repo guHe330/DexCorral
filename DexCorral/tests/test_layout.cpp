@@ -349,57 +349,44 @@ TEST(RepositionOnAxis, StaysInsideTheNewExtent) {
 }
 
 // ---------------------------------------------------------------------------
-// RescaleToMonitor: carrying a corral over to another resolution
+// Topology keys: naming a set of connected monitors
 // ---------------------------------------------------------------------------
 
-TEST(RescaleToMonitor, SameSizeChangesNothing) {
-    auto r = RescaleToMonitor(100, 200, 300, 400, 1920, 1080, 1920, 1080);
-    EXPECT_EQ(r.left, 100);
-    EXPECT_EQ(r.top, 200);
-    EXPECT_EQ(r.width, 300);
-    EXPECT_EQ(r.height, 400);
+TEST(TopologyKey, SameMonitorsSameKeyInAnyOrder) {
+    std::string benq = MonitorKey("BNQ", 3840, 2160);
+    std::string second = MonitorKey("RTD", 1920, 720);
+    EXPECT_EQ(benq, "BNQ@3840x2160");
+    EXPECT_EQ(TopologyKey({second, benq}), "BNQ@3840x2160|RTD@1920x720");
+    EXPECT_EQ(TopologyKey({second, benq}), TopologyKey({benq, second}));
+    // Another resolution is another arrangement
+    EXPECT_NE(TopologyKey({benq}), TopologyKey({MonitorKey("BNQ", 1920, 1080)}));
 }
 
-TEST(RescaleToMonitor, ScalesProportionally) {
-    auto r = RescaleToMonitor(100, 200, 300, 400, 1920, 1080, 3840, 2160);
-    EXPECT_EQ(r.left, 200);
-    EXPECT_EQ(r.top, 400);
-    EXPECT_EQ(r.width, 600);
-    EXPECT_EQ(r.height, 800);
+TEST(TopologyKey, MonitorIds) {
+    auto ids = TopologyMonitorIds("RTD@1920x720|BNQ@3840x2160");
+    ASSERT_EQ(ids.size(), 2u);
+    EXPECT_EQ(ids[0], "BNQ");
+    EXPECT_EQ(ids[1], "RTD");
+    // A real device path has '#', '&' and braces but neither '|' nor '@'
+    ids = TopologyMonitorIds(MonitorKey("\\\\?\\DISPLAY#BNQ7F5C#5&2d7b&0&UID4352#{e6f07b5f}", 3840, 2160));
+    ASSERT_EQ(ids.size(), 1u);
+    EXPECT_EQ(ids[0], "\\\\?\\DISPLAY#BNQ7F5C#5&2d7b&0&UID4352#{e6f07b5f}");
 }
 
-TEST(RescaleToMonitor, RoundTripDoesNotDrift) {
-    // A game switching to 1280x720 and back must not shrink a corral a pixel
-    // at a time. Truncation did; rounding keeps it within one pixel.
-    int left = 1337, top = 611, width = 301, height = 199;
-    for (int i = 0; i < 20; i++) {
-        auto down = RescaleToMonitor(left, top, width, height, 1920, 1080, 1280, 720);
-        auto up = RescaleToMonitor(down.left, down.top, down.width, down.height, 1280, 720, 1920, 1080);
-        left = up.left; top = up.top; width = up.width; height = up.height;
-    }
-    EXPECT_NEAR(left, 1337, 1);
-    EXPECT_NEAR(top, 611, 1);
-    EXPECT_NEAR(width, 301, 1);
-    EXPECT_NEAR(height, 199, 1);
+TEST(ClosestTopology, MostMonitorsInCommonWins) {
+    std::vector<std::string> keys = {"A@1x1", "A@1x1|B@1x1"};
+    // A third monitor was added: the two-monitor arrangement is closer
+    EXPECT_EQ(ClosestTopology(keys, "A@1x1|B@1x1|C@1x1"), "A@1x1|B@1x1");
+    // B was unplugged and there is no arrangement for A alone yet
+    EXPECT_EQ(ClosestTopology({"A@1x1|B@1x1"}, "A@1x1"), "A@1x1|B@1x1");
 }
 
-TEST(RescaleToMonitor, ZeroReferenceDoesNotDivide) {
-    auto r = RescaleToMonitor(100, 200, 300, 400, 0, 0, 1920, 1080);
-    EXPECT_EQ(r.left, 100);
-    EXPECT_EQ(r.top, 200);
-    EXPECT_EQ(r.width, 300);
-    EXPECT_EQ(r.height, 400);
+TEST(ClosestTopology, SameMonitorsAtAnotherResolutionBeatALargerSet) {
+    std::vector<std::string> keys = {"A@1920x1080|B@1x1", "A@1920x1080"};
+    EXPECT_EQ(ClosestTopology(keys, "A@1280x720"), "A@1920x1080");
 }
 
-TEST(RescaleToMonitor, KeepsTheRectOnTheMonitor) {
-    // Unscaled (bad reference) and hanging over the right and bottom edges
-    auto r = RescaleToMonitor(1800, 1000, 300, 200, 0, 0, 1920, 1080);
-    EXPECT_EQ(r.left, 1620);
-    EXPECT_EQ(r.top, 880);
-
-    // Larger than the monitor: pinned to the origin, size kept
-    r = RescaleToMonitor(50, 50, 3000, 2000, 0, 0, 1920, 1080);
-    EXPECT_EQ(r.left, 0);
-    EXPECT_EQ(r.top, 0);
-    EXPECT_EQ(r.width, 3000);
+TEST(ClosestTopology, NothingInCommonStillAnswers) {
+    EXPECT_EQ(ClosestTopology({"B@1x1|C@1x1", "B@1x1"}, "A@1x1"), "B@1x1");
+    EXPECT_EQ(ClosestTopology({}, "A@1x1"), "");
 }

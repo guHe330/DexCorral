@@ -29,6 +29,7 @@
  */
 
 #pragma once
+#include <string>
 #include <vector>
 #include <windows.h> // RECT
 
@@ -41,24 +42,6 @@ namespace LayoutMath
         RECT iconRect; ///< Icon image rect within the cell
     };
 
-    /// A window rectangle relative to its monitor's origin
-    struct ScaledRect
-    {
-        int left, top, width, height;
-    };
-
-    /**
-     * Carries a monitor-relative rectangle saved on a monitor of refWidth x
-     * refHeight over to one of newWidth x newHeight: same proportions, rounded
-     * to the nearest pixel, then moved (not shrunk) so that it lies inside the
-     * new monitor where it fits.
-     *
-     * A reference size of zero or less (a damaged config) leaves the rectangle
-     * unscaled instead of dividing by it.
-     */
-    ScaledRect RescaleToMonitor(int left, int top, int width, int height,
-                                int refWidth, int refHeight, int newWidth, int newHeight);
-
     /**
      * One axis of carrying a rectangle over to another area without scaling
      * it: `pos` is where a span of `size` began on an extent of `extent`, the
@@ -69,6 +52,27 @@ namespace LayoutMath
      * inside the new extent; a span that does not fit starts at 0.
      */
     int RepositionOnAxis(int pos, int size, int extent, int newSize, int newExtent);
+
+    /// One monitor of a topology key: "<deviceId>@<width>x<height>"
+    std::string MonitorKey(const std::string &deviceId, int width, int height);
+
+    /**
+     * Names a set of connected monitors: their MonitorKeys, sorted and joined
+     * by '|'. The same monitors at the same resolutions give the same key in
+     * whatever order Windows lists them.
+     */
+    std::string TopologyKey(std::vector<std::string> monitorKeys);
+
+    /// The device ids in a topology key, sorted
+    std::vector<std::string> TopologyMonitorIds(const std::string &topologyKey);
+
+    /**
+     * From `keys`, the topology whose arrangement comes closest to `current`,
+     * to take a Corral's place from when it has none for `current` itself:
+     * the most monitors in common, then the fewest other monitors, then the
+     * smaller key. Empty if `keys` is empty.
+     */
+    std::string ClosestTopology(const std::vector<std::string> &keys, const std::string &current);
 
     /// Direction for keyboard navigation between icon cells.
     enum class NavDirection

@@ -59,6 +59,9 @@ public:
     // Get primary monitor
     const MonitorInfo *GetPrimaryMonitor() const;
 
+    // Names the set of active monitors and their resolutions (LayoutMath::TopologyKey)
+    std::string GetTopologyKey() const;
+
     // Get hardware ID from HMONITOR
     static std::string GetMonitorDeviceId(HMONITOR hMon);
 
