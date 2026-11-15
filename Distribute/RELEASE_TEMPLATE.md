@@ -67,7 +67,17 @@ The zip contains:
 <!-- Per-release, not cumulative: list only the changes since the last tag.
      Emptied after each release ships. -->
 
-- Dragging an icon on the desktop, for example out of a Corral and back in, no longer crashes Explorer.
+- Icons in a Corral can be dragged into other applications and Explorer windows, as from the desktop.
+- Multi-monitor: DexCorral now notices display changes while it runs and remembers one arrangement of Corrals for each set of connected monitors and their resolutions. A Corral whose monitor is disconnected waits on the primary monitor, keeps its size, and returns when the monitor comes back. Existing positions are carried over.
+- A click or double-click on a Corral header no longer counts as moving it.
+- A Corral dragged to a monitor with a different display scaling adapts completely: size, icons, spacing and text.
+- The mouse no longer stutters across Windows while DexCorral is busy, and scrolling in Corrals and double-click Quick-Hide no longer stop working afterwards.
+- The desktop watch recovers when the desktop folder moves or becomes unavailable, for example when OneDrive backup is switched on or off.
+- Virtual Corrals reload much faster in large folders and no longer miss files that arrive together.
+- Files replaced by an installer or editor keep their Corral, tab and position; new desktop files always go into the catch-all tab.
+- Drops onto an icon in a Corral respect Ctrl, Shift and right-button drags; a selected icon can be dragged by its label.
+- **New DexCorral** and **New Virtual DexCorral** are offered in the desktop menu only, no longer in every folder window and file dialog.
+- Less CPU while dragging Corrals and during the Quick-Hide fade, fewer writes of the configuration file, and debug logs are capped at 2 MB.
 
 The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blob/main/docs/CHANGELOG.md).
 

@@ -4,6 +4,8 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-15
+
 ### Added
 - Icons in a normal Corral can be dragged into other applications and Explorer windows, as from the desktop: drop one on a terminal to paste its path, or on an editor to open it. A multi-selection travels as a whole. Dropping on the desktop, on another Corral or on a tab works as before. ([#83](https://github.com/guHe330/DexCorral/issues/83))
 
