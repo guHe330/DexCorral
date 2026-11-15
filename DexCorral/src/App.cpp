@@ -602,6 +602,19 @@ void App::RestoreCorrals()
             corralConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
         }
 
+        // A config from 1.1.x: per-monitor positions become layouts. They
+        // carry no DPI; for a monitor that is connected it is the current one.
+        if (monitorManager)
+        {
+            Config::MigrateLayouts(corralConfig, monitorManager->GetTopologyKey());
+            for (auto &layout : corralConfig.Layouts)
+            {
+                const MonitorInfo *mon = monitorManager->FindMonitor(layout.second.MonitorId);
+                if (mon && layout.second.Dpi <= 0)
+                    layout.second.Dpi = (int)DpiForPoint({mon->bounds.left, mon->bounds.top});
+            }
+        }
+
         auto corral = std::make_unique<CorralWindow>(corralConfig);
         corral->Show();
         corrals.push_back(std::move(corral));
@@ -2397,115 +2410,96 @@ void App::UpdateCorralPositions()
     if (!primaryMon)
         return;
 
-    bool configChanged = false;
+    const std::string topology = monitorManager->GetTopologyKey();
+
+    struct Placement
+    {
+        CorralWindow *corral;
+        const MonitorInfo *mon;
+        int left, top, width, height; // Screen coordinates, unrolled height
+        bool derived;                 // Not where the user put it: found for it below
+    };
+    std::vector<Placement> placements;
+    std::vector<RECT> occupied;
 
     for (auto &corral : corrals)
     {
-        CorralWindowConfig &cfg = corral->GetConfig();
-        const std::string &targetId = cfg.TargetMonitorId;
+        const CorralWindowConfig &cfg = corral->GetConfig();
 
-        // Check if target monitor is active
-        const MonitorInfo *targetMon = monitorManager->FindMonitor(targetId);
-
-        if (targetMon)
+        // The arrangement the user made for this set of monitors, or failing
+        // that the one for the set that comes closest
+        auto it = cfg.Layouts.find(topology);
+        if (it == cfg.Layouts.end())
         {
-            // Target monitor is active - restore/scale position
-            auto it = cfg.MonitorPositions.find(targetId);
-            if (it != cfg.MonitorPositions.end())
-            {
-                MonitorPosition &stored = it->second;
-
-                // Parked on another monitor while this one was away (by us
-                // below, or by Windows): bring it back to where it was
-                RECT now;
-                GetWindowRect(corral->GetHWND(), &now);
-                bool away = monitorManager->FindMonitorForRect(now) != targetMon;
-
-                bool resized = stored.RefWidth != targetMon->width || stored.RefHeight != targetMon->height;
-                if (away || resized)
-                {
-                    // Back on its monitor: exactly where it was. Pulling it
-                    // onto the monitor here made a Corral that hangs over an
-                    // edge creep a step further with every round trip.
-                    LayoutMath::ScaledRect scaled = {stored.Left, stored.Top, stored.Width, stored.Height};
-                    // Resolution changed: scale position and size proportionally and keep the corral on the monitor
-                    if (resized)
-                        scaled = LayoutMath::RescaleToMonitor(
-                            stored.Left, stored.Top, stored.Width, stored.Height,
-                            stored.RefWidth, stored.RefHeight, targetMon->width, targetMon->height);
-                    int newRelLeft = scaled.left;
-                    int newRelTop = scaled.top;
-                    int newWidth = scaled.width;
-                    int newHeight = scaled.height;
-                    // Convert to screen coordinates
-                    int screenLeft = targetMon->bounds.left + newRelLeft;
-                    int screenTop = targetMon->bounds.top + newRelTop;
-
-                    // Update stored position with new relative values
-                    stored.Left = newRelLeft;
-                    stored.Top = newRelTop;
-                    stored.Width = newWidth;
-                    stored.Height = newHeight;
-                    stored.RefWidth = targetMon->width;
-                    stored.RefHeight = targetMon->height;
-
-                    // Apply to corral (using screen coordinates)
-                    cfg.Left = screenLeft;
-                    cfg.Top = screenTop;
-                    cfg.Width = newWidth;
-                    cfg.Height = newHeight;
-
-                    // A rolled-up Corral keeps its rolled-up window height
-                    SetWindowPos(corral->GetHWND(), nullptr,
-                                 screenLeft, screenTop, newWidth,
-                                 cfg.IsRolledUp ? (int)(now.bottom - now.top) : newHeight,
-                                 SWP_NOZORDER | SWP_NOACTIVATE);
-
-                    configChanged = true;
-                }
-            }
+            std::vector<std::string> keys;
+            for (const auto &layout : cfg.Layouts)
+                keys.push_back(layout.first);
+            it = cfg.Layouts.find(LayoutMath::ClosestTopology(keys, topology));
         }
-        else if (!targetId.empty())
+        if (it == cfg.Layouts.end())
+            continue;
+        const MonitorPosition &stored = it->second;
+
+        Placement p = {corral.get(), monitorManager->FindMonitor(stored.MonitorId)};
+        p.derived = !p.mon || stored.RefWidth != p.mon->width || stored.RefHeight != p.mon->height;
+        if (!p.mon)
+            p.mon = primaryMon;
+
+        // A Corral does not grow or shrink with the resolution, only with the DPI
+        p.width = stored.Width;
+        p.height = stored.Height;
+        if (stored.Dpi > 0)
         {
-            // Target monitor is offline - move to primary monitor
-            // Calculate position based on percentage from stored position
-            auto it = cfg.MonitorPositions.find(targetId);
-            if (it != cfg.MonitorPositions.end())
-            {
-                MonitorPosition &stored = it->second;
+            int dpi = (int)DpiForPoint({p.mon->bounds.left, p.mon->bounds.top});
+            p.width = MulDiv(stored.Width, dpi, stored.Dpi);
+            p.height = MulDiv(stored.Height, dpi, stored.Dpi);
+        }
 
-                // Same relative place in the primary monitor's work area. The
-                // size stays as it is: a Corral does not grow with the
-                // resolution, and Windows has already converted it for the
-                // DPI of the monitor it moved the window to.
-                const RECT &work = primaryMon->workArea;
-                int newWidth = (int)cfg.Width;
-                int newHeight = (int)cfg.Height;
-                int screenLeft = work.left + LayoutMath::RepositionOnAxis(
-                                                 stored.Left, stored.Width, stored.RefWidth,
-                                                 newWidth, work.right - work.left);
-                int screenTop = work.top + LayoutMath::RepositionOnAxis(
-                                               stored.Top, stored.Height, stored.RefHeight,
-                                               newHeight, work.bottom - work.top);
+        if (!p.derived)
+        {
+            // Its monitor as the user left it: exactly there, hanging over an edge or not
+            p.left = p.mon->bounds.left + stored.Left;
+            p.top = p.mon->bounds.top + stored.Top;
+            occupied.push_back({p.left, p.top, p.left + p.width, p.top + p.height});
+        }
+        else
+        {
+            // Another monitor or another resolution: the same relative place in the work area
+            const RECT &work = p.mon->workArea;
+            p.left = work.left + LayoutMath::RepositionOnAxis(stored.Left, stored.Width, stored.RefWidth,
+                                                              p.width, work.right - work.left);
+            p.top = work.top + LayoutMath::RepositionOnAxis(stored.Top, stored.Height, stored.RefHeight,
+                                                            p.height, work.bottom - work.top);
+        }
+        placements.push_back(p);
+    }
 
-                // Update current position (but keep TargetMonitorId unchanged so it returns when monitor reconnects)
-                cfg.Left = screenLeft;
-                cfg.Top = screenTop;
+    bool moved = false;
+    for (auto &p : placements)
+    {
+        if (p.derived)
+        {
+            // Beside the Corrals that are already there, where there is room.
+            // Not remembered: it becomes an arrangement when the user moves it.
+            POINT free = LayoutMath::FindNearestFreeTopLeft({p.left, p.top}, p.width, p.height,
+                                                            p.mon->workArea, occupied, 0);
+            p.left = free.x;
+            p.top = free.y;
+            occupied.push_back({p.left, p.top, p.left + p.width, p.top + p.height});
+        }
 
-                // A rolled-up Corral keeps its rolled-up window height
-                RECT now;
-                GetWindowRect(corral->GetHWND(), &now);
-                SetWindowPos(corral->GetHWND(), nullptr,
-                             screenLeft, screenTop, newWidth,
-                             cfg.IsRolledUp ? (int)(now.bottom - now.top) : newHeight,
-                             SWP_NOZORDER | SWP_NOACTIVATE);
-
-                configChanged = true;
-            }
+        const CorralWindowConfig &cfg = p.corral->GetConfig();
+        RECT now;
+        GetWindowRect(p.corral->GetHWND(), &now);
+        int heightNow = cfg.IsRolledUp ? (int)cfg.Height : (int)(now.bottom - now.top);
+        if (now.left != p.left || now.top != p.top || now.right - now.left != p.width || heightNow != p.height)
+        {
+            p.corral->MoveTo(p.left, p.top, p.width, p.height);
+            moved = true;
         }
     }
 
-    if (configChanged)
+    if (moved)
     {
         SaveConfig();
     }

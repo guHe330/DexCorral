@@ -99,7 +99,13 @@ Double-click the title bar to **roll up** a Corral so only the title bar remains
 A rolled-up Corral also opens by itself while the mouse rests on it, and closes again when the mouse leaves. If one sits where your mouse often passes and keeps popping open, right-click it and uncheck **Expand on Hover**; it then only opens on a double-click.
 
 ### Multi-Monitor
-Corral positions are remembered **per monitor and per resolution**. Moving a Corral to another monitor or changing display resolution restores the layout you used there last.
+DexCorral remembers **one arrangement for each set of connected monitors** and their resolutions.
+
+- When a monitor is disconnected, its Corrals move to the primary monitor. They keep their size and take the same relative place there, beside the Corrals that are already on it.
+- You can rearrange them while they wait. That arrangement is used again the next time the same monitor is missing.
+- When the monitor comes back, every Corral returns to where it was with all monitors connected.
+- A Corral gets a new home monitor only when you drag it there while its own monitor is connected.
+- A change of resolution works the same way: the first time, Corrals keep their size and relative place; going back to the earlier resolution restores the arrangement you had there.
 
 ### Customizing
 Right-click a Corral's title bar or background:

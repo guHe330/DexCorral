@@ -162,17 +162,7 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     // the logical value when hwnd is null). Now that the window exists and is
     // associated with its monitor, re-apply the correctly scaled rolled-up height
     // so a freshly created minimized corral isn't clipped on high-DPI displays.
-    if (config.IsRolledUp)
-    {
-        int rolledHeight = GetTitleBarHeight();
-        RECT r;
-        GetWindowRect(hwnd, &r);
-        if ((r.bottom - r.top) != rolledHeight)
-        {
-            SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, rolledHeight,
-                         SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-        }
-    }
+    FitRolledUpHeight();
 
     // Sync config from actual window position/size (in case Windows adjusted it)
     SyncConfigFromWindow();
@@ -391,26 +381,61 @@ void CorralWindow::SyncConfigFromWindow(bool userPlaced)
         {
             MonitorManager *monMgr = app->GetMonitorManager();
             const MonitorInfo *mon = monMgr->FindMonitorForRect(rect);
-            // The home monitor only changes when the user puts the Corral
-            // somewhere. A move made for it, because its monitor went away,
-            // must not count, or the Corral could never return there.
-            bool atHome = mon && (config.TargetMonitorId.empty() || config.TargetMonitorId == mon->deviceId);
-            if (mon && (atHome || userPlaced || ((isDragging || isResizing) && dragMoved)))
+            // Only the user arranges. A move made for the Corral (its monitor
+            // went away, Windows relocated the window, a layout was applied)
+            // leaves the layouts alone, or the Corral could never return to
+            // where it was put. A Corral without any layout is new and
+            // records where it was created.
+            if (mon && (userPlaced || config.Layouts.empty()))
             {
-                // Update target monitor ID
-                config.TargetMonitorId = mon->deviceId;
-
-                // Store position for this monitor (relative to monitor origin)
-                MonitorPosition &pos = config.MonitorPositions[mon->deviceId];
+                // Relative to the monitor's origin
+                MonitorPosition pos;
+                pos.MonitorId = mon->deviceId;
                 pos.Left = (int)config.Left - mon->bounds.left;
                 pos.Top = (int)config.Top - mon->bounds.top;
                 pos.Width = (int)config.Width;
                 pos.Height = (int)(config.IsRolledUp ? savedHeight : config.Height);
                 pos.RefWidth = mon->width;
                 pos.RefHeight = mon->height;
+                pos.Dpi = (int)GetDpiForWindow(hwnd);
+                Config::StoreLayout(config, monMgr->GetTopologyKey(), pos);
             }
         }
     }
+}
+
+void CorralWindow::FitRolledUpHeight()
+{
+    if (!config.IsRolledUp)
+        return;
+    int rolledHeight = GetTitleBarHeight();
+    RECT r;
+    GetWindowRect(hwnd, &r);
+    if ((r.bottom - r.top) != rolledHeight)
+    {
+        SetWindowPos(hwnd, nullptr, 0, 0, (int)config.Width, rolledHeight,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+void CorralWindow::MoveTo(int left, int top, int width, int height)
+{
+    config.Left = left;
+    config.Top = top;
+    config.Width = width;
+    config.Height = height;
+    savedHeight = height;
+
+    // The size was worked out for the monitor the Corral lands on. If that
+    // monitor has another DPI, OnDpiChanged must not scale it a second time.
+    isBeingPlaced = true;
+    SetWindowPos(hwnd, nullptr, left, top, width,
+                 config.IsRolledUp ? GetTitleBarHeight() : height,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+    isBeingPlaced = false;
+
+    // The title bar height above was still that of the monitor it came from
+    FitRolledUpHeight();
 }
 
 void CorralWindow::LoadFiles()
@@ -598,8 +623,12 @@ void CorralWindow::MergeWith(CorralWindow *other)
                          (int)config.Width, (int)config.Height,
                          SWP_NOZORDER | SWP_NOACTIVATE);
             RecalculateLayout();
+
+            // In the target's place for every set of monitors, not only this one
+            config.Layouts = other->GetConfig().Layouts;
         }
     }
+    SyncConfigFromWindow(true); // The user dropped it here
 
     // Copy all tabs from other to this
     for (const auto &tab : other->GetConfig().Tabs)
@@ -1385,13 +1414,14 @@ void CorralWindow::OnDpiChanged(UINT newDpi, const RECT *suggested)
     // The suggested rect is the current window scaled to the new DPI. For a
     // rolled-up corral that is only the title bar, so the height it unrolls
     // to has to be scaled here.
-    if (config.IsRolledUp && lastRenderDpi != 0 && newDpi != lastRenderDpi)
+    if (!isBeingPlaced && config.IsRolledUp && lastRenderDpi != 0 && newDpi != lastRenderDpi)
     {
         savedHeight = MulDiv((int)savedHeight, newDpi, lastRenderDpi);
         config.Height = savedHeight;
     }
 
-    if (suggested)
+    // MoveTo has already chosen the size for this DPI
+    if (suggested && !isBeingPlaced)
     {
         SetWindowPos(hwnd, nullptr, suggested->left, suggested->top,
                      suggested->right - suggested->left, suggested->bottom - suggested->top,

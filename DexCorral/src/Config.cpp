@@ -23,7 +23,9 @@
 #include <ShlObj.h>
 #include <fstream>
 #include <filesystem>
+#include <algorithm>
 #include "ChromeAlpha.h"
+#include "LayoutMath.h"
 
 static std::wstring Utf8ToWide(const std::string &s)
 {
@@ -71,6 +73,44 @@ namespace
             hex = fallback;
     }
 } // namespace
+
+void Config::StoreLayout(CorralWindowConfig &corral, const std::string &topologyKey,
+                         const MonitorPosition &layout)
+{
+    auto current = corral.Layouts.find(topologyKey);
+    if (current != corral.Layouts.end() && current->second.MonitorId != layout.MonitorId)
+    {
+        const std::vector<std::string> ids = LayoutMath::TopologyMonitorIds(topologyKey);
+        for (auto it = corral.Layouts.begin(); it != corral.Layouts.end();)
+        {
+            const std::vector<std::string> sub = LayoutMath::TopologyMonitorIds(it->first);
+            if (sub.size() < ids.size() && std::includes(ids.begin(), ids.end(), sub.begin(), sub.end()))
+                it = corral.Layouts.erase(it);
+            else
+                ++it;
+        }
+    }
+    corral.Layouts[topologyKey] = layout;
+}
+
+void Config::MigrateLayouts(CorralWindowConfig &corral, const std::string &topologyKey)
+{
+    if (corral.Layouts.empty())
+    {
+        const std::vector<std::string> connected = LayoutMath::TopologyMonitorIds(topologyKey);
+        for (const auto &entry : corral.MonitorPositions)
+        {
+            MonitorPosition layout = entry.second;
+            layout.MonitorId = entry.first;
+            bool home = entry.first == corral.TargetMonitorId &&
+                        std::binary_search(connected.begin(), connected.end(), entry.first);
+            corral.Layouts[home ? topologyKey
+                                : LayoutMath::MonitorKey(entry.first, layout.RefWidth, layout.RefHeight)] = layout;
+        }
+    }
+    corral.TargetMonitorId.clear();
+    corral.MonitorPositions.clear();
+}
 
 void Config::Normalize(AppConfig &config)
 {
