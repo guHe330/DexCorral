@@ -240,6 +240,7 @@ private:
     void RestoreCorrals();
     void ShowTrayMenu();
     void ShowAbout();
+    void ShowSettings(); // App-wide options; applied on OK
 
     /// Switches the UI language at runtime and persists the choice.
     void ApplyLanguage(const std::string &langCode);

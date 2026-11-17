@@ -134,9 +134,9 @@ Right-click it and choose Resume DexCorral to try again, or run
 DexCorral.exe --reset-guard and sign in again.
 
 LANGUAGE: The UI is available in English (default) and German. Right-click the
-tray icon and choose Language to switch; the change is immediate and is saved
-for next time. The installer asks at install time, but the portable package has
-no installer, so the tray menu is where you set it.
+tray icon, choose Settings and pick the Language there; the change applies on
+OK and is saved for next time. The installer asks at install time, but the
+portable package has no installer, so the settings window is where you set it.
 
 NOTE: The binaries are currently unsigned, so Windows SmartScreen warns and
 reports the publisher as unknown. Click "More info" then "Run anyway" to

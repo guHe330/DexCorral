@@ -16,7 +16,7 @@ Alongside your corral names, positions and tab settings, `config.json` **holds t
 
 ## The update check
 
-**Off by default.** Enable it with **Check for Updates Automatically** in the tray menu; 
+**Off by default.** Enable it with **Check for Updates Automatically** in the settings window (tray menu, **Settings...**); 
 **Check for Updates Now** runs a single check without turning anything on.
 
 While enabled, at startup and at most once every 24 hours, DexCorral makes one HTTPS

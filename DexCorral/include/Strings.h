@@ -54,7 +54,16 @@ enum class Str
     Key_Shift,                   // "Shift" (German: "Umschalt")
     Menu_CheckUpdatesAuto,       // "Check for Updates Automatically"
     Menu_CheckUpdatesNow,        // "Check for Updates Now"
-    Menu_Language,               // "Language" (submenu)
+    Menu_Language,               // "Language" (label in the settings window)
+    Menu_Settings,               // "Settings..." (tray menu)
+
+    // Settings window (App.cpp)
+    Title_Settings,              // window title
+    Settings_Hotkey,             // label of the Quick-Hide hotkey field
+    Settings_HotkeyHint,         // how to use the field
+    Settings_HotkeyUnsupported,  // message: the key pressed cannot be a hotkey
+    Settings_DebugLogging,       // checkbox
+    Settings_DebugHint,          // what the logs are for and where they go
 
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby

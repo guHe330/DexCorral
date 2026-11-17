@@ -117,3 +117,30 @@ std::wstring FormatHotkey(const HotkeySpec &spec, const std::wstring &ctrlName, 
         text += L"Win+";
     return text + key;
 }
+
+// HOTKEYF_* (CommCtrl.h) numbers Shift and Alt the other way round from MOD_*
+unsigned HotkeyToControlWord(const HotkeySpec &spec)
+{
+    unsigned flags = 0;
+    if (spec.modifiers & MOD_SHIFT)
+        flags |= 0x01; // HOTKEYF_SHIFT
+    if (spec.modifiers & MOD_CONTROL)
+        flags |= 0x02; // HOTKEYF_CONTROL
+    if (spec.modifiers & MOD_ALT)
+        flags |= 0x04; // HOTKEYF_ALT
+    return (flags << 8) | (spec.vk & 0xFF);
+}
+
+HotkeySpec HotkeyFromControlWord(unsigned word)
+{
+    HotkeySpec spec;
+    spec.vk = word & 0xFF;
+    const unsigned flags = (word >> 8) & 0xFF;
+    if (flags & 0x01)
+        spec.modifiers |= MOD_SHIFT;
+    if (flags & 0x02)
+        spec.modifiers |= MOD_CONTROL;
+    if (flags & 0x04)
+        spec.modifiers |= MOD_ALT;
+    return spec;
+}

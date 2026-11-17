@@ -57,3 +57,11 @@ bool ParseHotkey(const std::string &text, HotkeySpec &out);
  * passes the names for the interface language. Empty for a spec without a key.
  */
 std::wstring FormatHotkey(const HotkeySpec &spec, const std::wstring &ctrlName, const std::wstring &shiftName);
+
+/**
+ * Conversion to and from the word a Windows hot key control holds
+ * (HKM_SETHOTKEY / HKM_GETHOTKEY: key in the low byte, HOTKEYF_* in the high).
+ * The control has no Win key, so MOD_WIN is dropped on the way in.
+ */
+unsigned HotkeyToControlWord(const HotkeySpec &spec);
+HotkeySpec HotkeyFromControlWord(unsigned word);

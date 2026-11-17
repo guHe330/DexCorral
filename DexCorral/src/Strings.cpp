@@ -60,6 +60,16 @@ const wchar_t *const kEnglish[] = {
     /* Menu_CheckUpdatesAuto */    L"Check for Updates Automatically",
     /* Menu_CheckUpdatesNow */     L"Check for Updates Now",
     /* Menu_Language */            L"Language",
+    /* Menu_Settings */            L"Settings...",
+
+    // Settings window
+    /* Title_Settings */           L"DexCorral Settings",
+    /* Settings_Hotkey */          L"Quick-Hide hotkey",
+    /* Settings_HotkeyHint */      L"Click the field and press the keys, for example Ctrl+Alt+H. "
+                                   L"Backspace removes the hotkey.",
+    /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
+    /* Settings_DebugLogging */    L"Write debug logs",
+    /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
@@ -117,7 +127,7 @@ const wchar_t *const kEnglish[] = {
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Hotkey not available",
     /* Hotkey_FailedBody */        L"{0} is not a usable combination, or Windows or another program already uses it. "
-                                   L"Set a different one as QuickHideHotkey in config.json.",
+                                   L"Choose a different one in the tray menu under Settings.",
 
     // About dialog
     /* Title_About */              L"About DexCorral",
@@ -311,6 +321,17 @@ const wchar_t *const kGerman[] = {
     /* Menu_CheckUpdatesAuto */    L"Automatisch nach Updates suchen",
     /* Menu_CheckUpdatesNow */     L"Jetzt nach Updates suchen",
     /* Menu_Language */            L"Sprache",
+    /* Menu_Settings */            L"Einstellungen...",
+
+    // Settings window
+    /* Title_Settings */           L"DexCorral-Einstellungen",
+    /* Settings_Hotkey */          L"Tastenkürzel für Schnell-Ausblenden",
+    /* Settings_HotkeyHint */      L"In das Feld klicken und die Tasten drücken, zum Beispiel Strg+Alt+H. "
+                                   L"Die Rücktaste entfernt das Tastenkürzel.",
+    /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg, Alt oder Umschalt und dazu einen Buchstaben, "
+                                   L"eine Ziffer oder eine Funktionstaste.",
+    /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
+    /* Settings_DebugHint */       L"Für Fehlerberichte. Die Protokolle liegen im Konfigurationsordner.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
@@ -374,8 +395,8 @@ const wchar_t *const kGerman[] = {
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Tastenkürzel nicht verfügbar",
     /* Hotkey_FailedBody */        L"{0} ist keine gültige Kombination oder wird bereits von Windows oder einem "
-                                   L"anderen Programm verwendet. Eine andere lässt sich als QuickHideHotkey in "
-                                   L"config.json festlegen.",
+                                   L"anderen Programm verwendet. Eine andere lässt sich im Tray-Menü unter "
+                                   L"Einstellungen festlegen.",
 
     // About dialog
     /* Title_About */              L"Über DexCorral",

@@ -117,3 +117,32 @@ TEST(FormatHotkey, SpecWithoutAKnownKey_IsEmpty) {
     spec.vk = VK_ESCAPE;
     EXPECT_EQ(FormatHotkey(spec, L"Ctrl", L"Shift"), L"");
 }
+
+// The settings window: spec -> hot key control -> spec -> config text -> spec
+TEST(Hotkey, ControlWordRoundTrip) {
+    HotkeySpec spec;
+    ASSERT_TRUE(ParseHotkey("Ctrl+Alt+Shift+F9", spec));
+    const unsigned word = HotkeyToControlWord(spec);
+    EXPECT_EQ(word, (0x07u << 8) | VK_F9);
+
+    const HotkeySpec back = HotkeyFromControlWord(word);
+    EXPECT_EQ(back.modifiers, spec.modifiers);
+    EXPECT_EQ(back.vk, spec.vk);
+
+    const std::wstring text = FormatHotkey(back, L"Ctrl", L"Shift");
+    std::string narrow;
+    for (wchar_t c : text)
+        narrow += (char)c;
+    HotkeySpec reparsed;
+    ASSERT_TRUE(ParseHotkey(narrow, reparsed));
+    EXPECT_EQ(reparsed.modifiers, spec.modifiers);
+    EXPECT_EQ(reparsed.vk, spec.vk);
+}
+
+TEST(Hotkey, ControlWordDropsWin_AndEmptyStaysEmpty) {
+    HotkeySpec spec;
+    ASSERT_TRUE(ParseHotkey("Win+Alt+D", spec));
+    EXPECT_EQ(HotkeyFromControlWord(HotkeyToControlWord(spec)).modifiers, (unsigned)MOD_ALT);
+    EXPECT_EQ(HotkeyToControlWord(HotkeySpec{}), 0u);
+    EXPECT_EQ(HotkeyFromControlWord(0).vk, 0u);
+}
