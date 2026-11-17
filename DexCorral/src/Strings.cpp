@@ -150,12 +150,11 @@ const wchar_t *const kEnglish[] = {
     // Virtual corral folder selection
     /* Dlg_SelectVirtualFolder */  L"Select Folder for Virtual Corral",
     /* Err_InvalidFolderSelected */L"Invalid folder selected.",
-    /* Err_NetworkPaths */         L"Network paths are not supported.",
-    /* Err_NetworkDrives */        L"Network drives are not supported.",
+    /* Info_NetworkFolder */       L"This folder is on the network.\n\n"
+                                   L"While it cannot be reached, the Corral shows \"Folder unavailable\". It fills "
+                                   L"again by itself within a few seconds of the share coming back.",
     /* Err_FolderNotExist */       L"The specified folder does not exist.",
     /* Err_PathNotFolder */        L"The specified path is not a folder.",
-    /* Err_NetworkPathsLocal */    L"Network paths are not supported. Please select a local folder.",
-    /* Err_NetworkDrivesLocal */   L"Network drives are not supported. Please select a local folder.",
     /* Title_InvalidFolder */      L"Invalid Folder",
 
     // Corral context menu
@@ -419,12 +418,11 @@ const wchar_t *const kGerman[] = {
     // Virtual corral folder selection
     /* Dlg_SelectVirtualFolder */  L"Ordner für virtuelles Corral auswählen",
     /* Err_InvalidFolderSelected */L"Ungültiger Ordner ausgewählt.",
-    /* Err_NetworkPaths */         L"Netzwerkpfade werden nicht unterstützt.",
-    /* Err_NetworkDrives */        L"Netzlaufwerke werden nicht unterstützt.",
+    /* Info_NetworkFolder */       L"Dieser Ordner liegt im Netzwerk.\n\n"
+                                   L"Solange er nicht erreichbar ist, zeigt das Corral \"Ordner nicht verfügbar\". "
+                                   L"Wenige Sekunden nachdem die Freigabe wieder da ist, füllt es sich von selbst.",
     /* Err_FolderNotExist */       L"Der angegebene Ordner existiert nicht.",
     /* Err_PathNotFolder */        L"Der angegebene Pfad ist kein Ordner.",
-    /* Err_NetworkPathsLocal */    L"Netzwerkpfade werden nicht unterstützt. Bitte wählen Sie einen lokalen Ordner.",
-    /* Err_NetworkDrivesLocal */   L"Netzlaufwerke werden nicht unterstützt. Bitte wählen Sie einen lokalen Ordner.",
     /* Title_InvalidFolder */      L"Ungültiger Ordner",
 
     // Corral context menu

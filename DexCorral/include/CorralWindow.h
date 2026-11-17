@@ -171,6 +171,9 @@ public:
     /// Helper to detect if entry is a special shell icon (format: "shell:{CLSID}")
     static bool IsSpecialIconEntry(const std::string &fileName);
 
+    /// True for a UNC path or a path on a mapped network drive. Does not touch the network.
+    static bool IsNetworkFolder(const std::wstring &path);
+
     /// Helper to extract CLSID from special icon entry
     static std::wstring GetSpecialIconClsid(const std::string &fileName);
 
@@ -659,6 +662,24 @@ private:
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;
     static const UINT_PTR FOLDER_RELOAD_TIMER_ID = 10;
     static const UINT FOLDER_RELOAD_DELAY_MS = 300; // Quiet time after the last folder change
+
+    // Network folders. Any call on a share that is offline can block for tens
+    // of seconds, and this thread serves every corral. So whether the share
+    // answers is asked on a throwaway thread, and the folder is only touched
+    // here while the last answer was yes. Asked again every NET_PROBE_MS.
+    enum class NetState { Unknown, Reachable, Unreachable };
+    NetState netState = NetState::Unknown;
+    std::wstring netProbeRoot;     // The root folder netState is about
+    bool netProbeInFlight = false; // One probe at a time: a blocked one must not pile up
+    std::wstring netProbeAsked;    // The root the probe in flight was sent for
+    LONG netProbeSeq = 0;          // Its number, so no other message passes for its answer
+    int netProbeCount = 0;
+    void StartNetworkProbe();
+    void OnNetworkProbeDone(LONG seq, bool reachable);
+    static const UINT WM_NET_PROBE_DONE = WM_USER + 102; // wParam: reachable, lParam: netProbeSeq
+    static const UINT_PTR NET_PROBE_TIMER_ID = 11;
+    static const UINT NET_PROBE_MS = 10000;
+    static const int NET_RELIST_EVERY = 6; // Re-list every 6th probe: change notifications are unreliable on a NAS
 
     // Details-view column resize state
     bool isResizingColumn = false;

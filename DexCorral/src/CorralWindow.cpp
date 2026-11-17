@@ -1185,6 +1185,20 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->OnFolderContentsChanged();
                 return 0;
             }
+            if (wParam == NET_PROBE_TIMER_ID)
+            {
+                if (window->GetActiveTab().IsVirtual &&
+                    IsNetworkFolder(Utf8ToWide(window->GetActiveTab().VirtualFolderPath)))
+                    window->StartNetworkProbe();
+                else
+                {
+                    // Left the network tab: nobody keeps the answer fresh, so it must not be trusted later
+                    KillTimer(hwnd, NET_PROBE_TIMER_ID);
+                    window->netState = NetState::Unknown;
+                    window->netProbeRoot.clear();
+                }
+                return 0;
+            }
             if (wParam == TYPEAHEAD_TIMER_ID)
             {
                 window->OnTypeAheadTimeout();
@@ -1212,6 +1226,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             // the timer on every event turns a burst (an archive being
             // extracted) into one reload that sees all of it.
             SetTimer(hwnd, FOLDER_RELOAD_TIMER_ID, FOLDER_RELOAD_DELAY_MS, nullptr);
+            return 0;
+        case WM_NET_PROBE_DONE:
+            window->OnNetworkProbeDone((LONG)lParam, wParam != 0);
             return 0;
         case WM_DEFERRED_LOAD:
             // Deferred icon loading for virtual corrals (keeps UI responsive)

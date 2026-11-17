@@ -99,25 +99,6 @@ static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg
         return false;
     }
 
-    // Check for network path (starts with \\)
-    if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\')
-    {
-        errorMsg = Tr(Str::Err_NetworkPathsLocal);
-        return false;
-    }
-
-    // Check if it's a network drive
-    if (path.length() >= 2 && path[1] == L':')
-    {
-        wchar_t rootPath[4] = {path[0], L':', L'\\', L'\0'};
-        UINT driveType = GetDriveTypeW(rootPath);
-        if (driveType == DRIVE_REMOTE)
-        {
-            errorMsg = Tr(Str::Err_NetworkDrivesLocal);
-            return false;
-        }
-    }
-
     return true;
 }
 
@@ -633,6 +614,8 @@ void CorralWindow::ChangeFolderPath()
         MessageBoxW(hwnd, errorMsg.c_str(), Tr(Str::Title_InvalidFolder), MB_OK | MB_ICONWARNING);
         return;
     }
+    if (IsNetworkFolder(newPath))
+        MessageBoxW(hwnd, Tr(Str::Info_NetworkFolder), Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
 
     // Stop existing watcher
     if (folderWatcher)

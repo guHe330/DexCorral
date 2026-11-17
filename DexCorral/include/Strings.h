@@ -108,12 +108,9 @@ enum class Str
     // Virtual corral folder selection (App.cpp, CorralWindowCommands.cpp)
     Dlg_SelectVirtualFolder,     // "Select Folder for Virtual Corral"
     Err_InvalidFolderSelected,   // "Invalid folder selected."
-    Err_NetworkPaths,            // "Network paths are not supported."
-    Err_NetworkDrives,           // "Network drives are not supported."
+    Info_NetworkFolder,          // notice when a network folder is chosen: what happens while the share is away
     Err_FolderNotExist,          // "The specified folder does not exist."
     Err_PathNotFolder,           // "The specified path is not a folder."
-    Err_NetworkPathsLocal,       // "... Please select a local folder." (path variant)
-    Err_NetworkDrivesLocal,      // "... Please select a local folder." (drive variant)
     Title_InvalidFolder,         // "Invalid Folder"
 
     // Corral context menu (CorralWindowCommands.cpp, CorralWindowInput.cpp)
