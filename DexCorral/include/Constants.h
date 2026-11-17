@@ -33,10 +33,6 @@
 // Buffer Sizes
 // ============================================================================
 
-/// Buffer size for cross-process ListView item retrieval (4KB)
-/// Used when reading window titles, paths, and other metadata from Explorer
-constexpr DWORD DESKTOP_ICON_BUFFER_SIZE = 4096;
-
 /// Dialog template buffer size (4KB)
 /// Sufficient for in-memory DLGTEMPLATE construction and dialog resources
 constexpr DWORD DIALOG_TEMPLATE_BUFFER_SIZE = 4096;
