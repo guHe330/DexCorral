@@ -86,6 +86,18 @@ void HookBridge::ClearHiddenIcons()
     LeaveCriticalSection(&s_Lock);
 }
 
+static volatile LONG s_UserPaused = 0;
+
+void HookBridge::SetUserPaused(bool paused)
+{
+    InterlockedExchange(&s_UserPaused, paused ? 1 : 0);
+}
+
+bool HookBridge::IsUserPaused()
+{
+    return s_UserPaused != 0;
+}
+
 DWORD HookBridge::GetVersion()
 {
     return s_Version;
