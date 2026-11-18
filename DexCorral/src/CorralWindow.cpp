@@ -319,6 +319,17 @@ void CorralWindow::PinToBandTop()
         SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
+void CorralWindow::ActivateInPlace(bool foreground)
+{
+    blockRaise = true;
+    if (foreground)
+        SetForegroundWindow(hwnd);
+    else
+        SetFocus(hwnd);
+    blockRaise = false;
+    PinToBandTop(); // Whatever moved anyway goes back, and this corral leads the band
+}
+
 void CorralWindow::Show()
 {
     // Paused by the user: corrals exist but stay hidden until App::SetPaused(false)
@@ -1273,6 +1284,9 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             {
                 wp->flags &= ~SWP_HIDEWINDOW;
             }
+            // Our own activation must not lift a corral, not even for one frame
+            if (wp && blockRaise && wp->hwndInsertAfter != HWND_BOTTOM)
+                wp->flags |= SWP_NOZORDER;
             return 0;
         }
         case WM_CAPTURECHANGED:

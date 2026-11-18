@@ -694,6 +694,11 @@ private:
     // Prevent Win+D (Show Desktop) from hiding corrals
     bool allowHide = false;
 
+    // Takes focus (or the foreground, for a menu) without coming to the front.
+    // Activation raises every corral above other apps: all are owned by Progman.
+    void ActivateInPlace(bool foreground = false);
+    static inline bool blockRaise = false; // App thread only
+
     // OLE drop target
     CorralDropTarget *dropTarget = nullptr;
 };
