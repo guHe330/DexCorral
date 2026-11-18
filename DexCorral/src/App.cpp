@@ -2170,22 +2170,9 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
         return;
     }
 
-    // Check for network path
-    if (folderPath.length() >= 2 && folderPath[0] == L'\\' && folderPath[1] == L'\\')
-    {
-        MessageBoxW(messageWindow, Tr(Str::Err_NetworkPaths), Tr(Str::Title_Error), MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    if (folderPath.length() >= 2 && folderPath[1] == L':')
-    {
-        wchar_t rootPath[4] = {folderPath[0], L':', L'\\', L'\0'};
-        if (GetDriveTypeW(rootPath) == DRIVE_REMOTE)
-        {
-            MessageBoxW(messageWindow, Tr(Str::Err_NetworkDrives), Tr(Str::Title_Error), MB_OK | MB_ICONWARNING);
-            return;
-        }
-    }
+    // A network folder is allowed; say what to expect while its share is away
+    if (CorralWindow::IsNetworkFolder(folderPath))
+        MessageBoxW(messageWindow, Tr(Str::Info_NetworkFolder), Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
 
     // Extract folder name for title
     size_t lastSlash = folderPath.find_last_of(L"\\/");

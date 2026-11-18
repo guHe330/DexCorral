@@ -85,6 +85,5 @@ The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blo
 
 - Two files with the exact same filename on the user desktop and the Public desktop can't be told apart; DexCorral assumes the one on the user desktop.
 - If Stardock Fences is started while DexCorral is already running, DexCorral can only tell you; it steps aside at the next sign-in.
-- Folders on network drives cannot be used for virtual Corrals.
 
 See [open issues](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+is%3Aopen+label%3Abug) for known bugs.

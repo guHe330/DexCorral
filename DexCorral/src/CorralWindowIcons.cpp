@@ -39,6 +39,10 @@
 #include <ShlObj.h>
 #include <commoncontrols.h>
 #include <algorithm>
+#include <thread>
+
+// Debug log (dllmain.cpp); a no-op unless DebugLogging is on
+void DllLog(const wchar_t *format, ...);
 
 // Cloud file attributes (missing from older Windows SDK headers, provide fallbacks)
 #ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
@@ -575,8 +579,26 @@ void CorralWindow::LoadVirtualFolderIcons()
     if (tab.VirtualFolderPath.empty())
         return;
 
+    // A network folder is only touched while its share is known to answer
+    // (see netState). Until then: empty, and "unavailable" once the answer is no.
+    const std::wstring root = Utf8ToWide(tab.VirtualFolderPath);
+    if (IsNetworkFolder(root))
+    {
+        if (netProbeRoot != root)
+        {
+            netProbeRoot = root;
+            netState = NetState::Unknown;
+        }
+        if (netState != NetState::Reachable)
+        {
+            virtualFolderMissing = (netState == NetState::Unreachable);
+            StartNetworkProbe();
+            return;
+        }
+    }
+
     // Root folder gone (deleted/renamed/moved): show the unavailable state.
-    if (!IsExistingDirectory(Utf8ToWide(tab.VirtualFolderPath)))
+    if (!IsExistingDirectory(root))
     {
         virtualFolderMissing = true;
         return;
@@ -869,6 +891,13 @@ void CorralWindow::InitializeFolderWatcher()
     if (!GetActiveTab().IsVirtual || GetActiveTab().VirtualFolderPath.empty())
         return;
 
+    // A watcher opens its folder on its own thread, but stopping it waits for
+    // that thread: no watcher on a share that may not answer. The probe result
+    // calls back here once it does.
+    const std::wstring root = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+    if (IsNetworkFolder(root) && !(netProbeRoot == root && netState == NetState::Reachable))
+        return;
+
     auto notify = [this]()
     {
         // Post message to window to handle on main thread
@@ -898,6 +927,78 @@ void CorralWindow::InitializeFolderWatcher()
             parentWatcher->SetChangeCallback(notify);
             parentWatcher->Start();
         }
+    }
+}
+
+bool CorralWindow::IsNetworkFolder(const std::wstring &path)
+{
+    if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\')
+        return true;
+    if (path.length() >= 2 && path[1] == L':')
+    {
+        const wchar_t drive[4] = {path[0], L':', L'\\', L'\0'};
+        return GetDriveTypeW(drive) == DRIVE_REMOTE;
+    }
+    return false;
+}
+
+void CorralWindow::StartNetworkProbe()
+{
+    if (!hwnd || netProbeInFlight || netProbeRoot.empty())
+        return;
+    netProbeInFlight = true;
+    netProbeAsked = netProbeRoot;
+    const LONG seq = ++netProbeSeq;
+    SetTimer(hwnd, NET_PROBE_TIMER_ID, NET_PROBE_MS, nullptr);
+
+    // The thread owns nothing of this window: it gets the path and the window
+    // handle by value and answers with two numbers in a message, which fails
+    // harmlessly when the window is gone. It may sit in the call for as long
+    // as SMB takes.
+    try
+    {
+        std::thread([target = hwnd, root = netProbeRoot, seq]()
+                    {
+                        const DWORD attrs = GetFileAttributesW(root.c_str());
+                        const bool reachable = attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY);
+                        PostMessageW(target, WM_NET_PROBE_DONE, reachable ? 1 : 0, (LPARAM)seq);
+                    })
+            .detach();
+    }
+    catch (const std::exception &)
+    {
+        netProbeInFlight = false; // No thread to be had: the timer tries again
+    }
+}
+
+void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
+{
+    if (!netProbeInFlight || seq != netProbeSeq)
+        return; // Not the answer being waited for
+    netProbeInFlight = false;
+    const std::wstring root = netProbeAsked;
+
+    const bool onNetworkTab = GetActiveTab().IsVirtual && IsNetworkFolder(Utf8ToWide(GetActiveTab().VirtualFolderPath));
+    if (!onNetworkTab)
+        return; // The timer notices too, and forgets the state
+    if (root != netProbeRoot || root != Utf8ToWide(GetActiveTab().VirtualFolderPath))
+    {
+        LoadFiles(); // An answer about a folder since left: ask about the current one
+        return;
+    }
+
+    const NetState answer = reachable ? NetState::Reachable : NetState::Unreachable;
+    if (answer != netState)
+    {
+        DllLog(L"Network folder '%s': %s", root.c_str(), reachable ? L"reachable" : L"not reachable");
+        netState = answer;
+        netProbeCount = 0;
+        InitializeFolderWatcher(); // Starts the watchers when reachable, drops them when not
+        LoadFiles();
+    }
+    else if (reachable && ++netProbeCount % NET_RELIST_EVERY == 0)
+    {
+        PostMessageW(hwnd, WM_FOLDER_CHANGED, 0, 0);
     }
 }
 

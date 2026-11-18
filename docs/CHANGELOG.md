@@ -7,6 +7,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 ### Added
 - **Pause DexCorral** in the tray menu: hides every Corral and shows all icons as ordinary desktop icons, without restarting Explorer. Choosing it again brings everything back as it was. The pause is kept across sign-out and restart. ([#50](https://github.com/guHe330/DexCorral/issues/50))
 - A settings window, opened with **Settings...** in the tray menu. It holds the language, the automatic update check, a field that captures the Quick-Hide hotkey when you press the keys, a switch for debug logs and a button for the config folder. The hotkey and debug logging no longer need `config.json` edited by hand, and both apply without signing out. ([#78](https://github.com/guHe330/DexCorral/issues/78))
+- A virtual Corral can show a folder on the network, a share or a mapped network drive; these were refused before. Whether the share answers is checked in the background, so a NAS that is switched off does not make the other Corrals hang: the Corral shows "Folder unavailable" and fills again by itself when the share is back. A network folder is also read again once a minute, because many network devices do not report changes. ([#60](https://github.com/guHe330/DexCorral/issues/60))
 
 ### Changed
 - The tray menu is shorter: **Language**, **Check for Updates Automatically** and **Open Config Folder** moved into the settings window. ([#78](https://github.com/guHe330/DexCorral/issues/78))
