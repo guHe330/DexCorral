@@ -1473,6 +1473,7 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
         }
 
         SetForegroundWindow(hwnd);
+        PinToBandTop(); // Before the modal loop too, see ShowContextMenu
         int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                  screenX, screenY, 0, hwnd, nullptr);
         PostMessageW(hwnd, WM_NULL, 0, 0);
