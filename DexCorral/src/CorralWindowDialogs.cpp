@@ -66,17 +66,15 @@ void CorralWindow::StartIconRename(int iconIndex)
     labelRect.top -= scrollPosition;
     labelRect.bottom -= scrollPosition;
 
-    // Temporarily disable layered window style so child controls render properly
-    LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
-    RedrawWindow(hwnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
-
-    // Create edit control as a normal child window
+    // A layered window cannot show child controls, so the edit is a popup of its
+    // own, owned by the corral and laid over the label. The corral itself keeps
+    // its normal look underneath.
+    MapWindowPoints(hwnd, nullptr, (POINT *)&labelRect, 2);
     hEditControl = CreateWindowExW(
-        0,
+        WS_EX_TOOLWINDOW,
         L"EDIT",
         icons[iconIndex].displayName.c_str(),
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_CENTER,
+        WS_POPUP | WS_BORDER | ES_AUTOHSCROLL | ES_CENTER,
         labelRect.left,
         labelRect.top,
         labelRect.right - labelRect.left,
@@ -108,11 +106,19 @@ void CorralWindow::StartIconRename(int iconIndex)
         // Select all text
         SendMessageW(hEditControl, EM_SETSEL, 0, -1);
 
-        // Set focus
-        SetFocus(hEditControl);
-
-        // Subclass the edit control to handle Enter/Escape
+        // Subclass the edit control to handle Enter/Escape and loss of focus
         SetWindowSubclass(hEditControl, EditSubclassProc, 0, (DWORD_PTR)this);
+
+        // Show and focus it; the popup comes to the front, the corrals stay behind
+        blockRaise = true;
+        ShowWindow(hEditControl, SW_SHOW);
+        SetForegroundWindow(hEditControl);
+        SetFocus(hEditControl);
+        blockRaise = false;
+    }
+    else
+    {
+        isRenamingIcon = false;
     }
 }
 
@@ -250,7 +256,9 @@ void CorralWindow::EndIconRename(bool save)
 
     if (editToDestroy)
     {
+        blockRaise = true; // Windows hands the activation back to the owning corral
         DestroyWindow(editToDestroy);
+        blockRaise = false;
     }
 
     if (hEditFont)
@@ -259,9 +267,6 @@ void CorralWindow::EndIconRename(bool save)
         hEditFont = nullptr;
     }
 
-    // Restore layered window style (was disabled for child edit control to work)
-    LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
     PinToBandTop();
 
     // Redraw to show the updated label
