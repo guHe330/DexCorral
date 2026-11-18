@@ -1328,109 +1328,11 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 void CorralWindow::OnPaint()
 {
     PAINTSTRUCT ps;
-    HDC hdc = BeginPaint(hwnd, &ps);
-
-    // Check if we're currently in non-layered mode (during rename)
-    LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    if (!(exStyle & WS_EX_LAYERED))
-    {
-        // Paint a solid background when not layered
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-
-        // Use the active tab's background color
-        BYTE bgR = 40, bgG = 40, bgB = 40;
-        const std::string &colorHex = GetActiveTab().ColorHex;
-        if (!colorHex.empty() && colorHex[0] == '#' && colorHex.length() >= 7)
-        {
-            unsigned int colorValue;
-            sscanf_s(colorHex.c_str() + 1, "%x", &colorValue);
-            bgR = (colorValue >> 16) & 0xFF;
-            bgG = (colorValue >> 8) & 0xFF;
-            bgB = colorValue & 0xFF;
-        }
-
-        HBRUSH brush = CreateSolidBrush(RGB(bgR, bgG, bgB));
-        FillRect(hdc, &rect, brush);
-        DeleteObject(brush);
-
-        // Draw title bar background (darker)
-        HBRUSH titleBrush = CreateSolidBrush(RGB(bgR / 2, bgG / 2, bgB / 2));
-        RECT titleBarRect = {0, 0, rect.right, GetTitleBarHeight()};
-        FillRect(hdc, &titleBarRect, titleBrush);
-        DeleteObject(titleBrush);
-
-        // Draw title text (match the layered render: tab's header font/size)
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, RGB(255, 255, 255));
-        std::wstring titleFontNameW = Utf8ToWide(GetActiveTab().HeaderFontName);
-        int titleFontHeight = -MulDiv(GetActiveTab().HeaderFontSize, GetDpiForWindow(hwnd), 72);
-        HFONT titleFont = CreateFontW(titleFontHeight, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, titleFontNameW.c_str());
-        HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
-        std::wstring wtitle = Utf8ToWide(GetActiveTab().Title);
-        RECT titleRect = {8, 8, rect.right - 8, 30};
-        DrawTextW(hdc, wtitle.c_str(), -1, &titleRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-        SelectObject(hdc, oldFont);
-        DeleteObject(titleFont);
-
-        // Draw icons. Use the system icon title font (DPI-aware) so labels
-        // match the layered render and don't shrink during inline rename.
-        LOGFONTW iconLogFont = {};
-        HFONT labelFont;
-        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0))
-        {
-            iconLogFont.lfQuality = CLEARTYPE_QUALITY;
-            labelFont = CreateFontIndirectW(&iconLogFont);
-        }
-        else
-        {
-            labelFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-        }
-        SelectObject(hdc, labelFont);
-
-        for (size_t i = 0; i < icons.size(); i++)
-        {
-            const auto &icon = icons[i];
-            int drawTop = icon.iconRect.top - scrollPosition;
-
-            // Skip if outside visible area
-            if (drawTop + iconSize < GetIconAreaTop() || drawTop > rect.bottom)
-                continue;
-
-            // Draw icon
-            if (icon.hIcon)
-            {
-                DrawIconEx(hdc, icon.iconRect.left, drawTop, icon.hIcon,
-                           iconSize, iconSize, 0, nullptr, DI_NORMAL);
-            }
-
-            // Draw label (skip the one being edited)
-            if ((int)i != renamingIconIndex)
-            {
-                RECT labelRect = {
-                    icon.rect.left,
-                    icon.iconRect.bottom + 2 - scrollPosition,
-                    icon.rect.right,
-                    icon.rect.bottom - scrollPosition};
-                DrawTextW(hdc, icon.displayName.c_str(), -1, &labelRect,
-                          DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS);
-            }
-        }
-
-        DeleteObject(labelFont);
-    }
-
+    BeginPaint(hwnd, &ps);
     EndPaint(hwnd, &ps);
 
-    // For layered windows, we use UpdateLayeredWindow instead of regular painting
-    if (exStyle & WS_EX_LAYERED)
-    {
-        UpdateLayeredContent();
-    }
+    // The window is layered: its content goes through UpdateLayeredWindow
+    UpdateLayeredContent();
 }
 
 // ============================================================================

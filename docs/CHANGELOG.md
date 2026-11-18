@@ -14,6 +14,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Fixed
 - Right-clicking a Corral or an icon in it brought every Corral in front of the open windows for as long as the menu was shown. Corrals now stay behind other windows while their menu is open, and a click on an icon no longer makes a Corral flash in front of a window for a moment.
+- While an icon was being renamed, its Corral changed its look: the title jumped to the left, the other tabs disappeared, and transparency, border and selection were gone. The Corral now stays as it is, and only the name field appears over the label.
 
 ## [1.2.0] - 2026-11-15
 
