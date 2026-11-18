@@ -200,7 +200,7 @@ Double-click an empty spot on the desktop to hide everything at once: all native
 - Corrals can opt out: right-click a corral and check **Exclude from Quick-Hide** to keep it visible while everything else hides.
 - Double-clicking the **tray icon** does the same, and so does the tray menu's **Quick-Hide Everything** entry.
 - Quick-hide is temporary: restarting DexCorral always restores your normal desktop.
-- For a keyboard shortcut, set `QuickHideHotkey` in `config.json`, for example `"QuickHideHotkey": "Ctrl+Alt+H"`, then sign out and back in. There is none by default. The combination needs at least one of Ctrl, Alt, Shift, Win, plus one letter, digit or function key: `"Ctrl+Shift+F9"` and `"Win+Alt+D"` work too. Once active, the tray menu shows it on the **Quick-Hide Everything** line. If the combination is not valid or already taken, DexCorral says so at start and runs without a hotkey. Ctrl+Alt is the same as AltGr, so avoid a letter you type with AltGr on your keyboard.
+- For a keyboard shortcut, open **Settings** in the tray menu, click the **Quick-Hide hotkey** field and press the keys, for example Ctrl+Alt+H. It applies as soon as you click OK; Backspace in the field removes it. There is none by default. The combination needs Ctrl or Alt (Shift can be added) plus one letter, digit or function key. Once active, the tray menu shows it on the **Quick-Hide Everything** line. If the combination is already taken by Windows or another program, DexCorral says so and runs without a hotkey. Ctrl+Alt is the same as AltGr, so avoid a letter you type with AltGr on your keyboard. A combination with the Win key cannot be entered in the field; set it as `QuickHideHotkey` in `config.json` instead, for example `"QuickHideHotkey": "Win+Alt+D"`, then sign out and back in. The settings window leaves such a hotkey alone unless you enter a new one.
 
 ## Tray Icon
 
@@ -212,10 +212,18 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 - **Create New Corral** / **New Virtual Corral**.
 - **Show Desktop Icons**: toggle all native desktop icons.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
+- **Settings...**: opens the settings window, see below.
+- **Check for Updates Now**: asks GitHub once, right now, whether a newer version exists, without switching the automatic check on.
+
+### Settings
+
+The settings window holds the options that apply to DexCorral as a whole. Changes take effect when you click **OK**. It also opens while DexCorral is paused.
+
+- **Language**: switch the interface between English and German, without a restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.
 - **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API once every 24 hours whether a newer version exists and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
-- **Check for Updates Now**: run that check once, right now, without switching the automatic one on.
-- **Language**: switch the interface between English and German. The change takes effect immediately, no restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.
-- **Open Config Folder**: opens `%APPDATA%\DexCorral` in Explorer, where `config.json`, its backup and any debug logs live. A debug log that passes 2 MB is renamed to `<name>.log.old` and started again, so at most two files of that size exist per log.
+- **Quick-Hide hotkey**: see [Quick-Hide](#quick-hide).
+- **Write debug logs**: off by default. Switch it on before reproducing a problem you want to report. Logging starts at once; to capture DexCorral's start as well, leave it on and sign out and back in. A debug log that passes 2 MB is renamed to `<name>.log.old` and started again, so at most two files of that size exist per log.
+- **Open Config Folder**: opens `%APPDATA%\DexCorral` in Explorer, where `config.json`, its backup and any debug logs live.
 
 ## When DexCorral pauses itself
 
@@ -225,7 +233,7 @@ Standby is also what DexCorral does when [Stardock Fences](#stardock-fences) is 
 
 - All your icons are ordinary desktop icons again. No Corrals are shown.
 - Your layout is safe. `config.json` is not changed, and everything comes back as it was.
-- The tray icon stays, with the tooltip "DexCorral is paused". Its menu shows why, and keeps About, User Manual, the update check, Language and Open Config Folder.
+- The tray icon stays, with the tooltip "DexCorral is paused". Its menu shows why, and keeps About, User Manual, Settings and the update check.
 - The desktop right-click menu does not offer "New DexCorral".
 - It stays that way across restarts. DexCorral does not quietly try again at the next login.
 
@@ -271,7 +279,7 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | Key | Value | Why | Removed by the uninstaller |
 |---|---|---|---|
 | `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
-| `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the tray menu's **Language** submenu. | Yes |
+| `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the **Language** choice in the settings window. | Yes |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
 | `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | Yes |
 | `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |

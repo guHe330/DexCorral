@@ -35,6 +35,7 @@
 constexpr WORD DLG_CLASS_BUTTON = 0x0080;
 constexpr WORD DLG_CLASS_EDIT = 0x0081;
 constexpr WORD DLG_CLASS_STATIC = 0x0082;
+constexpr WORD DLG_CLASS_COMBOBOX = 0x0085;
 
 /**
  * Writes the DLGTEMPLATE header (no menu, default class, DS_SETFONT font).

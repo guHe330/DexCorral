@@ -6,6 +6,10 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Added
 - **Pause DexCorral** in the tray menu: hides every Corral and shows all icons as ordinary desktop icons, without restarting Explorer. Choosing it again brings everything back as it was. The pause is kept across sign-out and restart. ([#50](https://github.com/guHe330/DexCorral/issues/50))
+- A settings window, opened with **Settings...** in the tray menu. It holds the language, the automatic update check, a field that captures the Quick-Hide hotkey when you press the keys, a switch for debug logs and a button for the config folder. The hotkey and debug logging no longer need `config.json` edited by hand, and both apply without signing out. ([#78](https://github.com/guHe330/DexCorral/issues/78))
+
+### Changed
+- The tray menu is shorter: **Language**, **Check for Updates Automatically** and **Open Config Folder** moved into the settings window. ([#78](https://github.com/guHe330/DexCorral/issues/78))
 
 ## [1.2.0] - 2026-11-15
 

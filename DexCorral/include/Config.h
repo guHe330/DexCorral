@@ -152,7 +152,7 @@ struct AppConfig
     bool CheckForUpdates = false;
     long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
 
-    // UI language code ("en", "de"), set by the tray menu's Language submenu.
+    // UI language code ("en", "de"), set in the settings window.
     // Empty = use the installer's choice (HKCU\Software\DexCorral\Language),
     // falling back to English.
     std::string Language = "";

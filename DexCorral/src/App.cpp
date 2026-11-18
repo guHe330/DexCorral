@@ -1586,29 +1586,11 @@ void App::ShowTrayMenu()
     AppendMenuW(menu, MF_STRING | quickHideFlags, 6, quickHideLabel.c_str());
     }
 
-    // Update check (opt-in)
+    // Language, the automatic update check, the hotkey, debug logging and the
+    // config folder live in the settings window; it works in standby too
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    UINT updateFlags = config.CheckForUpdates ? MF_CHECKED : MF_UNCHECKED;
-    AppendMenuW(menu, MF_STRING | updateFlags, 7, Tr(Str::Menu_CheckUpdatesAuto));
+    AppendMenuW(menu, MF_STRING, 17, Tr(Str::Menu_Settings));
     AppendMenuW(menu, MF_STRING, 8, Tr(Str::Menu_CheckUpdatesNow));
-
-    // UI language. The portable zip never runs the installer, so without this
-    // its users can only change the language by editing config.json by hand.
-    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    std::wstring activeLang = CorralWindow::Utf8ToWide(config.Language);
-    if (activeLang.empty())
-        activeLang = GetInstallerLanguage();
-    if (activeLang != L"de")
-        activeLang = L"en";
-    HMENU langMenu = CreatePopupMenu();
-    // Endonyms — identical in every table, so deliberately not translated.
-    AppendMenuW(langMenu, MF_STRING, 10, L"English");
-    AppendMenuW(langMenu, MF_STRING, 11, L"Deutsch");
-    CheckMenuRadioItem(langMenu, 10, 11, activeLang == L"de" ? 11 : 10, MF_BYCOMMAND);
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)langMenu, Tr(Str::Menu_Language));
-
-    // config.json, its backup and the debug logs: the folder a bug report asks for
-    AppendMenuW(menu, MF_STRING, 13, Tr(Str::Menu_OpenConfigFolder));
 
     POINT pt;
     GetCursorPos(&pt);
@@ -1644,11 +1626,8 @@ void App::ShowTrayMenu()
         CreateVirtualCorralAt(cursorPt);
         break;
     }
-    case 7:
-        config.CheckForUpdates = !config.CheckForUpdates;
-        SaveConfig();
-        if (config.CheckForUpdates)
-            StartUpdateCheck(true); // immediate confirmation that checking works
+    case 17:
+        ShowSettings();
         break;
     case 8:
         StartUpdateCheck(true);
@@ -1667,21 +1646,6 @@ void App::ShowTrayMenu()
         // The manual on GitHub, rendered. Opened in the user's browser, on request only.
         ShellExecuteW(nullptr, L"open", L"https://github.com/guHe330/DexCorral/blob/main/docs/USER_MANUAL.md",
                       nullptr, nullptr, SW_SHOWNORMAL);
-        break;
-    case 13:
-    {
-        // GetConfigPath creates the folder if it is missing, so there is always something to open
-        std::wstring configPath = CorralWindow::Utf8ToWide(Config::GetConfigPath());
-        size_t slash = configPath.find_last_of(L"\\/");
-        if (slash != std::wstring::npos)
-            ShellExecuteW(nullptr, L"open", configPath.substr(0, slash).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-        break;
-    }
-    case 10:
-        ApplyLanguage("en");
-        break;
-    case 11:
-        ApplyLanguage("de");
         break;
     }
 }
@@ -1783,6 +1747,197 @@ void App::ShowAbout()
 
     DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr, AboutDlgProc, 0);
     showing = false;
+}
+
+// Settings dialog control ids
+static const WORD IDC_SET_LANGUAGE = 310;
+static const WORD IDC_SET_UPDATES = 311;
+static const WORD IDC_SET_HOTKEY_LABEL = 312;
+static const WORD IDC_SET_HOTKEY = 313;
+static const WORD IDC_SET_DEBUG = 314;
+static const WORD IDC_SET_FOLDER = 315;
+
+// Where the hot key control goes, in dialog units (it is created in
+// WM_INITDIALOG: its class has no ordinal a dialog template could name)
+static const RECT SETTINGS_HOTKEY_RECT = {10, 57, 130, 71};
+
+/// What the settings dialog shows, and on IDOK what the user chose
+struct SettingsDialogData
+{
+    bool german = false;
+    bool checkUpdates = false;
+    bool debugLogging = false;
+    unsigned hotkeyWord = 0;     /// Hot key control word (see Hotkey.h)
+    unsigned hotkeyBaseline = 0; /// The word the control reported before the user touched it
+    bool hotkeyChanged = false;
+};
+
+static void OpenConfigFolder()
+{
+    // GetConfigPath creates the folder if it is missing, so there is always something to open
+    std::wstring configPath = CorralWindow::Utf8ToWide(Config::GetConfigPath());
+    size_t slash = configPath.find_last_of(L"\\/");
+    if (slash != std::wstring::npos)
+        ShellExecuteW(nullptr, L"open", configPath.substr(0, slash).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
+static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    auto *data = (SettingsDialogData *)GetWindowLongPtrW(hDlg, DWLP_USER);
+
+    switch (msg)
+    {
+    case WM_INITDIALOG:
+    {
+        data = (SettingsDialogData *)lParam;
+        SetWindowLongPtrW(hDlg, DWLP_USER, (LONG_PTR)data);
+
+        // Endonyms — identical in every table, so deliberately not translated.
+        SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)L"English");
+        SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)L"Deutsch");
+        SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_SETCURSEL, data->german ? 1 : 0, 0);
+        CheckDlgButton(hDlg, IDC_SET_UPDATES, data->checkUpdates ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(hDlg, IDC_SET_DEBUG, data->debugLogging ? BST_CHECKED : BST_UNCHECKED);
+
+        INITCOMMONCONTROLSEX icc = {sizeof(icc), ICC_HOTKEY_CLASS};
+        InitCommonControlsEx(&icc);
+        RECT r = SETTINGS_HOTKEY_RECT;
+        MapDialogRect(hDlg, &r);
+        HWND hotkey = CreateWindowExW(0, HOTKEY_CLASSW, nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                                      r.left, r.top, r.right - r.left, r.bottom - r.top,
+                                      hDlg, (HMENU)(INT_PTR)IDC_SET_HOTKEY, nullptr, nullptr);
+        if (hotkey)
+        {
+            SendMessageW(hotkey, WM_SETFONT, SendMessageW(hDlg, WM_GETFONT, 0, 0), FALSE);
+            // Tab order follows z-order: straight after its label
+            SetWindowPos(hotkey, GetDlgItem(hDlg, IDC_SET_HOTKEY_LABEL), 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            // A bare key or Shift+key as a global hotkey would take that key
+            // away from every program: the control turns those into Ctrl+Alt+key
+            SendMessageW(hotkey, HKM_SETRULES, HKCOMB_NONE | HKCOMB_S, MAKELPARAM(HOTKEYF_CONTROL | HOTKEYF_ALT, 0));
+            SendMessageW(hotkey, HKM_SETHOTKEY, data->hotkeyWord, 0);
+            data->hotkeyBaseline = (unsigned)SendMessageW(hotkey, HKM_GETHOTKEY, 0, 0) & 0xFFFF;
+        }
+
+        // Opened from the tray menu, with no owner window to bring it forward
+        SetForegroundWindow(hDlg);
+        return TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case IDC_SET_FOLDER:
+            OpenConfigFolder();
+            return TRUE;
+        case IDOK:
+        {
+            if (HWND hotkey = GetDlgItem(hDlg, IDC_SET_HOTKEY))
+            {
+                const unsigned word = (unsigned)SendMessageW(hotkey, HKM_GETHOTKEY, 0, 0) & 0xFFFF;
+                const HotkeySpec spec = HotkeyFromControlWord(word);
+                // The control accepts keys the hotkey parser does not (Home, Insert, ...)
+                if (word != data->hotkeyBaseline && spec.vk != 0 && FormatHotkey(spec, L"Ctrl", L"Shift").empty())
+                {
+                    MessageBoxW(hDlg, Tr(Str::Settings_HotkeyUnsupported), Tr(Str::Title_Settings),
+                                MB_OK | MB_ICONWARNING);
+                    SetFocus(hotkey);
+                    return TRUE;
+                }
+                data->hotkeyChanged = (word != data->hotkeyBaseline);
+                data->hotkeyWord = word;
+            }
+            data->german = (SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_GETCURSEL, 0, 0) == 1);
+            data->checkUpdates = (IsDlgButtonChecked(hDlg, IDC_SET_UPDATES) == BST_CHECKED);
+            data->debugLogging = (IsDlgButtonChecked(hDlg, IDC_SET_DEBUG) == BST_CHECKED);
+            EndDialog(hDlg, IDOK);
+            return TRUE;
+        }
+        case IDCANCEL:
+            EndDialog(hDlg, IDCANCEL);
+            return TRUE;
+        }
+        break;
+    }
+    return FALSE;
+}
+
+void App::ShowSettings()
+{
+    // The tray menu stays reachable while the dialog is up; one is enough
+    static bool showing = false;
+    if (showing)
+        return;
+    showing = true;
+
+    SettingsDialogData data;
+    std::wstring lang = CorralWindow::Utf8ToWide(config.Language);
+    if (lang.empty())
+        lang = GetInstallerLanguage();
+    const bool wasGerman = (lang == L"de");
+    data.german = wasGerman;
+    data.checkUpdates = config.CheckForUpdates;
+    data.debugLogging = config.DebugLogging;
+    HotkeySpec current; // Stays empty when none is set or the text is not valid
+    ParseHotkey(config.QuickHideHotkey, current);
+    data.hotkeyWord = HotkeyToControlWord(current);
+
+    // Layout in dialog units, one option per block with its explanation below it
+    const short DLG_W = 250, DLG_H = 178, W = 230;
+    const DWORD label = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX;
+    const DWORD check = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
+
+    WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
+    WORD *p = BeginDlgTemplate(dlgTemplate,
+                               DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
+                               10, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 10 = the AddDlgItem calls below
+
+    p = AddDlgItem(p, label, 10, 12, 76, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 90, 10, 100, 60,
+                   IDC_SET_LANGUAGE, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
+    p = AddDlgItem(p, check, 10, 30, W, 10, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
+    p = AddDlgItem(p, label, 10, 46, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
+    // (the hot key control sits here, see SETTINGS_HOTKEY_RECT)
+    p = AddDlgItem(p, label, 10, 75, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
+    p = AddDlgItem(p, check, 10, 99, W, 10, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
+    p = AddDlgItem(p, label, 10, 111, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 10, 132, 110, 14, IDC_SET_FOLDER, 0xFFFF,
+                   DLG_CLASS_BUTTON, Tr(Str::Menu_OpenConfigFolder));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 136, 156, 50, 14, IDOK, 0xFFFF,
+                   DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 190, 156, 50, 14, IDCANCEL, 0xFFFF,
+                   DLG_CLASS_BUTTON, Tr(Str::Btn_Cancel));
+
+    const INT_PTR result = DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr,
+                                                   SettingsDlgProc, (LPARAM)&data);
+    showing = false;
+    if (result != IDOK)
+        return;
+
+    const bool updatesSwitchedOn = data.checkUpdates && !config.CheckForUpdates;
+    config.CheckForUpdates = data.checkUpdates;
+    config.DebugLogging = data.debugLogging;
+    HookBridge::SetDebugLogging(data.debugLogging);
+
+    // Only a hotkey the user changed is written back: the field cannot show
+    // a Win combination from config.json, and must not strip it by being opened
+    bool hotkeyOk = true;
+    if (data.hotkeyChanged)
+    {
+        config.QuickHideHotkey = CorralWindow::WideToUtf8(
+            FormatHotkey(HotkeyFromControlWord(data.hotkeyWord), L"Ctrl", L"Shift"));
+        if (desktopActive) // In standby it is registered when the desktop comes back
+            hotkeyOk = ApplyQuickHideHotkey();
+    }
+    SaveConfig();
+
+    if (data.german != wasGerman)
+        ApplyLanguage(data.german ? "de" : "en");
+
+    if (!hotkeyOk && trayIcon)
+        trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
+                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+    if (updatesSwitchedOn)
+        StartUpdateCheck(true); // immediate confirmation that checking works
 }
 
 void App::StartUpdateCheck(bool userInitiated)
