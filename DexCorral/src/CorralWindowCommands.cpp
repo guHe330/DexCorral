@@ -226,10 +226,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
     POINT pt = {x, y};
     ClientToScreen(hwnd, &pt);
 
-    SetForegroundWindow(hwnd);
-    // Activation raises every corral (all are owned by Progman) above other apps;
-    // sink them again before the menu's modal loop, not only after it
-    PinToBandTop();
+    ActivateInPlace(true); // Foreground, so the menu closes on a click elsewhere
     int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
     PostMessageW(hwnd, WM_NULL, 0, 0);
     PinToBandTop();

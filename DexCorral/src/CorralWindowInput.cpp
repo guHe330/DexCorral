@@ -1032,8 +1032,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 ToggleSelection(hit);
             else
                 SelectRangeTo(hit, false);
-            SetFocus(hwnd);
-            PinToBandTop();
+            ActivateInPlace();
             UpdateLayeredContent();
             return;
         }
@@ -1054,12 +1053,9 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         draggedIconIndex = hit; // Potential drag candidate
         iconDragStart = {x, y}; // Store starting position
         dropTargetIndex = -1;
-        SetFocus(hwnd); // Take keyboard focus so F2 works
-        // SetFocus activates the window (and can raise it in the z-order) as a side
-        // effect — WM_MOUSEACTIVATE's MA_NOACTIVATE doesn't cover this path since it's
-        // not triggered by the click itself. Re-pin immediately, same as the right-click
-        // context menu's SetForegroundWindow/PinToBandTop pair.
-        PinToBandTop();
+        // Take keyboard focus so F2 works. SetFocus activates the window, which
+        // WM_MOUSEACTIVATE's MA_NOACTIVATE does not cover: it is not the click itself.
+        ActivateInPlace();
         SetCapture(hwnd);
         UpdateLayeredContent(); // Show selection highlight
         return;
@@ -1068,8 +1064,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
     // Empty icon area: start a rubber-band selection (Ctrl adds to the selection)
     if (y >= GetIconAreaTop() && !config.IsRolledUp)
     {
-        SetFocus(hwnd);
-        PinToBandTop();
+        ActivateInPlace();
         StartRubberBand(x, y);
         UpdateLayeredContent();
         return;
@@ -1472,8 +1467,7 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
             AppendMenuW(hMenu, MF_STRING, removeCmdId, Tr(Str::Menu_RemoveFromCorral));
         }
 
-        SetForegroundWindow(hwnd);
-        PinToBandTop(); // Before the modal loop too, see ShowContextMenu
+        ActivateInPlace(true);
         int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                  screenX, screenY, 0, hwnd, nullptr);
         PostMessageW(hwnd, WM_NULL, 0, 0);

@@ -13,7 +13,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The tray menu is shorter: **Language**, **Check for Updates Automatically** and **Open Config Folder** moved into the settings window. ([#78](https://github.com/guHe330/DexCorral/issues/78))
 
 ### Fixed
-- Right-clicking a Corral or an icon in it brought every Corral in front of the open windows for as long as the menu was shown. Corrals now stay behind other windows while their menu is open.
+- Right-clicking a Corral or an icon in it brought every Corral in front of the open windows for as long as the menu was shown. Corrals now stay behind other windows while their menu is open, and a click on an icon no longer makes a Corral flash in front of a window for a moment.
 
 ## [1.2.0] - 2026-11-15
 
