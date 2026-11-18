@@ -335,12 +335,45 @@ void App::Initialize()
 
 const wchar_t *App::TrayTooltip() const
 {
-    return Tr(standbyReason != HookStandbyReason::None ? Str::Tray_TooltipPaused : Str::Tray_Tooltip);
+    return Tr(standbyReason != HookStandbyReason::None || config.Paused ? Str::Tray_TooltipPaused : Str::Tray_Tooltip);
+}
+
+void App::SetPaused(bool pause)
+{
+    if (!desktopActive || config.Paused == pause)
+        return;
+
+    // Quick-hide hid the desktop's own icons; give them back before standing down
+    if (pause && quickHideActive)
+        ToggleQuickHide();
+
+    config.Paused = pause;
+    HookBridge::SetUserPaused(pause);
+    DllLog(L"App::SetPaused: %s", pause ? L"paused" : L"resumed");
+
+    if (pause)
+    {
+        for (auto &corral : corrals)
+            corral->Hide();
+    }
+    else
+    {
+        // Show() promotes each corral in turn; put back the one that was on top
+        CorralWindow *top = topCorral;
+        for (auto &corral : corrals)
+            corral->Show();
+        RepinBand(top);
+    }
+
+    if (trayIcon)
+        trayIcon->UpdateTooltip(TrayTooltip());
+    SaveConfig(); // Also pushes the hidden-icon list: empty while paused
 }
 
 void App::ActivateDesktop()
 {
     desktopActive = true;
+    HookBridge::SetUserPaused(config.Paused); // Before any corral is shown
 
     // Setup mouse hook
     mouseHook = std::make_unique<MouseHook>();
@@ -883,6 +916,9 @@ bool App::ApplyQuickHideHotkey()
 
 void App::ToggleQuickHide()
 {
+    if (config.Paused)
+        return; // Nothing of DexCorral's is on screen to hide
+
     quickHideActive = !quickHideActive;
 
     if (quickHideActive)
@@ -1072,6 +1108,16 @@ void App::HideDeletedDesktopFile(const std::wstring &fileName)
 
 void App::UpdateHookHiddenIcons()
 {
+    // Paused: nothing is hidden. Every push of the list comes through here.
+    // Not ClearHiddenIcons: that bumps the version on every call (see UpdateHiddenIcons).
+    if (config.Paused)
+    {
+        if (messageWindow)
+            KillTimer(messageWindow, TRANSIENT_HIDDEN_TIMER);
+        HookBridge::UpdateHiddenIcons({});
+        return;
+    }
+
     auto icons = CollectCorralIconIdentities();
 
     // Append unexpired transient identities (old names of just-renamed icons,
@@ -1122,6 +1168,9 @@ void App::PositionHiddenIconsUnderCorrals()
     // at their actual screen coords (under the corral window). Icons scrolled out
     // of view get positioned just outside the corral edge. If DexCorral crashes,
     // icons reappear near where the corral was.
+    if (config.Paused)
+        return; // The icons are the user's to arrange while paused
+
     std::vector<IconPositionRequest> requests;
 
     for (const auto &corral : corrals)
@@ -1505,8 +1554,16 @@ void App::ShowTrayMenu()
             AppendMenuW(menu, MF_STRING, 15, Tr(Str::Menu_WhyPaused));
         }
     }
+    else if (config.Paused)
+    {
+        AppendMenuW(menu, MF_STRING | MF_CHECKED, 16, Tr(Str::Menu_Pause));
+        // Stays reachable: icons hidden before the pause would otherwise be stuck hidden
+        AppendMenuW(menu, MF_STRING | (DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED), 2,
+                    Tr(Str::Menu_ShowDesktopIcons));
+    }
     else
     {
+    AppendMenuW(menu, MF_STRING, 16, Tr(Str::Menu_Pause));
     AppendMenuW(menu, MF_STRING, 1, Tr(Str::Menu_CreateNewCorral));
     AppendMenuW(menu, MF_STRING, 5, Tr(Str::Menu_NewVirtualCorral));
 
@@ -1602,6 +1659,9 @@ void App::ShowTrayMenu()
         break;
     case 15:
         ShowStandbyExplanation();
+        break;
+    case 16:
+        SetPaused(!config.Paused);
         break;
     case 12:
         // The manual on GitHub, rendered. Opened in the user's browser, on request only.
@@ -2182,7 +2242,8 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     // on the thread that owns `corrals`.
     if (uMsg == WM_CREATE_CORRAL_AT || uMsg == WM_CREATE_VIRTUAL_CORRAL_AT)
     {
-        if (app && app->desktopActive) // the desktop menu entries are hidden in standby; this is the backstop
+        // The desktop menu entries are hidden in standby and while paused; this is the backstop
+        if (app && app->desktopActive && !app->config.Paused)
         {
             POINT pt = {(int)(LONG)wParam, (int)(LONG)lParam};
             if (uMsg == WM_CREATE_CORRAL_AT)

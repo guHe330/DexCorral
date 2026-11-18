@@ -64,6 +64,7 @@ const wchar_t *const kEnglish[] = {
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
     /* Menu_Resume */              L"Resume DexCorral",
+    /* Menu_Pause */               L"Pause DexCorral",
     /* Standby_CrashStatus */      L"Paused: Explorer crashed twice in a row",
     /* SafeMode_Title */           L"DexCorral is paused",
     /* SafeMode_Body */            L"DexCorral is still paused after Explorer crashed twice in a row. Your icons "
@@ -314,6 +315,7 @@ const wchar_t *const kGerman[] = {
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
     /* Menu_Resume */              L"DexCorral fortsetzen",
+    /* Menu_Pause */               L"DexCorral pausieren",
     /* Standby_CrashStatus */      L"Pausiert: Der Explorer ist zweimal abgestürzt",
     /* SafeMode_Title */           L"DexCorral ist pausiert",
     /* SafeMode_Body */            L"DexCorral ist weiterhin pausiert, nachdem der Explorer zweimal hintereinander "

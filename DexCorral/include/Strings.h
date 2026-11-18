@@ -59,6 +59,7 @@ enum class Str
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby
     Menu_Resume,                 // "Resume DexCorral"
+    Menu_Pause,                  // "Pause DexCorral" (tray menu; checked while paused by the user)
     Standby_CrashStatus,         // greyed status line in the tray menu
     SafeMode_Title,              // title of the standby dialog and of the reminder balloon
     SafeMode_Body,               // reminder balloon at later starts: still paused, how to resume

@@ -54,6 +54,11 @@ public:
     // Clear the hidden icon list (call on shutdown)
     static void ClearHiddenIcons();
 
+    // Paused by the user (tray menu). Set by the app; read on Explorer's UI
+    // thread, where the desktop context menu leaves out its "New" entries.
+    static void SetUserPaused(bool paused);
+    static bool IsUserPaused();
+
     // Force desktop repaint (so hidden icons disappear/reappear)
     static void RefreshDesktop();
 

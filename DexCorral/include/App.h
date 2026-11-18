@@ -92,6 +92,14 @@ public:
     /// Leaves standby on the user's request (tray menu): installs the hook and brings the corrals back
     void ResumeFromStandby();
 
+    /**
+     * Pause on the user's request (tray menu): hides every corral and shows
+     * every desktop icon, without unloading anything. Unlike standby the hook
+     * stays installed and the corrals stay alive, so resuming is immediate.
+     */
+    void SetPaused(bool pause);
+    bool IsPaused() const { return config.Paused; }
+
     /// The dialog that explains the current standby (crash guard or conflict)
     void ShowStandbyExplanation();
     /// The style a newly created corral gets (the saved "default for new corrals")

@@ -4,6 +4,9 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Pause DexCorral** in the tray menu: hides every Corral and shows all icons as ordinary desktop icons, without restarting Explorer. Choosing it again brings everything back as it was. The pause is kept across sign-out and restart. ([#50](https://github.com/guHe330/DexCorral/issues/50))
+
 ## [1.2.0] - 2026-11-15
 
 ### Added

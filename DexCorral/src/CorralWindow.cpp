@@ -321,6 +321,10 @@ void CorralWindow::PinToBandTop()
 
 void CorralWindow::Show()
 {
+    // Paused by the user: corrals exist but stay hidden until App::SetPaused(false)
+    if (App *app = App::GetInstance(); app && app->IsPaused())
+        return;
+
     if (hwnd)
     {
         // Showing through the normal path cancels any quick-hide state
