@@ -20,11 +20,10 @@
  */
 
 /**
- * DesktopIcons.h - Cross-process desktop icon manipulation
+ * DesktopIcons.h - Desktop icon manipulation
  *
- * Provides static methods to read and manipulate desktop icons in the Explorer
- * ListView. Uses cross-process techniques (VirtualAllocEx, ReadProcessMemory, SendMessage)
- * to access the desktop ListView without direct memory access to explorer.exe.
+ * Static methods to read and move desktop icons in the Explorer ListView,
+ * from inside explorer.exe.
  */
 
 #pragma once
@@ -68,8 +67,8 @@ struct DesktopIconInfo
 
 /**
  * Static utility class for desktop icon manipulation.
- * Provides cross-process access to Explorer's desktop ListView to read icon positions
- * and properties, and to move icons (hide/restore).
+ * Reads icon positions and properties from Explorer's desktop ListView and
+ * moves icons (hide/restore).
  */
 class DesktopIcons
 {
@@ -121,6 +120,6 @@ public:
     static std::wstring GetShellDisplayName(const std::wstring &fullPath);
 
 private:
-    /// Helper to extract text from remote ListView item using cross-process access
-    static std::wstring GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index);
+    /// Text of one desktop ListView item
+    static std::wstring GetItemText(HWND hListView, int index);
 };

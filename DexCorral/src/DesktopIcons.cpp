@@ -20,12 +20,11 @@
  */
 
 /**
- * DesktopIcons.cpp - Cross-process desktop icon manipulation
+ * DesktopIcons.cpp - Desktop icon manipulation
  *
- * Implements cross-process access to the Explorer desktop ListView to read icon positions,
- * names, and properties, and to modify icon positions (hide/restore). Uses VirtualAllocEx,
- * ReadProcessMemory, and SendMessage to access and manipulate the ListView in explorer.exe
- * without direct access to its memory space.
+ * Reads icon positions and names from the Explorer desktop ListView and moves
+ * icons. This code runs inside explorer.exe, so the ListView messages take
+ * plain local buffers.
  */
 
 #include "DesktopIcons.h"
@@ -88,25 +87,16 @@ std::wstring DesktopIcons::GetShellDisplayName(const std::wstring &fullPath)
     return name;
 }
 
-std::wstring DesktopIcons::GetItemText(HWND hListView, HANDLE hProcess, LPVOID pRemoteItem, LPVOID pRemoteText, int index)
+std::wstring DesktopIcons::GetItemText(HWND hListView, int index)
 {
+    wchar_t buffer[MAX_PATH] = {};
     LVITEMW lvItem = {};
-    lvItem.mask = LVIF_TEXT;
-    lvItem.iItem = index;
     lvItem.iSubItem = 0;
-    lvItem.pszText = (LPWSTR)pRemoteText;
+    lvItem.pszText = buffer;
     lvItem.cchTextMax = MAX_PATH;
-
-    SIZE_T written;
-    WriteProcessMemory(hProcess, pRemoteItem, &lvItem, sizeof(LVITEMW), &written);
-    SendMessageW(hListView, LVM_GETITEMTEXTW, index, (LPARAM)pRemoteItem);
-
-    wchar_t buffer[MAX_PATH];
-    SIZE_T bytesRead;
-    ReadProcessMemory(hProcess, pRemoteText, buffer, MAX_PATH * sizeof(wchar_t), &bytesRead);
+    SendMessageW(hListView, LVM_GETITEMTEXTW, index, (LPARAM)&lvItem);
     buffer[MAX_PATH - 1] = L'\0';
-
-    return std::wstring(buffer);
+    return buffer;
 }
 
 bool DesktopIcons::IsPointOnIcon(int screenX, int screenY)
@@ -115,28 +105,10 @@ bool DesktopIcons::IsPointOnIcon(int screenX, int screenY)
     if (hListView == nullptr)
         return false;
 
-    POINT pt = {screenX, screenY};
-    ScreenToClient(hListView, &pt);
-
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr)
-        return false;
-
-    LPVOID pRemoteInfo = VirtualAllocEx(hProcess, nullptr, 1024, MEM_COMMIT, PAGE_READWRITE);
-
     LVHITTESTINFO info = {};
-    info.pt = pt;
-
-    SIZE_T written;
-    WriteProcessMemory(hProcess, pRemoteInfo, &info, sizeof(LVHITTESTINFO), &written);
-    int index = (int)SendMessageW(hListView, LVM_HITTEST, 0, (LPARAM)pRemoteInfo);
-
-    VirtualFreeEx(hProcess, pRemoteInfo, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
-
-    return index != -1;
+    info.pt = {screenX, screenY};
+    ScreenToClient(hListView, &info.pt);
+    return (int)SendMessageW(hListView, LVM_HITTEST, 0, (LPARAM)&info) != -1;
 }
 
 void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions)
@@ -151,19 +123,9 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPosi
         return;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
-
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr)
-        return;
-
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
-    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
-
     for (int i = 0; i < count; i++)
     {
-        std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
+        std::wstring text = GetItemText(hListView, i);
 
         // Case-insensitive lookup (display names may differ in case from filenames)
         for (const auto &[name, pos2d] : iconPositions)
@@ -176,9 +138,6 @@ void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPosi
             }
         }
     }
-
-    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
 }
 
 void DesktopIcons::PositionIconsByPath(const std::vector<IconPositionRequest> &requests)
@@ -243,35 +202,16 @@ std::map<std::wstring, POINT2D> DesktopIcons::GetAllIconPositions()
         return result;
 
     int count = (int)SendMessageW(hListView, LVM_GETITEMCOUNT, 0, 0);
-    DWORD processId;
-    GetWindowThreadProcessId(hListView, &processId);
-
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, processId);
-    if (hProcess == nullptr)
-        return result;
-
-    LPVOID pRemoteItem = VirtualAllocEx(hProcess, nullptr, DESKTOP_ICON_BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
-    LPVOID pRemoteText = (LPBYTE)pRemoteItem + sizeof(LVITEMW);
-    LPVOID pRemotePoint = VirtualAllocEx(hProcess, nullptr, 8, MEM_COMMIT, PAGE_READWRITE);
-
     for (int i = 0; i < count; i++)
     {
-        std::wstring text = GetItemText(hListView, hProcess, pRemoteItem, pRemoteText, i);
+        std::wstring text = GetItemText(hListView, i);
         if (text.empty())
             continue;
 
-        SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)pRemotePoint);
-
-        POINT pt;
-        SIZE_T bytesRead;
-        ReadProcessMemory(hProcess, pRemotePoint, &pt, 8, &bytesRead);
-
+        POINT pt = {};
+        SendMessageW(hListView, LVM_GETITEMPOSITION, i, (LPARAM)&pt);
         result[text] = {pt.x, pt.y};
     }
-
-    VirtualFreeEx(hProcess, pRemotePoint, 0, MEM_RELEASE);
-    VirtualFreeEx(hProcess, pRemoteItem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
 
     return result;
 }
