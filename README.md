@@ -28,7 +28,7 @@ Double-click an empty spot on the desktop and every icon and Corral fades out at
 ### Tabs
 
 - Multiple tabs per Corral, each with its own icons and view settings.
-- Virtual folders backed by real directories.
+- Virtual folders backed by real directories, including network shares and mapped drives.
 
 ### Opacity on hover
 
@@ -60,6 +60,8 @@ Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 - Small, medium, large, and details views.
 - Catch-all Corral for new desktop items.
 - Multi-monitor and resolution-aware layouts.
+- Pause from the tray menu: all Corrals step aside and the plain desktop is back, without restarting Explorer.
+- One settings window for language, update check, the Quick-Hide hotkey and debug logs.
 - Native C++ / Win32, ~1 MB executable + DLL, no runtime dependencies.
 
 ## Requirements

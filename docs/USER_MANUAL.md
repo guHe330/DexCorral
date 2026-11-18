@@ -84,6 +84,7 @@ The folder can be on the network: a share (`\\nas\photos`) or a mapped network d
 ### Creating
 - Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab**.
 - Choose **New Virtual Corral** instead to pick a folder and create a Corral mirroring it.
+- The classic right-click menu of the desktop background (**Show more options**) offers **New DexCorral** and **New Virtual DexCorral** as well, and creates the Corral where you clicked. See [Known Limitations](#known-limitations) if the entries are missing.
 
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
@@ -320,6 +321,8 @@ Fences is recognised by its entry in Windows' list of installed programs and by 
 ## Known Limitations
 
 - **Identical filenames on the user and Public desktop**: corral membership is stored as a bare filename, so DexCorral assumes the one on the user desktop. The same *display* name with different filenames (a folder `test` next to `test.txt`) is handled correctly.
+- **Network folders**: whether a share answers is checked in the background every 10 seconds, but the folder itself is read on the thread all Corrals share. If a share stops answering between two checks, Corrals can stall once until Windows gives up on it. A new network Corral is empty until the first check has answered.
+- **"New DexCorral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Some recent Windows 11 builds show only the new menu on the desktop background and no longer ask classic extensions (seen on build 26200.9974). Create Corrals from the tray menu or from the right-click menu of a Corral instead.
 
 ## Troubleshooting
 

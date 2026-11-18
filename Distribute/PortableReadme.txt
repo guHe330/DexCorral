@@ -60,8 +60,11 @@ User Interface
   name, type, size, date, and cloud sync status.
 * Multi-Monitor Aware: one arrangement of Corrals is remembered for each set
   of connected monitors and their resolutions.
-* Tray Integration: Manage global settings and create new Corrals from the
+* Tray Integration: Create new Corrals, pause DexCorral and open the settings
+  window (language, update check, Quick-Hide hotkey, debug logs) from the
   system tray.
+* Network Folders: A virtual Corral can show a share or a mapped network
+  drive; while the share does not answer it shows "Folder unavailable".
 
 Performance and Efficiency
 --------------------------

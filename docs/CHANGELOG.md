@@ -4,6 +4,8 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-18
+
 ### Added
 - **Pause DexCorral** in the tray menu: hides every Corral and shows all icons as ordinary desktop icons, without restarting Explorer. Choosing it again brings everything back as it was. The pause is kept across sign-out and restart. ([#50](https://github.com/guHe330/DexCorral/issues/50))
 - A settings window, opened with **Settings...** in the tray menu. It holds the language, the automatic update check, a field that captures the Quick-Hide hotkey when you press the keys, a switch for debug logs and a button for the config folder. The hotkey and debug logging no longer need `config.json` edited by hand, and both apply without signing out. ([#78](https://github.com/guHe330/DexCorral/issues/78))
@@ -13,8 +15,8 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The tray menu is shorter: **Language**, **Check for Updates Automatically** and **Open Config Folder** moved into the settings window. ([#78](https://github.com/guHe330/DexCorral/issues/78))
 
 ### Fixed
-- Right-clicking a Corral or an icon in it brought every Corral in front of the open windows for as long as the menu was shown. Corrals now stay behind other windows while their menu is open, and a click on an icon no longer makes a Corral flash in front of a window for a moment.
-- While an icon was being renamed, its Corral changed its look: the title jumped to the left, the other tabs disappeared, and transparency, border and selection were gone. The Corral now stays as it is, and only the name field appears over the label.
+- Right-clicking a Corral or an icon in it brought every Corral in front of the open windows for as long as the menu was shown. Corrals now stay behind other windows while their menu is open, and a click on an icon no longer makes a Corral flash in front of a window for a moment. ([#145](https://github.com/guHe330/DexCorral/issues/145))
+- While an icon was being renamed, its Corral changed its look: the title jumped to the left, the other tabs disappeared, and transparency, border and selection were gone. The Corral now stays as it is, and only the name field appears over the label. ([#146](https://github.com/guHe330/DexCorral/issues/146))
 
 ## [1.2.0] - 2026-11-15
 

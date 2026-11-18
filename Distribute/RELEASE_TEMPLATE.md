@@ -67,23 +67,20 @@ The zip contains:
 <!-- Per-release, not cumulative: list only the changes since the last tag.
      Emptied after each release ships. -->
 
-- Icons in a Corral can be dragged into other applications and Explorer windows, as from the desktop.
-- Multi-monitor: DexCorral now notices display changes while it runs and remembers one arrangement of Corrals for each set of connected monitors and their resolutions. A Corral whose monitor is disconnected waits on the primary monitor, keeps its size, and returns when the monitor comes back. Existing positions are carried over.
-- A click or double-click on a Corral header no longer counts as moving it.
-- A Corral dragged to a monitor with a different display scaling adapts completely: size, icons, spacing and text.
-- The mouse no longer stutters across Windows while DexCorral is busy, and scrolling in Corrals and double-click Quick-Hide no longer stop working afterwards.
-- The desktop watch recovers when the desktop folder moves or becomes unavailable, for example when OneDrive backup is switched on or off.
-- Virtual Corrals reload much faster in large folders and no longer miss files that arrive together.
-- Files replaced by an installer or editor keep their Corral, tab and position; new desktop files always go into the catch-all tab.
-- Drops onto an icon in a Corral respect Ctrl, Shift and right-button drags; a selected icon can be dragged by its label.
-- **New DexCorral** and **New Virtual DexCorral** are offered in the desktop menu only, no longer in every folder window and file dialog.
-- Less CPU while dragging Corrals and during the Quick-Hide fade, fewer writes of the configuration file, and debug logs are capped at 2 MB.
+- **Pause DexCorral** in the tray menu hides every Corral and shows all icons as ordinary desktop icons, without restarting Explorer. Choosing it again brings everything back; the pause is kept across sign-out and restart.
+- A settings window (**Settings...** in the tray menu) holds the language, the automatic update check, the Quick-Hide hotkey, debug logging and a button for the config folder. The hotkey is set by pressing the keys, and neither it nor debug logging needs `config.json` edited by hand any more.
+- The tray menu is shorter: **Language**, **Check for Updates Automatically** and **Open Config Folder** moved into the settings window.
+- A virtual Corral can show a folder on the network, a share or a mapped network drive. A share that does not answer no longer makes the other Corrals hang: the Corral shows "Folder unavailable" and fills again by itself when the share is back.
+- Right-clicking a Corral no longer brings every Corral in front of the open windows while the menu is shown, and a click on an icon no longer makes a Corral flash in front of a window.
+- A Corral keeps its look while an icon in it is renamed; only the name field appears over the label.
 
 The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blob/main/docs/CHANGELOG.md).
 
 ### Known issues
 
 - Two files with the exact same filename on the user desktop and the Public desktop can't be told apart; DexCorral assumes the one on the user desktop.
+- A network folder is read on the thread all Corrals share. If a share stops answering between two reachability checks, Corrals can stall once until Windows gives up on it.
+- On some recent Windows 11 builds the desktop right-click menu no longer lists **New DexCorral** and **New Virtual DexCorral**. Both are in the tray menu and in the right-click menu of every Corral.
 - If Stardock Fences is started while DexCorral is already running, DexCorral can only tell you; it steps aside at the next sign-in.
 
 See [open issues](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+is%3Aopen+label%3Abug) for known bugs.
