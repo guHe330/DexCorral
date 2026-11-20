@@ -41,6 +41,7 @@
 #include "UpdateChecker.h"
 #include "Strings.h"
 #include "LayoutMath.h"
+#include "Presets.h"
 #include "UndoMove.h"
 #include "AccentColor.h"
 #include "Constants.h"
@@ -970,6 +971,23 @@ void App::ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
     }
 }
 
+void App::ApplyLookToAllCorrals(const AppearanceSettings &look)
+{
+    if (desktopActive)
+    {
+        for (auto &corral : corrals)
+            corral->ApplyLook(look);
+    }
+    else
+    {
+        // Standby: there are no windows, the Corrals exist as loaded
+        for (auto &corralConfig : config.Corrals)
+            Presets::ApplyLook(corralConfig, look);
+    }
+    config.DefaultColorHex = look.ColorHex;
+    SetDefaultAppearance(look);
+}
+
 void App::ToggleDesktopIcons()
 {
     bool currentlyVisible = DesktopIcons::AreIconsVisible();
@@ -1851,10 +1869,11 @@ static const WORD IDC_SET_HOTKEY_LABEL = 312;
 static const WORD IDC_SET_HOTKEY = 313;
 static const WORD IDC_SET_DEBUG = 314;
 static const WORD IDC_SET_FOLDER = 315;
+static const WORD IDC_SET_LOOK = 316;
 
 // Where the hot key control goes, in dialog units (it is created in
 // WM_INITDIALOG: its class has no ordinal a dialog template could name)
-static const RECT SETTINGS_HOTKEY_RECT = {10, 57, 130, 71};
+static const RECT SETTINGS_HOTKEY_RECT = {10, 97, 130, 111};
 
 /// What the settings dialog shows, and on IDOK what the user chose
 struct SettingsDialogData
@@ -1865,7 +1884,62 @@ struct SettingsDialogData
     unsigned hotkeyWord = 0;     /// Hot key control word (see Hotkey.h)
     unsigned hotkeyBaseline = 0; /// The word the control reported before the user touched it
     bool hotkeyChanged = false;
+    int look = 0;                       /// 0 = keep the current look, else 1 + index into Presets::Shipped()
+    bool demoAllowed = false;           /// No demo Corral in standby: nothing of DexCorral is on the desktop then
+    std::unique_ptr<CorralWindow> demo; /// Shows the chosen preset next to the dialog; gone when the dialog closes
 };
+
+/// Where the demo Corral goes: beside the dialog, on whichever side has room
+static RECT LookDemoRect(HWND hDlg)
+{
+    RECT dlg;
+    GetWindowRect(hDlg, &dlg);
+    const SIZE size = App::DefaultCorralSize({dlg.right, dlg.top});
+    const int gap = MulDiv(12, (int)App::DpiForPoint({dlg.right, dlg.top}), 96);
+
+    LONG left = dlg.right + gap;
+    MONITORINFO mi = {sizeof(mi)};
+    if (GetMonitorInfoW(MonitorFromWindow(hDlg, MONITOR_DEFAULTTONEAREST), &mi) && left + size.cx > mi.rcWork.right)
+        left = dlg.left - gap - size.cx;
+    return {left, dlg.top, left + size.cx, dlg.top + size.cy};
+}
+
+/// Shows the preset chosen in the list on the demo Corral, or removes the
+/// demo when the list says "keep the current look"
+static void UpdateLookDemo(HWND hDlg, SettingsDialogData *data)
+{
+    const auto presets = Presets::Shipped();
+    const int sel = (int)SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_GETCURSEL, 0, 0);
+    if (!data->demoAllowed || sel < 1 || sel > (int)presets.size())
+    {
+        data->demo.reset();
+        return;
+    }
+    const AppearanceSettings &look = presets[sel - 1].look;
+    if (data->demo)
+    {
+        data->demo->ApplyLook(look);
+        return;
+    }
+
+    // Icons every Windows has, so the demo needs none of the user's files:
+    // This PC, Recycle Bin, the user's folder, Network
+    CorralTabConfig tab;
+    tab.Title = CorralWindow::WideToUtf8(Tr(Str::Preset_DemoTitle));
+    tab.Files = {"shell:{20D04FE0-3AEA-1069-A2D8-08002B30309D}", "shell:{645FF040-5081-101B-9F08-00AA002F954E}",
+                 "shell:{59031A47-3F72-44A7-89C5-5595FE6B30EE}", "shell:{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}"};
+    CorralWindowConfig demoConfig;
+    demoConfig.Tabs.push_back(tab);
+    Presets::ApplyLook(demoConfig, look);
+    const RECT r = LookDemoRect(hDlg);
+    demoConfig.Left = r.left;
+    demoConfig.Top = r.top;
+    demoConfig.Width = r.right - r.left;
+    demoConfig.Height = r.bottom - r.top;
+
+    data->demo = std::make_unique<CorralWindow>(demoConfig, hDlg);
+    data->demo->Show();
+}
 
 static void OpenConfigFolder()
 {
@@ -1891,6 +1965,10 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
         SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)L"English");
         SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)L"Deutsch");
         SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_SETCURSEL, data->german ? 1 : 0, 0);
+        SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(Str::Settings_LookKeep));
+        for (const auto &preset : Presets::Shipped())
+            SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(preset.name));
+        SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_SETCURSEL, 0, 0);
         CheckDlgButton(hDlg, IDC_SET_UPDATES, data->checkUpdates ? BST_CHECKED : BST_UNCHECKED);
         CheckDlgButton(hDlg, IDC_SET_DEBUG, data->debugLogging ? BST_CHECKED : BST_UNCHECKED);
 
@@ -1918,9 +1996,22 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
         SetForegroundWindow(hDlg);
         return TRUE;
     }
+    case WM_MOVE:
+        // The demo Corral keeps its place beside the dialog
+        if (data && data->demo && data->demo->GetHWND())
+        {
+            const RECT r = LookDemoRect(hDlg);
+            SetWindowPos(data->demo->GetHWND(), nullptr, r.left, r.top, 0, 0,
+                         SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        break;
     case WM_COMMAND:
         switch (LOWORD(wParam))
         {
+        case IDC_SET_LOOK:
+            if (HIWORD(wParam) == CBN_SELCHANGE)
+                UpdateLookDemo(hDlg, data);
+            return TRUE;
         case IDC_SET_FOLDER:
             OpenConfigFolder();
             return TRUE;
@@ -1944,10 +2035,13 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
             data->german = (SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_GETCURSEL, 0, 0) == 1);
             data->checkUpdates = (IsDlgButtonChecked(hDlg, IDC_SET_UPDATES) == BST_CHECKED);
             data->debugLogging = (IsDlgButtonChecked(hDlg, IDC_SET_DEBUG) == BST_CHECKED);
+            data->look = (int)SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_GETCURSEL, 0, 0);
+            data->demo.reset(); // Before its owner goes
             EndDialog(hDlg, IDOK);
             return TRUE;
         }
         case IDCANCEL:
+            data->demo.reset();
             EndDialog(hDlg, IDCANCEL);
             return TRUE;
         }
@@ -1975,38 +2069,48 @@ void App::ShowSettings()
     HotkeySpec current; // Stays empty when none is set or the text is not valid
     ParseHotkey(config.QuickHideHotkey, current);
     data.hotkeyWord = HotkeyToControlWord(current);
+    data.demoAllowed = desktopActive;
 
     // Layout in dialog units, one option per block with its explanation below it
-    const short DLG_W = 250, DLG_H = 178, W = 230;
+    const short DLG_W = 250, DLG_H = 218, W = 230;
     const DWORD label = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX;
     const DWORD check = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
 
     WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
-                               10, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 10 = the AddDlgItem calls below
+                               13, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 13 = the AddDlgItem calls below
 
     p = AddDlgItem(p, label, 10, 12, 76, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 90, 10, 100, 60,
                    IDC_SET_LANGUAGE, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, check, 10, 30, W, 10, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
-    p = AddDlgItem(p, label, 10, 46, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
+    p = AddDlgItem(p, label, 10, 32, 76, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 90, 30, 150, 100,
+                   IDC_SET_LOOK, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
+    p = AddDlgItem(p, label, 10, 47, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
+    p = AddDlgItem(p, check, 10, 70, W, 10, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
+    p = AddDlgItem(p, label, 10, 86, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
     // (the hot key control sits here, see SETTINGS_HOTKEY_RECT)
-    p = AddDlgItem(p, label, 10, 75, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
-    p = AddDlgItem(p, check, 10, 99, W, 10, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
-    p = AddDlgItem(p, label, 10, 111, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 10, 132, 110, 14, IDC_SET_FOLDER, 0xFFFF,
+    p = AddDlgItem(p, label, 10, 115, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
+    p = AddDlgItem(p, check, 10, 139, W, 10, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
+    p = AddDlgItem(p, label, 10, 151, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 10, 172, 110, 14, IDC_SET_FOLDER, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Menu_OpenConfigFolder));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 136, 156, 50, 14, IDOK, 0xFFFF,
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 136, 196, 50, 14, IDOK, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 190, 156, 50, 14, IDCANCEL, 0xFFFF,
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 190, 196, 50, 14, IDCANCEL, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Btn_Cancel));
 
     const INT_PTR result = DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr,
                                                    SettingsDlgProc, (LPARAM)&data);
     showing = false;
+    data.demo.reset(); // Closed some other way than by its buttons
     if (result != IDOK)
         return;
+
+    const auto presets = Presets::Shipped();
+    if (data.look >= 1 && data.look <= (int)presets.size())
+        ApplyLookToAllCorrals(presets[data.look - 1].look);
 
     const bool updatesSwitchedOn = data.checkUpdates && !config.CheckForUpdates;
     config.CheckForUpdates = data.checkUpdates;

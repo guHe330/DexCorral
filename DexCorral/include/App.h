@@ -132,6 +132,10 @@ public:
     void ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
                                      const AppearanceApplyFlags &apply);
 
+    /// Puts a whole look (a preset) on every Corral and all their tabs, and
+    /// makes it the look of new Corrals. The caller saves.
+    void ApplyLookToAllCorrals(const AppearanceSettings &look);
+
     /**
      * Creates a new corral centred on `desiredCenter`, nudged to the nearest
      * spot that does not overlap an existing corral. Every creation path goes

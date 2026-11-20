@@ -64,6 +64,9 @@ enum class Str
     Settings_HotkeyUnsupported,  // message: the key pressed cannot be a hotkey
     Settings_DebugLogging,       // checkbox
     Settings_DebugHint,          // what the logs are for and where they go
+    Settings_Look,               // label of the preset list
+    Settings_LookKeep,           // first entry: change nothing
+    Settings_LookHint,           // what choosing a preset and OK do
 
     // Look presets (Presets.h)
     Preset_Automatic,            // follows the Windows accent colour
@@ -72,6 +75,7 @@ enum class Str
     Preset_DarkGlass,
     Preset_Graphite,
     Preset_Compact,
+    Preset_DemoTitle,            // title of the demo Corral
 
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby
