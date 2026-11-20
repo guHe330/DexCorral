@@ -574,13 +574,14 @@ void CorralWindow::LoadVirtualFolderIcons()
 
     ClearIcons();
     virtualFolderMissing = false;
+    virtualFolderConnecting = false;
 
     CorralTabConfig &tab = GetActiveTab();
     if (tab.VirtualFolderPath.empty())
         return;
 
     // A network folder is only touched while its share is known to answer
-    // (see netState). Until then: empty, and "unavailable" once the answer is no.
+    // (see netState). Until then: "connecting", and "unavailable" once the answer is no.
     const std::wstring root = Utf8ToWide(tab.VirtualFolderPath);
     if (IsNetworkFolder(root))
     {
@@ -592,6 +593,7 @@ void CorralWindow::LoadVirtualFolderIcons()
         if (netState != NetState::Reachable)
         {
             virtualFolderMissing = (netState == NetState::Unreachable);
+            virtualFolderConnecting = (netState == NetState::Unknown);
             StartNetworkProbe();
             return;
         }

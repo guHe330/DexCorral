@@ -186,6 +186,7 @@ enum class Str
 
     // Corral header states (CorralWindowRender.cpp)
     Hdr_FolderUnavailable,       // "Folder unavailable\nRight-click to relink"
+    Hdr_FolderConnecting,        // "Connecting..."
 
     // File size units (CorralWindowRender.cpp)
     Unit_Bytes,                  // " B"

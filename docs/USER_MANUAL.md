@@ -77,7 +77,7 @@ It is a live view of that folder, and its icons are the real files, so dragging 
 - **Dragging files out of it**, to an Explorer window, the desktop or an application, moves or copies them by Explorer's usual rules. Several selected files travel together.
 - Dragged onto a **normal Corral**, a file stays where it is and gets a desktop shortcut in that Corral.
 
-The folder can be on the network: a share (`\\nas\photos`) or a mapped network drive. DexCorral asks every ten seconds whether the share answers, without making the other Corrals wait for it. While it does not, for example at sign-in before the NAS is up, the Corral shows **Folder unavailable**; it fills again by itself within a few seconds of the share coming back. Because many network devices do not report changes reliably, a network folder is also read again once a minute. Reading a large folder over a slow connection can make all Corrals pause for that moment.
+The folder can be on the network: a share (`\\nas\photos`) or a mapped network drive. DexCorral asks every ten seconds whether the share answers, without making the other Corrals wait for it. Until the first answer is in, the Corral shows **Connecting...**. While the share does not answer, for example at sign-in before the NAS is up, the Corral shows **Folder unavailable**; it fills again by itself within a few seconds of the share coming back. Because many network devices do not report changes reliably, a network folder is also read again once a minute. Reading a large folder over a slow connection can make all Corrals pause for that moment.
 
 ## Managing Corrals
 
