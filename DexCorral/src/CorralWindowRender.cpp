@@ -35,6 +35,7 @@
 #include "Constants.h"
 #include "TextLayer.h"
 #include "App.h"
+#include "AccentColor.h"
 #include "Strings.h"
 #include <windowsx.h>
 #include <uxtheme.h>
@@ -152,7 +153,12 @@ void CorralWindow::UpdateLayeredContent()
     BYTE bgAlpha = 153; // Default ~60% opacity
     BYTE bgR = 0, bgG = 0, bgB = 0;
 
-    const std::string &colorHex = GetActiveTab().ColorHex;
+    // A tab that follows Windows takes the accent colour and keeps its own alpha
+    auto backgroundOf = [](const CorralTabConfig &tab)
+    {
+        return tab.UseAccentColor ? AccentColor::Background(tab.ColorHex, App::AccentRgb()) : tab.ColorHex;
+    };
+    const std::string colorHex = backgroundOf(GetActiveTab());
     if (!colorHex.empty() && colorHex[0] == '#' && colorHex.length() >= 9)
     {
         unsigned int colorValue;
@@ -188,7 +194,7 @@ void CorralWindow::UpdateLayeredContent()
     for (int i = 0; i < (int)config.Tabs.size(); i++)
     {
         BYTE tabR = bgR, tabG = bgG, tabB = bgB;
-        const std::string &tabColorHex = config.Tabs[i].ColorHex;
+        const std::string tabColorHex = backgroundOf(config.Tabs[i]);
         if (!tabColorHex.empty() && tabColorHex[0] == '#' && tabColorHex.length() >= 9)
         {
             unsigned int tabColorValue;
@@ -280,7 +286,9 @@ void CorralWindow::UpdateLayeredContent()
     std::vector<BYTE> tabFontB(config.Tabs.size(), 255);
     for (int i = 0; i < (int)config.Tabs.size(); i++)
     {
-        const std::string &fontColorHex = config.Tabs[i].HeaderFontColor;
+        // On the accent colour the header text is black or white, whichever reads better
+        const std::string fontColorHex = config.Tabs[i].UseAccentColor ? AccentColor::TextOn(App::AccentRgb())
+                                                                      : config.Tabs[i].HeaderFontColor;
         if (!fontColorHex.empty() && fontColorHex[0] == '#' && fontColorHex.length() >= 7)
         {
             unsigned int fontColorVal;

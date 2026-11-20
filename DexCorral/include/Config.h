@@ -62,6 +62,7 @@ struct CorralTabConfig
 {
     std::string Title = "New Tab";           /// User-friendly tab name
     std::string ColorHex = "#99000000";      /// Background color (ARGB hex format)
+    bool UseAccentColor = false;             /// Background takes the Windows accent colour; ColorHex keeps its alpha
     std::vector<std::string> Files;          /// List of file names or "shell:{CLSID}" for special icons
     int ViewModeInt = 0;                     /// View mode (0=Small, 1=Medium, 2=Large, 3=Details)
     bool IsCatchAll = false;                 /// True if this is the automatic catch-all folder tab
@@ -85,7 +86,7 @@ struct CorralTabConfig
     /// Sets the view mode from enum
     void SetViewMode(ViewMode mode) { ViewModeInt = static_cast<int>(mode); }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity, UseAccentColor)
 };
 
 /// Configuration for a single corral window
@@ -130,6 +131,7 @@ struct AppConfig
     std::vector<CorralWindowConfig> Corrals;
     bool DesktopIconsVisible = true;
     std::string DefaultColorHex = "#7F0000FF"; // Default appearance for new corrals
+    bool DefaultUseAccentColor = false;
 
     // Default appearance for new corrals/tabs
     int DefaultTitleBarHeight = 26;
@@ -165,7 +167,7 @@ struct AppConfig
     // Paused from the tray menu: every corral hidden and every desktop icon
     // shown, until resumed there. Kept across restarts of Explorer.
     bool Paused = false;
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
 };
 
 /**
@@ -179,6 +181,7 @@ struct AppConfig
 struct AppearanceSettings
 {
     std::string ColorHex;            /// Tab background (ARGB hex) — per tab, applied to every tab
+    bool UseAccentColor = false;     /// Travels with the colour (AppearanceApplyFlags::Color)
     int TitleBarHeight = 32;
     int HeaderOpacity = 240;
     int BorderOpacity = 255;
