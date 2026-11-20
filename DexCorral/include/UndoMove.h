@@ -76,6 +76,14 @@ inline std::vector<IconPositionRequest> IconsToRestore(const std::vector<Desktop
     return result;
 }
 
+/// Top of a Corral's resting place. A rolled-up Corral that the hover
+/// unrolled upward has its window top raised by the height it gained; its
+/// header rests that much lower.
+inline int RestingTop(int windowTop, int unrolledHeight, int titleBarHeight, bool unrolledUpward)
+{
+    return unrolledUpward ? windowTop + (unrolledHeight - titleBarHeight) : windowTop;
+}
+
 /// Puts `record` on top of `stack` (newest last) and drops the oldest
 /// records beyond `depth`.
 template <typename T>

@@ -39,6 +39,7 @@
 #include <set>
 #include "Config.h"
 #include "DesktopIcons.h"
+#include "UndoMove.h"
 #include "ChromeAlpha.h"
 
 class FolderWatcher;
@@ -172,8 +173,10 @@ public:
     };
     Placement GetPlacement() const
     {
-        return {(int)config.Left, (int)config.Top, (int)config.Width,
-                (int)(config.IsRolledUp ? savedHeight : config.Height)};
+        const int height = (int)(config.IsRolledUp ? savedHeight : config.Height);
+        const int top = UndoMove::RestingTop((int)config.Top, height, GetTitleBarHeight(),
+                                             config.IsRolledUp && isHoverExpanded && expandUpward);
+        return {(int)config.Left, top, (int)config.Width, height};
     }
 
     /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
