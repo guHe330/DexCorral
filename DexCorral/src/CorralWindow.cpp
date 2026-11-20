@@ -147,20 +147,17 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg, HWND demoOwner)
     HWND progman = FindWindowW(L"Progman", nullptr);
 
     hwnd = CreateWindowExW(
-        WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        // The demo must not take the activation from its settings window, and
+        // is looked at, never used: no mouse, no keyboard, no drops
+        WS_EX_TOOLWINDOW | WS_EX_LAYERED | (isDemo ? WS_EX_NOACTIVATE : 0),
         CORRAL_WINDOW_CLASS,
         wtitle.c_str(),
-        WS_POPUP | WS_VISIBLE,
+        WS_POPUP | (isDemo ? WS_DISABLED : WS_VISIBLE), // Show() shows the demo, without activating it
         (int)config.Left, (int)config.Top,
         (int)config.Width, initialHeight,
         isDemo ? demoOwner : progman, nullptr, GetModuleHandleW(nullptr), this);
 
-    if (isDemo)
-    {
-        // Looked at, never used: no mouse, no keyboard, no drops
-        EnableWindow(hwnd, FALSE);
-    }
-    else
+    if (!isDemo)
     {
         // Register OLE drop target (replaces WS_EX_ACCEPTFILES for richer drop support)
         dropTarget = new CorralDropTarget(this);

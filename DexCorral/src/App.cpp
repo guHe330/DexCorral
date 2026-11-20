@@ -1900,7 +1900,7 @@ static RECT LookDemoRect(HWND hDlg)
     LONG left = dlg.right + gap;
     MONITORINFO mi = {sizeof(mi)};
     if (GetMonitorInfoW(MonitorFromWindow(hDlg, MONITOR_DEFAULTTONEAREST), &mi) && left + size.cx > mi.rcWork.right)
-        left = dlg.left - gap - size.cx;
+        left = std::max(mi.rcWork.left, dlg.left - gap - size.cx); // No room on either side: over the dialog's edge
     return {left, dlg.top, left + size.cx, dlg.top + size.cy};
 }
 
