@@ -1202,7 +1202,7 @@ void CorralWindow::ShowAppearanceDialog()
     const int DLG_HEIGHT = 371;
     const int ITEM_COUNT = 52;
 
-    // Twice the usual buffer: 51 controls, eleven of them with a spelled-out
+    // Twice the usual buffer: 52 controls, eleven of them with a spelled-out
     // class name, and translated texts of open-ended length
     WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD *p = dlgTemplate;

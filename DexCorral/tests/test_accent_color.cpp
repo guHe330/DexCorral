@@ -36,3 +36,11 @@ TEST(AccentColor, TextIsBlackOnALightAccent)
     EXPECT_EQ(AccentColor::TextOn(0xFFB900u), "#000000"); // Windows yellow
     EXPECT_EQ(AccentColor::TextOn(0xFFFFFFu), "#000000");
 }
+
+TEST(AccentColor, TextIsBlackOnAMidBrightAccent)
+{
+    EXPECT_EQ(AccentColor::TextOn(0x00B7C3u), "#000000"); // Windows teal
+    EXPECT_EQ(AccentColor::TextOn(0x00CC6Au), "#000000"); // Windows green
+    EXPECT_EQ(AccentColor::TextOn(0xFF8C00u), "#000000"); // Windows orange
+    EXPECT_EQ(AccentColor::TextOn(0x107C10u), "#FFFFFF"); // Dark green stays white
+}

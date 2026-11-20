@@ -400,6 +400,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
         CorralTabConfig newTab;
         newTab.Title = WideToUtf8(Tr(Str::Name_NewTab));
         newTab.ColorHex = GetActiveTab().ColorHex;             // Inherit color from current tab
+        newTab.UseAccentColor = GetActiveTab().UseAccentColor;
         newTab.HeaderFontName = GetActiveTab().HeaderFontName;  // Inherit font from current tab
         newTab.HeaderFontSize = GetActiveTab().HeaderFontSize;
         newTab.HeaderFontColor = GetActiveTab().HeaderFontColor;

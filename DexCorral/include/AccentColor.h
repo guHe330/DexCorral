@@ -61,6 +61,6 @@ inline std::string TextOn(unsigned accentRgb)
 {
     const unsigned r = (accentRgb >> 16) & 0xFF, g = (accentRgb >> 8) & 0xFF, b = accentRgb & 0xFF;
     const unsigned luma = (299 * r + 587 * g + 114 * b) / 1000; // Perceived brightness, 0-255
-    return luma > 150 ? "#000000" : "#FFFFFF";
+    return luma > 128 ? "#000000" : "#FFFFFF";
 }
 } // namespace AccentColor
