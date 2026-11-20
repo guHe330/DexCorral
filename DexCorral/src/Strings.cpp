@@ -71,6 +71,14 @@ const wchar_t *const kEnglish[] = {
     /* Settings_DebugLogging */    L"Write debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
 
+    // Look presets
+    /* Preset_Automatic */         L"Automatic (Windows accent color)",
+    /* Preset_ClassicBlue */       L"Classic Blue",
+    /* Preset_LightGlass */        L"Light Glass",
+    /* Preset_DarkGlass */         L"Dark Glass",
+    /* Preset_Graphite */          L"Graphite",
+    /* Preset_Compact */           L"Compact",
+
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
     /* Menu_Resume */              L"Resume DexCorral",
@@ -334,6 +342,14 @@ const wchar_t *const kGerman[] = {
                                    L"eine Ziffer oder eine Funktionstaste.",
     /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
     /* Settings_DebugHint */       L"Für Fehlerberichte. Die Protokolle liegen im Konfigurationsordner.",
+
+    // Look presets
+    /* Preset_Automatic */         L"Automatisch (Windows-Akzentfarbe)",
+    /* Preset_ClassicBlue */       L"Klassisch Blau",
+    /* Preset_LightGlass */        L"Glas hell",
+    /* Preset_DarkGlass */         L"Glas dunkel",
+    /* Preset_Graphite */          L"Graphit",
+    /* Preset_Compact */           L"Kompakt",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",

@@ -65,6 +65,14 @@ enum class Str
     Settings_DebugLogging,       // checkbox
     Settings_DebugHint,          // what the logs are for and where they go
 
+    // Look presets (Presets.h)
+    Preset_Automatic,            // follows the Windows accent colour
+    Preset_ClassicBlue,          // the stock look
+    Preset_LightGlass,
+    Preset_DarkGlass,
+    Preset_Graphite,
+    Preset_Compact,
+
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby
     Menu_Resume,                 // "Resume DexCorral"
