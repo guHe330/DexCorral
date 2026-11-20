@@ -88,13 +88,14 @@ The folder can be on the network: a share (`\\nas\photos`) or a mapped network d
 
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
+- Moved or resized one by accident? Right-click any Corral and choose **Undo Last Move**. The Corral goes back to where it was, and so do the desktop icons it pushed out of the way; an icon you have moved by hand since stays where you put it. Choose it again to go further back, up to ten steps through the last moves and resizes of all Corrals. The steps are forgotten when you sign out, pause DexCorral or change the set of monitors.
 - Drag any **edge or corner** to resize. While moving or resizing, Corrals snap to screen edges and align to other Corrals on the same monitor.
 - Corrals are immune to **Win+D / Show Desktop**: they stay visible with your desktop.
 
 ### Lock Position
 Right-click a Corral and choose **Lock Position** to freeze it where it is. A locked Corral cannot be moved or resized with the mouse, and a small padlock appears in its title bar. Everything else keeps working: tabs still switch, double-clicking the title bar still rolls it up, and positions are still restored per monitor and resolution. Choose **Lock Position** again to unlock.
 
-Lock any Corral that sits where you drop files all day. An accidental drag moves the Corral and also pushes the desktop icons underneath it out of the way, and that cannot be undone.
+Lock any Corral that sits where you drop files all day. An accidental drag moves the Corral and also pushes the desktop icons underneath it out of the way. **Undo Last Move** (see [Moving and Resizing](#moving-and-resizing)) takes that back, but only until you sign out.
 
 ### Roll-Up
 Double-click the title bar to **roll up** a Corral so only the title bar remains visible. Double-click again to expand it.

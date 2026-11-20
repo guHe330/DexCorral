@@ -4,6 +4,9 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Undo Last Move** in the right-click menu of every Corral takes back a move or resize: the Corral returns to where it was, and so do the desktop icons it pushed out of the way. An icon you have moved by hand since stays where you put it. It goes back up to ten steps and forgets them at sign-out. ([#154](https://github.com/guHe330/DexCorral/issues/154))
+
 ## [1.3.0] - 2026-11-18
 
 ### Added
