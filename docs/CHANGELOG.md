@@ -5,6 +5,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 ## [Unreleased]
 
 ### Added
+- **Windows accent color** in the Appearance dialog: a tab can take its background from the accent colour set in Windows and follows it when it changes, without a restart. The tab keeps its own transparency, and its header text turns black or white for contrast. ([#159](https://github.com/guHe330/DexCorral/issues/159))
 - **Undo Last Move** in the right-click menu of every Corral takes back a move or resize: the Corral returns to where it was, and so do the desktop icons it pushed out of the way. An icon you have moved by hand since stays where you put it. It goes back up to ten steps and forgets them at sign-out. ([#154](https://github.com/guHe330/DexCorral/issues/154))
 
 ## [1.3.0] - 2026-11-18

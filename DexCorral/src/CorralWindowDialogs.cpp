@@ -590,6 +590,16 @@ static COLORREF RgbOf(unsigned int argb)
     return RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
 }
 
+// "Windows accent color" (ID 135): while it is on, the tab is drawn in the accent
+// colour with black or white header text, so the two colour buttons have no effect
+static void AppearanceSyncAccentControls(HWND hDlg, const AppearanceDlgData *data)
+{
+    const bool accent = data->activeTabConfig && data->activeTabConfig->UseAccentColor;
+    CheckDlgButton(hDlg, 135, accent ? BST_CHECKED : BST_UNCHECKED);
+    EnableWindow(GetDlgItem(hDlg, 106), !accent);
+    EnableWindow(GetDlgItem(hDlg, 115), !accent);
+}
+
 static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     AppearanceDlgData *data = (AppearanceDlgData *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
@@ -605,6 +615,7 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         data->hBrush = CreateSolidBrush(data->color);
         data->fontColorBrush = CreateSolidBrush(data->fontColor);
         data->tintColorBrush = CreateSolidBrush(data->tintColor);
+        AppearanceSyncAccentControls(hDlg, data);
 
         // --- Opacity group: six sliders, in the order they appear ---
 
@@ -766,6 +777,18 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             return TRUE;
         }
 
+        if (id == 135)
+        { // Windows accent color
+            if (data->activeTabConfig)
+            {
+                data->activeTabConfig->UseAccentColor = IsDlgButtonChecked(hDlg, 135) == BST_CHECKED;
+                data->colorChanged = true; // Travels with the colour to "apply to all"
+                AppearanceSyncAccentControls(hDlg, data);
+                AppearanceUpdateLivePreview(data);
+            }
+            return TRUE;
+        }
+
         if (id == 113)
         { // Choose Font
             // Convert point size to pixel height for LOGFONT
@@ -881,6 +904,9 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
                 DeleteObject(data->hBrush);
             data->hBrush = CreateSolidBrush(data->color);
             InvalidateRect(GetDlgItem(hDlg, 105), nullptr, TRUE);
+            if (data->activeTabConfig)
+                data->activeTabConfig->UseAccentColor = def.UseAccentColor;
+            AppearanceSyncAccentControls(hDlg, data);
 
             data->fontName = CorralWindow::Utf8ToWide(def.HeaderFontName);
             data->fontSize = def.HeaderFontSize;
@@ -1174,7 +1200,7 @@ void CorralWindow::ShowAppearanceDialog()
 
     const int DLG_WIDTH = 220;
     const int DLG_HEIGHT = 371;
-    const int ITEM_COUNT = 51;
+    const int ITEM_COUNT = 52;
 
     // Twice the usual buffer: 51 controls, eleven of them with a spelled-out
     // class name, and translated texts of open-ended length
@@ -1208,6 +1234,9 @@ void CorralWindow::ShowAppearanceDialog()
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY, 15, 18, 30, 14, 105, 0xFFFF, 0x0082, nullptr);
     // 3. Change button (ID 106)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 55, 18, 60, 14, 106, 0xFFFF, 0x0080, Tr(Str::Btn_Change));
+
+    // 3a. Windows accent color (ID 135)
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, 122, 19, 90, 12, 135, 0xFFFF, 0x0080, Tr(Str::Chk_AccentColor));
 
     // === Opacity group — every opacity slider lives here, each label directly
     // under the thing it belongs to. All are per-corral except "Header Label",
@@ -1381,6 +1410,7 @@ void CorralWindow::ShowAppearanceDialog()
 
     // Save originals for cancel
     std::string originalColor = GetActiveTab().ColorHex;
+    bool originalUseAccent = GetActiveTab().UseAccentColor;
     int originalTitleBarHeight = config.TitleBarHeight;
     int originalHeaderOpacity = config.HeaderOpacity;
     int originalBorderOpacity = config.BorderOpacity;
@@ -1407,6 +1437,7 @@ void CorralWindow::ShowAppearanceDialog()
     {
         // Restore all settings on cancel
         GetActiveTab().ColorHex = originalColor;
+        GetActiveTab().UseAccentColor = originalUseAccent;
         config.TitleBarHeight = originalTitleBarHeight;
         config.HeaderOpacity = originalHeaderOpacity;
         config.BorderOpacity = originalBorderOpacity;
@@ -1461,6 +1492,7 @@ void CorralWindow::ShowAppearanceDialog()
             // it depends on the checkboxes.
             AppearanceSettings look;
             look.ColorHex = GetActiveTab().ColorHex;
+            look.UseAccentColor = GetActiveTab().UseAccentColor;
             look.TitleBarHeight = config.TitleBarHeight;
             look.HeaderOpacity = config.HeaderOpacity;
             look.BorderOpacity = config.BorderOpacity;

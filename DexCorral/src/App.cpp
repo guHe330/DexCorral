@@ -2127,6 +2127,7 @@ AppearanceSettings App::GetDefaultAppearance() const
 
     AppearanceSettings s;
     s.ColorHex = t.ColorHex;
+    s.UseAccentColor = t.UseAccentColor;
     s.TitleBarHeight = c.TitleBarHeight;
     s.HeaderOpacity = c.HeaderOpacity;
     s.BorderOpacity = c.BorderOpacity;
