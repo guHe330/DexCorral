@@ -41,6 +41,8 @@
 #include "UpdateChecker.h"
 #include "Strings.h"
 #include "LayoutMath.h"
+#include "UndoMove.h"
+#include "Constants.h"
 #include "Hotkey.h"
 #include "DialogTemplate.h"
 #include "Conflicts.h"
@@ -353,6 +355,7 @@ void App::SetPaused(bool pause)
 
     if (pause)
     {
+        ClearMoveUndo(); // The icons are about to be laid out as a plain desktop
         for (auto &corral : corrals)
             corral->Hide();
     }
@@ -701,6 +704,74 @@ void App::ForgetCorral(CorralWindow *corral)
         topCorral = nullptr;
     if (hoverExpandedCorral == corral)
         hoverExpandedCorral = nullptr;
+
+    // Its undo steps go with it. The other steps stay valid: an icon is only
+    // ever put back if it still lies where its own step left it.
+    if (pendingMoveUndo.corral == corral)
+        pendingMoveUndo = {};
+    moveUndoStack.erase(std::remove_if(moveUndoStack.begin(), moveUndoStack.end(),
+                                       [corral](const MoveUndoRecord &r) { return r.corral == corral; }),
+                        moveUndoStack.end());
+}
+
+void App::ClearMoveUndo()
+{
+    pendingMoveUndo = {};
+    moveUndoStack.clear();
+}
+
+void App::BeginMoveUndo(CorralWindow *corral)
+{
+    if (!corral)
+        return;
+    if (!desktopIconCacheValid)
+        CacheDesktopIconPositions();
+
+    const CorralWindow::Placement place = corral->GetPlacement();
+    pendingMoveUndo = {corral, place.left, place.top, place.width, place.height, cachedDesktopIconPositions, {}};
+}
+
+void App::CommitMoveUndo(CorralWindow *corral, bool moved)
+{
+    MoveUndoRecord record = std::move(pendingMoveUndo);
+    pendingMoveUndo = {};
+
+    // A click that never became a move leaves the earlier steps as they are
+    if (!moved || !corral || record.corral != corral)
+        return;
+
+    record.iconsAfter = cachedDesktopIconPositions;
+    UndoMove::PushCapped(moveUndoStack, std::move(record), MOVE_UNDO_DEPTH);
+}
+
+void App::UndoLastMove()
+{
+    if (moveUndoStack.empty())
+        return;
+    MoveUndoRecord record = std::move(moveUndoStack.back());
+    moveUndoStack.pop_back();
+    pendingMoveUndo = {};
+
+    // Decide which icons go back before anything moves
+    CacheDesktopIconPositions();
+    const std::vector<IconPositionRequest> requests =
+        UndoMove::IconsToRestore(record.iconsBefore, record.iconsAfter, cachedDesktopIconPositions);
+    DllLog(L"App::UndoLastMove: corral back to %d,%d %dx%d, %zu icons return, %zu steps left",
+           record.left, record.top, record.width, record.height, requests.size(), moveUndoStack.size());
+
+    record.corral->MoveTo(record.left, record.top, record.width, record.height);
+    record.corral->SyncConfigFromWindow(true); // Counts as placed by the user
+
+    if (!requests.empty())
+        DesktopIcons::PositionIconsByPath(requests);
+
+    // As at the end of a drag: an icon that has taken an old place since must
+    // not be left under the Corral
+    CacheDesktopIconPositions();
+    PushDesktopIconsFromCorrals();
+    InvalidateDesktopIconCache();
+    PositionHiddenIconsUnderCorrals();
+    SaveConfig();
 }
 
 bool App::BeginHoverExpand(CorralWindow *corral)
@@ -2608,6 +2679,9 @@ void App::UpdateCorralPositions()
 {
     if (!monitorManager)
         return;
+
+    // Undo steps name places on the set of monitors that was connected
+    ClearMoveUndo();
 
     const MonitorInfo *primaryMon = monitorManager->GetPrimaryMonitor();
     if (!primaryMon)

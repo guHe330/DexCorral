@@ -208,6 +208,14 @@ public:
     /// Moves desktop icons out of the way if they overlap with corrals
     void PushDesktopIconsFromCorrals();
 
+    /// Undo for moves and resizes of Corrals, MOVE_UNDO_DEPTH steps, in memory.
+    /// Begin: a drag or resize may start (the icon cache must be fresh).
+    /// Commit: it ended, after the final push; `moved` = past the drag threshold.
+    void BeginMoveUndo(CorralWindow *corral);
+    void CommitMoveUndo(CorralWindow *corral, bool moved);
+    bool CanUndoMove() const { return !moveUndoStack.empty(); }
+    void UndoLastMove();
+
     void UpdateHookHiddenIcons();           // Push hidden icon list to shared memory
     void PositionHiddenIconsUnderCorrals(); // Reposition hidden icons to match corral scroll state
 
@@ -349,6 +357,18 @@ private:
     // Desktop icon push cache (free icons only — corral-owned ones filtered out)
     std::vector<DesktopIconInfo> cachedDesktopIconPositions;
     bool desktopIconCacheValid = false;
+
+    // Where a Corral was before a move or resize, and where the free desktop
+    // icons were before and after it
+    struct MoveUndoRecord
+    {
+        CorralWindow *corral = nullptr;
+        int left = 0, top = 0, width = 0, height = 0; // height unrolled
+        std::vector<DesktopIconInfo> iconsBefore, iconsAfter;
+    };
+    MoveUndoRecord pendingMoveUndo;            // corral == nullptr: none
+    std::vector<MoveUndoRecord> moveUndoStack; // newest last
+    void ClearMoveUndo();
     std::vector<RECT> GetAllCorralRects() const;
 
     // Identities (display + parsing name) of every icon owned by any corral —

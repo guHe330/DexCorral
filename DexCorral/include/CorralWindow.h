@@ -165,6 +165,17 @@ public:
     /// change. `height` is the unrolled height; a rolled-up Corral stays rolled up.
     void MoveTo(int left, int top, int width, int height);
 
+    /// Where the Corral is, in the form MoveTo takes: `height` is the unrolled height
+    struct Placement
+    {
+        int left, top, width, height;
+    };
+    Placement GetPlacement() const
+    {
+        return {(int)config.Left, (int)config.Top, (int)config.Width,
+                (int)(config.IsRolledUp ? savedHeight : config.Height)};
+    }
+
     /// Appends entries to one of this corral's (non-virtual) tabs; reloads if it is the active one
     void AddFilesToTab(const std::vector<std::string> &names, int tabIndex);
 

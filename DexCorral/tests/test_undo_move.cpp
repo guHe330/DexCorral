@@ -74,3 +74,13 @@ TEST(UndoMove, FallsBackToDisplayNameWithoutParsingName)
     EXPECT_EQ(r[0].pt.x, 10);
     EXPECT_EQ(r[0].pt.y, 10);
 }
+
+TEST(UndoMove, PushCappedKeepsTheNewestRecords)
+{
+    std::vector<int> stack;
+    for (int i = 1; i <= 12; i++)
+        UndoMove::PushCapped(stack, i, 10);
+    ASSERT_EQ(stack.size(), 10u);
+    EXPECT_EQ(stack.front(), 3);
+    EXPECT_EQ(stack.back(), 12);
+}
