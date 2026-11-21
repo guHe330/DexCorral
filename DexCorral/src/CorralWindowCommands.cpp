@@ -205,6 +205,10 @@ void CorralWindow::ShowContextMenu(int x, int y)
     UINT lockFlags = MF_STRING | (config.IsLocked ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(menu, lockFlags, 16, Tr(Str::Menu_LockPosition));
 
+    // Undo Last Move: the newest move or resize of any Corral, up to ten steps back
+    bool canUndoMove = App::GetInstance() && App::GetInstance()->CanUndoMove();
+    AppendMenuW(menu, MF_STRING | (canUndoMove ? 0 : MF_GRAYED), 18, Tr(Str::Menu_UndoMove));
+
     // Expand on Hover (a rolled-up corral unrolls under a resting mouse)
     UINT expandFlags = MF_STRING | (config.ExpandOnHover ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(menu, expandFlags, 17, Tr(Str::Menu_ExpandOnHover));
@@ -374,6 +378,11 @@ void CorralWindow::ShowContextMenu(int x, int y)
             App::GetInstance()->SaveConfig();
         }
         UpdateLayeredContent(); // Show/hide the lock glyph
+        break;
+    case 18:
+        // Undo Last Move
+        if (App::GetInstance())
+            App::GetInstance()->UndoLastMove();
         break;
     case 17:
         // Expand on Hover

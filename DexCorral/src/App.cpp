@@ -740,6 +740,9 @@ void App::CommitMoveUndo(CorralWindow *corral, bool moved)
     if (!moved || !corral || record.corral != corral)
         return;
 
+    // Read the positions back instead of trusting the ones the push asked
+    // for: Explorer may have snapped an icon to its own grid
+    CacheDesktopIconPositions();
     record.iconsAfter = cachedDesktopIconPositions;
     UndoMove::PushCapped(moveUndoStack, std::move(record), MOVE_UNDO_DEPTH);
 }

@@ -84,3 +84,14 @@ TEST(UndoMove, PushCappedKeepsTheNewestRecords)
     EXPECT_EQ(stack.front(), 3);
     EXPECT_EQ(stack.back(), 12);
 }
+
+TEST(UndoMove, RestingTopOfACorralUnrolledUpwardIsWhereItsHeaderRests)
+{
+    // Unrolled upward from a 30 px header to 300 px: the window top went up by 270
+    EXPECT_EQ(UndoMove::RestingTop(700, 300, 30, true), 970);
+}
+
+TEST(UndoMove, RestingTopIsTheWindowTopOtherwise)
+{
+    EXPECT_EQ(UndoMove::RestingTop(700, 300, 30, false), 700);
+}
