@@ -143,6 +143,7 @@ add_executable(DexCorralTests
     tests/test_icon_stamp.cpp
     tests/test_undo_move.cpp
     tests/test_accent_color.cpp
+    tests/test_presets.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
