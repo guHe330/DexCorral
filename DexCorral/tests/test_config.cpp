@@ -699,3 +699,17 @@ TEST(CorralWindowConfig, ExpandOnHover_RoundTripsWhenOff) {
     auto back = toJson(orig).get<CorralWindowConfig>();
     EXPECT_FALSE(back.ExpandOnHover);
 }
+TEST(CorralTabConfig, UseAccentColor_RoundTripsAndDefaultsToOff)
+{
+    EXPECT_FALSE(CorralTabConfig{}.UseAccentColor);
+    EXPECT_FALSE(AppConfig{}.DefaultUseAccentColor);
+
+    CorralTabConfig tab;
+    tab.UseAccentColor = true;
+    nlohmann::json j = tab;
+    EXPECT_TRUE(j.get<CorralTabConfig>().UseAccentColor);
+
+    // A config written before the setting existed
+    j.erase("UseAccentColor");
+    EXPECT_FALSE(j.get<CorralTabConfig>().UseAccentColor);
+}

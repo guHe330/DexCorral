@@ -42,6 +42,7 @@
 #include "Strings.h"
 #include "LayoutMath.h"
 #include "UndoMove.h"
+#include "AccentColor.h"
 #include "Constants.h"
 #include "Hotkey.h"
 #include "DialogTemplate.h"
@@ -206,6 +207,7 @@ App::~App()
 void App::Initialize()
 {
     DllLog(L"App::Initialize: starting");
+    RefreshAccentColor();
 
     // Register message window class
     WNDCLASSEXW wc = {};
@@ -714,6 +716,19 @@ void App::ForgetCorral(CorralWindow *corral)
                         moveUndoStack.end());
 }
 
+bool App::RefreshAccentColor()
+{
+    DWORD abgr = 0, size = sizeof(abgr);
+    unsigned rgb = AccentColor::FALLBACK_RGB;
+    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM", L"AccentColor",
+                     RRF_RT_REG_DWORD, nullptr, &abgr, &size) == ERROR_SUCCESS)
+        rgb = AccentColor::RgbFromRegistry(abgr);
+
+    const bool changed = rgb != accentRgb;
+    accentRgb = rgb;
+    return changed;
+}
+
 void App::ClearMoveUndo()
 {
     pendingMoveUndo = {};
@@ -848,6 +863,7 @@ void App::SetDefaultColorHex(const std::string &colorHex)
 
 void App::SetDefaultAppearance(const AppearanceSettings &settings)
 {
+    config.DefaultUseAccentColor = settings.UseAccentColor;
     config.DefaultTitleBarHeight = settings.TitleBarHeight;
     config.DefaultHeaderFontName = settings.HeaderFontName;
     config.DefaultHeaderFontSize = settings.HeaderFontSize;
@@ -887,6 +903,7 @@ void App::ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
             for (auto &tab : cfg.Tabs)
             {
                 tab.ColorHex = settings.ColorHex;
+                tab.UseAccentColor = settings.UseAccentColor;
             }
         }
         if (apply.TitleBarHeight)
@@ -2145,6 +2162,7 @@ CorralTabConfig App::MakeDefaultTabConfig(const std::string &title) const
     CorralTabConfig t;
     t.Title = title;
     t.ColorHex = config.DefaultColorHex;
+    t.UseAccentColor = config.DefaultUseAccentColor;
     t.HeaderFontName = config.DefaultHeaderFontName;
     t.HeaderFontSize = config.DefaultHeaderFontSize;
     t.HeaderFontColor = config.DefaultHeaderFontColor;
@@ -2357,6 +2375,19 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     // Display changes come in bursts, and while a monitor wakes up or a mode is
     // being switched Windows can report a transient resolution in between. Act
     // once things have been quiet for a moment, on the layout that stayed.
+    // The accent colour changed: tabs that follow it need a redraw. Windows
+    // sends both messages for one change; the second finds nothing new.
+    if (app && (uMsg == WM_DWMCOLORIZATIONCOLORCHANGED ||
+                (uMsg == WM_SETTINGCHANGE && lParam && wcscmp((const wchar_t *)lParam, L"ImmersiveColorSet") == 0)))
+    {
+        if (RefreshAccentColor())
+        {
+            for (auto &corral : app->corrals)
+                corral->RecalculateLayout();
+        }
+        return 0;
+    }
+
     if (app && uMsg == WM_DISPLAYCHANGE)
     {
         SetTimer(hwnd, DISPLAY_CHANGE_TIMER, DISPLAY_CHANGE_SETTLE_MS, nullptr);

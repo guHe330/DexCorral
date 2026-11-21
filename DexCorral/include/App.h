@@ -199,6 +199,11 @@ public:
     /// Returns the singleton App instance
     static App *GetInstance() { return instance; }
 
+    /// The Windows accent colour (0xRRGGBB), for tabs that follow it.
+    /// RefreshAccentColor reads it again and returns true if it changed.
+    static unsigned AccentRgb() { return accentRgb; }
+    static bool RefreshAccentColor();
+
     /// Caches current desktop icon positions for push-out-of-way algorithm
     void CacheDesktopIconPositions();
 
@@ -357,6 +362,8 @@ private:
     // Desktop icon push cache (free icons only — corral-owned ones filtered out)
     std::vector<DesktopIconInfo> cachedDesktopIconPositions;
     bool desktopIconCacheValid = false;
+
+    inline static unsigned accentRgb = 0x0078D4; // Windows blue until it is read
 
     // Where a Corral was before a move or resize, and where the free desktop
     // icons were before and after it
