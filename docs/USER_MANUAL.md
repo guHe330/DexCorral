@@ -114,6 +114,8 @@ DexCorral remembers **one arrangement for each set of connected monitors** and t
 ### Customizing
 Right-click a Corral's title bar or background:
 
+<img src="assets/screenshots/menu-corral.png" alt="The Corral menu in light mode" width="230"> <img src="assets/screenshots/menu-corral-dark.png" alt="The Corral menu in dark mode" width="230">
+
 - **Add Tab**: add a new tab to this Corral and name it.
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
 - **Rename Tab**: change the current tab's title.
@@ -131,6 +133,8 @@ Right-click a Corral's title bar or background:
 
 ### Appearance Dialog
 **Appearance...** changes the look of a Corral, with a live preview on the Corral while you work. The settings are spread over three pages, chosen at the top:
+
+<img src="assets/screenshots/appearance-background.png" alt="Appearance dialog, Background page" width="255"> <img src="assets/screenshots/appearance-header.png" alt="Appearance dialog, Header page" width="255"> <img src="assets/screenshots/appearance-icons.png" alt="Appearance dialog, Icons page" width="255">
 
 - **Background**: the colour and opacity of the Corral fill and the opacity of the border. Tick **Windows accent color** to let the tab take the accent colour you chose in Windows instead; it then changes along with Windows, keeps the transparency you set, and its header text turns black or white for contrast. Untick it and the colour you had before is back. The border's resize grip stays visible however far down you take its opacity.
 - **Header**: height and opacity of the title bar, and the font, colour and opacity of its text (the font settings are per tab).
@@ -216,6 +220,8 @@ Double-click an empty spot on the desktop to hide everything at once: all native
 
 Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
+<img src="assets/screenshots/menu-tray.png" alt="The tray menu" width="200">
+
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
 - **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
@@ -228,6 +234,8 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 ### Settings
 
 The settings window holds the options that apply to DexCorral as a whole. Changes take effect when you click **OK**. It also opens while DexCorral is paused.
+
+<img src="assets/screenshots/settings.png" alt="Settings window in light mode" width="300"> <img src="assets/screenshots/settings-dark.png" alt="Settings window in dark mode" width="300">
 
 - **Language**: switch the interface between English and German, without a restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.
 - **Windows and menus**: whether DexCorral's dialogs and menus are light or dark. **Like Windows** follows the app mode set in Windows; **Light** and **Dark** override it.
