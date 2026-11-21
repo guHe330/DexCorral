@@ -76,9 +76,6 @@ void Attach(HWND hDlg, int footerTopDlu);
 /// True if the skin answered the message; return `result` from the dialog procedure then
 bool HandleMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam, INT_PTR &result);
 
-/// A static text as a section heading (semibold)
-void MakeHeading(HWND hDlg, int id);
-
 /// A static text as an explanation (muted colour)
 void MakeHint(HWND hDlg, int id);
 

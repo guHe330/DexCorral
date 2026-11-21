@@ -261,8 +261,6 @@ public:
     /// Reverses quick-hide: shows the corral and fades it back in. No-op if not quick-hidden.
     void StartQuickShow();
 
-    /// Returns true if the corral is hidden (or fading out) due to quick-hide
-    bool IsQuickHidden() const { return isQuickHidden; }
 
 public:
     /// Column geometry for the details view (absolute client x range + label)
@@ -361,7 +359,6 @@ private:
     void ToggleRollUp();
     void ToggleCatchAll();
     void SetViewMode(ViewMode mode);
-    void ShowViewMenu(int screenX, int screenY);
 
     // Hover-expand for rolled-up corrals
     void StartHoverExpand();
@@ -403,7 +400,6 @@ private:
 
     // Scrollbar support
     bool NeedsScrollbar() const;
-    int GetContentHeight() const;
     int GetVisibleHeight() const;
     RECT GetScrollbarTrackRect() const;
     RECT GetScrollbarThumbRect() const;
@@ -495,7 +491,6 @@ private:
 
     // DPI scaling - applies monitor DPI factor to logical pixel values.
     int Dpi(int logicalPixels) const;
-    static bool s_enableDpiScaling;
 
     HWND hwnd;
     CorralWindowConfig config;

@@ -51,7 +51,6 @@ const wchar_t *PROP_POS = L"DexSkinPos"; // Track bar: 1 + the position last pai
 enum Role : INT_PTR
 {
     ROLE_NONE = 0,
-    ROLE_HEADING,
     ROLE_HINT,
     ROLE_PAGETAB,
     ROLE_PAGETAB_SELECTED,
@@ -598,17 +597,6 @@ void Attach(HWND hDlg, int footerTopDlu)
         DwmSetWindowAttribute(hDlg, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &on, sizeof(on));
     }
     EnumChildWindows(hDlg, SkinChild, (LPARAM)s);
-}
-
-void MakeHeading(HWND hDlg, int id)
-{
-    State *s = StateOf(hDlg);
-    HWND control = GetDlgItem(hDlg, id);
-    if (!s || !control)
-        return;
-    SetPropW(control, PROP_ROLE, (HANDLE)ROLE_HEADING);
-    if (s->heading)
-        SendMessageW(control, WM_SETFONT, (WPARAM)s->heading, TRUE);
 }
 
 void MakeHint(HWND hDlg, int id)

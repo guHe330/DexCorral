@@ -27,16 +27,9 @@
 #include <algorithm>
 #include "ChromeAlpha.h"
 #include "LayoutMath.h"
+#include "IconUtils.h"
 
-static std::wstring Utf8ToWide(const std::string &s)
-{
-    if (s.empty())
-        return std::wstring();
-    int size = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, NULL, 0);
-    std::wstring result(size - 1, 0);
-    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &result[0], size);
-    return result;
-}
+using IconUtils::Utf8ToWide;
 
 std::string Config::GetConfigPath()
 {

@@ -43,6 +43,10 @@ namespace IconUtils
     /// If the name doesn't end in ".lnk" or is too short, it is returned unchanged.
     std::wstring StripLnkExtension(const std::wstring &name);
 
+    /// UTF-8 (config.json, file names in it) to UTF-16 and back
+    std::wstring Utf8ToWide(const std::string &utf8);
+    std::string WideToUtf8(const std::wstring &wide);
+
     /// True if `name` can be the new name of a file that stays in its folder:
     /// not empty, not "." or "..", none of \ / : * ? " < > | and no control
     /// character. A typed "..\\x" must not move the file somewhere else.

@@ -138,3 +138,22 @@ TEST(ContainsPath, ComparesWithoutCase) {
     EXPECT_FALSE(ContainsPath(paths, L"C:\\Stuff\\other.exe"));
     EXPECT_FALSE(ContainsPath({}, L"C:\\Stuff\\tool.exe"));
 }
+
+// --- Audit #185: one UTF-8 conversion for the whole program -------------------
+
+TEST(Utf8, RoundTripsTextOutsideAscii) {
+    const std::wstring wide = L"Grüße ☃ \U0001F600.lnk"; // umlauts, a snowman, an emoji (surrogate pair)
+    const std::string utf8 = WideToUtf8(wide);
+    EXPECT_EQ(utf8, "Gr\xC3\xBC\xC3\x9F" "e \xE2\x98\x83 \xF0\x9F\x98\x80.lnk");
+    EXPECT_EQ(Utf8ToWide(utf8), wide);
+}
+
+TEST(Utf8, EmptyStaysEmpty) {
+    EXPECT_TRUE(Utf8ToWide("").empty());
+    EXPECT_TRUE(WideToUtf8(L"").empty());
+}
+
+TEST(Utf8, TheResultHasNoTrailingNul) {
+    EXPECT_EQ(Utf8ToWide("abc").size(), 3u);
+    EXPECT_EQ(WideToUtf8(L"abc").size(), 3u);
+}

@@ -36,6 +36,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
+#include "IconUtils.h"
 #include "HookBridge.h"
 #include "Presets.h"
 #include "Strings.h"
@@ -52,34 +53,20 @@
 
 static const wchar_t *CORRAL_WINDOW_CLASS = L"DexCorralWindowClass";
 
-/// Dead code: Incomplete precision touchpad support block.
-/// WM_POINTERWHEEL message handling was planned but never implemented (Windows 8+).
-/// Pointer input is currently not supported; mouse wheel events are handled instead.
-// #ifndef WM_POINTERWHEEL
-// #endif
 
 // ============================================================================
 // String conversion utilities (used across all implementation files)
 // ============================================================================
 
+// Kept under these names for the many callers; the conversion itself is in IconUtils
 std::string CorralWindow::WideToUtf8(const std::wstring &wide)
 {
-    if (wide.empty())
-        return std::string();
-    int size = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), nullptr, 0, nullptr, nullptr);
-    std::string result(size, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), &result[0], size, nullptr, nullptr);
-    return result;
+    return IconUtils::WideToUtf8(wide);
 }
 
 std::wstring CorralWindow::Utf8ToWide(const std::string &utf8)
 {
-    if (utf8.empty())
-        return std::wstring();
-    int size = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), nullptr, 0);
-    std::wstring result(size, 0);
-    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), &result[0], size);
-    return result;
+    return IconUtils::Utf8ToWide(utf8);
 }
 
 // ============================================================================
@@ -210,8 +197,6 @@ CorralWindow::~CorralWindow()
 // ============================================================================
 // DPI scaling
 // ============================================================================
-
-bool CorralWindow::s_enableDpiScaling = true;
 
 int CorralWindow::Dpi(int logicalPixels) const
 {
