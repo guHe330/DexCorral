@@ -403,6 +403,13 @@ void CorralWindow::LoadIconImages()
     // don't show a permanently blank "ghost" icon that has no way to be removed via the UI.
     std::vector<std::string> staleFiles;
 
+    // "Not found" only means "deleted" while the desktop folder itself answers.
+    // A desktop on a share or drive that is not there yet (sign-in) would
+    // otherwise empty every tab, and the empty tabs would be saved.
+    const DWORD desktopAttributes = GetFileAttributesW(desktopPath.c_str());
+    const bool desktopReachable =
+        desktopAttributes != INVALID_FILE_ATTRIBUTES && (desktopAttributes & FILE_ATTRIBUTE_DIRECTORY);
+
     for (const auto &fileName : GetActiveTab().Files)
     {
         // Guard against empty entries — they would resolve to the desktop
@@ -441,7 +448,8 @@ void CorralWindow::LoadIconImages()
         {
             // Backing file is gone (renamed/deleted/moved outside our watcher's notice).
             // Drop it instead of pushing a permanently blank icon.
-            staleFiles.push_back(fileName);
+            if (desktopReachable)
+                staleFiles.push_back(fileName);
             continue;
         }
 

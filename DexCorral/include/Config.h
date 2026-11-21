@@ -238,10 +238,15 @@ struct AppConfig
     // "light" and "dark" override it. Set in the settings window.
     std::string Theme = "";
 
+    // The first run creates one catch-all Corral. Once that has happened (or a
+    // layout exists) it must not happen again: a user who deleted every Corral
+    // wants none, not a new default at each sign-in.
+    bool FirstCorralSeeded = false;
+
     // Looks the user saved in the Appearance dialog. Cleaned on load
     // (Config::Normalize) and on import, see Presets.h.
     std::vector<LookPreset> Presets;
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Theme, Presets, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Theme, FirstCorralSeeded, Presets, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
 };
 
 /**

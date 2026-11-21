@@ -786,3 +786,49 @@ TEST(ConfigPresets, ABrokenPresetEntryDoesNotSpoilTheConfig)
     EXPECT_EQ(cfg.Presets[0].Name, "Good");
     EXPECT_EQ(cfg.Presets[0].Look.TitleBarHeight, AppearanceSettings{}.TitleBarHeight);
 }
+
+// --- Audit #182 -------------------------------------------------------------
+
+TEST_F(ConfigFiles, BrieflyLockedFile_IsWaitedForInsteadOfRestoringTheBackup) {
+    ASSERT_TRUE(Config::SaveTo(path, OneCorral(111)));
+    ASSERT_TRUE(Config::SaveTo(Config::GetBackupPath(path), OneCorral(222)));
+
+    // Another program (a virus scanner at sign-in) holds the file for a moment
+    HANDLE lock = CreateFileW(path.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    ASSERT_NE(lock, INVALID_HANDLE_VALUE);
+    HANDLE releaser = CreateThread(nullptr, 0, [](LPVOID h) -> DWORD {
+        Sleep(300);
+        CloseHandle((HANDLE)h);
+        return 0;
+    }, lock, 0, nullptr);
+
+    ConfigLoadStatus status = ConfigLoadStatus::Reset;
+    AppConfig c = Config::LoadFrom(path, &status);
+    WaitForSingleObject(releaser, INFINITE);
+    CloseHandle(releaser);
+
+    EXPECT_EQ(status, ConfigLoadStatus::Ok);
+    ASSERT_EQ(c.Corrals.size(), 1u);
+    EXPECT_EQ(c.Corrals[0].Width, 111);
+    EXPECT_FALSE(Exists(Config::GetCorruptPath(path)));
+}
+
+TEST(ConfigFirstCorral, AConfigWithCorralsCountsAsSeeded) {
+    AppConfig c;
+    EXPECT_FALSE(c.FirstCorralSeeded);
+    Config::Normalize(c);
+    EXPECT_FALSE(c.FirstCorralSeeded); // No Corrals yet: the first run still has to create one
+
+    c.Corrals.push_back(CorralWindowConfig());
+    Config::Normalize(c);
+    EXPECT_TRUE(c.FirstCorralSeeded); // An existing layout: never seed again, also when it is emptied later
+}
+
+TEST(ConfigFirstCorral, SeededSurvivesARoundTripWithNoCorrals) {
+    AppConfig c;
+    c.FirstCorralSeeded = true;
+    AppConfig back = nlohmann::json::parse(nlohmann::json(c).dump()).get<AppConfig>();
+    Config::Normalize(back);
+    EXPECT_TRUE(back.FirstCorralSeeded);
+    EXPECT_TRUE(back.Corrals.empty());
+}

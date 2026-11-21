@@ -14,6 +14,12 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - A new look for the dialogs and menus: light or dark like Windows (or as chosen under **Windows and menus** in the settings window), rounded buttons, check boxes and sliders in the accent colour, roomier menus. The Appearance dialog is split into three pages (Background, Header, Icons) and is a good third shorter. With a high-contrast theme Windows draws everything as before. ([#168](https://github.com/guHe330/DexCorral/issues/168))
 - A Corral on a network folder shows "Connecting..." while the first check of its share is still running, instead of looking like an empty folder. ([#162](https://github.com/guHe330/DexCorral/issues/162))
 
+### Fixed
+- A file that was deleted while DexCorral was not watching could empty every Corral after the one it was in, at the next start. ([#182](https://github.com/guHe330/DexCorral/issues/182))
+- With the Desktop on a share or drive that is not reachable at sign-in, the Corrals no longer forget their icons. ([#182](https://github.com/guHe330/DexCorral/issues/182))
+- A `config.json` that another program holds open for a moment at start is waited for, instead of being replaced by the backup. ([#182](https://github.com/guHe330/DexCorral/issues/182))
+- After you deleted the last Corral, a new default Corral no longer appears at every sign-in. ([#182](https://github.com/guHe330/DexCorral/issues/182))
+
 ## [1.3.0] - 2026-11-18
 
 ### Added

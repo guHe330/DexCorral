@@ -421,7 +421,7 @@ void App::ActivateDesktop()
     // Default to true if not specified (backward compatibility)
     DesktopIcons::SetIconsVisible(config.DesktopIconsVisible);
 
-    if (corrals.empty())
+    if (corrals.empty() && !config.FirstCorralSeeded)
     {
         // First run: a default catch-all corral in the centre of the primary
         // monitor's work area (work area, not screen: it must clear the taskbar).
@@ -450,6 +450,7 @@ void App::ActivateDesktop()
         corral->Show();
         corrals.push_back(std::move(corral));
 
+        config.FirstCorralSeeded = true;
         SaveConfig();
     }
 
@@ -592,6 +593,11 @@ void App::SaveConfig()
         ScheduleConfigWrite();
         return;
     }
+    if (restoringCorrals)
+    {
+        saveAfterRestore = true;
+        return;
+    }
 
     // Update desktop icons state. Quick-hide is a transient state — persist
     // the visibility the user will get back when quick-hide ends.
@@ -635,6 +641,7 @@ void App::FlushConfigWrite()
 
 void App::RestoreCorrals()
 {
+    restoringCorrals = true; // Showing a Corral can ask for a save (a file of it is gone)
     for (auto &corralConfig : config.Corrals)
     {
         // Skip corrals with invalid dimensions (corrupted config)
@@ -665,6 +672,12 @@ void App::RestoreCorrals()
         auto corral = std::make_unique<CorralWindow>(corralConfig);
         corral->Show();
         corrals.push_back(std::move(corral));
+    }
+    restoringCorrals = false;
+    if (saveAfterRestore)
+    {
+        saveAfterRestore = false;
+        SaveConfig();
     }
 }
 

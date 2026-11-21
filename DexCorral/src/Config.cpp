@@ -115,6 +115,9 @@ void Config::MigrateLayouts(CorralWindowConfig &corral, const std::string &topol
 
 void Config::Normalize(AppConfig &config)
 {
+    if (!config.Corrals.empty())
+        config.FirstCorralSeeded = true; // A layout exists: the first run is over
+
     static const AppConfig defaultApp;
     static const CorralWindowConfig defaultCorral;
     static const CorralTabConfig defaultTab;
@@ -170,7 +173,19 @@ namespace
         if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
             return ReadResult::NotFound;
 
-        std::ifstream file(path.c_str(), std::ios::binary);
+        // The file is there. If it cannot be opened, another program (a virus
+        // scanner, a backup tool) is holding it for a moment: wait for it rather
+        // than fall back to the backup, which the next save would write over
+        // the newer file. This runs once at start, off the UI thread.
+        std::ifstream file;
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            file.open(path.c_str(), std::ios::binary);
+            if (file.is_open())
+                break;
+            file.clear();
+            Sleep(100);
+        }
         if (!file.is_open())
             return ReadResult::Unreadable;
 
