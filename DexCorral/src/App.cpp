@@ -420,6 +420,7 @@ void App::ActivateDesktop()
     // Restore desktop icons state
     // Default to true if not specified (backward compatibility)
     DesktopIcons::SetIconsVisible(config.DesktopIconsVisible);
+    iconVisibilityApplied = DesktopIcons::GetDesktopListView() != nullptr;
 
     if (corrals.empty() && !config.FirstCorralSeeded)
     {
@@ -601,8 +602,9 @@ void App::SaveConfig()
 
     // Update desktop icons state. Quick-hide is a transient state — persist
     // the visibility the user will get back when quick-hide ends.
-    config.DesktopIconsVisible = quickHideActive ? desktopIconsVisibleBeforeQuickHide
-                                                 : DesktopIcons::AreIconsVisible();
+    if (iconVisibilityApplied)
+        config.DesktopIconsVisible = quickHideActive ? desktopIconsVisibleBeforeQuickHide
+                                                     : DesktopIcons::AreIconsVisible();
 
     // Sync all corral configs from their current window states
     config.Corrals.clear();
@@ -2173,7 +2175,11 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
                 const unsigned word = (unsigned)SendMessageW(hotkey, HKM_GETHOTKEY, 0, 0) & 0xFFFF;
                 const HotkeySpec spec = HotkeyFromControlWord(word);
                 // The control accepts keys the hotkey parser does not (Home, Insert, ...)
-                if (word != data->hotkeyBaseline && spec.vk != 0 && FormatHotkey(spec, L"Ctrl", L"Shift").empty())
+                // and combinations it refuses (Shift plus a key that types)
+                const std::wstring shown = FormatHotkey(spec, L"Ctrl", L"Shift");
+                HotkeySpec parsed;
+                if (word != data->hotkeyBaseline && spec.vk != 0 &&
+                    (shown.empty() || !ParseHotkey(CorralWindow::WideToUtf8(shown), parsed)))
                 {
                     MessageBoxW(hDlg, Tr(Str::Settings_HotkeyUnsupported), Tr(Str::Title_Settings),
                                 MB_OK | MB_ICONWARNING);
@@ -2804,11 +2810,16 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     // Hook retry thread succeeded — refresh hidden icon data now that the hook is active
     if (app && uMsg == WM_HOOK_READY && app->desktopActive)
     {
-        // "Show Desktop Icons" off was applied at start, but the list view may
-        // not have existed then. Without this the icons stay visible, and the
-        // next save would store that as the user's choice.
-        if (!app->quickHideActive && !app->config.Paused)
+        // "Show Desktop Icons" from the config could not be applied at start
+        // when the list view did not exist yet. Once, not on every such message:
+        // the hook sends it after each re-park, and the user may have changed
+        // the visibility in Explorer's own desktop menu since.
+        if (!app->iconVisibilityApplied && !app->quickHideActive && !app->config.Paused &&
+            DesktopIcons::GetDesktopListView())
+        {
             DesktopIcons::SetIconsVisible(app->config.DesktopIconsVisible);
+            app->iconVisibilityApplied = true;
+        }
         app->UpdateHookHiddenIcons();
         app->PositionHiddenIconsUnderCorrals();
         HookBridge::RefreshDesktop();

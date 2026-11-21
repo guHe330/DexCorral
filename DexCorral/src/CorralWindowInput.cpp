@@ -1834,9 +1834,33 @@ void CorralDropTarget::EndDragSession()
     }
     hasDropData = false;
     springTab = -1;
+    iconAsked.clear();
 }
 
-void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt)
+bool CorralDropTarget::IconTakesDrops(int iconIndex)
+{
+    // Binding an item is not free, and DragOver comes many times a second:
+    // ask once per icon. The answer decides whether the cursor promises a drop
+    // on the icon or shows what the tab would do, which is what Drop then does.
+    const CorralIcon &icon = owner->icons[iconIndex];
+    const std::wstring key = icon.isSpecialIcon ? icon.clsid : icon.fullPath;
+    if (key != iconAsked)
+    {
+        iconAsked = key;
+        iconAnswer = false;
+        if (owner->FolderAnswers())
+        {
+            if (IDropTarget *target = owner->BindIconDropTarget(iconIndex))
+            {
+                target->Release();
+                iconAnswer = true;
+            }
+        }
+    }
+    return iconAnswer;
+}
+
+void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt, bool forDrop)
 {
     // The active tab can change while a drag is in flight, so the folder target
     // follows whatever the corral is showing right now.
@@ -1847,8 +1871,11 @@ void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt)
     ReleaseFolderTarget(true);
     if (wanted.empty() || !dragData)
         return;
-    if (!owner->FolderAnswers())
-        return; // Binding to a share that does not answer blocks, and DragOver asks again and again
+    // Binding to a share that does not answer blocks, and DragOver asks again
+    // and again: only a share known to answer. The drop itself happens once and
+    // may wait for a share nobody has asked yet (a tab that just came forward).
+    if (forDrop ? owner->FolderKnownDead() : !owner->FolderAnswers())
+        return;
 
     folderTarget = BindFolderDropTarget(wanted);
     if (!folderTarget)
@@ -1900,7 +1927,8 @@ DWORD CorralDropTarget::EffectAt(DWORD grfKeyState, POINTL pt)
 
     // Over an icon the drop goes to that item (open with / move into folder),
     // whatever kind of tab this is.
-    if (owner->HitTestDropIcon(clientPt.x, clientPt.y) >= 0)
+    const int hit = owner->HitTestDropIcon(clientPt.x, clientPt.y);
+    if (hit >= 0 && IconTakesDrops(hit))
         return DROPEFFECT_COPY;
 
     if (owner->GetActiveTab().IsVirtual)
@@ -1965,7 +1993,7 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
     if (tab >= 0 && tab != owner->config.ActiveTabIndex)
         owner->SetActiveTab(tab);
 
-    if (!owner->FolderAnswers())
+    if (owner->FolderKnownDead())
     {
         // The share went away during the drag: nothing here can take a drop
         *pdwEffect = DROPEFFECT_NONE;
@@ -1998,7 +2026,7 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
     else if (owner->GetActiveTab().IsVirtual)
     {
         allowedEffects = *pdwEffect;
-        SyncFolderTarget(grfKeyState, pt);
+        SyncFolderTarget(grfKeyState, pt, true);
         if (folderTarget)
         {
             LogCorralDrop(L"Drop: virtual tab -> folder drop target '%s'", folderTargetPath.c_str());
@@ -2178,6 +2206,29 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
     }
 }
 // ============================================================================
+// BindIconDropTarget - the shell's drop target of one icon
+// ============================================================================
+
+IDropTarget *CorralWindow::BindIconDropTarget(int iconIndex)
+{
+    if (iconIndex < 0 || iconIndex >= (int)icons.size())
+        return nullptr;
+    const CorralIcon &icon = icons[iconIndex];
+    const std::wstring path = icon.isSpecialIcon ? L"::" + icon.clsid : icon.fullPath;
+
+    // What Explorer does for a drop on an item: an exe opens the file, a folder
+    // moves or copies it, a shortcut hands it to its target. A document has none.
+    IShellItem *item = nullptr;
+    if (FAILED(SHCreateItemFromParsingName(path.c_str(), nullptr, IID_PPV_ARGS(&item))) || !item)
+        return nullptr;
+    IDropTarget *target = nullptr;
+    if (FAILED(item->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&target))))
+        target = nullptr;
+    item->Release();
+    return target;
+}
+
+// ============================================================================
 // OnDropOnIcon - drop a file onto a corral icon (shell-execute / open with)
 // ============================================================================
 
@@ -2211,36 +2262,24 @@ bool CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD ente
     LogCorralDrop(L"OnDropOnIcon: icon=%d target='%s' special=%d",
                   iconIndex, targetPath.c_str(), targetIcon.isSpecialIcon);
 
-    IShellItem *pItem = nullptr;
-    HRESULT hr = SHCreateItemFromParsingName(targetPath.c_str(), nullptr, IID_PPV_ARGS(&pItem));
-    if (SUCCEEDED(hr) && pItem)
+    if (IDropTarget *pDropTarget = BindIconDropTarget(iconIndex))
     {
-        IDropTarget *pDropTarget = nullptr;
-        hr = pItem->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&pDropTarget));
-        if (SUCCEEDED(hr) && pDropTarget)
-        {
-            LogCorralDrop(L"OnDropOnIcon: got IDropTarget, forwarding drop");
-            // Hand the icon's drop target the real keys and position, as the
-            // desktop would: Ctrl copies, Shift moves, Ctrl+Shift links, and a
-            // right-drag gets its menu, at the pointer. A fixed MK_LBUTTON at
-            // (0,0) ignored all of that.
-            DWORD dwEffect = allowedEffects;
-            pDropTarget->DragEnter(pDataObj, enterKeyState, pt, &dwEffect);
-            dwEffect = allowedEffects;
-            pDropTarget->Drop(pDataObj, dropKeyState, pt, &dwEffect);
-            pDropTarget->Release();
-            forwarded = true;
-            LogCorralDrop(L"OnDropOnIcon: drop forwarded, effect=0x%X", dwEffect);
-        }
-        else
-        {
-            LogCorralDrop(L"OnDropOnIcon: BindToHandler failed hr=0x%08X", hr);
-        }
-        pItem->Release();
+        LogCorralDrop(L"OnDropOnIcon: got IDropTarget, forwarding drop");
+        // Hand the icon's drop target the real keys and position, as the
+        // desktop would: Ctrl copies, Shift moves, Ctrl+Shift links, and a
+        // right-drag gets its menu, at the pointer. A fixed MK_LBUTTON at
+        // (0,0) ignored all of that.
+        DWORD dwEffect = allowedEffects;
+        pDropTarget->DragEnter(pDataObj, enterKeyState, pt, &dwEffect);
+        dwEffect = allowedEffects;
+        pDropTarget->Drop(pDataObj, dropKeyState, pt, &dwEffect);
+        pDropTarget->Release();
+        forwarded = true;
+        LogCorralDrop(L"OnDropOnIcon: drop forwarded, effect=0x%X", dwEffect);
     }
     else
     {
-        LogCorralDrop(L"OnDropOnIcon: SHCreateItemFromParsingName failed hr=0x%08X", hr);
+        LogCorralDrop(L"OnDropOnIcon: the item takes no drops");
     }
     return forwarded;
 }

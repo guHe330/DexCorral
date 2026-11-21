@@ -580,7 +580,7 @@ void CorralWindow::InvokeVerbOnFolder(const char *verb)
     // Paste targets a folder, not an item — the item menu has no paste target.
     // A virtual corral pastes into the folder it shows; a normal one to the desktop.
     std::wstring path = GetActiveTab().IsVirtual ? GetVirtualCurrentPath() : GetDesktopPath();
-    if (path.empty() || !FolderAnswers()) // A share that does not answer would block right here
+    if (path.empty() || FolderKnownDead()) // A share that does not answer would block right here
         return;
 
     LPITEMIDLIST pidl = nullptr;

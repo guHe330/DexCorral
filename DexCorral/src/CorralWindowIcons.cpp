@@ -409,6 +409,16 @@ void CorralWindow::LoadIconImages()
     const DWORD desktopAttributes = GetFileAttributesW(desktopPath.c_str());
     const bool desktopReachable =
         desktopAttributes != INVALID_FILE_ATTRIBUTES && (desktopAttributes & FILE_ATTRIBUTE_DIRECTORY);
+    if (desktopReachable)
+    {
+        desktopRetryMs = 0;
+    }
+    else if (hwnd && !GetActiveTab().Files.empty())
+    {
+        // Nothing reloads the tab when the folder comes back, so look again later
+        desktopRetryMs = desktopRetryMs ? (std::min)(desktopRetryMs * 2, 60000u) : 5000u;
+        SetTimer(hwnd, DESKTOP_RETRY_TIMER_ID, desktopRetryMs, nullptr);
+    }
 
     for (const auto &fileName : GetActiveTab().Files)
     {
@@ -557,6 +567,15 @@ bool CorralWindow::FolderAnswers() const
     if (!IsNetworkFolder(root))
         return true;
     return netProbeRoot == root && netState == NetState::Reachable && !NetworkProbeOverdue();
+}
+
+bool CorralWindow::FolderKnownDead() const
+{
+    if (!GetActiveTab().IsVirtual)
+        return false;
+    const std::wstring root = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+    return IsNetworkFolder(root) && netProbeRoot == root &&
+           (netState == NetState::Unreachable || NetworkProbeOverdue());
 }
 
 void CorralWindow::LoadVirtualFolderIcons()

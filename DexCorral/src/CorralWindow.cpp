@@ -1178,6 +1178,13 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 window->OnFolderContentsChanged();
                 return 0;
             }
+            if (wParam == DESKTOP_RETRY_TIMER_ID)
+            {
+                KillTimer(hwnd, DESKTOP_RETRY_TIMER_ID);
+                if (!window->GetActiveTab().IsVirtual)
+                    window->LoadFiles(); // Arms the timer again if the desktop still does not answer
+                return 0;
+            }
             if (wParam == NET_PROBE_TIMER_ID)
             {
                 if (window->GetActiveTab().IsVirtual &&
