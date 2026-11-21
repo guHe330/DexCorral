@@ -48,6 +48,7 @@
 #include "Hotkey.h"
 #include "DialogTemplate.h"
 #include "DialogSkin.h"
+#include "ModernMenu.h"
 #include "Conflicts.h"
 #include <CommCtrl.h>
 #include <commdlg.h>
@@ -1712,7 +1713,7 @@ void App::ShowTrayMenu()
     GetCursorPos(&pt);
 
     SetForegroundWindow(messageWindow);
-    int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, messageWindow, nullptr);
+    int cmd = ModernMenu::Track(menu, TPM_RIGHTBUTTON, pt.x, pt.y, messageWindow);
     PostMessageW(messageWindow, WM_NULL, 0, 0);
 
     DestroyMenu(menu);

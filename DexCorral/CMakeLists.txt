@@ -79,6 +79,7 @@ add_library(DexCorralHook SHARED
     src/Conflicts.cpp
     src/Strings.cpp
     src/DialogSkin.cpp
+    src/ModernMenu.cpp
 )
 
 target_include_directories(DexCorralHook PRIVATE
