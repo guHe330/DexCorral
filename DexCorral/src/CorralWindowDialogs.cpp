@@ -31,6 +31,7 @@
 #include "CorralWindow.h"
 #include "DialogTemplate.h"
 #include "DialogSkin.h"
+#include "Presets.h"
 #include <vector>
 #include "App.h"
 #include "Constants.h"
@@ -396,96 +397,31 @@ void CorralWindow::PromptRename()
     ShowRenameDialog();
 }
 
-void CorralWindow::ShowRenameDialog()
+/// Asks for a name in the small edit dialog. `name` (256 characters) holds
+/// the text to start with and, on true, what the user entered.
+static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name)
 {
     WORD dlgTemplate[512] = {};
-    WORD *p = dlgTemplate;
+    WORD *p = BeginDlgTemplate(dlgTemplate,
+                               DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
+                               3, 180, RENAME_FOOTER_TOP + 28, title);
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, 10, 10, 160, 14, 101, 0xFFFF,
+                   DLG_CLASS_EDIT, nullptr);
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 62, RENAME_FOOTER_TOP + 7, 50, 14, IDOK,
+                   0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 118, RENAME_FOOTER_TOP + 7, 50, 14, IDCANCEL,
+                   0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_Cancel));
+    return DialogBoxIndirectParamW(GetModuleHandleW(nullptr), (DLGTEMPLATE *)dlgTemplate, owner, RenameDlgProc,
+                                   (LPARAM)name) == IDOK;
+}
 
-    DLGTEMPLATE *dlg = (DLGTEMPLATE *)p;
-    dlg->style = DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT;
-    dlg->cdit = 3;
-    dlg->cx = 180;
-    dlg->cy = RENAME_FOOTER_TOP + 28;
-    p += sizeof(DLGTEMPLATE) / sizeof(WORD);
-
-    *p++ = 0;
-    *p++ = 0;
-
-    const wchar_t *dlgTitle = Tr(Str::Dlg_RenameTab);
-    size_t titleLen = wcslen(dlgTitle) + 1;
-    memcpy(p, dlgTitle, titleLen * sizeof(wchar_t));
-    p += titleLen;
-
-    *p++ = 9;
-    const wchar_t *fontName = L"Segoe UI";
-    size_t fontLen = wcslen(fontName) + 1;
-    memcpy(p, fontName, fontLen * sizeof(wchar_t));
-    p += fontLen;
-
-    if ((ULONG_PTR)p % 4)
-        p++;
-
-    DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *)p;
-    item->style = WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL;
-    item->x = 10;
-    item->y = 10;
-    item->cx = 160;
-    item->cy = 14;
-    item->id = 101;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF;
-    *p++ = 0x0081;
-    *p++ = 0;
-    *p++ = 0;
-
-    if ((ULONG_PTR)p % 4)
-        p++;
-
-    item = (DLGITEMTEMPLATE *)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP;
-    item->x = 62;
-    item->y = RENAME_FOOTER_TOP + 7;
-    item->cx = 50;
-    item->cy = 14;
-    item->id = IDOK;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF;
-    *p++ = 0x0080;
-    const wchar_t *okText = Tr(Str::Btn_OK);
-    size_t okLen = wcslen(okText) + 1;
-    memcpy(p, okText, okLen * sizeof(wchar_t));
-    p += okLen;
-    *p++ = 0;
-
-    if ((ULONG_PTR)p % 4)
-        p++;
-
-    item = (DLGITEMTEMPLATE *)p;
-    item->style = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
-    item->x = 118;
-    item->y = RENAME_FOOTER_TOP + 7;
-    item->cx = 50;
-    item->cy = 14;
-    item->id = IDCANCEL;
-    p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
-    *p++ = 0xFFFF;
-    *p++ = 0x0080;
-    const wchar_t *cancelText = Tr(Str::Btn_Cancel);
-    size_t cancelLen = wcslen(cancelText) + 1;
-    memcpy(p, cancelText, cancelLen * sizeof(wchar_t));
-    p += cancelLen;
-    *p++ = 0;
-
+void CorralWindow::ShowRenameDialog()
+{
     wchar_t nameBuffer[256] = {};
     std::wstring currentTitle = Utf8ToWide(GetActiveTab().Title);
     wcsncpy_s(nameBuffer, currentTitle.c_str(), _TRUNCATE);
 
-    INT_PTR result = DialogBoxIndirectParamW(
-        GetModuleHandleW(nullptr),
-        (DLGTEMPLATE *)dlgTemplate,
-        hwnd,
-        RenameDlgProc,
-        (LPARAM)nameBuffer);
+    const INT_PTR result = PromptForName(hwnd, Tr(Str::Dlg_RenameTab), nameBuffer) ? IDOK : IDCANCEL;
     PinToBandTop();
 
     if (result == IDOK && wcslen(nameBuffer) > 0)
@@ -551,6 +487,11 @@ struct AppearanceDlgData
     int iconSpacingY;
     bool iconSpacingYChanged;
 
+    // Own presets were saved or deleted: the config is written whichever way the dialog ends
+    bool presetsChanged;
+    // A preset was loaded: OK gives the look to every tab of the Corral, not only the active one
+    bool presetLoaded;
+
     // Checkboxes
     bool useAsDefault;
     bool applyChangesToAll;    // Apply only changed settings to all corrals
@@ -609,9 +550,157 @@ static void AppearanceSyncAccentControls(HWND hDlg, const AppearanceDlgData *dat
     EnableWindow(GetDlgItem(hDlg, 115), !accent);
 }
 
+// The preset row: list, "Save as...", "Delete"
+static const WORD IDC_APPEARANCE_PRESET = 170;
+static const WORD IDC_APPEARANCE_PRESET_SAVE = 171;
+static const WORD IDC_APPEARANCE_PRESET_DELETE = 172;
+
+/// Puts a whole look into the dialog: every control, the live preview and
+/// the "changed" flags follow, as if the user had set each value by hand
+static void AppearanceLoadLook(HWND hDlg, AppearanceDlgData *data, const AppearanceSettings &look)
+{
+    // Colours and font first. They have no slider to carry them, and the
+    // background slider below rebuilds the colour string from data->color.
+    unsigned int background = ParseHexColor(look.ColorHex, 0x99000000);
+    data->color = RgbOf(background);
+    data->colorChanged = true;
+    if (data->hBrush)
+        DeleteObject(data->hBrush);
+    data->hBrush = CreateSolidBrush(data->color);
+    InvalidateRect(GetDlgItem(hDlg, 105), nullptr, TRUE);
+    if (data->activeTabConfig)
+        data->activeTabConfig->UseAccentColor = look.UseAccentColor;
+    AppearanceSyncAccentControls(hDlg, data);
+
+    data->fontName = CorralWindow::Utf8ToWide(look.HeaderFontName);
+    data->fontSize = look.HeaderFontSize;
+    data->fontChanged = true;
+    SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
+
+    data->fontColor = RgbOf(ParseHexColor(look.HeaderFontColor, 0xFFFFFF));
+    data->fontColorChanged = true;
+    if (data->fontColorBrush)
+        DeleteObject(data->fontColorBrush);
+    data->fontColorBrush = CreateSolidBrush(data->fontColor);
+    InvalidateRect(GetDlgItem(hDlg, 114), nullptr, TRUE);
+
+    data->tintColor = RgbOf(ParseHexColor(look.IconTintColor, 0x000000));
+    data->tintChanged = true;
+    if (data->tintColorBrush)
+        DeleteObject(data->tintColorBrush);
+    data->tintColorBrush = CreateSolidBrush(data->tintColor);
+    InvalidateRect(GetDlgItem(hDlg, 118), nullptr, TRUE);
+
+    if (data->activeTabConfig)
+    {
+        data->activeTabConfig->HeaderFontName = look.HeaderFontName;
+        data->activeTabConfig->HeaderFontSize = look.HeaderFontSize;
+        data->activeTabConfig->HeaderFontColor = look.HeaderFontColor;
+    }
+    if (data->corralConfig)
+        data->corralConfig->IconTintColor = look.IconTintColor;
+
+    // Everything with a slider goes through the slider's own handler
+    AppearanceSetSlider(hDlg, 102, (background >> 24) & 0xFF);
+    AppearanceSetSlider(hDlg, 122, look.BorderOpacity);
+    AppearanceSetSlider(hDlg, 124, look.HeaderOpacity);
+    AppearanceSetSlider(hDlg, 126, look.HeaderFontOpacity);
+    AppearanceSetSlider(hDlg, 116, look.IconOpacity);
+    AppearanceSetSlider(hDlg, 128, look.IconLabelOpacity);
+    AppearanceSetSlider(hDlg, 120, look.IconTintStrength);
+    AppearanceSetSlider(hDlg, 130, look.IconSpacingXPercent);
+    AppearanceSetSlider(hDlg, 132, look.IconSpacingYPercent);
+    AppearanceSetSlider(hDlg, 110, look.TitleBarHeight); // last: it relayouts, picking up the font too
+}
+
+/// The look the dialog shows right now
+static AppearanceSettings AppearanceCurrentLook(const AppearanceDlgData *data)
+{
+    AppearanceSettings look;
+    char hex[16];
+    sprintf_s(hex, "#%02X%02X%02X%02X", data->alpha, GetRValue(data->color), GetGValue(data->color), GetBValue(data->color));
+    look.ColorHex = hex;
+    look.UseAccentColor = data->activeTabConfig && data->activeTabConfig->UseAccentColor;
+    look.TitleBarHeight = data->titleBarHeight;
+    look.HeaderOpacity = data->headerOpacity;
+    look.BorderOpacity = data->borderOpacity;
+    look.HeaderFontName = CorralWindow::WideToUtf8(data->fontName);
+    look.HeaderFontSize = data->fontSize;
+    sprintf_s(hex, "#%02X%02X%02X", GetRValue(data->fontColor), GetGValue(data->fontColor), GetBValue(data->fontColor));
+    look.HeaderFontColor = hex;
+    look.HeaderFontOpacity = data->fontOpacity;
+    look.IconOpacity = data->iconOpacity;
+    look.IconLabelOpacity = data->labelOpacity;
+    sprintf_s(hex, "#%02X%02X%02X", GetRValue(data->tintColor), GetGValue(data->tintColor), GetBValue(data->tintColor));
+    look.IconTintColor = hex;
+    look.IconTintStrength = data->tintStrength;
+    look.IconSpacingXPercent = data->iconSpacingX;
+    look.IconSpacingYPercent = data->iconSpacingY;
+    return look;
+}
+
+/// Fills the preset list: the prompt, the shipped looks, then the user's own.
+/// Selects the own preset named `select`, else the prompt.
+static void AppearanceFillPresets(HWND hDlg, const std::string &select)
+{
+    HWND list = GetDlgItem(hDlg, IDC_APPEARANCE_PRESET);
+    SendMessageW(list, CB_RESETCONTENT, 0, 0);
+    SendMessageW(list, CB_ADDSTRING, 0, (LPARAM)Tr(Str::Preset_Load));
+    for (const auto &preset : Presets::Shipped())
+        SendMessageW(list, CB_ADDSTRING, 0, (LPARAM)Tr(preset.name));
+    int selected = 0;
+    if (App *app = App::GetInstance())
+    {
+        for (const auto &preset : app->OwnPresets())
+        {
+            const LRESULT at = SendMessageW(list, CB_ADDSTRING, 0, (LPARAM)CorralWindow::Utf8ToWide(preset.Name).c_str());
+            if (preset.Name == select && at >= 0)
+                selected = (int)at;
+        }
+    }
+    SendMessageW(list, CB_SETCURSEL, selected, 0);
+    EnableWindow(GetDlgItem(hDlg, IDC_APPEARANCE_PRESET_DELETE), selected > 0);
+}
+
+/// The look of the list entry that is selected; false for the prompt
+static bool AppearancePresetAt(HWND hDlg, AppearanceSettings &look)
+{
+    const auto shipped = Presets::Shipped();
+    const int sel = (int)SendDlgItemMessageW(hDlg, IDC_APPEARANCE_PRESET, CB_GETCURSEL, 0, 0);
+    if (sel >= 1 && sel <= (int)shipped.size())
+    {
+        look = shipped[sel - 1].look;
+        return true;
+    }
+    App *app = App::GetInstance();
+    const int own = sel - 1 - (int)shipped.size();
+    if (app && own >= 0 && own < (int)app->OwnPresets().size())
+    {
+        look = app->OwnPresets()[own].Look;
+        return true;
+    }
+    return false;
+}
+
+/// The name of the own preset that is selected; empty for the prompt and the shipped looks
+static std::string AppearanceOwnPresetName(HWND hDlg)
+{
+    App *app = App::GetInstance();
+    const int own = (int)SendDlgItemMessageW(hDlg, IDC_APPEARANCE_PRESET, CB_GETCURSEL, 0, 0) - 1 -
+                    (int)Presets::Shipped().size();
+    return (app && own >= 0 && own < (int)app->OwnPresets().size()) ? app->OwnPresets()[own].Name : std::string();
+}
+
+/// Only an own preset can be deleted
+static void AppearanceSyncPresetButtons(HWND hDlg)
+{
+    EnableWindow(GetDlgItem(hDlg, IDC_APPEARANCE_PRESET_DELETE), !AppearanceOwnPresetName(hDlg).empty());
+}
+
 // Layout of the Appearance dialog, in dialog units
 static const short APPEARANCE_DLG_W = 246;
-static const short APPEARANCE_STRIP_TOP = 8;                           // The page strip
+static const short APPEARANCE_PRESET_TOP = 10;                         // The preset row
+static const short APPEARANCE_STRIP_TOP = APPEARANCE_PRESET_TOP + 24;  // The page strip
 static const short APPEARANCE_PAGE_TOP = APPEARANCE_STRIP_TOP + 26;    // First row of a page
 static const short APPEARANCE_FOOTER_TOP = APPEARANCE_PAGE_TOP + 6 * 18 + 2 + 3 * 14 + 4;
 
@@ -739,6 +828,7 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
         DialogSkin::Attach(hDlg, APPEARANCE_FOOTER_TOP);
         AppearanceShowPage(hDlg, 0);
+        AppearanceFillPresets(hDlg, "");
 
         // Position below parent corral
         HWND hParent = GetParent(hDlg);
@@ -934,63 +1024,68 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
 
         if (id == IDC_APPEARANCE_RESET)
         { // Reset to Defaults: every control goes to the style a new corral would get
+            if (App *app = App::GetInstance())
+                AppearanceLoadLook(hDlg, data, app->GetDefaultAppearance());
+            return TRUE;
+        }
+
+        if (id == IDC_APPEARANCE_PRESET && HIWORD(wParam) == CBN_SELCHANGE)
+        {
+            AppearanceSettings look;
+            if (AppearancePresetAt(hDlg, look))
+            {
+                AppearanceLoadLook(hDlg, data, look);
+                data->presetLoaded = true;
+            }
+            AppearanceSyncPresetButtons(hDlg);
+            return TRUE;
+        }
+
+        if (id == IDC_APPEARANCE_PRESET_SAVE)
+        {
             App *app = App::GetInstance();
             if (!app)
                 return TRUE;
-            AppearanceSettings def = app->GetDefaultAppearance();
+            // Offer the name of the own preset that is selected, for saving over it
+            wchar_t name[256] = {};
+            const std::string selected = AppearanceOwnPresetName(hDlg);
+            wcsncpy_s(name, CorralWindow::Utf8ToWide(selected).c_str(), _TRUNCATE);
+            if (!PromptForName(hDlg, Tr(Str::Title_SavePreset), name))
+                return TRUE;
 
-            // Colours and font first. They have no slider to carry them, and the
-            // background slider below rebuilds the colour string from data->color.
-            unsigned int background = ParseHexColor(def.ColorHex, 0x99000000);
-            data->color = RgbOf(background);
-            data->colorChanged = true;
-            if (data->hBrush)
-                DeleteObject(data->hBrush);
-            data->hBrush = CreateSolidBrush(data->color);
-            InvalidateRect(GetDlgItem(hDlg, 105), nullptr, TRUE);
-            if (data->activeTabConfig)
-                data->activeTabConfig->UseAccentColor = def.UseAccentColor;
-            AppearanceSyncAccentControls(hDlg, data);
-
-            data->fontName = CorralWindow::Utf8ToWide(def.HeaderFontName);
-            data->fontSize = def.HeaderFontSize;
-            data->fontChanged = true;
-            SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
-
-            data->fontColor = RgbOf(ParseHexColor(def.HeaderFontColor, 0xFFFFFF));
-            data->fontColorChanged = true;
-            if (data->fontColorBrush)
-                DeleteObject(data->fontColorBrush);
-            data->fontColorBrush = CreateSolidBrush(data->fontColor);
-            InvalidateRect(GetDlgItem(hDlg, 114), nullptr, TRUE);
-
-            data->tintColor = RgbOf(ParseHexColor(def.IconTintColor, 0x000000));
-            data->tintChanged = true;
-            if (data->tintColorBrush)
-                DeleteObject(data->tintColorBrush);
-            data->tintColorBrush = CreateSolidBrush(data->tintColor);
-            InvalidateRect(GetDlgItem(hDlg, 118), nullptr, TRUE);
-
-            if (data->activeTabConfig)
+            const std::string clean = Presets::CleanName(CorralWindow::WideToUtf8(name));
+            auto &own = app->OwnPresets();
+            const bool exists = std::any_of(own.begin(), own.end(), [&](const LookPreset &p) { return p.Name == clean; });
+            if (exists && MessageBoxW(hDlg, TrFmt(Str::Msg_PresetReplace, CorralWindow::Utf8ToWide(clean)).c_str(),
+                                      Tr(Str::App_Name), MB_YESNO | MB_ICONQUESTION) != IDYES)
+                return TRUE;
+            switch (Presets::Upsert(own, clean, AppearanceCurrentLook(data)))
             {
-                data->activeTabConfig->HeaderFontName = def.HeaderFontName;
-                data->activeTabConfig->HeaderFontSize = def.HeaderFontSize;
-                data->activeTabConfig->HeaderFontColor = def.HeaderFontColor;
+            case Presets::UpsertResult::Full:
+                MessageBoxW(hDlg, TrFmt(Str::Msg_PresetsFull, std::to_wstring(Presets::MAX_OWN)).c_str(),
+                            Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
+                break;
+            case Presets::UpsertResult::BadName:
+                break; // Nothing entered
+            default:
+                data->presetsChanged = true;
+                AppearanceFillPresets(hDlg, clean);
             }
-            if (data->corralConfig)
-                data->corralConfig->IconTintColor = def.IconTintColor;
+            return TRUE;
+        }
 
-            // Everything with a slider goes through the slider's own handler
-            AppearanceSetSlider(hDlg, 102, (background >> 24) & 0xFF);
-            AppearanceSetSlider(hDlg, 122, def.BorderOpacity);
-            AppearanceSetSlider(hDlg, 124, def.HeaderOpacity);
-            AppearanceSetSlider(hDlg, 126, def.HeaderFontOpacity);
-            AppearanceSetSlider(hDlg, 116, def.IconOpacity);
-            AppearanceSetSlider(hDlg, 128, def.IconLabelOpacity);
-            AppearanceSetSlider(hDlg, 120, def.IconTintStrength);
-            AppearanceSetSlider(hDlg, 130, def.IconSpacingXPercent);
-            AppearanceSetSlider(hDlg, 132, def.IconSpacingYPercent);
-            AppearanceSetSlider(hDlg, 110, def.TitleBarHeight); // last: it relayouts, picking up the font too
+        if (id == IDC_APPEARANCE_PRESET_DELETE)
+        {
+            App *app = App::GetInstance();
+            const std::string name = AppearanceOwnPresetName(hDlg);
+            if (app && !name.empty() &&
+                MessageBoxW(hDlg, TrFmt(Str::Msg_PresetDelete, CorralWindow::Utf8ToWide(name)).c_str(), Tr(Str::App_Name),
+                            MB_YESNO | MB_ICONQUESTION) == IDYES &&
+                Presets::Remove(app->OwnPresets(), name))
+            {
+                data->presetsChanged = true;
+                AppearanceFillPresets(hDlg, "");
+            }
             return TRUE;
         }
 
@@ -1275,6 +1370,13 @@ void CorralWindow::ShowAppearanceDialog()
         text(VALUE_X, rowY(row), VALUE_W, valueId, L"", WS_CHILD | WS_VISIBLE | SS_RIGHT);
     };
 
+    // Preset row
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 10, APPEARANCE_PRESET_TOP, 118,
+                   160, IDC_APPEARANCE_PRESET, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
+    itemCount++;
+    button(132, (short)(APPEARANCE_PRESET_TOP - 1), 56, IDC_APPEARANCE_PRESET_SAVE, Tr(Str::Btn_SavePreset), buttonStyle);
+    button(192, (short)(APPEARANCE_PRESET_TOP - 1), 44, IDC_APPEARANCE_PRESET_DELETE, Tr(Str::Btn_DeletePreset), buttonStyle);
+
     // Page strip
     button(10, APPEARANCE_STRIP_TOP, 62, IDC_APPEARANCE_PAGE, Tr(Str::Lbl_Background), buttonStyle | WS_GROUP);
     button(74, APPEARANCE_STRIP_TOP, 62, IDC_APPEARANCE_PAGE + 1, Tr(Str::Grp_Header), buttonStyle);
@@ -1429,6 +1531,9 @@ void CorralWindow::ShowAppearanceDialog()
         config.IconSpacingYPercent = originalSpacingY;
         CalculateIconLayout();
         UpdateLayeredContent();
+        // A preset saved or deleted in the dialog stays so; the look is back as it was
+        if (dlgData.presetsChanged && App::GetInstance())
+            App::GetInstance()->SaveConfig();
     }
     else
     {
@@ -1454,6 +1559,8 @@ void CorralWindow::ShowAppearanceDialog()
         currentTintStrength = dlgData.tintStrength;
         config.IconSpacingXPercent = dlgData.iconSpacingX;
         config.IconSpacingYPercent = dlgData.iconSpacingY;
+        if (dlgData.presetLoaded)
+            Presets::ApplyLook(config, AppearanceCurrentLook(&dlgData)); // The other tabs too
 
         CalculateIconLayout();
         UpdateLayeredContent();

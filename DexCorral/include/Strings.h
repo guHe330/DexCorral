@@ -80,6 +80,13 @@ enum class Str
     Preset_Graphite,
     Preset_Compact,
     Preset_DemoTitle,            // title of the demo Corral
+    Preset_Load,                 // first entry of the preset list in the Appearance dialog
+    Btn_SavePreset,              // "Save as..."
+    Btn_DeletePreset,            // "Delete"
+    Title_SavePreset,            // title of the name prompt
+    Msg_PresetReplace,           // {0} = name
+    Msg_PresetDelete,            // {0} = name
+    Msg_PresetsFull,             // {0} = the limit
 
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby

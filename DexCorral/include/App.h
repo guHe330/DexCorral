@@ -136,6 +136,9 @@ public:
     /// makes it the look of new Corrals. The caller saves.
     void ApplyLookToAllCorrals(const AppearanceSettings &look);
 
+    /// The looks the user saved (see Presets.h). Whoever changes them saves the config.
+    std::vector<LookPreset> &OwnPresets() { return config.Presets; }
+
     /**
      * Creates a new corral centred on `desiredCenter`, nudged to the nearest
      * spot that does not overlap an existing corral. Every creation path goes
