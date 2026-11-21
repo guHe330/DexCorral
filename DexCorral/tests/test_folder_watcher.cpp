@@ -36,6 +36,19 @@ protected:
         f << GetTickCount64();
     }
 
+    /// Touches the file until a change is reported. Not once after a fixed
+    /// pause: a change made before the watch thread has opened the folder is
+    /// not reported, and how long that takes depends on the machine.
+    bool TouchUntilChange(DWORD ms) {
+        for (DWORD waited = 0; waited < ms; waited += 50) {
+            Touch();
+            Sleep(50);
+            if (changes > 0)
+                return true;
+        }
+        return false;
+    }
+
     bool WaitForChange(int moreThan, DWORD ms) {
         for (DWORD waited = 0; waited < ms; waited += 20) {
             if (changes > moreThan)
@@ -53,10 +66,8 @@ TEST_F(WatchedFolder, ReportsAChange) {
     watcher.SetPath(dir);
     watcher.SetChangeCallback([this] { changes++; });
     watcher.Start();
-    Sleep(200); // Let the watch thread open the folder
 
-    Touch();
-    EXPECT_TRUE(WaitForChange(0, 3000));
+    EXPECT_TRUE(TouchUntilChange(5000));
 }
 
 TEST_F(WatchedFolder, IsQuietAfterStop) {
@@ -80,10 +91,8 @@ TEST_F(WatchedFolder, StopAndRestartKeepWorking) {
     watcher.Stop();
     watcher.Stop(); // Twice is harmless
     watcher.Start();
-    Sleep(200);
 
-    Touch();
-    EXPECT_TRUE(WaitForChange(0, 3000));
+    EXPECT_TRUE(TouchUntilChange(5000));
 }
 
 TEST_F(WatchedFolder, AFolderThatDoesNotExistIsNotAnError) {

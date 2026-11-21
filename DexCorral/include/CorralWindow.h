@@ -74,7 +74,10 @@ private:
     /// Effect to show at this point: per-icon, per-folder (virtual tab) or "join the corral"
     DWORD EffectAt(DWORD grfKeyState, POINTL pt);
     /// Binds (or rebinds) folderTarget to the folder the active virtual tab shows
-    void SyncFolderTarget(DWORD grfKeyState, POINTL pt);
+    void SyncFolderTarget(DWORD grfKeyState, POINTL pt, bool forDrop = false);
+    bool IconTakesDrops(int iconIndex); /// Asked once per icon the drag rests on, not per DragOver
+    std::wstring iconAsked;             /// The icon IconTakesDrops last asked about
+    bool iconAnswer = false;
     void ReleaseFolderTarget(bool notifyLeave);
     void EndDragSession();
 
@@ -346,7 +349,9 @@ private:
     void OnRightButtonDown(int x, int y);
     void OnDrop(IDataObject *pDataObj);                      // OLE drop handler (replaces OnDropFiles)
     /// Drop onto a corral icon: forwarded to that item's own shell drop target
-    /// False if that item takes no drops (a document): the drop is then for the tab
+    /// The item's own shell drop target, or nullptr if it takes no drops (a document)
+    IDropTarget *BindIconDropTarget(int iconIndex);
+    /// False if that item takes no drops: the drop is then for the tab
     bool OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
                       DWORD dropKeyState, POINTL pt, DWORD allowedEffects);
 
@@ -708,10 +713,18 @@ private:
         return netProbeInFlight && GetTickCount64() - netProbeStarted > NET_PROBE_PATIENCE_MS;
     }
     bool FolderAnswers() const; // False while the active tab shows a network folder that may block
+    // True if that folder is known not to answer. Weaker than !FolderAnswers(): a share
+    // nobody has asked yet is not dead. For what the user does once and on purpose (a
+    // drop, a paste), where waiting for the share is right and refusing would be wrong.
+    bool FolderKnownDead() const;
     void StartNetworkProbe();
     void OnNetworkProbeDone(LONG seq, bool reachable);
     static const UINT WM_NET_PROBE_DONE = WM_USER + 102; // wParam: reachable, lParam: netProbeSeq
     static const UINT_PTR NET_PROBE_TIMER_ID = 11;
+    // The desktop folder did not answer when a normal tab was loaded: its icons
+    // could not be shown. Tried again after a pause that doubles up to a minute.
+    static const UINT_PTR DESKTOP_RETRY_TIMER_ID = 12;
+    UINT desktopRetryMs = 0;
     static const UINT NET_PROBE_MS = 10000;
     static const int NET_RELIST_EVERY = 6; // Re-list every 6th probe: change notifications are unreliable on a NAS
 

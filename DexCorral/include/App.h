@@ -296,6 +296,10 @@ private:
     // it would otherwise empty the list that is being walked. If restoring is
     // left by an exception this stays set, and the half layout is never saved.
     bool restoringCorrals = false;
+    // False until "Show Desktop Icons" from the config has really been applied
+    // (the desktop list view may not exist at start). Until then a save keeps
+    // the configured value instead of reading "visible" off a missing window.
+    bool iconVisibilityApplied = false;
     bool saveAfterRestore = false;
     void ActivateDesktop();             // Everything Initialize skips in standby
     const wchar_t *TrayTooltip() const; // Normal or "paused" tooltip
