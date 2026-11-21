@@ -639,6 +639,19 @@ static AppearanceSettings AppearanceCurrentLook(const AppearanceDlgData *data)
     return look;
 }
 
+static std::string AppearanceOwnPresetName(HWND hDlg);
+
+/// Only an own preset can be deleted
+static void AppearanceSyncPresetButtons(HWND hDlg)
+{
+    HWND remove = GetDlgItem(hDlg, IDC_APPEARANCE_PRESET_DELETE);
+    const bool own = !AppearanceOwnPresetName(hDlg).empty();
+    // A disabled control must not keep the focus, or the keyboard is stuck in the dialog
+    if (!own && GetFocus() == remove)
+        SendMessageW(hDlg, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(hDlg, IDC_APPEARANCE_PRESET), TRUE);
+    EnableWindow(remove, own);
+}
+
 /// Fills the preset list: the prompt, the shipped looks, then the user's own.
 /// Selects the own preset named `select`, else the prompt.
 static void AppearanceFillPresets(HWND hDlg, const std::string &select)
@@ -659,7 +672,7 @@ static void AppearanceFillPresets(HWND hDlg, const std::string &select)
         }
     }
     SendMessageW(list, CB_SETCURSEL, selected, 0);
-    EnableWindow(GetDlgItem(hDlg, IDC_APPEARANCE_PRESET_DELETE), selected > 0);
+    AppearanceSyncPresetButtons(hDlg);
 }
 
 /// The look of the list entry that is selected; false for the prompt
@@ -691,11 +704,6 @@ static std::string AppearanceOwnPresetName(HWND hDlg)
     return (app && own >= 0 && own < (int)app->OwnPresets().size()) ? app->OwnPresets()[own].Name : std::string();
 }
 
-/// Only an own preset can be deleted
-static void AppearanceSyncPresetButtons(HWND hDlg)
-{
-    EnableWindow(GetDlgItem(hDlg, IDC_APPEARANCE_PRESET_DELETE), !AppearanceOwnPresetName(hDlg).empty());
-}
 
 // Layout of the Appearance dialog, in dialog units
 static const short APPEARANCE_DLG_W = 246;
@@ -1338,7 +1346,8 @@ void CorralWindow::ShowAppearanceDialog()
                                0, APPEARANCE_DLG_W, APPEARANCE_FOOTER_TOP + 28, dlgTitleStr.c_str());
     WORD itemCount = 0;
 
-    const DWORD labelStyle = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX;
+    // WS_GROUP on every label: the arrow keys stay within the page strip and within each row
+    const DWORD labelStyle = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX | WS_GROUP;
     const DWORD buttonStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
     const DWORD checkStyle = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
     const DWORD swatchStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY;
@@ -1413,13 +1422,13 @@ void CorralWindow::ShowAppearanceDialog()
 
     // On every page: what OK does beyond this Corral
     const short CHECK_TOP = rowY(6) + 2;
-    button(LABEL_X, CHECK_TOP, 222, 107, Tr(Str::Chk_UseAsDefault), checkStyle);
+    button(LABEL_X, CHECK_TOP, 222, 107, Tr(Str::Chk_UseAsDefault), checkStyle | WS_GROUP);
     button(LABEL_X, (short)(CHECK_TOP + 14), 222, 108, Tr(Str::Chk_ApplyToAll), checkStyle);
     button(LABEL_X, (short)(CHECK_TOP + 28), 222, 109, Tr(Str::Chk_CopyStyleToAll), checkStyle);
 
     // Footer: Reset to Defaults set apart on the left
     const short BTN_Y = APPEARANCE_FOOTER_TOP + 7;
-    button(10, BTN_Y, 104, IDC_APPEARANCE_RESET, Tr(Str::Btn_ResetToDefaults), buttonStyle);
+    button(10, BTN_Y, 104, IDC_APPEARANCE_RESET, Tr(Str::Btn_ResetToDefaults), buttonStyle | WS_GROUP);
     button(APPEARANCE_DLG_W - 10 - 54 - 6 - 54, BTN_Y, 54, IDOK, Tr(Str::Btn_OK), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP);
     button(APPEARANCE_DLG_W - 10 - 54, BTN_Y, 54, IDCANCEL, Tr(Str::Btn_Cancel), buttonStyle);
 
@@ -1523,6 +1532,7 @@ void CorralWindow::ShowAppearanceDialog()
         GetActiveTab().HeaderFontColor = originalFontColor;
         GetActiveTab().HeaderFontOpacity = originalFontOpacity;
         config.IconOpacity = originalIconOpacity;
+        SetCurrentOpacity(originalIconOpacity); // The slider and a loaded preset set it for the preview
         config.IconLabelOpacity = originalLabelOpacity;
         config.IconTintColor = originalTintColor;
         config.IconTintStrength = originalTintStrength;

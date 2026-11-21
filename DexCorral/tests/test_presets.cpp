@@ -160,9 +160,9 @@ TEST(Presets, CleanNameTrimsAndCuts)
     EXPECT_EQ(Presets::CleanName("  Night shift 	"), "Night shift");
     EXPECT_EQ(Presets::CleanName("   "), "");
     EXPECT_EQ(Presets::CleanName(std::string(60, 'a')).size(), Presets::MAX_NAME);
-    // Never cuts a UTF-8 character in half: 39 bytes, then a two-byte "ae" umlaut
-    const std::string cut = Presets::CleanName(std::string(39, 'a') + "Ã¤" + "b");
-    EXPECT_EQ(cut, std::string(39, 'a'));
+    // Counts characters, not bytes: 39 letters and a two-byte umlaut are 40
+    const std::string umlaut = "\xC3\xA4";
+    EXPECT_EQ(Presets::CleanName(std::string(39, 'a') + umlaut + "b"), std::string(39, 'a') + umlaut);
 }
 
 TEST(Presets, SanitizeRepairsWhatACorralCannotShow)
@@ -298,4 +298,14 @@ TEST(Presets, MergeReplacesSameNamesAndStopsWhenFull)
         many.push_back({"m" + std::to_string(i), changed});
     EXPECT_EQ(Presets::Merge(own, many), (int)(Presets::MAX_OWN - 2));
     EXPECT_EQ(own.size(), Presets::MAX_OWN);
+}
+
+TEST(Presets, SanitizeKeepsALongFontNameInAnotherScript)
+{
+    // 20 two-byte characters: 40 bytes, but well within the 31 characters a font name may have
+    AppearanceSettings look = Presets::Classic();
+    look.HeaderFontName.clear();
+    for (int i = 0; i < 20; i++)
+        look.HeaderFontName += "\xC3\xA4";
+    EXPECT_EQ(Presets::Sanitize(look).HeaderFontName, look.HeaderFontName);
 }

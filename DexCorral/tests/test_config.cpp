@@ -773,3 +773,16 @@ TEST(ConfigTheme, OnlyLightAndDarkOverrideWindows)
     EXPECT_EQ(DialogSkin::ThemeOverride("dark"), 1);
     EXPECT_EQ(DialogSkin::ThemeOverride("purple"), -1);
 }
+
+TEST(ConfigPresets, ABrokenPresetEntryDoesNotSpoilTheConfig)
+{
+    const auto j = nlohmann::json::parse(
+        R"({"Language":"de","Presets":[{"Name":7,"Look":{}},"text",{"Name":"Good","Look":{"TitleBarHeight":"tall"}}]})");
+    AppConfig cfg = j.get<AppConfig>();
+    Config::Normalize(cfg);
+
+    EXPECT_EQ(cfg.Language, "de");
+    ASSERT_EQ(cfg.Presets.size(), 1u);
+    EXPECT_EQ(cfg.Presets[0].Name, "Good");
+    EXPECT_EQ(cfg.Presets[0].Look.TitleBarHeight, AppearanceSettings{}.TitleBarHeight);
+}

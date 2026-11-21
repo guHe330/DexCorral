@@ -1907,6 +1907,7 @@ struct SettingsDialogData
     int theme = 0;                      /// 0 = like Windows, 1 = light, 2 = dark
     int look = 0;                       /// 0 = keep the current look, else an entry of the Look list (SettingsLookAt)
     std::vector<LookPreset> *own = nullptr; /// The user's presets; import changes them at once
+    std::vector<LookPreset> listed;     /// The own presets as the Look list shows them: another dialog may change `own` meanwhile
     bool presetsChanged = false;        /// Presets were imported: the config is saved even after Cancel
     bool demoAllowed = false;           /// No demo Corral in standby: nothing of DexCorral is on the desktop then
     std::unique_ptr<CorralWindow> demo; /// Shows the chosen preset next to the dialog; gone when the dialog closes
@@ -1923,26 +1924,23 @@ static bool SettingsLookAt(const SettingsDialogData *data, int entry, Appearance
         return true;
     }
     const int own = entry - 1 - (int)shipped.size();
-    if (data->own && own >= 0 && own < (int)data->own->size())
+    if (own >= 0 && own < (int)data->listed.size())
     {
-        look = (*data->own)[own].Look;
+        look = data->listed[own].Look;
         return true;
     }
     return false;
 }
 
-static void SettingsFillLooks(HWND hDlg, const SettingsDialogData *data)
+static void SettingsFillLooks(HWND hDlg, SettingsDialogData *data)
 {
+    data->listed = data->own ? *data->own : std::vector<LookPreset>();
     SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_RESETCONTENT, 0, 0);
     SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(Str::Settings_LookKeep));
     for (const auto &preset : Presets::Shipped())
         SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(preset.name));
-    if (data->own)
-    {
-        for (const auto &preset : *data->own)
-            SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0,
-                                (LPARAM)CorralWindow::Utf8ToWide(preset.Name).c_str());
-    }
+    for (const auto &preset : data->listed)
+        SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)CorralWindow::Utf8ToWide(preset.Name).c_str());
     SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_SETCURSEL, 0, 0);
 }
 

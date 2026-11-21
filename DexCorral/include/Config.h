@@ -160,9 +160,36 @@ struct LookPreset
 {
     std::string Name;
     AppearanceSettings Look;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LookPreset, Name, Look)
 };
+
+inline void to_json(nlohmann::json &j, const LookPreset &preset)
+{
+    j = nlohmann::json{{"Name", preset.Name}, {"Look", preset.Look}};
+}
+
+/// An entry that is not a preset (wrong types, not an object) comes out
+/// nameless instead of throwing: one bad entry must not make the whole
+/// config unreadable. Nameless presets are dropped (Config::Normalize).
+inline void from_json(const nlohmann::json &j, LookPreset &preset)
+{
+    preset = LookPreset();
+    try
+    {
+        preset.Look = j.at("Look").get<AppearanceSettings>();
+    }
+    catch (const nlohmann::json::exception &)
+    {
+        preset.Look = AppearanceSettings(); // No look, or a broken one: the stock values, cleaned later
+    }
+    try
+    {
+        preset.Name = j.at("Name").get<std::string>();
+    }
+    catch (const nlohmann::json::exception &)
+    {
+        preset.Name.clear();
+    }
+}
 
 
 struct AppConfig
