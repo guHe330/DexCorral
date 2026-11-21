@@ -38,11 +38,19 @@
 
 #pragma once
 #include <Windows.h>
+#include <string>
 
 namespace DialogSkin
 {
 /// -1: follow Windows. 0 / 1: light / dark regardless (previews)
 extern int forceTheme;
+
+/// The value of forceTheme for the Theme setting of the config ("", "light", "dark");
+/// anything else follows Windows
+inline int ThemeOverride(const std::string &theme)
+{
+    return theme == "light" ? 0 : theme == "dark" ? 1 : -1;
+}
 
 /// True when dialogs are to be dark
 bool IsDark();

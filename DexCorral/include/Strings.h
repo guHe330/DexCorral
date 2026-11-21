@@ -64,6 +64,10 @@ enum class Str
     Settings_HotkeyUnsupported,  // message: the key pressed cannot be a hotkey
     Settings_DebugLogging,       // checkbox
     Settings_DebugHint,          // what the logs are for and where they go
+    Settings_Theme,              // label of the light/dark choice
+    Theme_Windows,               // follow Windows
+    Theme_Light,
+    Theme_Dark,
     Settings_Look,               // label of the preset list
     Settings_LookKeep,           // first entry: change nothing
     Settings_LookHint,           // what choosing a preset and OK do

@@ -10,6 +10,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "DialogSkin.h"
 #include "Config.h"
 #include <Windows.h>
 #include <fstream>
@@ -754,4 +755,21 @@ TEST(ConfigPresets, NormalizeCleansOwnPresets)
     EXPECT_EQ(cfg.Presets[0].Name, "Odd");
     EXPECT_EQ(cfg.Presets[0].Look.ColorHex, AppConfig{}.DefaultColorHex);
     EXPECT_EQ(cfg.Presets[0].Look.TitleBarHeight, 64);
+}
+
+TEST(ConfigTheme, ThemeSurvivesARoundTripAndDefaultsToWindows)
+{
+    EXPECT_EQ(AppConfig{}.Theme, "");
+    AppConfig orig;
+    orig.Theme = "dark";
+    nlohmann::json j = orig;
+    EXPECT_EQ(j.get<AppConfig>().Theme, "dark");
+}
+
+TEST(ConfigTheme, OnlyLightAndDarkOverrideWindows)
+{
+    EXPECT_EQ(DialogSkin::ThemeOverride(""), -1);
+    EXPECT_EQ(DialogSkin::ThemeOverride("light"), 0);
+    EXPECT_EQ(DialogSkin::ThemeOverride("dark"), 1);
+    EXPECT_EQ(DialogSkin::ThemeOverride("purple"), -1);
 }
