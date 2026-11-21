@@ -295,6 +295,12 @@ private:
     // corrals, hides icons or rewrites the corral list.
     HookStandbyReason standbyReason = HookStandbyReason::None;
     bool desktopActive = false;
+    // RestoreCorrals builds the windows from config.Corrals. SaveConfig rebuilds
+    // config.Corrals from the windows, so it must wait until all of them exist:
+    // it would otherwise empty the list that is being walked. If restoring is
+    // left by an exception this stays set, and the half layout is never saved.
+    bool restoringCorrals = false;
+    bool saveAfterRestore = false;
     void ActivateDesktop();             // Everything Initialize skips in standby
     const wchar_t *TrayTooltip() const; // Normal or "paused" tooltip
     bool quickHideHotkeyRegistered = false;
