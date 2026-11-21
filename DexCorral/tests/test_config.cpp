@@ -713,3 +713,45 @@ TEST(CorralTabConfig, UseAccentColor_RoundTripsAndDefaultsToOff)
     j.erase("UseAccentColor");
     EXPECT_FALSE(j.get<CorralTabConfig>().UseAccentColor);
 }
+
+TEST(ConfigPresets, OwnPresetsSurviveARoundTrip)
+{
+    AppConfig orig;
+    AppearanceSettings look;
+    look.ColorHex = "#80112233";
+    look.UseAccentColor = true;
+    look.TitleBarHeight = 30;
+    look.HeaderFontName = "Arial";
+    orig.Presets.push_back({"Mine", look});
+
+    nlohmann::json j = orig;
+    AppConfig back = j.get<AppConfig>();
+    ASSERT_EQ(back.Presets.size(), 1u);
+    EXPECT_EQ(back.Presets[0].Name, "Mine");
+    EXPECT_EQ(back.Presets[0].Look.ColorHex, "#80112233");
+    EXPECT_TRUE(back.Presets[0].Look.UseAccentColor);
+    EXPECT_EQ(back.Presets[0].Look.TitleBarHeight, 30);
+    EXPECT_EQ(back.Presets[0].Look.HeaderFontName, "Arial");
+}
+
+TEST(ConfigPresets, AConfigWithoutPresetsLoadsWithNone)
+{
+    AppConfig back = nlohmann::json::parse("{}").get<AppConfig>();
+    EXPECT_TRUE(back.Presets.empty());
+}
+
+TEST(ConfigPresets, NormalizeCleansOwnPresets)
+{
+    AppConfig cfg;
+    AppearanceSettings bad;
+    bad.ColorHex = "nonsense";
+    bad.TitleBarHeight = 900;
+    cfg.Presets.push_back({"  Odd ", bad});
+    cfg.Presets.push_back({"   ", bad});
+    Config::Normalize(cfg);
+
+    ASSERT_EQ(cfg.Presets.size(), 1u);
+    EXPECT_EQ(cfg.Presets[0].Name, "Odd");
+    EXPECT_EQ(cfg.Presets[0].Look.ColorHex, AppConfig{}.DefaultColorHex);
+    EXPECT_EQ(cfg.Presets[0].Look.TitleBarHeight, 64);
+}
