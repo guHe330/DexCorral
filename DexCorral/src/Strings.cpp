@@ -70,6 +70,10 @@ const wchar_t *const kEnglish[] = {
     /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
     /* Settings_DebugLogging */    L"Write debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
+    /* Settings_Theme */           L"Windows and menus",
+    /* Theme_Windows */            L"Like Windows",
+    /* Theme_Light */              L"Light",
+    /* Theme_Dark */               L"Dark",
     /* Settings_Look */            L"Look",
     /* Settings_LookKeep */        L"Keep current look",
     /* Settings_LookHint */        L"A preset is shown on an example Corral. "
@@ -347,6 +351,10 @@ const wchar_t *const kGerman[] = {
                                    L"eine Ziffer oder eine Funktionstaste.",
     /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
     /* Settings_DebugHint */       L"Für Fehlerberichte. Die Protokolle liegen im Konfigurationsordner.",
+    /* Settings_Theme */           L"Fenster und Menüs",
+    /* Theme_Windows */            L"Wie Windows",
+    /* Theme_Light */              L"Hell",
+    /* Theme_Dark */               L"Dunkel",
     /* Settings_Look */            L"Aussehen",
     /* Settings_LookKeep */        L"Aktuelles Aussehen behalten",
     /* Settings_LookHint */        L"Eine Vorlage wird an einem Beispiel-Corral gezeigt. "

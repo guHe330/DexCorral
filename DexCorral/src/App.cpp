@@ -255,6 +255,7 @@ void App::Initialize()
 
     // Load configuration
     LoadConfig();
+    DialogSkin::forceTheme = DialogSkin::ThemeOverride(config.Theme);
 
     // Select UI language before any user-visible string is built:
     // config.json "Language" wins; else the installer's choice; else English.
@@ -1883,11 +1884,12 @@ static const WORD IDC_SET_HOTKEY_HINT = 318;
 static const WORD IDC_SET_DEBUG_HINT = 319;
 
 // Where the footer band of the settings dialog begins (dialog units)
-static const int SETTINGS_FOOTER_TOP = 214;
+static const int SETTINGS_FOOTER_TOP = 236;
+static const WORD IDC_SET_THEME = 320;
 
 // Where the hot key control goes, in dialog units (it is created in
 // WM_INITDIALOG: its class has no ordinal a dialog template could name)
-static const RECT SETTINGS_HOTKEY_RECT = {12, 112, 132, 126};
+static const RECT SETTINGS_HOTKEY_RECT = {12, 134, 132, 148};
 
 /// What the settings dialog shows, and on IDOK what the user chose
 struct SettingsDialogData
@@ -1898,6 +1900,7 @@ struct SettingsDialogData
     unsigned hotkeyWord = 0;     /// Hot key control word (see Hotkey.h)
     unsigned hotkeyBaseline = 0; /// The word the control reported before the user touched it
     bool hotkeyChanged = false;
+    int theme = 0;                      /// 0 = like Windows, 1 = light, 2 = dark
     int look = 0;                       /// 0 = keep the current look, else 1 + index into Presets::Shipped()
     bool demoAllowed = false;           /// No demo Corral in standby: nothing of DexCorral is on the desktop then
     std::unique_ptr<CorralWindow> demo; /// Shows the chosen preset next to the dialog; gone when the dialog closes
@@ -1979,6 +1982,9 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
         SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)L"English");
         SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)L"Deutsch");
         SendDlgItemMessageW(hDlg, IDC_SET_LANGUAGE, CB_SETCURSEL, data->german ? 1 : 0, 0);
+        for (Str entry : {Str::Theme_Windows, Str::Theme_Light, Str::Theme_Dark})
+            SendDlgItemMessageW(hDlg, IDC_SET_THEME, CB_ADDSTRING, 0, (LPARAM)Tr(entry));
+        SendDlgItemMessageW(hDlg, IDC_SET_THEME, CB_SETCURSEL, data->theme, 0);
         SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(Str::Settings_LookKeep));
         for (const auto &preset : Presets::Shipped())
             SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(preset.name));
@@ -2055,6 +2061,7 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
             data->checkUpdates = (IsDlgButtonChecked(hDlg, IDC_SET_UPDATES) == BST_CHECKED);
             data->debugLogging = (IsDlgButtonChecked(hDlg, IDC_SET_DEBUG) == BST_CHECKED);
             data->look = (int)SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_GETCURSEL, 0, 0);
+            data->theme = (int)SendDlgItemMessageW(hDlg, IDC_SET_THEME, CB_GETCURSEL, 0, 0);
             data->demo.reset(); // Before its owner goes
             EndDialog(hDlg, IDOK);
             return TRUE;
@@ -2092,6 +2099,7 @@ void App::ShowSettings()
     ParseHotkey(config.QuickHideHotkey, current);
     data.hotkeyWord = HotkeyToControlWord(current);
     data.demoAllowed = desktopActive;
+    data.theme = DialogSkin::ThemeOverride(config.Theme) + 1;
 
     // Layout in dialog units, one option per block with its explanation below it
     const short DLG_W = 260, DLG_H = SETTINGS_FOOTER_TOP + 28, W = 236;
@@ -2101,23 +2109,26 @@ void App::ShowSettings()
     WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
-                               13, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 13 = the AddDlgItem calls below
+                               15, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 15 = the AddDlgItem calls below
 
     const short X = 12, FIELD_X = 96, BTN_Y = SETTINGS_FOOTER_TOP + 7;
     p = AddDlgItem(p, label, X, 16, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 14, 152, 60,
                    IDC_SET_LANGUAGE, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, label, X, 38, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 36, 152, 120,
+    p = AddDlgItem(p, label, X, 38, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Theme));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 36, 152, 60,
+                   IDC_SET_THEME, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
+    p = AddDlgItem(p, label, X, 60, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 58, 152, 120,
                    IDC_SET_LOOK, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, label, X, 54, W, 18, IDC_SET_LOOK_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
-    p = AddDlgItem(p, check, X, 80, W, 12, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
-    p = AddDlgItem(p, label, X, 100, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
+    p = AddDlgItem(p, label, X, 76, W, 18, IDC_SET_LOOK_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
+    p = AddDlgItem(p, check, X, 102, W, 12, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
+    p = AddDlgItem(p, label, X, 122, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
     // (the hot key control sits here, see SETTINGS_HOTKEY_RECT)
-    p = AddDlgItem(p, label, X, 131, W, 18, IDC_SET_HOTKEY_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
-    p = AddDlgItem(p, check, X, 157, W, 12, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
-    p = AddDlgItem(p, label, X, 171, W, 10, IDC_SET_DEBUG_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X, 189, 110, 14, IDC_SET_FOLDER, 0xFFFF,
+    p = AddDlgItem(p, label, X, 153, W, 18, IDC_SET_HOTKEY_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
+    p = AddDlgItem(p, check, X, 179, W, 12, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
+    p = AddDlgItem(p, label, X, 193, W, 10, IDC_SET_DEBUG_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X, 211, 110, 14, IDC_SET_FOLDER, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Menu_OpenConfigFolder));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, DLG_W - 12 - 54 - 6 - 54, BTN_Y, 54, 14, IDOK,
                    0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
@@ -2130,6 +2141,9 @@ void App::ShowSettings()
     data.demo.reset(); // Closed some other way than by its buttons
     if (result != IDOK)
         return;
+
+    config.Theme = data.theme == 1 ? "light" : data.theme == 2 ? "dark" : "";
+    DialogSkin::forceTheme = DialogSkin::ThemeOverride(config.Theme); // For the next dialog or menu
 
     const auto presets = Presets::Shipped();
     if (data.look >= 1 && data.look <= (int)presets.size())

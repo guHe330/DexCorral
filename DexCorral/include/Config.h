@@ -207,10 +207,14 @@ struct AppConfig
     // shown, until resumed there. Kept across restarts of Explorer.
     bool Paused = false;
 
+    // Light or dark dialogs and menus: "" follows the app mode of Windows,
+    // "light" and "dark" override it. Set in the settings window.
+    std::string Theme = "";
+
     // Looks the user saved in the Appearance dialog. Cleaned on load
     // (Config::Normalize) and on import, see Presets.h.
     std::vector<LookPreset> Presets;
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Presets, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Theme, Presets, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
 };
 
 /**
