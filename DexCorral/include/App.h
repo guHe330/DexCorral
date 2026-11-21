@@ -311,6 +311,7 @@ private:
     // no WM_LBUTTONDBLCLK, so pair consecutive clicks manually)
     DWORD lastClickTick = 0;
     POINT lastClickPt = {};
+    HWND lastClickRoot = nullptr; // Top-level window under the first click of a pair
 
     // Desktop monitoring callbacks
     void EnsureCatchAllCorral();
