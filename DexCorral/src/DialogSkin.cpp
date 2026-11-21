@@ -46,6 +46,7 @@ const wchar_t *PROP_STATE = L"DexSkin";
 const wchar_t *PROP_ROLE = L"DexSkinRole";
 const wchar_t *PROP_HOT = L"DexSkinHot";
 const wchar_t *PROP_DEFAULT = L"DexSkinDefault";
+const wchar_t *PROP_POS = L"DexSkinPos"; // Track bar: 1 + the position last painted
 
 enum Role : INT_PTR
 {
@@ -360,7 +361,19 @@ LRESULT DrawCheckBox(HWND hDlg, const NMCUSTOMDRAW *draw, const State *s)
 LRESULT DrawTrackBar(HWND hDlg, const NMCUSTOMDRAW *draw, const State *s)
 {
     if (draw->dwDrawStage == CDDS_PREPAINT)
+    {
+        // The knob is drawn wider than the bar's own thumb and the filled part
+        // of the channel moves with it, but the bar repaints only around its
+        // thumb: after a move, have all of it painted once more
+        HWND moved = draw->hdr.hwndFrom;
+        const INT_PTR pos = SendMessageW(moved, TBM_GETPOS, 0, 0) + 1;
+        if ((INT_PTR)GetPropW(moved, PROP_POS) != pos)
+        {
+            SetPropW(moved, PROP_POS, (HANDLE)pos);
+            InvalidateRect(moved, nullptr, TRUE);
+        }
         return CDRF_NOTIFYITEMDRAW;
+    }
     if (draw->dwDrawStage != CDDS_ITEMPREPAINT)
         return CDRF_DODEFAULT;
 
@@ -696,12 +709,6 @@ bool HandleMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam, INT_PTR &r
         }
         break;
     }
-    case WM_HSCROLL:
-        // The knob is drawn wider than the bar's own thumb, and the filled part
-        // of the channel moves with it: repaint the bar, then let the dialog go on
-        if (lParam)
-            InvalidateRect((HWND)lParam, nullptr, TRUE);
-        break;
     case WM_NCDESTROY:
         RemovePropW(hDlg, PROP_STATE);
         DeleteObject(s->body);

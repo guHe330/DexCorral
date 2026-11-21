@@ -181,9 +181,9 @@ enum class Str
     Lbl_HeaderLabel,             // "Header Label" (opacity row)
     Lbl_IconLabel,               // "Icon Label" (opacity row)
     Btn_Color,                   // "Color..."
-    Grp_IconSpacing,             // "Icon Spacing"
     Lbl_Horiz,                   // "Horiz"
     Lbl_Vert,                    // "Vert"
+    Lbl_TintStrength,            // "Tint strength"
     Chk_AccentColor,             // "Windows accent color"
     Chk_UseAsDefault,            // save this style as the default for new corrals
     Chk_ApplyToAll,              // transfer only the settings touched in this session
