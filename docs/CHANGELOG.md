@@ -19,6 +19,15 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - With the Desktop on a share or drive that is not reachable at sign-in, the Corrals no longer forget their icons. ([#182](https://github.com/guHe330/DexCorral/issues/182))
 - A `config.json` that another program holds open for a moment at start is waited for, instead of being replaced by the backup. ([#182](https://github.com/guHe330/DexCorral/issues/182))
 - After you deleted the last Corral, a new default Corral no longer appears at every sign-in. ([#182](https://github.com/guHe330/DexCorral/issues/182))
+- A network folder that is disconnected no longer freezes all Corrals: when the folder reports a change, DexCorral first asks in the background whether the share still answers, and stopping the folder watch no longer waits for it. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- **Close Tab** showed the icons of the closed tab under the title of the next one. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- A file dropped on a Corral's header could land on an icon scrolled out of view beneath it. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- In a folder tab, a click that moved a few pixels could drop a file onto itself, starting a program with itself as argument. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- A drop on an icon that takes no drops (a document) is now a drop into the tab instead of being lost. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- Renaming an icon to a name with `\` or `/` moved the file to another folder; such names are refused now. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- The Windows context menu of an icon acts on the whole selection, and its submenus (**Send to**, **Open with**) are filled. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- Dragging a Corral onto one that has a dialog open no longer merges the two. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- A detached folder tab follows its folder again. ([#183](https://github.com/guHe330/DexCorral/issues/183))
 
 ## [1.3.0] - 2026-11-18
 

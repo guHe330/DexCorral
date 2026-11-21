@@ -549,6 +549,16 @@ static bool IsExistingDirectory(const std::wstring &p)
     return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY);
 }
 
+bool CorralWindow::FolderAnswers() const
+{
+    if (!GetActiveTab().IsVirtual)
+        return true;
+    const std::wstring root = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+    if (!IsNetworkFolder(root))
+        return true;
+    return netProbeRoot == root && netState == NetState::Reachable && !NetworkProbeOverdue();
+}
+
 void CorralWindow::LoadVirtualFolderIcons()
 {
     // Set the loaded entries aside, by path. Whatever is not taken back in
@@ -598,10 +608,14 @@ void CorralWindow::LoadVirtualFolderIcons()
             netProbeRoot = root;
             netState = NetState::Unknown;
         }
-        if (netState != NetState::Reachable)
+        // Reachable, but the probe that is asking now gets no answer: the share
+        // has most likely just gone away. Not touched either; the answer re-lists.
+        const bool waiting = netState == NetState::Reachable && NetworkProbeOverdue();
+        if (netState != NetState::Reachable || waiting)
         {
             virtualFolderMissing = (netState == NetState::Unreachable);
-            virtualFolderConnecting = (netState == NetState::Unknown);
+            virtualFolderConnecting = (netState == NetState::Unknown) || waiting;
+            relistWhenReachable = waiting;
             StartNetworkProbe();
             return;
         }
@@ -908,11 +922,12 @@ void CorralWindow::InitializeFolderWatcher()
     if (IsNetworkFolder(root) && !(netProbeRoot == root && netState == NetState::Reachable))
         return;
 
-    auto notify = [this]()
+    // By value: the watch thread may outlive this window (see FolderWatcher.h),
+    // and a message to a window that is gone fails harmlessly
+    auto notify = [target = hwnd]()
     {
-        // Post message to window to handle on main thread
-        if (hwnd)
-            PostMessageW(hwnd, WM_FOLDER_CHANGED, 0, 0);
+        if (target)
+            PostMessageW(target, WM_FOLDER_CHANGED, 0, 0);
     };
 
     std::wstring folderPath = GetVirtualCurrentPath();
@@ -957,6 +972,7 @@ void CorralWindow::StartNetworkProbe()
     if (!hwnd || netProbeInFlight || netProbeRoot.empty())
         return;
     netProbeInFlight = true;
+    netProbeStarted = GetTickCount64();
     netProbeAsked = netProbeRoot;
     const LONG seq = ++netProbeSeq;
     SetTimer(hwnd, NET_PROBE_TIMER_ID, NET_PROBE_MS, nullptr);
@@ -1003,16 +1019,36 @@ void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
         DllLog(L"Network folder '%s': %s", root.c_str(), reachable ? L"reachable" : L"not reachable");
         netState = answer;
         netProbeCount = 0;
+        relistWhenReachable = false;
         InitializeFolderWatcher(); // Starts the watchers when reachable, drops them when not
         LoadFiles();
     }
-    else if (reachable && ++netProbeCount % NET_RELIST_EVERY == 0)
+    else if (reachable)
     {
-        PostMessageW(hwnd, WM_FOLDER_CHANGED, 0, 0);
+        const bool due = ++netProbeCount % NET_RELIST_EVERY == 0;
+        if (due || relistWhenReachable)
+        {
+            relistWhenReachable = false;
+            ReloadFolderContents();
+        }
     }
 }
 
 void CorralWindow::OnFolderContentsChanged()
+{
+    // A network folder also reports "changed" when its share goes away, and
+    // listing it then blocks every Corral for as long as SMB waits. So ask
+    // first, off this thread; the answer re-lists (OnNetworkProbeDone).
+    if (GetActiveTab().IsVirtual && IsNetworkFolder(Utf8ToWide(GetActiveTab().VirtualFolderPath)))
+    {
+        relistWhenReachable = true;
+        StartNetworkProbe();
+        return;
+    }
+    ReloadFolderContents();
+}
+
+void CorralWindow::ReloadFolderContents()
 {
     // Usually one file changed: the others keep their icons. Every other
     // reload (view mode, navigation, shell icon change) loads everything.
@@ -1119,6 +1155,10 @@ void CorralWindow::CalculateIconLayoutDetails()
 
 int CorralWindow::HitTestIcon(int x, int y)
 {
+    // Icons scrolled out under the header are not there to be hit
+    if (y < GetIconAreaTop())
+        return -1;
+
     // Adjust for scroll offset
     int adjustedY = y + scrollPosition;
     POINT pt = {x, adjustedY};
@@ -1131,6 +1171,17 @@ int CorralWindow::HitTestIcon(int x, int y)
         }
     }
     return -1;
+}
+
+int CorralWindow::HitTestDropIcon(int x, int y)
+{
+    // A file must not be dropped onto itself: a click that moves a few pixels
+    // would start a program with itself as argument, or move a selection into
+    // one of its own folders.
+    int hit = HitTestIcon(x, y);
+    if (hit >= 0 && IconUtils::ContainsPath(shellDragPaths, icons[hit].fullPath))
+        return -1;
+    return hit;
 }
 
 RECT CorralWindow::GetIconLabelRect(int iconIndex) const

@@ -91,3 +91,50 @@ TEST(StripLnkExtension, TooShortToStrip) {
 TEST(StripLnkExtension, NoExtension_Unchanged) {
     EXPECT_EQ(StripLnkExtension(L"Recycle Bin"), L"Recycle Bin");
 }
+
+// --- Audit #183 -------------------------------------------------------------
+
+TEST(IsValidNewFileName, PlainNamesAreFine) {
+    EXPECT_TRUE(IsValidNewFileName(L"Report 2026.pdf"));
+    EXPECT_TRUE(IsValidNewFileName(L"..hidden"));
+    EXPECT_TRUE(IsValidNewFileName(L"a.b.c"));
+}
+
+TEST(IsValidNewFileName, ANameMustNotLeaveItsFolder) {
+    EXPECT_FALSE(IsValidNewFileName(L"..\\x"));
+    EXPECT_FALSE(IsValidNewFileName(L"sub\\x"));
+    EXPECT_FALSE(IsValidNewFileName(L"sub/x"));
+    EXPECT_FALSE(IsValidNewFileName(L"C:x"));
+    EXPECT_FALSE(IsValidNewFileName(L"."));
+    EXPECT_FALSE(IsValidNewFileName(L".."));
+}
+
+TEST(IsValidNewFileName, CharactersWindowsRefuses) {
+    for (const wchar_t *name : {L"a*b", L"a?b", L"a\"b", L"a<b", L"a>b", L"a|b", L"a\tb", L""})
+        EXPECT_FALSE(IsValidNewFileName(name)) << "name: " << (name[0] ? "(see list)" : "(empty)");
+}
+
+TEST(NameWithHiddenExtension, ReappendsTheExtensionTheUserCouldNotSee) {
+    // "Chrome.lnk" is shown as "Chrome"; typing "Browser" must keep it a shortcut
+    EXPECT_EQ(NameWithHiddenExtension(L"Chrome.lnk", L"Chrome", L"Browser"), L"Browser.lnk");
+    // Extensions hidden for known types
+    EXPECT_EQ(NameWithHiddenExtension(L"notes.txt", L"notes", L"todo"), L"todo.txt");
+}
+
+TEST(NameWithHiddenExtension, DoesNotDoubleAnExtensionTheUserTyped) {
+    EXPECT_EQ(NameWithHiddenExtension(L"notes.txt", L"notes", L"todo.TXT"), L"todo.TXT");
+}
+
+TEST(NameWithHiddenExtension, LeavesTheNameAloneWhenTheExtensionWasShown) {
+    EXPECT_EQ(NameWithHiddenExtension(L"notes.txt", L"notes.txt", L"todo.md"), L"todo.md");
+    EXPECT_EQ(NameWithHiddenExtension(L"Folder", L"Folder", L"Other"), L"Other");
+    // A display name that is not the start of the file name tells nothing about an extension
+    EXPECT_EQ(NameWithHiddenExtension(L"desktop.ini", L"Settings", L"x"), L"x");
+}
+
+TEST(ContainsPath, ComparesWithoutCase) {
+    const std::vector<std::wstring> paths = {L"C:\\Stuff\\tool.exe", L"C:\\Stuff\\Folder"};
+    EXPECT_TRUE(ContainsPath(paths, L"c:\\stuff\\TOOL.EXE"));
+    EXPECT_FALSE(ContainsPath(paths, L"C:\\Stuff\\other.exe"));
+    EXPECT_FALSE(ContainsPath({}, L"C:\\Stuff\\tool.exe"));
+}

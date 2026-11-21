@@ -146,8 +146,10 @@ add_executable(DexCorralTests
     tests/test_undo_move.cpp
     tests/test_accent_color.cpp
     tests/test_presets.cpp
+    tests/test_folder_watcher.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
+    src/FolderWatcher.cpp
     src/Config.cpp
     src/Hotkey.cpp
     src/CrashGuard.cpp

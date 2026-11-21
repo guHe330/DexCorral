@@ -28,6 +28,7 @@
 
 #pragma once
 #include <string>
+#include <vector>
 
 namespace IconUtils
 {
@@ -41,5 +42,20 @@ namespace IconUtils
     /// Strips a ".lnk" extension (case-insensitive) from a wide filename.
     /// If the name doesn't end in ".lnk" or is too short, it is returned unchanged.
     std::wstring StripLnkExtension(const std::wstring &name);
+
+    /// True if `name` can be the new name of a file that stays in its folder:
+    /// not empty, not "." or "..", none of \ / : * ? " < > | and no control
+    /// character. A typed "..\\x" must not move the file somewhere else.
+    bool IsValidNewFileName(const std::wstring &name);
+
+    /// The file name a rename to `newName` results in. `shownName` is what the
+    /// user saw and edited; if it was `oldFileName` without its extension
+    /// (.lnk, or "hide extensions" is on), that extension is put back, as
+    /// Explorer does, unless the user typed it.
+    std::wstring NameWithHiddenExtension(const std::wstring &oldFileName, const std::wstring &shownName,
+                                         const std::wstring &newName);
+
+    /// True if `path` is one of `paths`, ignoring case.
+    bool ContainsPath(const std::vector<std::wstring> &paths, const std::wstring &path);
 
 } // namespace IconUtils
