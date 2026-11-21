@@ -47,6 +47,7 @@
 #include "Constants.h"
 #include "Hotkey.h"
 #include "DialogTemplate.h"
+#include "DialogSkin.h"
 #include "Conflicts.h"
 #include <CommCtrl.h>
 #include <ShlObj.h>
@@ -1796,6 +1797,9 @@ static const WORD IDC_ABOUT_WEBSITE = 301;
 static const WORD IDC_ABOUT_GITHUB = 302;
 static const WORD IDC_ABOUT_LICENSE = 303;
 
+// Where the footer band of the About dialog begins (dialog units)
+static const int ABOUT_FOOTER_TOP = 100;
+
 static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -1806,6 +1810,7 @@ static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM 
                                        IMAGE_ICON, 32, 32, LR_SHARED);
         if (icon)
             SendDlgItemMessageW(hDlg, IDC_ABOUT_ICON, STM_SETICON, (WPARAM)icon, 0);
+        DialogSkin::Attach(hDlg, ABOUT_FOOTER_TOP);
         // Opened from the tray menu, with no owner window to bring it forward
         SetForegroundWindow(hDlg);
         return TRUE;
@@ -1830,6 +1835,9 @@ static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM 
         }
         break;
     }
+    INT_PTR skinned;
+    if (DialogSkin::HandleMessage(hDlg, msg, wParam, lParam, skinned))
+        return skinned;
     return FALSE;
 }
 
@@ -1844,7 +1852,7 @@ void App::ShowAbout()
     std::wstring aboutText = TrFmt(Str::About_Body, DEXCORRAL_VERSION);
 
     // Layout in dialog units: icon top-left, text beside it, one row of buttons
-    const short DLG_W = 240, DLG_H = 122, BTN_Y = 100, BTN_W = 50, BTN_H = 14;
+    const short DLG_W = 240, DLG_H = 128, BTN_Y = ABOUT_FOOTER_TOP + 7, BTN_W = 50, BTN_H = 14;
 
     WORD dlgTemplate[DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
@@ -1870,10 +1878,16 @@ static const WORD IDC_SET_HOTKEY = 313;
 static const WORD IDC_SET_DEBUG = 314;
 static const WORD IDC_SET_FOLDER = 315;
 static const WORD IDC_SET_LOOK = 316;
+static const WORD IDC_SET_LOOK_HINT = 317;
+static const WORD IDC_SET_HOTKEY_HINT = 318;
+static const WORD IDC_SET_DEBUG_HINT = 319;
+
+// Where the footer band of the settings dialog begins (dialog units)
+static const int SETTINGS_FOOTER_TOP = 214;
 
 // Where the hot key control goes, in dialog units (it is created in
 // WM_INITDIALOG: its class has no ordinal a dialog template could name)
-static const RECT SETTINGS_HOTKEY_RECT = {10, 97, 130, 111};
+static const RECT SETTINGS_HOTKEY_RECT = {12, 112, 132, 126};
 
 /// What the settings dialog shows, and on IDOK what the user chose
 struct SettingsDialogData
@@ -1992,6 +2006,11 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
             data->hotkeyBaseline = (unsigned)SendMessageW(hotkey, HKM_GETHOTKEY, 0, 0) & 0xFFFF;
         }
 
+        DialogSkin::Attach(hDlg, SETTINGS_FOOTER_TOP);
+        DialogSkin::MakeHint(hDlg, IDC_SET_LOOK_HINT);
+        DialogSkin::MakeHint(hDlg, IDC_SET_HOTKEY_HINT);
+        DialogSkin::MakeHint(hDlg, IDC_SET_DEBUG_HINT);
+
         // Opened from the tray menu, with no owner window to bring it forward
         SetForegroundWindow(hDlg);
         return TRUE;
@@ -2047,6 +2066,9 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
         }
         break;
     }
+    INT_PTR skinned;
+    if (DialogSkin::HandleMessage(hDlg, msg, wParam, lParam, skinned))
+        return skinned;
     return FALSE;
 }
 
@@ -2072,7 +2094,7 @@ void App::ShowSettings()
     data.demoAllowed = desktopActive;
 
     // Layout in dialog units, one option per block with its explanation below it
-    const short DLG_W = 250, DLG_H = 218, W = 230;
+    const short DLG_W = 260, DLG_H = SETTINGS_FOOTER_TOP + 28, W = 236;
     const DWORD label = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX;
     const DWORD check = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
 
@@ -2081,24 +2103,25 @@ void App::ShowSettings()
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
                                13, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 13 = the AddDlgItem calls below
 
-    p = AddDlgItem(p, label, 10, 12, 76, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 90, 10, 100, 60,
+    const short X = 12, FIELD_X = 96, BTN_Y = SETTINGS_FOOTER_TOP + 7;
+    p = AddDlgItem(p, label, X, 16, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 14, 152, 60,
                    IDC_SET_LANGUAGE, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, label, 10, 32, 76, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 90, 30, 150, 100,
+    p = AddDlgItem(p, label, X, 38, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 36, 152, 120,
                    IDC_SET_LOOK, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, label, 10, 47, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
-    p = AddDlgItem(p, check, 10, 70, W, 10, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
-    p = AddDlgItem(p, label, 10, 86, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
+    p = AddDlgItem(p, label, X, 54, W, 18, IDC_SET_LOOK_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
+    p = AddDlgItem(p, check, X, 80, W, 12, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
+    p = AddDlgItem(p, label, X, 100, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
     // (the hot key control sits here, see SETTINGS_HOTKEY_RECT)
-    p = AddDlgItem(p, label, 10, 115, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
-    p = AddDlgItem(p, check, 10, 139, W, 10, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
-    p = AddDlgItem(p, label, 10, 151, W, 18, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 10, 172, 110, 14, IDC_SET_FOLDER, 0xFFFF,
+    p = AddDlgItem(p, label, X, 131, W, 18, IDC_SET_HOTKEY_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
+    p = AddDlgItem(p, check, X, 157, W, 12, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
+    p = AddDlgItem(p, label, X, 171, W, 10, IDC_SET_DEBUG_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X, 189, 110, 14, IDC_SET_FOLDER, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Menu_OpenConfigFolder));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 136, 196, 50, 14, IDOK, 0xFFFF,
-                   DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 190, 196, 50, 14, IDCANCEL, 0xFFFF,
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, DLG_W - 12 - 54 - 6 - 54, BTN_Y, 54, 14, IDOK,
+                   0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, DLG_W - 12 - 54, BTN_Y, 54, 14, IDCANCEL, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Btn_Cancel));
 
     const INT_PTR result = DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr,
