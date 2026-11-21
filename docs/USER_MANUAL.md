@@ -84,7 +84,7 @@ The folder can be on the network: a share (`\\nas\photos`) or a mapped network d
 ### Creating
 - Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab**.
 - Choose **New Virtual Corral** instead to pick a folder and create a Corral mirroring it.
-- The classic right-click menu of the desktop background (**Show more options**) offers **New DexCorral** and **New Virtual DexCorral** as well, and creates the Corral where you clicked. See [Known Limitations](#known-limitations) if the entries are missing.
+- The classic right-click menu of the desktop background offers **New DexCorral** and **New Virtual DexCorral** as well, and creates the Corral where you clicked. Hold **Shift** while you right-click the desktop to get that menu; see [Known Limitations](#known-limitations) for why.
 
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
@@ -322,7 +322,9 @@ Fences is recognised by its entry in Windows' list of installed programs and by 
 
 - **Identical filenames on the user and Public desktop**: corral membership is stored as a bare filename, so DexCorral assumes the one on the user desktop. The same *display* name with different filenames (a folder `test` next to `test.txt`) is handled correctly.
 - **Network folders**: whether a share answers is checked in the background every 10 seconds, but the folder itself is read on the thread all Corrals share. If a share stops answering between two checks, Corrals can stall once until Windows gives up on it. A new network Corral is empty until the first check has answered.
-- **"New DexCorral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Some recent Windows 11 builds show only the new menu on the desktop background and no longer ask classic extensions (seen on build 26200.9974). Create Corrals from the tray menu or from the right-click menu of a Corral instead.
+- **"New DexCorral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Since the customizable context menu that Microsoft introduced with [KB5127936](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/10/kb5127936-windows-11-25h2-26h2-update) (October 2026, rolled out in phases; seen here after [KB5132061](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/11/kb5132061-windows-11-24h2-25h2-26h2-security-update), build 26200.9974), a plain right-click on the desktop shows the new menu, which does not list DexCorral. The registry setting that used to make the classic menu the default no longer has an effect there.
+  - **Hold Shift and right-click the desktop**: this opens the classic menu with both entries. Microsoft describes it on the KB5127936 page: "To see more options, hold down Shift and right-click on your desktop."
+  - Or create Corrals from the tray menu or from the right-click menu of any Corral.
 
 ## Troubleshooting
 
