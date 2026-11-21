@@ -26,18 +26,20 @@
 #include "DialogSkin.h"
 #include <CommCtrl.h>
 #include <deque>
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace ModernMenu
 {
 namespace
 {
-const wchar_t *PROP_FRAMED = L"DexMenuFramed";
 const UINT_PTR SUBCLASS_ID = 0x444D;
 
 struct Entry
 {
     std::wstring text;
+    std::wstring shortcut; // What followed a tab in the menu text; drawn at the right edge
     bool separator = false;
     bool submenu = false;
 };
@@ -50,6 +52,7 @@ struct Session
     COLORREF back = 0, hover = 0;
     HFONT font = nullptr, glyphs = nullptr;
     UINT dpi = 96;
+    mutable std::vector<HWND> framed; // Popup windows whose frame is painted over already
 
     int Px(int at96) const { return MulDiv(at96, (int)dpi, 96); }
     bool Owns(const Entry *e) const
@@ -78,6 +81,12 @@ void Convert(HMENU menu, Session &session)
         session.entries.emplace_back();
         Entry &entry = session.entries.back();
         entry.text = text;
+        const size_t tab = entry.text.find(L'\t');
+        if (tab != std::wstring::npos)
+        {
+            entry.shortcut = entry.text.substr(tab + 1);
+            entry.text.resize(tab);
+        }
         entry.separator = (info.fType & MFT_SEPARATOR) != 0;
         entry.submenu = info.hSubMenu != nullptr;
 
@@ -102,12 +111,17 @@ void Measure(MEASUREITEMSTRUCT *item, const Session &s, HWND owner)
     }
     HDC dc = GetDC(owner);
     HGDIOBJ old = SelectObject(dc, s.font);
-    SIZE size = {};
+    SIZE size = {}, keys = {};
     GetTextExtentPoint32W(dc, entry->text.c_str(), (int)entry->text.size(), &size);
+    if (!entry->shortcut.empty())
+    {
+        GetTextExtentPoint32W(dc, entry->shortcut.c_str(), (int)entry->shortcut.size(), &keys);
+        keys.cx += s.Px(24); // Gap between the label and its shortcut
+    }
     SelectObject(dc, old);
     ReleaseDC(owner, dc);
-    // Check column, text, room for a submenu arrow
-    item->itemWidth = s.Px(36) + size.cx + s.Px(40);
+    // Check column, text, shortcut, room for a submenu arrow
+    item->itemWidth = s.Px(36) + size.cx + keys.cx + s.Px(40);
     item->itemHeight = s.Px(30);
 }
 
@@ -116,9 +130,9 @@ void Measure(MEASUREITEMSTRUCT *item, const Session &s, HWND owner)
 void PaintFrame(HDC itemDc, const Session &s)
 {
     HWND popup = WindowFromDC(itemDc);
-    if (!popup || GetPropW(popup, PROP_FRAMED))
+    if (!popup || std::find(s.framed.begin(), s.framed.end(), popup) != s.framed.end())
         return;
-    SetPropW(popup, PROP_FRAMED, (HANDLE)1);
+    s.framed.push_back(popup);
 
     RECT window, client;
     GetWindowRect(popup, &window);
@@ -168,6 +182,12 @@ void Draw(const DRAWITEMSTRUCT *item, const Session &s)
     HGDIOBJ old = SelectObject(dc, s.font);
     RECT text = {r.left + s.Px(36), r.top, r.right - s.Px(28), r.bottom};
     DrawTextW(dc, entry->text.c_str(), -1, &text, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    if (!entry->shortcut.empty())
+    {
+        SetTextColor(dc, disabled ? s.colors.textDisabled : s.colors.textMuted);
+        DrawTextW(dc, entry->shortcut.c_str(), -1, &text, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        SetTextColor(dc, disabled ? s.colors.textDisabled : s.colors.text);
+    }
 
     // Check mark and submenu arrow from the Windows icon font
     if (s.glyphs)

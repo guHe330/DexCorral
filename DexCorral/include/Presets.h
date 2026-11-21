@@ -135,11 +135,17 @@ inline void ApplyLook(CorralWindowConfig &cfg, const AppearanceSettings &look)
 
 // ---- Own presets: looks the user saved under a name ----
 
-constexpr size_t MAX_NAME = 40; // Bytes of UTF-8
+constexpr size_t MAX_NAME = 40; // Characters
 constexpr size_t MAX_OWN = 50;
 
-/// A name as it is stored: no blanks around it, at most MAX_NAME bytes and
-/// never half a UTF-8 character. Empty means "not a name".
+/// How many characters a UTF-8 text has (bytes that do not continue a character)
+inline size_t Characters(const std::string &utf8)
+{
+    return (size_t)std::count_if(utf8.begin(), utf8.end(), [](unsigned char c) { return (c & 0xC0) != 0x80; });
+}
+
+/// A name as it is stored: no blanks around it and at most MAX_NAME
+/// characters. Empty means "not a name".
 inline std::string CleanName(std::string name)
 {
     auto blank = [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
@@ -149,12 +155,14 @@ inline std::string CleanName(std::string name)
     while (first < name.size() && blank((unsigned char)name[first]))
         first++;
     name.erase(0, first);
-    if (name.size() > MAX_NAME)
+    size_t characters = 0;
+    for (size_t i = 0; i < name.size(); i++)
     {
-        size_t cut = MAX_NAME;
-        while (cut > 0 && ((unsigned char)name[cut] & 0xC0) == 0x80) // Not in the middle of a character
-            cut--;
-        name.resize(cut);
+        if (((unsigned char)name[i] & 0xC0) != 0x80 && ++characters > MAX_NAME)
+        {
+            name.resize(i); // The first byte of the character that is one too many
+            break;
+        }
     }
     return name;
 }
@@ -179,7 +187,7 @@ inline AppearanceSettings Sanitize(AppearanceSettings look)
         look.HeaderFontColor = stock.HeaderFontColor;
     if (!isHex(look.IconTintColor, 6))
         look.IconTintColor = stock.IconTintColor;
-    if (look.HeaderFontName.empty() || look.HeaderFontName.size() > 31) // LF_FACESIZE - 1
+    if (look.HeaderFontName.empty() || Characters(look.HeaderFontName) > 31) // LF_FACESIZE - 1
         look.HeaderFontName = stock.HeaderFontName;
     look.HeaderFontSize = clamp(look.HeaderFontSize, 6, 72);
     look.TitleBarHeight = clamp(look.TitleBarHeight, 20, 64);

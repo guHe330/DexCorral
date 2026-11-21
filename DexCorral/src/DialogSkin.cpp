@@ -423,12 +423,14 @@ LRESULT CALLBACK DarkFieldProc(HWND w, UINT msg, WPARAM wParam, LPARAM lParam, U
 {
     if (msg == WM_NCDESTROY)
         RemoveWindowSubclass(w, DarkFieldProc, id);
+    // Only what the control is about to paint: what it painted earlier is recoloured already
+    RECT dirty = {};
+    const bool painting = (msg == WM_PAINT) && GetUpdateRect(w, &dirty, FALSE);
     const LRESULT result = DefSubclassProc(w, msg, wParam, lParam);
-    if (msg != WM_PAINT)
+    if (!painting)
         return result;
-    RECT r;
-    GetClientRect(w, &r);
-    const int width = r.right, height = r.bottom;
+
+    const int width = dirty.right - dirty.left, height = dirty.bottom - dirty.top;
     if (width <= 0 || height <= 0)
         return result;
     BITMAPINFO info = {};
@@ -444,7 +446,7 @@ LRESULT CALLBACK DarkFieldProc(HWND w, UINT msg, WPARAM wParam, LPARAM lParam, U
     if (dc && mem && bitmap && pixels)
     {
         HGDIOBJ old = SelectObject(mem, bitmap);
-        BitBlt(mem, 0, 0, width, height, dc, 0, 0, SRCCOPY);
+        BitBlt(mem, 0, 0, width, height, dc, dirty.left, dirty.top, SRCCOPY);
         GdiFlush();
         const Palette c = CurrentPalette();
         for (int i = 0; i < width * height; i++)
@@ -455,7 +457,7 @@ LRESULT CALLBACK DarkFieldProc(HWND w, UINT msg, WPARAM wParam, LPARAM lParam, U
             const COLORREF mixed = Mix(c.text, c.field, light * 100 / 255);
             pixels[i] = (GetRValue(mixed) << 16) | (GetGValue(mixed) << 8) | GetBValue(mixed);
         }
-        BitBlt(dc, 0, 0, width, height, mem, 0, 0, SRCCOPY);
+        BitBlt(dc, dirty.left, dirty.top, width, height, mem, 0, 0, SRCCOPY);
         SelectObject(mem, old);
     }
     if (bitmap)
