@@ -154,3 +154,148 @@ TEST(Presets, ApplyLookClampsWhatACorralCannotShow)
     EXPECT_EQ(cfg.Tabs[0].HeaderFontOpacity, ChromeAlpha::ClampTextOpacity(999));
     EXPECT_EQ(cfg.IconLabelOpacity, ChromeAlpha::ClampTextOpacity(-5));
 }
+
+TEST(Presets, CleanNameTrimsAndCuts)
+{
+    EXPECT_EQ(Presets::CleanName("  Night shift 	"), "Night shift");
+    EXPECT_EQ(Presets::CleanName("   "), "");
+    EXPECT_EQ(Presets::CleanName(std::string(60, 'a')).size(), Presets::MAX_NAME);
+    // Never cuts a UTF-8 character in half: 39 bytes, then a two-byte "ae" umlaut
+    const std::string cut = Presets::CleanName(std::string(39, 'a') + "Ã¤" + "b");
+    EXPECT_EQ(cut, std::string(39, 'a'));
+}
+
+TEST(Presets, SanitizeRepairsWhatACorralCannotShow)
+{
+    AppearanceSettings bad;
+    bad.ColorHex = "blue";
+    bad.HeaderFontColor = "#zzzzzz";
+    bad.IconTintColor = "";
+    bad.TitleBarHeight = 500;
+    bad.HeaderOpacity = -1;
+    bad.IconOpacity = -1;
+    bad.IconTintStrength = 999;
+    bad.IconSpacingXPercent = 1;
+    bad.IconSpacingYPercent = 999;
+    bad.HeaderFontSize = 0;
+    bad.HeaderFontName = "";
+    const AppearanceSettings l = Presets::Sanitize(bad);
+    const AppearanceSettings stock = Presets::Classic();
+
+    EXPECT_EQ(l.ColorHex, stock.ColorHex);
+    EXPECT_EQ(l.HeaderFontColor, stock.HeaderFontColor);
+    EXPECT_EQ(l.IconTintColor, stock.IconTintColor);
+    EXPECT_EQ(l.TitleBarHeight, 64);
+    EXPECT_EQ(l.HeaderOpacity, ChromeAlpha::ClampHeaderOpacity(-1));
+    EXPECT_EQ(l.IconOpacity, 5);
+    EXPECT_EQ(l.IconTintStrength, 255);
+    EXPECT_EQ(l.IconSpacingXPercent, 50);
+    EXPECT_EQ(l.IconSpacingYPercent, 200);
+    EXPECT_EQ(l.HeaderFontSize, 6);
+    EXPECT_EQ(l.HeaderFontName, stock.HeaderFontName);
+}
+
+TEST(Presets, SanitizeLeavesAGoodLookAlone)
+{
+    for (const auto &p : Presets::Shipped())
+    {
+        const AppearanceSettings l = Presets::Sanitize(p.look);
+        EXPECT_EQ(l.ColorHex, p.look.ColorHex);
+        EXPECT_EQ(l.TitleBarHeight, p.look.TitleBarHeight);
+        EXPECT_EQ(l.HeaderOpacity, p.look.HeaderOpacity);
+        EXPECT_EQ(l.IconOpacity, p.look.IconOpacity);
+        EXPECT_EQ(l.HeaderFontName, p.look.HeaderFontName);
+        EXPECT_EQ(l.UseAccentColor, p.look.UseAccentColor);
+    }
+}
+
+TEST(Presets, UpsertAddsReplacesAndRefuses)
+{
+    std::vector<LookPreset> own;
+    AppearanceSettings a = Presets::Classic();
+    EXPECT_EQ(Presets::Upsert(own, " Mine ", a), Presets::UpsertResult::Added);
+    ASSERT_EQ(own.size(), 1u);
+    EXPECT_EQ(own[0].Name, "Mine");
+
+    a.TitleBarHeight = 40;
+    EXPECT_EQ(Presets::Upsert(own, "Mine", a), Presets::UpsertResult::Replaced);
+    ASSERT_EQ(own.size(), 1u);
+    EXPECT_EQ(own[0].Look.TitleBarHeight, 40);
+
+    EXPECT_EQ(Presets::Upsert(own, "  ", a), Presets::UpsertResult::BadName);
+    while (own.size() < Presets::MAX_OWN)
+        own.push_back({"n" + std::to_string(own.size()), a});
+    EXPECT_EQ(Presets::Upsert(own, "one too many", a), Presets::UpsertResult::Full);
+    EXPECT_EQ(Presets::Upsert(own, "Mine", a), Presets::UpsertResult::Replaced); // Replacing needs no room
+    EXPECT_EQ(own.size(), Presets::MAX_OWN);
+}
+
+TEST(Presets, RemoveTakesOnlyTheNamedOne)
+{
+    std::vector<LookPreset> own = {{"A", Presets::Classic()}, {"B", Presets::Classic()}};
+    EXPECT_TRUE(Presets::Remove(own, "A"));
+    EXPECT_FALSE(Presets::Remove(own, "A"));
+    ASSERT_EQ(own.size(), 1u);
+    EXPECT_EQ(own[0].Name, "B");
+}
+
+TEST(Presets, ExportThenImportGivesTheSamePresets)
+{
+    AppearanceSettings look = Presets::Shipped()[3].look;
+    look.HeaderFontName = "Arial";
+    const std::vector<LookPreset> own = {{"Night", look}, {"Day", Presets::Classic()}};
+
+    std::vector<LookPreset> back;
+    ASSERT_TRUE(Presets::Import(Presets::Export(own), back));
+    ASSERT_EQ(back.size(), 2u);
+    EXPECT_EQ(back[0].Name, "Night");
+    EXPECT_EQ(back[0].Look.ColorHex, look.ColorHex);
+    EXPECT_EQ(back[0].Look.HeaderFontName, "Arial");
+    EXPECT_EQ(back[0].Look.BorderOpacity, look.BorderOpacity);
+    EXPECT_EQ(back[1].Name, "Day");
+}
+
+TEST(Presets, ImportRefusesWhatIsNotAPresetFile)
+{
+    std::vector<LookPreset> out;
+    EXPECT_FALSE(Presets::Import("", out));
+    EXPECT_FALSE(Presets::Import("not json at all {", out));
+    EXPECT_FALSE(Presets::Import("[1,2,3]", out));
+    EXPECT_FALSE(Presets::Import(R"({"Presets":[{"Name":"x"}]})", out)); // No marker: some other JSON
+    EXPECT_FALSE(Presets::Import(R"({"DexCorralPresets":1,"Presets":"none"})", out));
+    EXPECT_TRUE(out.empty());
+}
+
+TEST(Presets, ImportCleansEachPreset)
+{
+    std::vector<LookPreset> out;
+    ASSERT_TRUE(Presets::Import(
+        R"({"DexCorralPresets":1,"Presets":[
+              {"Name":"  Odd  ","Look":{"ColorHex":"nonsense","TitleBarHeight":900}},
+              {"Name":"","Look":{}},
+              {"Look":{}},
+              "not an object",
+              {"Name":"Plain"}]})",
+        out));
+    ASSERT_EQ(out.size(), 2u); // The nameless ones and the non-object are skipped
+    EXPECT_EQ(out[0].Name, "Odd");
+    EXPECT_EQ(out[0].Look.ColorHex, Presets::Classic().ColorHex);
+    EXPECT_EQ(out[0].Look.TitleBarHeight, 64);
+    EXPECT_EQ(out[1].Name, "Plain");
+}
+
+TEST(Presets, MergeReplacesSameNamesAndStopsWhenFull)
+{
+    AppearanceSettings changed = Presets::Classic();
+    changed.TitleBarHeight = 50;
+    std::vector<LookPreset> own = {{"A", Presets::Classic()}};
+    EXPECT_EQ(Presets::Merge(own, {{"A", changed}, {"B", changed}}), 2);
+    ASSERT_EQ(own.size(), 2u);
+    EXPECT_EQ(own[0].Look.TitleBarHeight, 50);
+
+    std::vector<LookPreset> many;
+    for (size_t i = 0; i < Presets::MAX_OWN + 5; i++)
+        many.push_back({"m" + std::to_string(i), changed});
+    EXPECT_EQ(Presets::Merge(own, many), (int)(Presets::MAX_OWN - 2));
+    EXPECT_EQ(own.size(), Presets::MAX_OWN);
+}

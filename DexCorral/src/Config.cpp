@@ -19,6 +19,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "Config.h"
+#include "Presets.h"
 #include <Windows.h>
 #include <ShlObj.h>
 #include <fstream>
@@ -147,6 +148,11 @@ void Config::Normalize(AppConfig &config)
             tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity);
         }
     }
+
+    // Own presets get the same cleaning as an imported file
+    std::vector<LookPreset> presets;
+    presets.swap(config.Presets);
+    Presets::Merge(config.Presets, presets);
 }
 
 namespace

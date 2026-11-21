@@ -126,6 +126,45 @@ struct CorralWindowConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralWindowConfig, Left, Top, Width, Height, IsRolledUp, ExcludeFromQuickHide, IsLocked, ExpandOnHover, Tabs, ActiveTabIndex, Layouts, TargetMonitorId, MonitorPositions, TitleBarHeight, HeaderOpacity, BorderOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
 };
 
+/**
+ * A corral's complete appearance, as the Appearance dialog understands it.
+ *
+ * Flattens the split between per-corral settings (CorralWindowConfig) and the
+ * per-tab font settings (CorralTabConfig) into the one thing the user is
+ * actually editing, so applying a look elsewhere is a single value to pass
+ * around rather than a dozen loose parameters in a fixed order.
+ */
+struct AppearanceSettings
+{
+    std::string ColorHex;            /// Tab background (ARGB hex) — per tab, applied to every tab
+    bool UseAccentColor = false;     /// Travels with the colour (AppearanceApplyFlags::Color)
+    int TitleBarHeight = 32;
+    int HeaderOpacity = 240;
+    int BorderOpacity = 255;
+    std::string HeaderFontName = "Segoe UI";
+    int HeaderFontSize = 10;
+    std::string HeaderFontColor = "#FFFFFF";
+    int HeaderFontOpacity = 255;
+    int IconOpacity = 255;
+    int IconLabelOpacity = 255;
+    std::string IconTintColor = "#000000";
+    int IconTintStrength = 0;
+    int IconSpacingXPercent = 100;
+    int IconSpacingYPercent = 100;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppearanceSettings, ColorHex, UseAccentColor, TitleBarHeight, HeaderOpacity, BorderOpacity, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity, IconOpacity, IconLabelOpacity, IconTintColor, IconTintStrength, IconSpacingXPercent, IconSpacingYPercent)
+};
+
+/// A look the user saved under a name (see Presets.h)
+struct LookPreset
+{
+    std::string Name;
+    AppearanceSettings Look;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LookPreset, Name, Look)
+};
+
+
 struct AppConfig
 {
     std::vector<CorralWindowConfig> Corrals;
@@ -167,34 +206,11 @@ struct AppConfig
     // Paused from the tray menu: every corral hidden and every desktop icon
     // shown, until resumed there. Kept across restarts of Explorer.
     bool Paused = false;
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
-};
 
-/**
- * A corral's complete appearance, as the Appearance dialog understands it.
- *
- * Flattens the split between per-corral settings (CorralWindowConfig) and the
- * per-tab font settings (CorralTabConfig) into the one thing the user is
- * actually editing, so applying a look elsewhere is a single value to pass
- * around rather than a dozen loose parameters in a fixed order.
- */
-struct AppearanceSettings
-{
-    std::string ColorHex;            /// Tab background (ARGB hex) — per tab, applied to every tab
-    bool UseAccentColor = false;     /// Travels with the colour (AppearanceApplyFlags::Color)
-    int TitleBarHeight = 32;
-    int HeaderOpacity = 240;
-    int BorderOpacity = 255;
-    std::string HeaderFontName = "Segoe UI";
-    int HeaderFontSize = 10;
-    std::string HeaderFontColor = "#FFFFFF";
-    int HeaderFontOpacity = 255;
-    int IconOpacity = 255;
-    int IconLabelOpacity = 255;
-    std::string IconTintColor = "#000000";
-    int IconTintStrength = 0;
-    int IconSpacingXPercent = 100;
-    int IconSpacingYPercent = 100;
+    // Looks the user saved in the Appearance dialog. Cleaned on load
+    // (Config::Normalize) and on import, see Presets.h.
+    std::vector<LookPreset> Presets;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AppConfig, Presets, Corrals, DesktopIconsVisible, DefaultColorHex, DefaultUseAccentColor, DefaultTitleBarHeight, DefaultHeaderFontName, DefaultHeaderFontSize, DefaultHeaderFontColor, DefaultHeaderFontOpacity, DefaultHeaderOpacity, DefaultBorderOpacity, DefaultIconOpacity, DefaultIconLabelOpacity, DefaultIconTintColor, DefaultIconTintStrength, DefaultIconSpacingXPercent, DefaultIconSpacingYPercent, DebugLogging, CheckForUpdates, LastUpdateCheckEpoch, Language, QuickHideHotkey, Paused)
 };
 
 /**

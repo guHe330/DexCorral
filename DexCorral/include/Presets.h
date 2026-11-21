@@ -28,6 +28,9 @@
 #include "ChromeAlpha.h"
 #include "Config.h"
 #include "Strings.h"
+#include <algorithm>
+#include <cctype>
+#include <string>
 #include <vector>
 
 namespace Presets
@@ -128,5 +131,158 @@ inline void ApplyLook(CorralWindowConfig &cfg, const AppearanceSettings &look)
         tab.HeaderFontColor = look.HeaderFontColor;
         tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(look.HeaderFontOpacity);
     }
+}
+
+// ---- Own presets: looks the user saved under a name ----
+
+constexpr size_t MAX_NAME = 40; // Bytes of UTF-8
+constexpr size_t MAX_OWN = 50;
+
+/// A name as it is stored: no blanks around it, at most MAX_NAME bytes and
+/// never half a UTF-8 character. Empty means "not a name".
+inline std::string CleanName(std::string name)
+{
+    auto blank = [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+    while (!name.empty() && blank((unsigned char)name.back()))
+        name.pop_back();
+    size_t first = 0;
+    while (first < name.size() && blank((unsigned char)name[first]))
+        first++;
+    name.erase(0, first);
+    if (name.size() > MAX_NAME)
+    {
+        size_t cut = MAX_NAME;
+        while (cut > 0 && ((unsigned char)name[cut] & 0xC0) == 0x80) // Not in the middle of a character
+            cut--;
+        name.resize(cut);
+    }
+    return name;
+}
+
+/// A look from outside (an imported file, a hand-edited config) with every
+/// value brought into the range the Appearance dialog offers. A colour that
+/// is not a colour becomes the stock one.
+inline AppearanceSettings Sanitize(AppearanceSettings look)
+{
+    const AppearanceSettings stock = Classic();
+    auto isHex = [](const std::string &s, size_t digits)
+    {
+        if (s.size() != digits + 1 || s[0] != '#')
+            return false;
+        return std::all_of(s.begin() + 1, s.end(), [](unsigned char c) { return isxdigit(c) != 0; });
+    };
+    auto clamp = [](int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); };
+
+    if (!isHex(look.ColorHex, 8))
+        look.ColorHex = stock.ColorHex;
+    if (!isHex(look.HeaderFontColor, 6))
+        look.HeaderFontColor = stock.HeaderFontColor;
+    if (!isHex(look.IconTintColor, 6))
+        look.IconTintColor = stock.IconTintColor;
+    if (look.HeaderFontName.empty() || look.HeaderFontName.size() > 31) // LF_FACESIZE - 1
+        look.HeaderFontName = stock.HeaderFontName;
+    look.HeaderFontSize = clamp(look.HeaderFontSize, 6, 72);
+    look.TitleBarHeight = clamp(look.TitleBarHeight, 20, 64);
+    look.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(look.HeaderOpacity);
+    look.BorderOpacity = ChromeAlpha::ClampBorderOpacity(look.BorderOpacity);
+    look.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(look.HeaderFontOpacity);
+    look.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(look.IconLabelOpacity);
+    look.IconOpacity = clamp(look.IconOpacity, 5, 255);
+    look.IconTintStrength = clamp(look.IconTintStrength, 0, 255);
+    look.IconSpacingXPercent = clamp(look.IconSpacingXPercent, 50, 200);
+    look.IconSpacingYPercent = clamp(look.IconSpacingYPercent, 50, 200);
+    return look;
+}
+
+enum class UpsertResult
+{
+    Added,
+    Replaced,
+    Full,   // MAX_OWN presets exist and this would be one more
+    BadName // Nothing left of the name after CleanName
+};
+
+/// Saves `look` under `name`: replaces the preset of that name, else adds one
+inline UpsertResult Upsert(std::vector<LookPreset> &own, const std::string &name, const AppearanceSettings &look)
+{
+    const std::string clean = CleanName(name);
+    if (clean.empty())
+        return UpsertResult::BadName;
+    for (auto &preset : own)
+    {
+        if (preset.Name == clean)
+        {
+            preset.Look = Sanitize(look);
+            return UpsertResult::Replaced;
+        }
+    }
+    if (own.size() >= MAX_OWN)
+        return UpsertResult::Full;
+    own.push_back({clean, Sanitize(look)});
+    return UpsertResult::Added;
+}
+
+inline bool Remove(std::vector<LookPreset> &own, const std::string &name)
+{
+    auto it = std::find_if(own.begin(), own.end(), [&](const LookPreset &p) { return p.Name == name; });
+    if (it == own.end())
+        return false;
+    own.erase(it);
+    return true;
+}
+
+/// Takes every preset of `from` into `own` through Upsert. Returns how many were taken.
+inline int Merge(std::vector<LookPreset> &own, const std::vector<LookPreset> &from)
+{
+    int taken = 0;
+    for (const auto &preset : from)
+    {
+        const UpsertResult r = Upsert(own, preset.Name, preset.Look);
+        if (r == UpsertResult::Added || r == UpsertResult::Replaced)
+            taken++;
+    }
+    return taken;
+}
+
+/// The text of an export file
+inline std::string Export(const std::vector<LookPreset> &own)
+{
+    nlohmann::json file;
+    file["DexCorralPresets"] = 1;
+    file["Presets"] = own;
+    return file.dump(2);
+}
+
+/// Reads the text of an export file into `out` (cleaned, nameless entries
+/// skipped). False, and `out` untouched, if the text is not such a file.
+inline bool Import(const std::string &text, std::vector<LookPreset> &out)
+{
+    const nlohmann::json file = nlohmann::json::parse(text, nullptr, false);
+    if (!file.is_object() || !file.contains("DexCorralPresets") || !file.contains("Presets") ||
+        !file["Presets"].is_array())
+        return false;
+
+    std::vector<LookPreset> read;
+    for (const auto &entry : file["Presets"])
+    {
+        if (!entry.is_object())
+            continue;
+        LookPreset preset;
+        try
+        {
+            preset = entry.get<LookPreset>();
+        }
+        catch (const nlohmann::json::exception &)
+        {
+            continue; // A value of the wrong type: this entry is not a preset
+        }
+        preset.Name = CleanName(preset.Name);
+        if (preset.Name.empty())
+            continue;
+        preset.Look = Sanitize(preset.Look);
+        read.push_back(std::move(preset));
+    }
+    out = std::move(read);
+    return true;
 }
 } // namespace Presets
