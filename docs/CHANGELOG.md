@@ -11,6 +11,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - **Undo Last Move** in the right-click menu of every Corral takes back a move or resize: the Corral returns to where it was, and so do the desktop icons it pushed out of the way. An icon you have moved by hand since stays where you put it. It goes back up to ten steps and forgets them at sign-out. ([#154](https://github.com/guHe330/DexCorral/issues/154))
 
 ### Changed
+- A new look for the dialogs and menus: light or dark like Windows (or as chosen under **Windows and menus** in the settings window), rounded buttons, check boxes and sliders in the accent colour, roomier menus. The Appearance dialog is split into three pages (Background, Header, Icons) and is a good third shorter. With a high-contrast theme Windows draws everything as before. ([#168](https://github.com/guHe330/DexCorral/issues/168))
 - A Corral on a network folder shows "Connecting..." while the first check of its share is still running, instead of looking like an empty folder. ([#162](https://github.com/guHe330/DexCorral/issues/162))
 
 ## [1.3.0] - 2026-11-18

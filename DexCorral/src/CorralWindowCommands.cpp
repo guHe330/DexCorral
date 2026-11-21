@@ -28,6 +28,7 @@
  */
 
 #include "CorralWindow.h"
+#include "ModernMenu.h"
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
@@ -231,7 +232,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
     ClientToScreen(hwnd, &pt);
 
     ActivateInPlace(true); // Foreground, so the menu closes on a click elsewhere
-    int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
+    int cmd = ModernMenu::Track(menu, TPM_RIGHTBUTTON, pt.x, pt.y, hwnd);
     PostMessageW(hwnd, WM_NULL, 0, 0);
     PinToBandTop();
 
