@@ -160,3 +160,6 @@ constexpr double ICON_CONTENT_THRESHOLD = 0.7;
 /// OneDrive uses 0x9000xxxx tags for cloud-synced or syncing files.
 /// Used to detect cloud status badges on icon file paths.
 constexpr DWORD ONEDRIVE_CLOUD_TAG_MASK = 0x90000000;
+
+/// How many moves and resizes of Corrals "Undo Last Move" can go back
+constexpr size_t MOVE_UNDO_DEPTH = 10;

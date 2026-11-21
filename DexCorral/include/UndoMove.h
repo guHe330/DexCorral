@@ -27,6 +27,7 @@
 #pragma once
 #include "DesktopIcons.h"
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace UndoMove
@@ -73,5 +74,15 @@ inline std::vector<IconPositionRequest> IconsToRestore(const std::vector<Desktop
             result.push_back({was.displayName, was.parsingName, was.pt});
     }
     return result;
+}
+
+/// Puts `record` on top of `stack` (newest last) and drops the oldest
+/// records beyond `depth`.
+template <typename T>
+void PushCapped(std::vector<T> &stack, T record, size_t depth)
+{
+    stack.push_back(std::move(record));
+    if (stack.size() > depth)
+        stack.erase(stack.begin(), stack.end() - depth);
 }
 } // namespace UndoMove

@@ -291,6 +291,11 @@ void CorralWindow::StartResize(int hitTest, int x, int y)
     resizeMode = hitTest;
     GetCursorPos(&resizeStart);
     GetWindowRect(hwnd, &resizeStartRect);
+    if (App::GetInstance())
+    {
+        App::GetInstance()->CacheDesktopIconPositions();
+        App::GetInstance()->BeginMoveUndo(this);
+    }
     SetCapture(hwnd);
     StartCursorTracking();
 }
@@ -373,6 +378,7 @@ void CorralWindow::EndResize()
             // Push desktop icons that may now be under the resized corral
             App::GetInstance()->CacheDesktopIconPositions();
             App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->CommitMoveUndo(this, dragMoved);
             App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
@@ -1012,6 +1018,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
             if (App::GetInstance())
             {
                 App::GetInstance()->CacheDesktopIconPositions();
+                App::GetInstance()->BeginMoveUndo(this);
             }
             SetCapture(hwnd);
             StartCursorTracking();
@@ -1088,6 +1095,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
         if (App::GetInstance())
         {
             App::GetInstance()->CacheDesktopIconPositions();
+            App::GetInstance()->BeginMoveUndo(this);
         }
         SetCapture(hwnd);
         StartCursorTracking();
@@ -1202,6 +1210,7 @@ void CorralWindow::EndCapturedOperationWithoutDrop()
         {
             App::GetInstance()->CacheDesktopIconPositions();
             App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->CommitMoveUndo(this, dragMoved);
             App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
@@ -1307,6 +1316,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
             // once more, matching what EndResize() does.
             App::GetInstance()->CacheDesktopIconPositions();
             App::GetInstance()->PushDesktopIconsFromCorrals();
+            App::GetInstance()->CommitMoveUndo(this, dragMoved);
             App::GetInstance()->InvalidateDesktopIconCache();
             App::GetInstance()->SaveConfig();
         }
