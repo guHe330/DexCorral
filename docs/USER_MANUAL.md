@@ -130,13 +130,19 @@ Right-click a Corral's title bar or background:
 - **Close Tab / Delete Corral**: remove the current tab, or the whole Corral if it's the last tab. Contained icons return to the desktop.
 
 ### Appearance Dialog
-**Appearance...** gives live-preview control over:
+**Appearance...** changes the look of a Corral, with a live preview on the Corral while you work. The settings are spread over three pages, chosen at the top:
 
-- **Background color**: the Corral fill. Tick **Windows accent color** to let the tab take the accent colour you chose in Windows instead; it then changes along with Windows, keeps the transparency you set, and its header text turns black or white for contrast. Untick it and the colour you had before is back.
-- **Opacity**: one slider each for the background fill, border, header, header label, icons and icon labels. The border's resize grip stays visible however far down you take it.
-- **Header**: title bar height, font face/size, and font color (font settings are per tab).
-- **Icons**: tint color and tint strength.
-- **Icon spacing**: horizontal and vertical spacing (50–200%).
+- **Background**: the colour and opacity of the Corral fill and the opacity of the border. Tick **Windows accent color** to let the tab take the accent colour you chose in Windows instead; it then changes along with Windows, keeps the transparency you set, and its header text turns black or white for contrast. Untick it and the colour you had before is back. The border's resize grip stays visible however far down you take its opacity.
+- **Header**: height and opacity of the title bar, and the font, colour and opacity of its text (the font settings are per tab).
+- **Icons**: opacity of the icons and of their labels, tint colour and tint strength, and the spacing across and down (50–200%).
+
+The row above the pages works with **presets**, complete looks under a name:
+
+- The list holds the looks DexCorral ships and, after them, your own. Choosing one loads it into the dialog and shows it on the Corral. **OK** then gives it to every tab of this Corral; **Cancel** brings back what was there.
+- **Save as...** stores what the dialog shows right now as a preset of your own. A name that already exists replaces that preset, after asking. You can keep up to 50.
+- **Delete** removes the own preset that is selected. The shipped looks cannot be deleted.
+
+Saving and deleting a preset take effect at once and are not undone by **Cancel**.
 
 Three checkboxes at the bottom decide where the style goes when you press OK:
 
@@ -224,7 +230,9 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 The settings window holds the options that apply to DexCorral as a whole. Changes take effect when you click **OK**. It also opens while DexCorral is paused.
 
 - **Language**: switch the interface between English and German, without a restart. The installer asks once at install time; this overrides that, and for the portable package it is the only place the language is set.
-- **Look**: a list of ready-made looks: **Automatic (Windows accent color)**, **Classic Blue** (the look DexCorral starts with), **Light Glass**, **Dark Glass**, **Graphite** and **Compact**. Choosing one shows it on an example Corral next to the settings window; the example cannot be clicked and disappears with the window. **OK** puts the look on every Corral and every tab and uses it for new Corrals; this replaces looks you tuned by hand in the Appearance dialog and cannot be undone. **Keep current look** and **Cancel** change nothing.
+- **Windows and menus**: whether DexCorral's dialogs and menus are light or dark. **Like Windows** follows the app mode set in Windows; **Light** and **Dark** override it.
+- **Look**: a list of ready-made looks: **Automatic (Windows accent color)**, **Classic Blue** (the look DexCorral starts with), **Light Glass**, **Dark Glass**, **Graphite** and **Compact**. Choosing one shows it on an example Corral next to the settings window; the example cannot be clicked and disappears with the window. **OK** puts the look on every Corral and every tab and uses it for new Corrals; this replaces looks you tuned by hand in the Appearance dialog and cannot be undone. **Keep current look** and **Cancel** change nothing. Presets you saved yourself in the Appearance dialog are in the list too.
+- **Export presets...** and **Import presets...**: write your own presets to a file and read such a file, to carry looks to another PC or to share them. Importing replaces an own preset of the same name and takes effect at once.
 - **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API once every 24 hours whether a newer version exists and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
 - **Quick-Hide hotkey**: see [Quick-Hide](#quick-hide).
 - **Write debug logs**: off by default. Switch it on before reproducing a problem you want to report. Logging starts at once; to capture DexCorral's start as well, leave it on and sign out and back in. A debug log that passes 2 MB is renamed to `<name>.log.old` and started again, so at most two files of that size exist per log.

@@ -87,6 +87,13 @@ enum class Str
     Msg_PresetReplace,           // {0} = name
     Msg_PresetDelete,            // {0} = name
     Msg_PresetsFull,             // {0} = the limit
+    Btn_ExportPresets,
+    Btn_ImportPresets,
+    Filter_Presets,              // file type name in the file dialogs
+    Msg_NoPresetsToExport,
+    Msg_PresetExportFailed,
+    Msg_NotAPresetFile,
+    Msg_PresetsImported,         // {0} = how many
 
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby
