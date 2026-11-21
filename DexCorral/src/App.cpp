@@ -50,6 +50,7 @@
 #include "DialogSkin.h"
 #include "Conflicts.h"
 #include <CommCtrl.h>
+#include <commdlg.h>
 #include <ShlObj.h>
 #include <shobjidl.h>
 #include <shellapi.h>
@@ -1884,12 +1885,14 @@ static const WORD IDC_SET_HOTKEY_HINT = 318;
 static const WORD IDC_SET_DEBUG_HINT = 319;
 
 // Where the footer band of the settings dialog begins (dialog units)
-static const int SETTINGS_FOOTER_TOP = 236;
+static const int SETTINGS_FOOTER_TOP = 258;
 static const WORD IDC_SET_THEME = 320;
+static const WORD IDC_SET_EXPORT = 321;
+static const WORD IDC_SET_IMPORT = 322;
 
 // Where the hot key control goes, in dialog units (it is created in
 // WM_INITDIALOG: its class has no ordinal a dialog template could name)
-static const RECT SETTINGS_HOTKEY_RECT = {12, 134, 132, 148};
+static const RECT SETTINGS_HOTKEY_RECT = {12, 156, 132, 170};
 
 /// What the settings dialog shows, and on IDOK what the user chose
 struct SettingsDialogData
@@ -1901,10 +1904,133 @@ struct SettingsDialogData
     unsigned hotkeyBaseline = 0; /// The word the control reported before the user touched it
     bool hotkeyChanged = false;
     int theme = 0;                      /// 0 = like Windows, 1 = light, 2 = dark
-    int look = 0;                       /// 0 = keep the current look, else 1 + index into Presets::Shipped()
+    int look = 0;                       /// 0 = keep the current look, else an entry of the Look list (SettingsLookAt)
+    std::vector<LookPreset> *own = nullptr; /// The user's presets; import changes them at once
+    bool presetsChanged = false;        /// Presets were imported: the config is saved even after Cancel
     bool demoAllowed = false;           /// No demo Corral in standby: nothing of DexCorral is on the desktop then
     std::unique_ptr<CorralWindow> demo; /// Shows the chosen preset next to the dialog; gone when the dialog closes
 };
+
+/// The look behind an entry of the Look list: 1.. are the shipped presets,
+/// then the user's own. False for "keep the current look" and anything else.
+static bool SettingsLookAt(const SettingsDialogData *data, int entry, AppearanceSettings &look)
+{
+    const auto shipped = Presets::Shipped();
+    if (entry >= 1 && entry <= (int)shipped.size())
+    {
+        look = shipped[entry - 1].look;
+        return true;
+    }
+    const int own = entry - 1 - (int)shipped.size();
+    if (data->own && own >= 0 && own < (int)data->own->size())
+    {
+        look = (*data->own)[own].Look;
+        return true;
+    }
+    return false;
+}
+
+static void SettingsFillLooks(HWND hDlg, const SettingsDialogData *data)
+{
+    SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_RESETCONTENT, 0, 0);
+    SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(Str::Settings_LookKeep));
+    for (const auto &preset : Presets::Shipped())
+        SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(preset.name));
+    if (data->own)
+    {
+        for (const auto &preset : *data->own)
+            SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0,
+                                (LPARAM)CorralWindow::Utf8ToWide(preset.Name).c_str());
+    }
+    SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_SETCURSEL, 0, 0);
+}
+
+/// Asks for the preset file to write or read. Empty if the user gave up.
+static std::wstring AskPresetFile(HWND hDlg, bool save)
+{
+    // "name\0*.json\0\0", the name from the string catalog
+    std::wstring filter = Tr(Str::Filter_Presets);
+    filter += L" (*.json)";
+    filter.push_back(L'\0');
+    filter += L"*.json";
+    filter.push_back(L'\0');
+
+    wchar_t path[MAX_PATH] = L"DexCorral-presets.json";
+    OPENFILENAMEW ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hDlg;
+    ofn.lpstrFilter = filter.c_str();
+    ofn.lpstrFile = path;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrDefExt = L"json";
+    ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
+    if (!save)
+        path[0] = L'\0';
+    const BOOL ok = save ? GetSaveFileNameW(&ofn) : GetOpenFileNameW(&ofn);
+    return ok ? std::wstring(path) : std::wstring();
+}
+
+static void ExportPresets(HWND hDlg, const SettingsDialogData *data)
+{
+    if (!data->own || data->own->empty())
+    {
+        MessageBoxW(hDlg, Tr(Str::Msg_NoPresetsToExport), Tr(Str::Title_Settings), MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+    const std::wstring path = AskPresetFile(hDlg, true);
+    if (path.empty())
+        return;
+    const std::string text = Presets::Export(*data->own);
+    bool written = false;
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file != INVALID_HANDLE_VALUE)
+    {
+        DWORD done = 0;
+        written = WriteFile(file, text.data(), (DWORD)text.size(), &done, nullptr) && done == text.size();
+        CloseHandle(file);
+    }
+    if (!written)
+        MessageBoxW(hDlg, Tr(Str::Msg_PresetExportFailed), Tr(Str::Title_Settings), MB_OK | MB_ICONWARNING);
+}
+
+static void ImportPresets(HWND hDlg, SettingsDialogData *data)
+{
+    const std::wstring path = AskPresetFile(hDlg, false);
+    if (path.empty() || !data->own)
+        return;
+
+    // A preset file is a few kilobytes; whatever is larger is not one
+    std::string text;
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (file != INVALID_HANDLE_VALUE)
+    {
+        LARGE_INTEGER size = {};
+        if (GetFileSizeEx(file, &size) && size.QuadPart > 0 && size.QuadPart <= 1024 * 1024)
+        {
+            text.resize((size_t)size.QuadPart);
+            DWORD done = 0;
+            if (!ReadFile(file, &text[0], (DWORD)text.size(), &done, nullptr) || done != text.size())
+                text.clear();
+        }
+        CloseHandle(file);
+    }
+
+    std::vector<LookPreset> read;
+    if (!Presets::Import(text, read))
+    {
+        MessageBoxW(hDlg, Tr(Str::Msg_NotAPresetFile), Tr(Str::Title_Settings), MB_OK | MB_ICONWARNING);
+        return;
+    }
+    const int taken = Presets::Merge(*data->own, read);
+    if (taken > 0)
+    {
+        data->presetsChanged = true;
+        data->demo.reset();
+        SettingsFillLooks(hDlg, data); // Back to "keep the current look": the entries moved
+    }
+    MessageBoxW(hDlg, TrFmt(Str::Msg_PresetsImported, std::to_wstring(taken)).c_str(), Tr(Str::Title_Settings),
+                MB_OK | MB_ICONINFORMATION);
+}
 
 /// Where the demo Corral goes: beside the dialog, on whichever side has room
 static RECT LookDemoRect(HWND hDlg)
@@ -1925,14 +2051,13 @@ static RECT LookDemoRect(HWND hDlg)
 /// demo when the list says "keep the current look"
 static void UpdateLookDemo(HWND hDlg, SettingsDialogData *data)
 {
-    const auto presets = Presets::Shipped();
     const int sel = (int)SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_GETCURSEL, 0, 0);
-    if (!data->demoAllowed || sel < 1 || sel > (int)presets.size())
+    AppearanceSettings look;
+    if (!data->demoAllowed || !SettingsLookAt(data, sel, look))
     {
         data->demo.reset();
         return;
     }
-    const AppearanceSettings &look = presets[sel - 1].look;
     if (data->demo)
     {
         data->demo->ApplyLook(look);
@@ -1985,10 +2110,7 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
         for (Str entry : {Str::Theme_Windows, Str::Theme_Light, Str::Theme_Dark})
             SendDlgItemMessageW(hDlg, IDC_SET_THEME, CB_ADDSTRING, 0, (LPARAM)Tr(entry));
         SendDlgItemMessageW(hDlg, IDC_SET_THEME, CB_SETCURSEL, data->theme, 0);
-        SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(Str::Settings_LookKeep));
-        for (const auto &preset : Presets::Shipped())
-            SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_ADDSTRING, 0, (LPARAM)Tr(preset.name));
-        SendDlgItemMessageW(hDlg, IDC_SET_LOOK, CB_SETCURSEL, 0, 0);
+        SettingsFillLooks(hDlg, data);
         CheckDlgButton(hDlg, IDC_SET_UPDATES, data->checkUpdates ? BST_CHECKED : BST_UNCHECKED);
         CheckDlgButton(hDlg, IDC_SET_DEBUG, data->debugLogging ? BST_CHECKED : BST_UNCHECKED);
 
@@ -2039,6 +2161,12 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
             return TRUE;
         case IDC_SET_FOLDER:
             OpenConfigFolder();
+            return TRUE;
+        case IDC_SET_EXPORT:
+            ExportPresets(hDlg, data);
+            return TRUE;
+        case IDC_SET_IMPORT:
+            ImportPresets(hDlg, data);
             return TRUE;
         case IDOK:
         {
@@ -2100,6 +2228,7 @@ void App::ShowSettings()
     data.hotkeyWord = HotkeyToControlWord(current);
     data.demoAllowed = desktopActive;
     data.theme = DialogSkin::ThemeOverride(config.Theme) + 1;
+    data.own = &config.Presets;
 
     // Layout in dialog units, one option per block with its explanation below it
     const short DLG_W = 260, DLG_H = SETTINGS_FOOTER_TOP + 28, W = 236;
@@ -2109,7 +2238,7 @@ void App::ShowSettings()
     WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
-                               15, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 15 = the AddDlgItem calls below
+                               17, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 17 = the AddDlgItem calls below
 
     const short X = 12, FIELD_X = 96, BTN_Y = SETTINGS_FOOTER_TOP + 7;
     p = AddDlgItem(p, label, X, 16, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
@@ -2122,13 +2251,17 @@ void App::ShowSettings()
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 58, 152, 120,
                    IDC_SET_LOOK, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
     p = AddDlgItem(p, label, X, 76, W, 18, IDC_SET_LOOK_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
-    p = AddDlgItem(p, check, X, 102, W, 12, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
-    p = AddDlgItem(p, label, X, 122, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X, 98, 114, 14, IDC_SET_EXPORT, 0xFFFF,
+                   DLG_CLASS_BUTTON, Tr(Str::Btn_ExportPresets));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X + 120, 98, 116, 14, IDC_SET_IMPORT, 0xFFFF,
+                   DLG_CLASS_BUTTON, Tr(Str::Btn_ImportPresets));
+    p = AddDlgItem(p, check, X, 124, W, 12, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
+    p = AddDlgItem(p, label, X, 144, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
     // (the hot key control sits here, see SETTINGS_HOTKEY_RECT)
-    p = AddDlgItem(p, label, X, 153, W, 18, IDC_SET_HOTKEY_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
-    p = AddDlgItem(p, check, X, 179, W, 12, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
-    p = AddDlgItem(p, label, X, 193, W, 10, IDC_SET_DEBUG_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
-    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X, 211, 110, 14, IDC_SET_FOLDER, 0xFFFF,
+    p = AddDlgItem(p, label, X, 175, W, 18, IDC_SET_HOTKEY_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
+    p = AddDlgItem(p, check, X, 201, W, 12, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));
+    p = AddDlgItem(p, label, X, 215, W, 10, IDC_SET_DEBUG_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_DebugHint));
+    p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X, 233, 110, 14, IDC_SET_FOLDER, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Menu_OpenConfigFolder));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, DLG_W - 12 - 54 - 6 - 54, BTN_Y, 54, 14, IDOK,
                    0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
@@ -2140,14 +2273,18 @@ void App::ShowSettings()
     showing = false;
     data.demo.reset(); // Closed some other way than by its buttons
     if (result != IDOK)
+    {
+        if (data.presetsChanged)
+            SaveConfig(); // An import stays, whatever happens to the rest of the dialog
         return;
+    }
 
     config.Theme = data.theme == 1 ? "light" : data.theme == 2 ? "dark" : "";
     DialogSkin::forceTheme = DialogSkin::ThemeOverride(config.Theme); // For the next dialog or menu
 
-    const auto presets = Presets::Shipped();
-    if (data.look >= 1 && data.look <= (int)presets.size())
-        ApplyLookToAllCorrals(presets[data.look - 1].look);
+    AppearanceSettings chosenLook;
+    if (SettingsLookAt(&data, data.look, chosenLook))
+        ApplyLookToAllCorrals(chosenLook);
 
     const bool updatesSwitchedOn = data.checkUpdates && !config.CheckForUpdates;
     config.CheckForUpdates = data.checkUpdates;

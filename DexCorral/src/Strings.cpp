@@ -94,6 +94,14 @@ const wchar_t *const kEnglish[] = {
     /* Msg_PresetReplace */        L"A preset named \"{0}\" already exists. Replace it?",
     /* Msg_PresetDelete */         L"Delete the preset \"{0}\"?",
     /* Msg_PresetsFull */          L"There are already {0} presets of your own. Delete one first.",
+    /* Btn_ExportPresets */        L"Export presets...",
+    /* Btn_ImportPresets */        L"Import presets...",
+    /* Filter_Presets */           L"DexCorral presets",
+    /* Msg_NoPresetsToExport */    L"There are no presets of your own yet.\n\n"
+                                   L"Save one with \"Save as...\" in the Appearance dialog of a Corral.",
+    /* Msg_PresetExportFailed */   L"The file could not be written.",
+    /* Msg_NotAPresetFile */       L"This file does not contain DexCorral presets.",
+    /* Msg_PresetsImported */      L"Presets imported: {0}",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
@@ -382,6 +390,14 @@ const wchar_t *const kGerman[] = {
     /* Msg_PresetReplace */        L"Eine Vorlage namens \"{0}\" gibt es schon. Ersetzen?",
     /* Msg_PresetDelete */         L"Die Vorlage \"{0}\" löschen?",
     /* Msg_PresetsFull */          L"Es gibt schon {0} eigene Vorlagen. Bitte zuerst eine löschen.",
+    /* Btn_ExportPresets */        L"Vorlagen exportieren...",
+    /* Btn_ImportPresets */        L"Vorlagen importieren...",
+    /* Filter_Presets */           L"DexCorral-Vorlagen",
+    /* Msg_NoPresetsToExport */    L"Es gibt noch keine eigenen Vorlagen.\n\n"
+                                   L"Eine Vorlage speichert man mit \"Speichern...\" im Darstellungs-Dialog eines Corrals.",
+    /* Msg_PresetExportFailed */   L"Die Datei konnte nicht geschrieben werden.",
+    /* Msg_NotAPresetFile */       L"Diese Datei enthält keine DexCorral-Vorlagen.",
+    /* Msg_PresetsImported */      L"Importierte Vorlagen: {0}",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
