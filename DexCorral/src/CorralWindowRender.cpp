@@ -509,7 +509,7 @@ void CorralWindow::UpdateLayeredContent()
     }
 
     // ---- Virtual corral: nav "up" button, details column header, unavailable message ----
-    if (IsNavBackVisible() || GetDetailsHeaderHeight() > 0 || virtualFolderMissing)
+    if (IsNavBackVisible() || GetDetailsHeaderHeight() > 0 || virtualFolderMissing || virtualFolderConnecting)
     {
         HTHEME hHdrTheme = OpenThemeData(hwnd, L"TextStyle");
         auto drawHeaderText = [&](const wchar_t *text, int len, DWORD flags, RECT r, COLORREF color)
@@ -583,14 +583,15 @@ void CorralWindow::UpdateLayeredContent()
             }
         }
 
-        // "Folder unavailable" message when the linked root is gone
-        if (virtualFolderMissing && (!config.IsRolledUp || isHoverExpanded))
+        // "Folder unavailable" when the linked root is gone, "Connecting..."
+        // while a network share has not answered yet
+        if ((virtualFolderMissing || virtualFolderConnecting) && (!config.IsRolledUp || isHoverExpanded))
         {
             RECT mr = {Dpi(12), GetIconAreaTop() + Dpi(8), w - Dpi(12), h - Dpi(8)};
             if (mr.bottom > mr.top)
-                drawHeaderText(Tr(Str::Hdr_FolderUnavailable), -1,
+                drawHeaderText(Tr(virtualFolderMissing ? Str::Hdr_FolderUnavailable : Str::Hdr_FolderConnecting), -1,
                                DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOPREFIX,
-                               mr, RGB(255, 210, 210));
+                               mr, virtualFolderMissing ? RGB(255, 210, 210) : RGB(230, 230, 230));
         }
 
         if (hHdrTheme)

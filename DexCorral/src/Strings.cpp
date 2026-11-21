@@ -230,6 +230,7 @@ const wchar_t *const kEnglish[] = {
 
     // Corral header states
     /* Hdr_FolderUnavailable */    L"Folder unavailable\nRight-click to relink",
+    /* Hdr_FolderConnecting */     L"Connecting...",
 
     // File size units
     /* Unit_Bytes */               L" B",
@@ -500,6 +501,7 @@ const wchar_t *const kGerman[] = {
 
     // Corral header states
     /* Hdr_FolderUnavailable */    L"Ordner nicht verfügbar\nRechtsklick zum Neuverknüpfen",
+    /* Hdr_FolderConnecting */     L"Verbinde...",
 
     // File size units
     /* Unit_Bytes */               L" B",
