@@ -46,13 +46,6 @@ Because the Corrals are drawn by Explorer itself rather than by a window floatin
 
 Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 
-### Live appearance preview
-
-<img src="docs/assets/screenshots/appearance-live-preview.gif" alt="Live appearance configuration" width="250">
-
-- Appearance changes apply as you drag, with no dialog round-trip.
-- Settings can be applied to one Corral or to all of them.
-
 ### Dialogs and menus, light or dark
 
 <img src="docs/assets/screenshots/settings.png" alt="Settings window in light mode" width="270"> <img src="docs/assets/screenshots/appearance-icons-dark.png" alt="Appearance dialog in dark mode" width="255"> <img src="docs/assets/screenshots/menu-corral-dark.png" alt="Corral menu in dark mode" width="172">
