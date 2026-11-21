@@ -37,6 +37,7 @@
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
 #include "HookBridge.h"
+#include "Presets.h"
 #include "Strings.h"
 #include "../resources/resource.h"
 #include <windowsx.h>
@@ -85,9 +86,10 @@ std::wstring CorralWindow::Utf8ToWide(const std::string &utf8)
 // Construction / Destruction
 // ============================================================================
 
-CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
+CorralWindow::CorralWindow(const CorralWindowConfig &cfg, HWND demoOwner)
     : config(cfg), isDragging(false), hwnd(nullptr)
 {
+    isDemo = (demoOwner != nullptr);
 
     // Ensure at least one tab exists
     if (config.Tabs.empty())
@@ -145,17 +147,22 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg)
     HWND progman = FindWindowW(L"Progman", nullptr);
 
     hwnd = CreateWindowExW(
-        WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        // The demo must not take the activation from its settings window, and
+        // is looked at, never used: no mouse, no keyboard, no drops
+        WS_EX_TOOLWINDOW | WS_EX_LAYERED | (isDemo ? WS_EX_NOACTIVATE : 0),
         CORRAL_WINDOW_CLASS,
         wtitle.c_str(),
-        WS_POPUP | WS_VISIBLE,
+        WS_POPUP | (isDemo ? WS_DISABLED : WS_VISIBLE), // Show() shows the demo, without activating it
         (int)config.Left, (int)config.Top,
         (int)config.Width, initialHeight,
-        progman, nullptr, GetModuleHandleW(nullptr), this);
+        isDemo ? demoOwner : progman, nullptr, GetModuleHandleW(nullptr), this);
 
-    // Register OLE drop target (replaces WS_EX_ACCEPTFILES for richer drop support)
-    dropTarget = new CorralDropTarget(this);
-    RegisterDragDrop(hwnd, dropTarget);
+    if (!isDemo)
+    {
+        // Register OLE drop target (replaces WS_EX_ACCEPTFILES for richer drop support)
+        dropTarget = new CorralDropTarget(this);
+        RegisterDragDrop(hwnd, dropTarget);
+    }
 
     // initialHeight above was computed before the window existed, so
     // GetTitleBarHeight() could not apply per-monitor DPI scaling (Dpi() returns
@@ -189,7 +196,8 @@ CorralWindow::~CorralWindow()
     ClearIcons();
     if (hwnd)
     {
-        RevokeDragDrop(hwnd);
+        if (dropTarget)
+            RevokeDragDrop(hwnd);
         DestroyWindow(hwnd);
     }
     if (dropTarget)
@@ -310,7 +318,7 @@ std::wstring CorralWindow::GetPublicDesktopPath()
 
 void CorralWindow::PinToBandTop()
 {
-    if (!hwnd)
+    if (!hwnd || isDemo) // The demo stays above its settings window
         return;
 
     if (App *app = App::GetInstance())
@@ -333,7 +341,7 @@ void CorralWindow::ActivateInPlace(bool foreground)
 void CorralWindow::Show()
 {
     // Paused by the user: corrals exist but stay hidden until App::SetPaused(false)
-    if (App *app = App::GetInstance(); app && app->IsPaused())
+    if (App *app = App::GetInstance(); app && app->IsPaused() && !isDemo)
         return;
 
     if (hwnd)
@@ -361,6 +369,19 @@ void CorralWindow::Show()
             LoadFiles(); // This calls UpdateLayeredContent
         }
     }
+}
+
+void CorralWindow::ApplyLook(const AppearanceSettings &look)
+{
+    Presets::ApplyLook(config, look);
+    // What is drawn right now follows the hover fade; start it from the new look
+    SetCurrentHeaderOpacity(config.HeaderOpacity);
+    SetCurrentBorderOpacity(config.BorderOpacity);
+    SetCurrentOpacity(config.IconOpacity);
+    SetCurrentTintStrength(config.IconTintStrength);
+    if (!isHoverExpanded && !isAnimating)
+        FitRolledUpHeight(); // The header height may have changed
+    RecalculateLayout();
 }
 
 void CorralWindow::Hide()

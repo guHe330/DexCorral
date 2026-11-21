@@ -136,8 +136,12 @@ struct CorralIcon
 class CorralWindow
 {
 public:
-    /// Constructor initializing corral with config
-    CorralWindow(const CorralWindowConfig &config);
+    /// Constructor initializing corral with config.
+    /// demoOwner: makes this a demo Corral for the settings window. It is
+    /// owned by that window instead of the desktop, takes no input and no
+    /// drops, and stays out of the Corral band. The caller keeps it out of
+    /// App's list of Corrals, so it is never saved.
+    CorralWindow(const CorralWindowConfig &config, HWND demoOwner = nullptr);
     ~CorralWindow();
 
     /// Shows the corral window (and syncs visibility to config)
@@ -145,6 +149,9 @@ public:
 
     /// Hides the corral window
     void Hide();
+
+    /// Puts a whole look on this Corral and all its tabs, and redraws it
+    void ApplyLook(const AppearanceSettings &look);
 
     /**
      * Re-pins the corral band below all ordinary windows, with this corral on
@@ -672,6 +679,7 @@ private:
     std::unique_ptr<FolderWatcher> parentWatcher; // Watches parent dir to catch rename/delete of current folder
     bool reuseUnchangedIcons = false;             // Set for a reload after a folder change only
     bool virtualFolderMissing = false;            // Root folder unavailable (deleted/renamed/moved)
+    bool isDemo = false;                          // Demo Corral of the settings window (see constructor)
     bool virtualFolderConnecting = false;         // Network root: first answer about its share still outstanding
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
     static const UINT WM_DEFERRED_LOAD = WM_USER + 101;

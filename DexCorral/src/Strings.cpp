@@ -70,6 +70,10 @@ const wchar_t *const kEnglish[] = {
     /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
     /* Settings_DebugLogging */    L"Write debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
+    /* Settings_Look */            L"Look",
+    /* Settings_LookKeep */        L"Keep current look",
+    /* Settings_LookHint */        L"A preset is shown on an example Corral. "
+                                   L"OK applies it to all Corrals and to new ones.",
 
     // Look presets
     /* Preset_Automatic */         L"Automatic (Windows accent color)",
@@ -78,6 +82,7 @@ const wchar_t *const kEnglish[] = {
     /* Preset_DarkGlass */         L"Dark Glass",
     /* Preset_Graphite */          L"Graphite",
     /* Preset_Compact */           L"Compact",
+    /* Preset_DemoTitle */         L"Example",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
@@ -342,6 +347,10 @@ const wchar_t *const kGerman[] = {
                                    L"eine Ziffer oder eine Funktionstaste.",
     /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
     /* Settings_DebugHint */       L"Für Fehlerberichte. Die Protokolle liegen im Konfigurationsordner.",
+    /* Settings_Look */            L"Aussehen",
+    /* Settings_LookKeep */        L"Aktuelles Aussehen behalten",
+    /* Settings_LookHint */        L"Eine Vorlage wird an einem Beispiel-Corral gezeigt. "
+                                   L"OK wendet sie auf alle Corrals und auf neue an.",
 
     // Look presets
     /* Preset_Automatic */         L"Automatisch (Windows-Akzentfarbe)",
@@ -350,6 +359,7 @@ const wchar_t *const kGerman[] = {
     /* Preset_DarkGlass */         L"Glas dunkel",
     /* Preset_Graphite */          L"Graphit",
     /* Preset_Compact */           L"Kompakt",
+    /* Preset_DemoTitle */         L"Beispiel",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
