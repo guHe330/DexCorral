@@ -19,6 +19,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "IconUtils.h"
 #include "UpdateChecker.h"
 #include "Version.h"
 #include "UpdateLogic.h"
@@ -50,15 +51,7 @@ namespace
 
     const size_t kMaxBodyBytes = 1024 * 1024;
 
-    std::wstring Utf8ToWide(const std::string &s)
-    {
-        if (s.empty())
-            return std::wstring();
-        int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
-        std::wstring w(len, L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &w[0], len);
-        return w;
-    }
+    using IconUtils::Utf8ToWide;
 
     /// Performs the blocking HTTPS GET and fills the result. Returns true on a
     /// successful request + parse (UpdateAvailable is set independently).

@@ -86,8 +86,6 @@ public:
      */
     void ToggleQuickHide();
 
-    /// False in standby: no corrals, no hidden icons, the layout in config.json left alone
-    bool IsDesktopActive() const { return desktopActive; }
 
     /// Leaves standby on the user's request (tray menu): installs the hook and brings the corrals back
     void ResumeFromStandby();
@@ -120,8 +118,6 @@ public:
     /// ColorHex is handled separately by SetDefaultColorHex and is ignored here.
     void SetDefaultAppearance(const AppearanceSettings &settings);
 
-    /// Applies the specified background color to all existing corrals
-    void ApplyColorToAllCorrals(const std::string &colorHex);
 
     /**
      * Applies appearance settings to all existing corrals.

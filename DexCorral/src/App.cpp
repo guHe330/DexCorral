@@ -901,18 +901,6 @@ void App::SetDefaultAppearance(const AppearanceSettings &settings)
     config.DefaultIconSpacingYPercent = settings.IconSpacingYPercent;
 }
 
-void App::ApplyColorToAllCorrals(const std::string &colorHex)
-{
-    for (auto &corral : corrals)
-    {
-        for (auto &tab : corral->GetConfig().Tabs)
-        {
-            tab.ColorHex = colorHex;
-        }
-        corral->RecalculateLayout();
-    }
-}
-
 void App::ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
                                       const AppearanceApplyFlags &apply)
 {
@@ -1180,12 +1168,7 @@ std::vector<HiddenIconInfo> App::CollectCorralIconIdentities() const
                     continue;
                 }
 
-                // Convert UTF-8 filename to wide
-                int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
-                std::wstring wName(size, 0);
-                MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
-
-                info.parsingName = ResolveDesktopFilePath(wName);
+                info.parsingName = ResolveDesktopFilePath(IconUtils::Utf8ToWide(fileUtf8));
 
                 // Shell display name matches the desktop ListView's item text
                 // (respects "Hide extensions for known file types")
@@ -1339,10 +1322,7 @@ void App::PositionHiddenIconsUnderCorrals()
                 }
                 else
                 {
-                    int size = MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), nullptr, 0);
-                    std::wstring wName(size, 0);
-                    MultiByteToWideChar(CP_UTF8, 0, fileUtf8.c_str(), (int)fileUtf8.size(), &wName[0], size);
-                    req.parsingName = ResolveDesktopFilePath(wName);
+                    req.parsingName = ResolveDesktopFilePath(IconUtils::Utf8ToWide(fileUtf8));
                     req.displayName = DesktopIcons::GetShellDisplayName(req.parsingName);
                 }
                 if (!req.displayName.empty() || !req.parsingName.empty())

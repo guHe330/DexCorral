@@ -64,11 +64,6 @@ bool CorralWindow::NeedsScrollbar() const
     return contentHeight > GetVisibleHeight();
 }
 
-int CorralWindow::GetContentHeight() const
-{
-    return contentHeight;
-}
-
 int CorralWindow::GetVisibleHeight() const
 {
     RECT rect;
