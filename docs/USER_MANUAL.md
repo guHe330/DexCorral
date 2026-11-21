@@ -18,14 +18,12 @@ DexCorral loads automatically at every login. Its shell extension is loaded by E
 
 ### Install for all users, or just me
 
-Setup's first page asks which one you want. Both give you the same DexCorral; they differ in who gets it and what it takes to install.
+Setup's first page asks which one you want. Both give you the same DexCorral.
 
-- **Install for all users**: goes to `C:\Program Files\DexCorral` and registers in `HKLM`. Needs Administrator rights, so Windows shows a UAC prompt. Every account on the PC gets DexCorral, and an administrator updates it once for everybody. Choose this on a shared or family PC.
-- **Install for me only**: goes to `%LOCALAPPDATA%\Programs\DexCorral` and registers in `HKCU`. No Administrator rights and no UAC prompt, which makes it the option on a work PC where you do not have admin. Only your account gets DexCorral, and you update your own copy. Other users on the PC are unaffected.
+- **Install for all users**: goes to `C:\Program Files\DexCorral` and needs Administrator rights, so Windows shows a UAC prompt. Every account on the PC gets DexCorral. Choose this on a shared or family PC, and if you are not sure.
+- **Install for me only**: goes to `%LOCALAPPDATA%\Programs\DexCorral` and needs no Administrator rights, which makes it the option on a work PC where you do not have admin. Only your account gets DexCorral.
 
-The two cannot be installed side by side. They register the same shell extension, and a per-user install would quietly take precedence over a machine-wide one for your account, leaving you on a different version than everyone else with nothing on screen to say so. Setup checks for the other kind before it writes anything: installing just for yourself over an existing all-users install offers to remove that one first, and installing for all users warns you about any per-user installs it can see (only the owner of one can remove it).
-
-If you are not sure, pick **all users**. It has one extra load path into Explorer, so it recovers on its own if Explorer crashes mid-session, where a per-user install waits until your next login or your next right-click on the desktop.
+The two cannot be installed side by side. Setup checks for the other kind before it writes anything and offers to resolve it. The reasons, and how the two differ inside, are in the [Technical Notes](TECHNICAL_NOTES.md#install-modes).
 
 ### Portable package
 
@@ -43,15 +41,11 @@ Run `DexCorral.exe` with no arguments for the full list of options.
 
 Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group's **Uninstall DexCorral** entry. The uninstaller asks whether to **keep your configuration** (corral layouts and appearance settings). Choose *Yes* if you plan to reinstall later. It then unregisters the shell extension and restarts Explorer to fully unload.
 
-The uninstaller removes only what its own install mode created. Uninstalling a per-user install never touches an all-users install, and uninstalling an all-users install removes the shared registration and files but leaves every account's own settings in `%APPDATA%\DexCorral` alone, including yours if you said *Yes* above.
+The uninstaller removes only what its own install mode created, including every registry entry ([the full list](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder)). Other accounts' settings in their `%APPDATA%\DexCorral` are left alone.
 
 After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
 
-The uninstaller removes every registry entry DexCorral created. See [What DexCorral writes outside its own folder](#what-dexcorral-writes-outside-its-own-folder) for the full list.
-
-Removed the portable package by deleting its folder? That leaves the same entries behind. Run `DexCorral.exe --unregister` first, with the same `--scope` you registered with (as Administrator for `--scope=machine`); to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
-
-Upgrading from 1.0.27 or earlier? Those versions registered without any notion of scope. The installer clears the old entries for you; for a portable install, run `DexCorral.exe --cleanup-legacy` once as Administrator.
+Portable package: before you delete its folder, run `DexCorral.exe --unregister` with the same `--scope` you registered with (as Administrator for `--scope=machine`). More on leftovers in the [Technical Notes](TECHNICAL_NOTES.md#removing-a-portable-package).
 
 ## Core Concepts
 
@@ -214,7 +208,11 @@ Double-click an empty spot on the desktop to hide everything at once: all native
 - Corrals can opt out: right-click a corral and check **Exclude from Quick-Hide** to keep it visible while everything else hides.
 - Double-clicking the **tray icon** does the same, and so does the tray menu's **Quick-Hide Everything** entry.
 - Quick-hide is temporary: restarting DexCorral always restores your normal desktop.
-- For a keyboard shortcut, open **Settings** in the tray menu, click the **Quick-Hide hotkey** field and press the keys, for example Ctrl+Alt+H. It applies as soon as you click OK; Backspace in the field removes it. There is none by default. The combination needs Ctrl or Alt (Shift can be added) plus one letter, digit or function key. Once active, the tray menu shows it on the **Quick-Hide Everything** line. If the combination is already taken by Windows or another program, DexCorral says so and runs without a hotkey. Ctrl+Alt is the same as AltGr, so avoid a letter you type with AltGr on your keyboard. A combination with the Win key cannot be entered in the field; set it as `QuickHideHotkey` in `config.json` instead, for example `"QuickHideHotkey": "Win+Alt+D"`, then sign out and back in. The settings window leaves such a hotkey alone unless you enter a new one.
+- For a keyboard shortcut, open **Settings** in the tray menu, click the **Quick-Hide hotkey** field and press the keys, for example Ctrl+Alt+H. Backspace in the field removes it. There is none by default.
+  - The combination needs Ctrl or Alt (Shift can be added) plus one letter, digit or function key. It applies as soon as you click OK.
+  - Ctrl+Alt is the same as AltGr, so avoid a letter you type with AltGr on your keyboard.
+  - If the combination is already taken by Windows or another program, DexCorral says so and runs without a hotkey.
+  - A combination with the Win key cannot be entered in the field; see the [Technical Notes](TECHNICAL_NOTES.md#a-quick-hide-hotkey-with-the-win-key).
 
 ## Tray Icon
 
@@ -260,11 +258,7 @@ Standby is also what DexCorral does when [Stardock Fences](#stardock-fences) is 
 
 To leave a crash-guard standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. Installing a different DexCorral version also ends it, since a new build deserves a fresh attempt.
 
-What counts as a crash: Explorer ending within a minute of DexCorral's start, without a clean shutdown. That includes Explorer being ended from Task Manager or a script, which is why a single one is only noted and forgotten again if nothing follows.
-
-Every decision the guard makes is written to `guard.log` in `%APPDATA%\DexCorral`, whether or not debug logging is on. If DexCorral paused itself and you do not know why, attach that file and `config.json` to a bug report.
-
-For scripts: `DexCorral.exe --reset-guard` clears the guard's memory, the same as **Resume**, effective at the next start.
+Every decision the guard makes is written to `guard.log` in `%APPDATA%\DexCorral`, whether or not debug logging is on. If DexCorral paused itself and you do not know why, attach that file and `config.json` to a bug report. What counts as a crash is described in the [Technical Notes](TECHNICAL_NOTES.md#the-crash-guard).
 
 ## Desktop Integration
 
@@ -291,48 +285,21 @@ Two more files can appear next to it:
 
 Deleting `config.json` still means "start over": the backup is not restored in that case.
 
-### What DexCorral writes outside its own folder
-
-Everything you configure lives in `config.json` above. The registry is used only where Windows requires it: to register the shell extension, to start at login, and for a few settings that must be readable before the config file is.
-
-Which hive these live in follows the install mode you chose. `<root>` below is `HKLM` for an all-users install and `HKCU` for a per-user one. Two keys are all-users only, because Windows reads them from `HKLM` and nowhere else.
-
-| Key | Value | Why | Removed by the uninstaller |
-|---|---|---|---|
-| `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
-| `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the **Language** choice in the settings window. | Yes |
-| `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
-| `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | Yes |
-| `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
-| `HKCU\Software\DexCorral` | `AutoArrange` | Whether **Auto arrange icons** is on for the desktop. DexCorral arranges the free icons itself and keeps Explorer's own setting off, so the choice has to be remembered here. | Yes |
-| `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
-| `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
-| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
-| `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Second startup load path. No overlay is ever drawn. All-users installs only. | Yes |
-
-The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes. They are the reason an all-users registration needs Administrator rights; a per-user registration writes only to `HKCU` and needs none. Nothing else on the system is touched.
-
-Early versions had a **Hide shortcut arrows** option, removed since. If you switched it on back then and want the arrows back, delete the value `29` under `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons` in `HKLM` or `HKCU`, whichever holds it, and restart Explorer.
-
-Versions up to 1.0.27 wrote the COM registration through `HKEY_CLASSES_ROOT` instead, with no per-user option. `DexCorral.exe --cleanup-legacy`, run once as Administrator, removes what those versions left behind; the installer does it for you.
+Outside that folder DexCorral writes only a few registry entries: to register the shell extension, to start at login, and for settings that must be readable before the config file is. The uninstaller removes them all. The [Technical Notes](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder) list every one.
 
 ## Stardock Fences
 
-DexCorral and Stardock Fences cannot share a desktop. Each one takes over the desktop icon view, and the two do not know about each other. Observed with Fences 6.5.4.1: while Fences is running, the icons DexCorral hides become visible again and are drawn twice.
+DexCorral and Stardock Fences cannot share a desktop. Each one takes over the desktop icon view, and the two do not know about each other: while Fences is running, the icons DexCorral hides become visible again and are drawn twice.
 
 So DexCorral declines to run next to it:
 
-- **Setup** stops with a message, before installing anything, if Stardock Fences is installed on the PC.
-- **`DexCorral.exe --register`** refuses for the same reason (exit code 3), which covers the portable package. `--check-conflicts` reports the same result without doing anything else.
-
+- **Setup** and `DexCorral.exe --register` stop with a message, before installing anything, if Stardock Fences is installed on the PC.
 - **A DexCorral that is already installed pauses itself.** If Stardock Fences is installed, or already loaded in Explorer, when DexCorral starts, DexCorral goes into [standby](#when-dexcorral-pauses-itself): no Corrals, all icons on the desktop, your layout saved and untouched. A dialog explains it the first time, a tray notification reminds you after that, and **Why is DexCorral paused?** in the tray menu shows the explanation again. There is no Resume for this: DexCorral starts normally at the first sign-in after Fences has been uninstalled.
 - **If Fences is started while DexCorral is running**, for instance right after you install it, DexCorral tells you once. It cannot step aside in a session that is already running, so until you sign out the doubled icons may appear. At the next sign-in it pauses as described above.
 
 This applies whenever Fences is installed, also if it is switched off: DexCorral cannot tell when it will be switched on again. There is no override.
 
-Which of the two you use is your choice. To use DexCorral, uninstall Stardock Fences first, then run Setup again. DexCorral never changes, stops or removes anything belonging to Fences.
-
-Fences is recognised by its entry in Windows' list of installed programs and by its desktop module being loaded in Explorer, checked against that file's own company and product description.
+Which of the two you use is your choice. To use DexCorral, uninstall Stardock Fences first, then run Setup again. DexCorral never changes, stops or removes anything belonging to Fences. How DexCorral recognises Fences is in the [Technical Notes](TECHNICAL_NOTES.md#how-stardock-fences-is-recognised).
 
 *Stardock and Fences are trademarks of Stardock. DexCorral is not affiliated with Stardock.*
 
