@@ -30,6 +30,7 @@
 
 #include "CorralWindow.h"
 #include "DialogTemplate.h"
+#include "DialogSkin.h"
 #include "App.h"
 #include "Constants.h"
 #include "Strings.h"
@@ -313,6 +314,9 @@ LRESULT CALLBACK CorralWindow::EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wPa
 // Rename dialog
 // ============================================================================
 
+// Where the footer band of the rename dialog begins (dialog units)
+static const int RENAME_FOOTER_TOP = 32;
+
 static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -326,6 +330,7 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         HWND hEdit = GetDlgItem(hDlg, 101);
         SendMessageW(hEdit, EM_SETSEL, 0, -1);
         SetFocus(hEdit);
+        DialogSkin::Attach(hDlg, RENAME_FOOTER_TOP);
 
         HWND hParent = GetParent(hDlg);
         if (hParent)
@@ -379,6 +384,9 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         EndDialog(hDlg, IDCANCEL);
         return TRUE;
     }
+    INT_PTR skinned;
+    if (DialogSkin::HandleMessage(hDlg, msg, wParam, lParam, skinned))
+        return skinned;
     return FALSE;
 }
 
@@ -396,7 +404,7 @@ void CorralWindow::ShowRenameDialog()
     dlg->style = DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT;
     dlg->cdit = 3;
     dlg->cx = 180;
-    dlg->cy = 55;
+    dlg->cy = RENAME_FOOTER_TOP + 28;
     p += sizeof(DLGTEMPLATE) / sizeof(WORD);
 
     *p++ = 0;
@@ -418,9 +426,9 @@ void CorralWindow::ShowRenameDialog()
 
     DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *)p;
     item->style = WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL;
-    item->x = 8;
-    item->y = 8;
-    item->cx = 164;
+    item->x = 10;
+    item->y = 10;
+    item->cx = 160;
     item->cy = 14;
     item->id = 101;
     p += sizeof(DLGITEMTEMPLATE) / sizeof(WORD);
@@ -434,8 +442,8 @@ void CorralWindow::ShowRenameDialog()
 
     item = (DLGITEMTEMPLATE *)p;
     item->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP;
-    item->x = 70;
-    item->y = 30;
+    item->x = 62;
+    item->y = RENAME_FOOTER_TOP + 7;
     item->cx = 50;
     item->cy = 14;
     item->id = IDOK;
@@ -453,8 +461,8 @@ void CorralWindow::ShowRenameDialog()
 
     item = (DLGITEMTEMPLATE *)p;
     item->style = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
-    item->x = 124;
-    item->y = 30;
+    item->x = 118;
+    item->y = RENAME_FOOTER_TOP + 7;
     item->cx = 50;
     item->cy = 14;
     item->id = IDCANCEL;

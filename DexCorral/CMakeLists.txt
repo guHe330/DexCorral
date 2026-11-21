@@ -78,6 +78,7 @@ add_library(DexCorralHook SHARED
     src/CrashGuard.cpp
     src/Conflicts.cpp
     src/Strings.cpp
+    src/DialogSkin.cpp
 )
 
 target_include_directories(DexCorralHook PRIVATE
