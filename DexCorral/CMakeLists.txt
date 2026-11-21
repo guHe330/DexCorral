@@ -141,6 +141,7 @@ add_executable(DexCorralTests
     tests/test_recently_left.cpp
     tests/test_name_diff.cpp
     tests/test_icon_stamp.cpp
+    tests/test_undo_move.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/Config.cpp
