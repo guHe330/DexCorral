@@ -20,136 +20,139 @@
  */
 
 #include "FolderWatcher.h"
+#include <process.h>
 
 // Debug log (dllmain.cpp); a no-op unless DebugLogging is on
 void DllLog(const wchar_t *format, ...);
 
-FolderWatcher::FolderWatcher() : running(false)
+namespace
 {
-}
+    /// What the watch thread works with. It owns this and frees it.
+    struct Watch
+    {
+        std::wstring path;
+        FolderWatcher::ChangeCallback changed;
+        HANDLE stop = nullptr; // The thread's own handle to the stop event
+    };
 
-FolderWatcher::~FolderWatcher()
-{
-    Stop();
-}
+    unsigned __stdcall WatchThread(void *param)
+    {
+        Watch *watch = static_cast<Watch *>(param);
+
+        HANDLE hDir = CreateFileW(
+            watch->path.c_str(),
+            FILE_LIST_DIRECTORY,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+            nullptr);
+
+        if (hDir == INVALID_HANDLE_VALUE)
+        {
+            DllLog(L"Folder watch: cannot open '%s' (error %lu), not watching it", watch->path.c_str(), GetLastError());
+        }
+        else
+        {
+            BYTE buffer[4096];
+            OVERLAPPED overlapped = {};
+            overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+
+            while (overlapped.hEvent && WaitForSingleObject(watch->stop, 0) != WAIT_OBJECT_0)
+            {
+                DWORD bytesReturned = 0;
+                if (!ReadDirectoryChangesW(
+                        hDir, buffer, sizeof(buffer),
+                        FALSE, // Don't watch subtree
+                        FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
+                        &bytesReturned, &overlapped, nullptr))
+                {
+                    // The folder was removed, renamed or unmounted. Nothing restarts the
+                    // watch, so at least leave a trace of why changes stopped arriving.
+                    DllLog(L"Folder watch: '%s' ended (error %lu)", watch->path.c_str(), GetLastError());
+                    break;
+                }
+
+                HANDLE handles[2] = {watch->stop, overlapped.hEvent};
+                if (WaitForMultipleObjects(2, handles, FALSE, INFINITE) != WAIT_OBJECT_0 + 1)
+                {
+                    // Stopped. The request still points at this stack frame: wait until it is really gone
+                    CancelIo(hDir);
+                    GetOverlappedResult(hDir, &overlapped, &bytesReturned, TRUE);
+                    break;
+                }
+
+                // Report every change, including a completion that carries none
+                // (the buffer overflowed, or the folder went away): the receiver
+                // reloads the whole folder either way. Coalescing a burst is the
+                // receiver's job (a restarted timer), so the last event is never lost.
+                const BOOL completed = GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE);
+                if (watch->changed)
+                    watch->changed();
+                if (!completed)
+                {
+                    DllLog(L"Folder watch: '%s' ended (error %lu)", watch->path.c_str(), GetLastError());
+                    break; // A share that went away would otherwise report itself in a loop
+                }
+                ResetEvent(overlapped.hEvent);
+            }
+
+            if (overlapped.hEvent)
+                CloseHandle(overlapped.hEvent);
+            CloseHandle(hDir);
+        }
+
+        CloseHandle(watch->stop);
+        delete watch;
+        return 0;
+    }
+} // namespace
 
 void FolderWatcher::SetPath(const std::wstring &path)
 {
-    bool wasRunning = running;
-    if (wasRunning)
-    {
-        Stop();
-    }
+    const bool wasRunning = stopEvent != nullptr;
+    Stop();
     watchPath = path;
-    if (wasRunning && !watchPath.empty())
-    {
+    if (wasRunning)
         Start();
-    }
 }
 
 void FolderWatcher::Start()
 {
-    if (running || watchPath.empty())
+    if (stopEvent || watchPath.empty())
         return;
-    running = true;
 
     stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-
-    monitorThread = std::thread([this]()
-                                { MonitorThread(); });
-}
-
-void FolderWatcher::Stop()
-{
-    if (!running)
+    if (!stopEvent)
         return;
-    running = false;
 
-    if (stopEvent)
-    {
-        SetEvent(stopEvent);
-    }
+    Watch *watch = new Watch{watchPath, changeCallback, nullptr};
+    if (DuplicateHandle(GetCurrentProcess(), stopEvent, GetCurrentProcess(), &watch->stop, 0, FALSE, DUPLICATE_SAME_ACCESS))
+        thread = (HANDLE)_beginthreadex(nullptr, 0, WatchThread, watch, 0, nullptr);
 
-    if (monitorThread.joinable())
+    if (!thread)
     {
-        monitorThread.join();
-    }
-
-    if (stopEvent)
-    {
+        // No thread to be had: no watch, but nothing is thrown at the caller
+        DllLog(L"Folder watch: no thread for '%s'", watchPath.c_str());
+        if (watch->stop)
+            CloseHandle(watch->stop);
+        delete watch;
         CloseHandle(stopEvent);
         stopEvent = nullptr;
     }
 }
 
-void FolderWatcher::MonitorThread()
+void FolderWatcher::Stop()
 {
-    HANDLE hDir = CreateFileW(
-        watchPath.c_str(),
-        FILE_LIST_DIRECTORY,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-        nullptr);
-
-    if (hDir == INVALID_HANDLE_VALUE)
-    {
-        DllLog(L"Folder watch: cannot open '%s' (error %lu), not watching it", watchPath.c_str(), GetLastError());
+    if (!stopEvent)
         return;
-    }
 
-    BYTE buffer[4096];
-    OVERLAPPED overlapped = {};
-    overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-
-    while (running)
-    {
-        DWORD bytesReturned = 0;
-
-        BOOL success = ReadDirectoryChangesW(
-            hDir,
-            buffer,
-            sizeof(buffer),
-            FALSE, // Don't watch subtree
-            FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
-            &bytesReturned,
-            &overlapped,
-            nullptr);
-
-        if (!success)
-        {
-            // The folder was removed, renamed or unmounted. Nothing restarts the
-            // watch, so at least leave a trace of why changes stopped arriving.
-            DllLog(L"Folder watch: '%s' ended (error %lu)", watchPath.c_str(), GetLastError());
-            break;
-        }
-
-        HANDLE handles[2] = {overlapped.hEvent, stopEvent};
-        DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-
-        if (waitResult == WAIT_OBJECT_0)
-        {
-            // Report every change, including a completion that carries none
-            // (the buffer overflowed): the receiver reloads the whole folder
-            // either way. Coalescing a burst is the receiver's job (a
-            // restarted timer), so the last event is never lost.
-            GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE);
-            if (changeCallback)
-            {
-                changeCallback();
-            }
-            ResetEvent(overlapped.hEvent);
-        }
-        else
-        {
-            // The request still points at this stack frame: wait until it is really gone
-            CancelIo(hDir);
-            GetOverlappedResult(hDir, &overlapped, &bytesReturned, TRUE);
-            break;
-        }
-    }
-
-    CloseHandle(overlapped.hEvent);
-    CloseHandle(hDir);
+    SetEvent(stopEvent);
+    // Normally the thread is gone within a millisecond. One that is stuck in a
+    // call on a dead share is left to end by itself: it owns all it touches.
+    WaitForSingleObject(thread, 200);
+    CloseHandle(thread);
+    thread = nullptr;
+    CloseHandle(stopEvent);
+    stopEvent = nullptr;
 }

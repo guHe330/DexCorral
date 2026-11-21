@@ -23,32 +23,37 @@
 #include <Windows.h>
 #include <string>
 #include <functional>
-#include <thread>
-#include <atomic>
 
+/**
+ * Watches one folder and calls back when something in it changes.
+ *
+ * The watch runs on its own thread, and that thread owns everything it uses.
+ * Stop() tells it to end and waits only a moment for it: a thread that is stuck
+ * in a call on a share that went away must not hold up the caller, which is
+ * the thread every Corral lives on. Consequences for the callback: it is called
+ * on the watch thread, it may be called once more after Stop(), and so it must
+ * own what it uses (a window handle by value, not a pointer to the window).
+ */
 class FolderWatcher
 {
 public:
     using ChangeCallback = std::function<void()>;
 
-    FolderWatcher();
-    ~FolderWatcher();
+    FolderWatcher() = default;
+    ~FolderWatcher() { Stop(); }
+    FolderWatcher(const FolderWatcher &) = delete;
+    FolderWatcher &operator=(const FolderWatcher &) = delete;
 
-    void SetPath(const std::wstring &path);
-    void SetChangeCallback(ChangeCallback callback) { changeCallback = callback; }
+    void SetPath(const std::wstring &path); /// Restarts the watch if it is running
+    void SetChangeCallback(ChangeCallback callback) { changeCallback = std::move(callback); }
 
     void Start();
     void Stop();
-    bool IsRunning() const { return running; }
     const std::wstring &GetPath() const { return watchPath; }
 
 private:
-    void MonitorThread();
-
     std::wstring watchPath;
     ChangeCallback changeCallback;
-
-    std::atomic<bool> running;
-    std::thread monitorThread;
-    HANDLE stopEvent = nullptr;
+    HANDLE stopEvent = nullptr; /// Set: the thread ends. Not null: a watch was started
+    HANDLE thread = nullptr;
 };

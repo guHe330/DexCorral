@@ -38,6 +38,7 @@
 #include <shobjidl.h>
 #include <algorithm>
 #include <Shlwapi.h>
+#include <commctrl.h>
 #include <cmath>
 #include <stdio.h>
 
@@ -1295,6 +1296,10 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
             {
                 if (other.get() == this)
                     continue;
+                // A Corral with a dialog open (rename, appearance, a question) is
+                // disabled. Merging would delete it while that dialog's code runs.
+                if (!IsWindowEnabled(other->GetHWND()))
+                    continue;
 
                 RECT otherRect;
                 GetWindowRect(other->GetHWND(), &otherRect);
@@ -1303,7 +1308,7 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
                 if (PtInRect(&otherRect, pt) && (pt.y - otherRect.top < other->GetTitleBarHeight()))
                 {
                     MergeWith(other.get());
-                    return; // This window is destroyed now
+                    return; // The other Corral is gone now; nothing more to do here
                 }
             }
         }
@@ -1391,6 +1396,39 @@ void CorralWindow::OpenFile(int iconIndex)
     ShellExecuteW(hwnd, L"open", icon.fullPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
+namespace
+{
+    /// The shell context menu that is open, for ShellMenuSubclass
+    struct ShellMenuMessages
+    {
+        IContextMenu2 *menu2 = nullptr;
+        IContextMenu3 *menu3 = nullptr;
+    };
+    const UINT_PTR SHELL_MENU_SUBCLASS_ID = 0x4443; // "DC"
+
+    /// On the Corral only while its shell context menu is open: hands the menu
+    /// messages to the shell, which builds submenus and owner-drawn items then.
+    LRESULT CALLBACK ShellMenuSubclass(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR ref)
+    {
+        const ShellMenuMessages *shell = (const ShellMenuMessages *)ref;
+        const bool menuMessage =
+            msg == WM_INITMENUPOPUP || msg == WM_MENUCHAR ||
+            ((msg == WM_DRAWITEM || msg == WM_MEASUREITEM) && wParam == 0); // 0: sent by a menu
+        if (menuMessage && shell->menu3)
+        {
+            LRESULT result = 0;
+            if (shell->menu3->HandleMenuMsg2(msg, wParam, lParam, &result) == S_OK)
+                return result;
+        }
+        else if (menuMessage && shell->menu2 && msg != WM_MENUCHAR)
+        {
+            if (shell->menu2->HandleMenuMsg(msg, wParam, lParam) == S_OK)
+                return msg == WM_INITMENUPOPUP ? 0 : TRUE;
+        }
+        return DefSubclassProc(hwnd, msg, wParam, lParam);
+    }
+} // namespace
+
 void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
 {
     if (iconIndex < 0 || iconIndex >= (int)icons.size())
@@ -1407,10 +1445,14 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
     IShellFolder *pParentFolder = nullptr;
     LPCITEMIDLIST pidlChild = nullptr;
     IContextMenu *pContextMenu = nullptr;
+    std::vector<LPITEMIDLIST> otherSelected; // Full PIDLs of the other selected icons, freed at the end
 
-    HRESULT hr = icon.isSpecialIcon
-        ? SHParseDisplayName((L"::" + icon.clsid).c_str(), nullptr, &pidlFull, 0, nullptr)
-        : SHParseDisplayName(icon.fullPath.c_str(), nullptr, &pidlFull, 0, nullptr);
+    auto parse = [](const CorralIcon &ci, LPITEMIDLIST *out)
+    {
+        return ci.isSpecialIcon ? SHParseDisplayName((L"::" + ci.clsid).c_str(), nullptr, out, 0, nullptr)
+                                : SHParseDisplayName(ci.fullPath.c_str(), nullptr, out, 0, nullptr);
+    };
+    HRESULT hr = parse(icon, &pidlFull);
 
     if (SUCCEEDED(hr) && pidlFull)
     {
@@ -1421,7 +1463,40 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
         }
         else
         {
-            hr = pParentFolder->GetUIObjectOf(hwnd, 1, &pidlChild, IID_IContextMenu, nullptr, (void **)&pContextMenu);
+            // The menu is for the whole selection when the clicked icon is part
+            // of one, as in Explorer: Cut, Copy, Delete then take all of them.
+            // shortcut: one menu takes the items of one folder only, so selected
+            // icons from another folder (public desktop next to the user's) are
+            // left out; group them like InvokeVerbOnSelection if that matters.
+            std::vector<LPCITEMIDLIST> children{pidlChild};
+            if (selection.size() > 1 && IsSelected(iconIndex))
+            {
+                LPITEMIDLIST parent = ILClone(pidlFull);
+                if (parent)
+                    ILRemoveLastID(parent);
+                for (int i : GetSelectedIndices())
+                {
+                    LPITEMIDLIST full = nullptr;
+                    if (!parent || i == iconIndex || FAILED(parse(icons[i], &full)) || !full)
+                        continue;
+                    LPITEMIDLIST itsParent = ILClone(full);
+                    if (itsParent)
+                        ILRemoveLastID(itsParent);
+                    if (itsParent && ILIsEqual(itsParent, parent))
+                    {
+                        otherSelected.push_back(full);
+                        children.push_back(ILFindLastID(full));
+                    }
+                    else
+                    {
+                        CoTaskMemFree(full);
+                    }
+                    CoTaskMemFree(itsParent);
+                }
+                CoTaskMemFree(parent);
+            }
+            hr = pParentFolder->GetUIObjectOf(hwnd, (UINT)children.size(), children.data(), IID_IContextMenu,
+                                              nullptr, (void **)&pContextMenu);
             if (FAILED(hr))
             {
                 pContextMenu = nullptr;
@@ -1477,11 +1552,29 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
             AppendMenuW(hMenu, MF_STRING, removeCmdId, Tr(Str::Menu_RemoveFromCorral));
         }
 
+        // The shell fills submenus (Send to, Open with) and draws its own items
+        // only when the menu's owner passes these messages on to it
+        ShellMenuMessages forward;
+        if (haveShellItems)
+        {
+            if (FAILED(pContextMenu->QueryInterface(IID_PPV_ARGS(&forward.menu3))))
+                forward.menu3 = nullptr;
+            if (!forward.menu3 && FAILED(pContextMenu->QueryInterface(IID_PPV_ARGS(&forward.menu2))))
+                forward.menu2 = nullptr;
+        }
+        SetWindowSubclass(hwnd, ShellMenuSubclass, SHELL_MENU_SUBCLASS_ID, (DWORD_PTR)&forward);
+
         ActivateInPlace(true);
         int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                  screenX, screenY, 0, hwnd, nullptr);
         PostMessageW(hwnd, WM_NULL, 0, 0);
         PinToBandTop();
+
+        RemoveWindowSubclass(hwnd, ShellMenuSubclass, SHELL_MENU_SUBCLASS_ID);
+        if (forward.menu3)
+            forward.menu3->Release();
+        if (forward.menu2)
+            forward.menu2->Release();
 
         if (cmd == (int)removeCmdId)
         {
@@ -1521,6 +1614,8 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
         pParentFolder->Release();
     if (pidlFull)
         CoTaskMemFree(pidlFull);
+    for (LPITEMIDLIST full : otherSelected)
+        CoTaskMemFree(full);
 }
 
 // ============================================================================
@@ -1757,6 +1852,8 @@ void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt)
     ReleaseFolderTarget(true);
     if (wanted.empty() || !dragData)
         return;
+    if (!owner->FolderAnswers())
+        return; // Binding to a share that does not answer blocks, and DragOver asks again and again
 
     folderTarget = BindFolderDropTarget(wanted);
     if (!folderTarget)
@@ -1808,7 +1905,7 @@ DWORD CorralDropTarget::EffectAt(DWORD grfKeyState, POINTL pt)
 
     // Over an icon the drop goes to that item (open with / move into folder),
     // whatever kind of tab this is.
-    if (owner->HitTestIcon(clientPt.x, clientPt.y) >= 0)
+    if (owner->HitTestDropIcon(clientPt.x, clientPt.y) >= 0)
         return DROPEFFECT_COPY;
 
     if (owner->GetActiveTab().IsVirtual)
@@ -1873,22 +1970,36 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
     if (tab >= 0 && tab != owner->config.ActiveTabIndex)
         owner->SetActiveTab(tab);
 
+    if (!owner->FolderAnswers())
+    {
+        // The share went away during the drag: nothing here can take a drop
+        *pdwEffect = DROPEFFECT_NONE;
+        EndDragSession();
+        return S_OK;
+    }
+
     // Check if dropped on a corral icon -> shell-execute (open with that icon)
-    int hit = owner->HitTestIcon(clientPt.x, clientPt.y);
+    int hit = owner->HitTestDropIcon(clientPt.x, clientPt.y);
 
     LogCorralDrop(L"Drop: screen=(%d,%d) client=(%d,%d) hitIcon=%d",
                   pt.x, pt.y, clientPt.x, clientPt.y, hit);
 
+    bool takenByIcon = false;
     if (hit >= 0)
     {
         // dragKeyState is from the last DragOver, so it still has the mouse
         // button in it; by the time Drop is called the button is up, and the
         // icon's own drop target needs it to tell a right-drag from a left one.
-        DWORD allowed = *pdwEffect;
-        *pdwEffect = DROPEFFECT_COPY;
         LogCorralDrop(L"Drop: on icon %d -> OnDropOnIcon", hit);
-        owner->OnDropOnIcon(pDataObj, hit, dragKeyState, grfKeyState, pt, allowed);
+        takenByIcon = owner->OnDropOnIcon(pDataObj, hit, dragKeyState, grfKeyState, pt, *pdwEffect);
     }
+
+    if (takenByIcon)
+    {
+        *pdwEffect = DROPEFFECT_COPY;
+    }
+    // An icon that takes no drops (a document) is just a place in the tab, as
+    // in an Explorer window: the drop is for the tab.
     else if (owner->GetActiveTab().IsVirtual)
     {
         allowedEffects = *pdwEffect;
@@ -2075,7 +2186,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
 // OnDropOnIcon - drop a file onto a corral icon (shell-execute / open with)
 // ============================================================================
 
-void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
+bool CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
                                 DWORD dropKeyState, POINTL pt, DWORD allowedEffects)
 {
     // What the drag source permits; a source that says nothing gets the usual three
@@ -2083,8 +2194,9 @@ void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD ente
         allowedEffects = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
 
     if (iconIndex < 0 || iconIndex >= (int)icons.size())
-        return;
+        return false;
 
+    bool forwarded = false;
     const auto &targetIcon = icons[iconIndex];
 
     // Get the target icon's IDropTarget via the shell and forward the drop.
@@ -2122,6 +2234,7 @@ void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD ente
             dwEffect = allowedEffects;
             pDropTarget->Drop(pDataObj, dropKeyState, pt, &dwEffect);
             pDropTarget->Release();
+            forwarded = true;
             LogCorralDrop(L"OnDropOnIcon: drop forwarded, effect=0x%X", dwEffect);
         }
         else
@@ -2134,6 +2247,7 @@ void CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD ente
     {
         LogCorralDrop(L"OnDropOnIcon: SHCreateItemFromParsingName failed hr=0x%08X", hr);
     }
+    return forwarded;
 }
 
 // ============================================================================
@@ -2293,8 +2407,12 @@ void CorralWindow::StartShellDrag()
         // out of an Explorer window.
         CorralDropSource *source = isVirtual ? nullptr : new CorralDropSource();
         DWORD effect = DROPEFFECT_NONE;
+        // While the drag runs, none of these may be its own drop target (HitTestDropIcon)
+        for (int i : dragged)
+            shellDragPaths.push_back(icons[i].fullPath);
         HRESULT hr = SHDoDragDrop(hwnd, dataObject, source,
                                   DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, &effect);
+        shellDragPaths.clear();
         LogCorralDrop(L"StartShellDrag: %zu item(s), hr=0x%08X effect=0x%X", fullPidls.size(), hr, effect);
         if (source)
         {

@@ -32,6 +32,7 @@
 #include "DialogTemplate.h"
 #include "DialogSkin.h"
 #include "Presets.h"
+#include "IconUtils.h"
 #include <vector>
 #include "App.h"
 #include "Constants.h"
@@ -177,28 +178,17 @@ void CorralWindow::EndIconRename(bool save)
                 // Build new path
                 size_t lastSlash = oldPath.find_last_of(L"\\");
                 std::wstring newPath;
-                if (lastSlash != std::wstring::npos)
+                // A name with a path separator would move the file to another
+                // folder: such a name is refused like any failed rename.
+                if (lastSlash != std::wstring::npos && IconUtils::IsValidNewFileName(newName))
                 {
-                    newPath = oldPath.substr(0, lastSlash + 1) + newName;
-
                     // The editable name is the shell display name, which may
                     // omit the extension (.lnk, or any extension when "hide
                     // extensions" is on). Re-append it like Explorer does so
                     // the rename can't silently change the file type.
-                    std::wstring oldFileName = oldPath.substr(lastSlash + 1);
-                    const std::wstring &shownName = icons[renamingIconIndex].displayName;
-                    if (oldFileName.length() > shownName.length() &&
-                        _wcsnicmp(oldFileName.c_str(), shownName.c_str(), shownName.length()) == 0 &&
-                        oldFileName[shownName.length()] == L'.')
-                    {
-                        std::wstring hiddenExt = oldFileName.substr(shownName.length());
-                        bool newNameHasExt = newName.length() >= hiddenExt.length() &&
-                            _wcsicmp(newName.c_str() + newName.length() - hiddenExt.length(), hiddenExt.c_str()) == 0;
-                        if (!newNameHasExt)
-                        {
-                            newPath += hiddenExt;
-                        }
-                    }
+                    newPath = oldPath.substr(0, lastSlash + 1) +
+                              IconUtils::NameWithHiddenExtension(oldPath.substr(lastSlash + 1),
+                                                                 icons[renamingIconIndex].displayName, newName);
                 }
 
                 // Attempt to rename the file

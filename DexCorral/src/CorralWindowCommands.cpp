@@ -515,7 +515,9 @@ void CorralWindow::DeleteCorral()
             {
                 config.ActiveTabIndex = (int)config.Tabs.size() - 1;
             }
-            SetActiveTab(config.ActiveTabIndex);
+            // Not SetActiveTab: the index is the same as before (or already
+            // corrected), so it would do nothing and the closed tab's icons stayed
+            ReloadActiveTab();
             if (App::GetInstance())
             {
                 App::GetInstance()->SaveConfig();

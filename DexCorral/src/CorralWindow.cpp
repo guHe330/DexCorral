@@ -524,36 +524,29 @@ void CorralWindow::SetActiveTab(int index)
     if (index >= 0 && index < (int)config.Tabs.size() && index != config.ActiveTabIndex)
     {
         config.ActiveTabIndex = index;
-
-        // Handle switching between virtual/regular
-        if (folderWatcher)
-        {
-            folderWatcher->Stop();
-            folderWatcher.reset();
-        }
-        if (parentWatcher)
-        {
-            parentWatcher->Stop();
-            parentWatcher.reset();
-        }
-
-        if (GetActiveTab().IsVirtual)
-        {
-            InitializeFolderWatcher();
-        }
-
-        // Update view mode specific settings
-        iconSize = GetIconSizeForViewMode();
-        UpdateIconSpacingForViewMode();
-
-        scrollPosition = 0;
-        LoadFiles();
+        ReloadActiveTab();
 
         if (App::GetInstance())
         {
             App::GetInstance()->SaveConfig();
         }
     }
+}
+
+void CorralWindow::ReloadActiveTab()
+{
+    // Everything that belongs to the tab shown before must go: its folder
+    // watchers, its icon size and spacing, its scroll position, its icons.
+    // Also needed when the active index stays the same but the tab behind it
+    // is another one (a tab was closed or detached).
+    InitializeFolderWatcher(); // Drops the old watchers; starts new ones for a virtual tab
+
+    iconSize = GetIconSizeForViewMode();
+    UpdateIconSpacingForViewMode();
+
+    scrollPosition = 0;
+    ClearSelection();
+    LoadFiles();
 }
 
 void CorralWindow::AddTab(const CorralTabConfig &tab)
@@ -586,24 +579,7 @@ void CorralWindow::DetachTab(int tabIndex)
     }
 
     // Reload this window with remaining tabs
-    if (folderWatcher)
-    {
-        folderWatcher->Stop();
-        folderWatcher.reset();
-    }
-    if (parentWatcher)
-    {
-        parentWatcher->Stop();
-        parentWatcher.reset();
-    }
-    if (GetActiveTab().IsVirtual)
-    {
-        InitializeFolderWatcher();
-    }
-    iconSize = GetIconSizeForViewMode();
-    UpdateIconSpacingForViewMode();
-    scrollPosition = 0;
-    LoadFiles();
+    ReloadActiveTab();
 
     // Create new window for the detached tab, seeded at a +30 cascade off the
     // source's top-left. CreateCorralAt finds the nearest free spot from there;
@@ -626,7 +602,7 @@ void CorralWindow::DetachTab(int tabIndex)
             newWindow->GetConfig().Tabs.clear();
             newWindow->GetConfig().Tabs.push_back(tabToDetach);
             newWindow->GetConfig().ActiveTabIndex = 0;
-            newWindow->LoadFiles();
+            newWindow->ReloadActiveTab(); // Not just the icons: a virtual tab needs its folder watcher
             newWindow->UpdateLayeredContent();
         }
 

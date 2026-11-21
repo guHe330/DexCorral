@@ -235,6 +235,7 @@ public:
 
     /// Switches to the specified tab by index
     void SetActiveTab(int index);
+    void ReloadActiveTab(); // Watchers, icon size and icons of the tab that is active now
 
     /// Adds a new tab with the given configuration
     void AddTab(const CorralTabConfig &tab);
@@ -285,6 +286,7 @@ private:
     void LoadVirtualFolderIcons();  // Load icons from virtual folder path
     void InitializeFolderWatcher(); // Set up folder change monitoring
     void OnFolderContentsChanged(); // Called when virtual folder contents change
+    void ReloadFolderContents();    // Re-lists the folder, keeping the icons of unchanged files
 
     // Virtual corral navigation (inline sub-folder browsing)
     std::wstring GetVirtualCurrentPath() const;          // Root path joined with CurrentSubPath
@@ -346,7 +348,8 @@ private:
     void OnRightButtonDown(int x, int y);
     void OnDrop(IDataObject *pDataObj);                      // OLE drop handler (replaces OnDropFiles)
     /// Drop onto a corral icon: forwarded to that item's own shell drop target
-    void OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
+    /// False if that item takes no drops (a document): the drop is then for the tab
+    bool OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
                       DWORD dropKeyState, POINTL pt, DWORD allowedEffects);
 
     friend class CorralDropTarget;
@@ -419,6 +422,8 @@ private:
     void CalculateIconLayoutGrid();    // Grid layout for icon views
     void CalculateIconLayoutDetails(); // List layout for details view
     int HitTestIcon(int x, int y);
+    int HitTestDropIcon(int x, int y);        // HitTestIcon, minus the icons that are being dragged
+    std::vector<std::wstring> shellDragPaths; // Files of the shell drag this Corral started, while it runs
     int HitTestTab(int x, int y);     // Returns tab index or -1
     RECT GetTabRect(int index) const; // Get rect for a specific tab
     RECT GetTabGripRect(int index) const; // Left-edge "Griff" drag handle for reordering
@@ -697,6 +702,17 @@ private:
     std::wstring netProbeAsked;    // The root the probe in flight was sent for
     LONG netProbeSeq = 0;          // Its number, so no other message passes for its answer
     int netProbeCount = 0;
+    ULONGLONG netProbeStarted = 0;     // Tick count of the probe in flight
+    bool relistWhenReachable = false;  // The folder reported a change: re-list once the share has answered
+    // A share that answered last time but lets the current probe wait has most
+    // likely just gone away: netState only changes when the probe gives up,
+    // which takes SMB tens of seconds.
+    static const ULONGLONG NET_PROBE_PATIENCE_MS = 2000;
+    bool NetworkProbeOverdue() const
+    {
+        return netProbeInFlight && GetTickCount64() - netProbeStarted > NET_PROBE_PATIENCE_MS;
+    }
+    bool FolderAnswers() const; // False while the active tab shows a network folder that may block
     void StartNetworkProbe();
     void OnNetworkProbeDone(LONG seq, bool reachable);
     static const UINT WM_NET_PROBE_DONE = WM_USER + 102; // wParam: reachable, lParam: netProbeSeq

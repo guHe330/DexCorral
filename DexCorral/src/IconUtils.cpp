@@ -49,4 +49,41 @@ namespace IconUtils
         return name;
     }
 
+    bool IsValidNewFileName(const std::wstring &name)
+    {
+        if (name.empty() || name == L"." || name == L"..")
+            return false;
+        for (wchar_t c : name)
+        {
+            if (c < 32 || wcschr(L"\\/:*?\"<>|", c))
+                return false;
+        }
+        return true;
+    }
+
+    std::wstring NameWithHiddenExtension(const std::wstring &oldFileName, const std::wstring &shownName,
+                                         const std::wstring &newName)
+    {
+        if (oldFileName.length() <= shownName.length() ||
+            _wcsnicmp(oldFileName.c_str(), shownName.c_str(), shownName.length()) != 0 ||
+            oldFileName[shownName.length()] != L'.')
+        {
+            return newName; // Nothing was hidden
+        }
+        const std::wstring hiddenExt = oldFileName.substr(shownName.length());
+        const bool typed = newName.length() >= hiddenExt.length() &&
+                           _wcsicmp(newName.c_str() + newName.length() - hiddenExt.length(), hiddenExt.c_str()) == 0;
+        return typed ? newName : newName + hiddenExt;
+    }
+
+    bool ContainsPath(const std::vector<std::wstring> &paths, const std::wstring &path)
+    {
+        for (const auto &p : paths)
+        {
+            if (_wcsicmp(p.c_str(), path.c_str()) == 0)
+                return true;
+        }
+        return false;
+    }
+
 } // namespace IconUtils
