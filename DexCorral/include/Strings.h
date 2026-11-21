@@ -172,6 +172,7 @@ enum class Str
     Grp_IconSpacing,             // "Icon Spacing"
     Lbl_Horiz,                   // "Horiz"
     Lbl_Vert,                    // "Vert"
+    Chk_AccentColor,             // "Windows accent color"
     Chk_UseAsDefault,            // save this style as the default for new corrals
     Chk_ApplyToAll,              // transfer only the settings touched in this session
     Chk_CopyStyleToAll,          // overwrite every corral's style with this one

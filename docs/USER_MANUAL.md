@@ -132,7 +132,7 @@ Right-click a Corral's title bar or background:
 ### Appearance Dialog
 **Appearance...** gives live-preview control over:
 
-- **Background color**: the Corral fill.
+- **Background color**: the Corral fill. Tick **Windows accent color** to let the tab take the accent colour you chose in Windows instead; it then changes along with Windows, keeps the transparency you set, and its header text turns black or white for contrast. Untick it and the colour you had before is back.
 - **Opacity**: one slider each for the background fill, border, header, header label, icons and icon labels. The border's resize grip stays visible however far down you take it.
 - **Header**: title bar height, font face/size, and font color (font settings are per tab).
 - **Icons**: tint color and tint strength.

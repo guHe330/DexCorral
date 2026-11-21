@@ -76,6 +76,10 @@ static const UINT_PTR CONFLICT_POLL_TIMER = 4;
 
 // Settling time after WM_DISPLAYCHANGE before corrals are repositioned
 static const UINT_PTR DISPLAY_CHANGE_TIMER = 6;
+// The accent colour is read a moment after Windows reports a change: one
+// change comes as two messages, and the registry value may trail them
+static const UINT_PTR ACCENT_CHANGE_TIMER = 8;
+static const UINT ACCENT_CHANGE_SETTLE_MS = 300;
 static const UINT DISPLAY_CHANGE_SETTLE_MS = 1500;
 
 // Coalesces a burst of SaveConfig calls into one write of config.json
@@ -2127,6 +2131,7 @@ AppearanceSettings App::GetDefaultAppearance() const
 
     AppearanceSettings s;
     s.ColorHex = t.ColorHex;
+    s.UseAccentColor = t.UseAccentColor;
     s.TitleBarHeight = c.TitleBarHeight;
     s.HeaderOpacity = c.HeaderOpacity;
     s.BorderOpacity = c.BorderOpacity;
@@ -2372,14 +2377,17 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     if (uMsg == WM_CLOSE)
         return 0;
 
-    // Display changes come in bursts, and while a monitor wakes up or a mode is
-    // being switched Windows can report a transient resolution in between. Act
-    // once things have been quiet for a moment, on the layout that stayed.
-    // The accent colour changed: tabs that follow it need a redraw. Windows
-    // sends both messages for one change; the second finds nothing new.
+    // The accent colour changed: tabs that follow it need a redraw
     if (app && (uMsg == WM_DWMCOLORIZATIONCOLORCHANGED ||
                 (uMsg == WM_SETTINGCHANGE && lParam && wcscmp((const wchar_t *)lParam, L"ImmersiveColorSet") == 0)))
     {
+        SetTimer(hwnd, ACCENT_CHANGE_TIMER, ACCENT_CHANGE_SETTLE_MS, nullptr);
+        return 0;
+    }
+
+    if (app && uMsg == WM_TIMER && wParam == ACCENT_CHANGE_TIMER)
+    {
+        KillTimer(hwnd, ACCENT_CHANGE_TIMER);
         if (RefreshAccentColor())
         {
             for (auto &corral : app->corrals)
@@ -2388,6 +2396,9 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    // Display changes come in bursts, and while a monitor wakes up or a mode is
+    // being switched Windows can report a transient resolution in between. Act
+    // once things have been quiet for a moment, on the layout that stayed.
     if (app && uMsg == WM_DISPLAYCHANGE)
     {
         SetTimer(hwnd, DISPLAY_CHANGE_TIMER, DISPLAY_CHANGE_SETTLE_MS, nullptr);
