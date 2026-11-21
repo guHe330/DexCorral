@@ -53,6 +53,13 @@ Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 - Appearance changes apply as you drag, with no dialog round-trip.
 - Settings can be applied to one Corral or to all of them.
 
+### Dialogs and menus, light or dark
+
+<img src="docs/assets/screenshots/settings.png" alt="Settings window in light mode" width="270"> <img src="docs/assets/screenshots/appearance-icons-dark.png" alt="Appearance dialog in dark mode" width="255"> <img src="docs/assets/screenshots/menu-corral-dark.png" alt="Corral menu in dark mode" width="172">
+
+- Dialogs and menus follow the light or dark mode of Windows, or the one you choose.
+- A look can be saved as a preset, loaded for one Corral or all, exported and imported.
+
 ### More features
 
 - Organize desktop icons into movable, resizable Corrals.
