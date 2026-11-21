@@ -87,6 +87,13 @@ const wchar_t *const kEnglish[] = {
     /* Preset_Graphite */          L"Graphite",
     /* Preset_Compact */           L"Compact",
     /* Preset_DemoTitle */         L"Example",
+    /* Preset_Load */              L"Load a preset...",
+    /* Btn_SavePreset */           L"Save as...",
+    /* Btn_DeletePreset */         L"Delete",
+    /* Title_SavePreset */         L"Save Look as Preset",
+    /* Msg_PresetReplace */        L"A preset named \"{0}\" already exists. Replace it?",
+    /* Msg_PresetDelete */         L"Delete the preset \"{0}\"?",
+    /* Msg_PresetsFull */          L"There are already {0} presets of your own. Delete one first.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
@@ -368,6 +375,13 @@ const wchar_t *const kGerman[] = {
     /* Preset_Graphite */          L"Graphit",
     /* Preset_Compact */           L"Kompakt",
     /* Preset_DemoTitle */         L"Beispiel",
+    /* Preset_Load */              L"Vorlage laden...",
+    /* Btn_SavePreset */           L"Speichern...",
+    /* Btn_DeletePreset */         L"Löschen",
+    /* Title_SavePreset */         L"Aussehen als Vorlage speichern",
+    /* Msg_PresetReplace */        L"Eine Vorlage namens \"{0}\" gibt es schon. Ersetzen?",
+    /* Msg_PresetDelete */         L"Die Vorlage \"{0}\" löschen?",
+    /* Msg_PresetsFull */          L"Es gibt schon {0} eigene Vorlagen. Bitte zuerst eine löschen.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
