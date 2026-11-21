@@ -89,7 +89,9 @@ bool ParseHotkey(const std::string &text, HotkeySpec &out)
         spec.vk = vk;
     }
 
-    if (spec.vk == 0 || spec.modifiers == 0)
+    // Shift alone is no modifier for a global hotkey: Shift+A would take the
+    // capital A away from every program
+    if (spec.vk == 0 || (spec.modifiers & ~(unsigned)MOD_SHIFT) == 0)
         return false;
 
     out = spec;

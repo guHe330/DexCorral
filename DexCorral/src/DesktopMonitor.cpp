@@ -118,10 +118,22 @@ void DesktopMonitor::MonitorThread(bool publicDesktop)
 
     const DWORD firstRetryMs = 2000, maxRetryMs = 60000;
     DWORD retryMs = firstRetryMs;
+    std::wstring knownIn; // The folder `known` is about
 
     while (running)
     {
         std::wstring path = publicDesktop ? GetPublicDesktopPath() : GetDesktopPath();
+        // The desktop moved to another folder (OneDrive backup switched on or
+        // off): what was known is about the old one. Compared with the new
+        // folder it would report every file that has not arrived yet as
+        // deleted, and the Corrals would drop them.
+        if (!path.empty() && !knownIn.empty() && _wcsicmp(path.c_str(), knownIn.c_str()) != 0)
+        {
+            known.clear();
+            haveKnown = false;
+        }
+        if (!path.empty())
+            knownIn = path;
         // Both desktops in one folder: the user thread covers it
         if (publicDesktop && _wcsicmp(path.c_str(), GetDesktopPath().c_str()) == 0)
             path.clear();

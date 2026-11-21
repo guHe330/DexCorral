@@ -146,3 +146,15 @@ TEST(Hotkey, ControlWordDropsWin_AndEmptyStaysEmpty) {
     EXPECT_EQ(HotkeyToControlWord(HotkeySpec{}), 0u);
     EXPECT_EQ(HotkeyFromControlWord(0).vk, 0u);
 }
+
+// --- Audit #184 -------------------------------------------------------------
+
+TEST(ParseHotkey, ShiftAloneIsNotEnough) {
+    // RegisterHotKey would take Shift+A, and then no program gets a capital A
+    HotkeySpec spec;
+    EXPECT_FALSE(ParseHotkey("Shift+A", spec));
+    EXPECT_FALSE(ParseHotkey("Shift+F9", spec));
+    EXPECT_TRUE(ParseHotkey("Ctrl+Shift+A", spec));
+    EXPECT_TRUE(ParseHotkey("Alt+Shift+A", spec));
+    EXPECT_TRUE(ParseHotkey("Win+Shift+A", spec));
+}

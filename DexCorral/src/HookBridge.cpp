@@ -177,14 +177,15 @@ HWND HookBridge::GetAppMessageWindow()
 // parse: this can run under the loader lock, and the file is machine-written.
 static bool ReadDebugLoggingFromConfigFile()
 {
-    wchar_t path[MAX_PATH];
     wchar_t *appData = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)))
         return false;
-    swprintf_s(path, L"%s\\DexCorral\\config.json", appData);
+    // Not swprintf_s into a MAX_PATH buffer: it ends the process when the text
+    // does not fit, and this runs inside Explorer at every start
+    const std::wstring path = std::wstring(appData) + L"\\DexCorral\\config.json";
     CoTaskMemFree(appData);
 
-    HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+    HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
         return false;

@@ -1609,13 +1609,18 @@ void App::PushDesktopIconsFromCorrals()
 void App::OnLeftButtonDown(POINT pt)
 {
     // Runs inside the WH_MOUSE_LL callback, on the mouse hook's own thread —
-    // keep it cheap, and touch nothing but lastClickTick/lastClickPt (used only
-    // here) and messageWindow (set before the hook starts). Pair consecutive
+    // keep it cheap, and touch nothing but lastClickTick/lastClickPt/lastClickRoot
+    // (used only here) and messageWindow (set before the hook starts). Pair consecutive
     // clicks into a double-click here; the expensive empty-desktop validation
     // happens on the app thread (WM_QUICKHIDE_DBLCLK handler).
     DWORD now = GetTickCount();
+    // Both clicks must hit the same top-level window. A double-click on the
+    // close button of a window above the desktop is not one on the desktop,
+    // although its second click lands there.
+    HWND root = GetAncestor(WindowFromPoint(pt), GA_ROOT);
     bool isDoubleClick =
         lastClickTick != 0 &&
+        root == lastClickRoot &&
         (now - lastClickTick) <= GetDoubleClickTime() &&
         abs(pt.x - lastClickPt.x) <= GetSystemMetrics(SM_CXDOUBLECLK) &&
         abs(pt.y - lastClickPt.y) <= GetSystemMetrics(SM_CYDOUBLECLK);
@@ -1630,6 +1635,7 @@ void App::OnLeftButtonDown(POINT pt)
     {
         lastClickTick = now;
         lastClickPt = pt;
+        lastClickRoot = root;
     }
 }
 
@@ -2818,6 +2824,11 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     // Hook retry thread succeeded — refresh hidden icon data now that the hook is active
     if (app && uMsg == WM_HOOK_READY && app->desktopActive)
     {
+        // "Show Desktop Icons" off was applied at start, but the list view may
+        // not have existed then. Without this the icons stay visible, and the
+        // next save would store that as the user's choice.
+        if (!app->quickHideActive && !app->config.Paused)
+            DesktopIcons::SetIconsVisible(app->config.DesktopIconsVisible);
         app->UpdateHookHiddenIcons();
         app->PositionHiddenIconsUnderCorrals();
         HookBridge::RefreshDesktop();

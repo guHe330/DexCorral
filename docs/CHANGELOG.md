@@ -28,6 +28,11 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - The Windows context menu of an icon acts on the whole selection, and its submenus (**Send to**, **Open with**) are filled. ([#183](https://github.com/guHe330/DexCorral/issues/183))
 - Dragging a Corral onto one that has a dialog open no longer merges the two. ([#183](https://github.com/guHe330/DexCorral/issues/183))
 - A detached folder tab follows its folder again. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- A very long path to the roaming AppData folder ended Explorer when DexCorral loaded. ([#184](https://github.com/guHe330/DexCorral/issues/184))
+- Moving the Desktop folder (switching OneDrive backup on or off) no longer throws the files out of their Corrals. ([#184](https://github.com/guHe330/DexCorral/issues/184))
+- **Show Desktop Icons** switched off is kept when DexCorral starts before the desktop is ready. ([#184](https://github.com/guHe330/DexCorral/issues/184))
+- Quick-Hide no longer fires on a double-click that began on a window above the desktop, such as its close button. ([#184](https://github.com/guHe330/DexCorral/issues/184))
+- A `QuickHideHotkey` of Shift plus a key in `config.json` is refused, as in the settings window: it took that key away from every program. ([#184](https://github.com/guHe330/DexCorral/issues/184))
 
 ## [1.3.0] - 2026-11-18
 
