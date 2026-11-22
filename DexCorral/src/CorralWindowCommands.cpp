@@ -508,7 +508,7 @@ void CorralWindow::DeleteCorral()
         // Say what happens to the contents: "close" must not read as "delete my files"
         std::wstring body = TrFmt(GetActiveTab().IsVirtual ? Str::Confirm_CloseVirtualTabBody : Str::Confirm_CloseTabBody,
                                   Utf8ToWide(GetActiveTab().Title));
-        if (MessageBoxW(hwnd, body.c_str(), Tr(Str::Confirm_CloseTabTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
+        if (MessageBoxBehind(body.c_str(), Tr(Str::Confirm_CloseTabTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             config.Tabs.erase(config.Tabs.begin() + config.ActiveTabIndex);
             if (config.ActiveTabIndex >= (int)config.Tabs.size())
@@ -528,7 +528,7 @@ void CorralWindow::DeleteCorral()
     {
         // Only one tab - delete the entire window
         const wchar_t *body = Tr(GetActiveTab().IsVirtual ? Str::Confirm_DeleteVirtualCorralBody : Str::Confirm_DeleteCorralBody);
-        if (MessageBoxW(hwnd, body, Tr(Str::Confirm_DeleteCorralTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
+        if (MessageBoxBehind(body, Tr(Str::Confirm_DeleteCorralTitle), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             if (App::GetInstance())
             {
@@ -624,11 +624,11 @@ void CorralWindow::ChangeFolderPath()
     std::wstring errorMsg;
     if (!ValidateLocalFolder(newPath, errorMsg))
     {
-        MessageBoxW(hwnd, errorMsg.c_str(), Tr(Str::Title_InvalidFolder), MB_OK | MB_ICONWARNING);
+        MessageBoxBehind(errorMsg.c_str(), Tr(Str::Title_InvalidFolder), MB_OK | MB_ICONWARNING);
         return;
     }
     if (IsNetworkFolder(newPath))
-        MessageBoxW(hwnd, Tr(Str::Info_NetworkFolder), Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
+        MessageBoxBehind(Tr(Str::Info_NetworkFolder), Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
 
     // Stop existing watcher
     if (folderWatcher)

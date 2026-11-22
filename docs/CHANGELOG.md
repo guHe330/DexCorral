@@ -20,6 +20,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - A `config.json` that another program holds open for a moment at start is waited for, instead of being replaced by the backup. ([#182](https://github.com/guHe330/DexCorral/issues/182))
 - After you deleted the last Corral, a new default Corral no longer appears at every sign-in. ([#182](https://github.com/guHe330/DexCorral/issues/182))
 - A network folder that is disconnected no longer freezes all Corrals: when the folder reports a change, DexCorral first asks in the background whether the share still answers, and stopping the folder watch no longer waits for it. ([#183](https://github.com/guHe330/DexCorral/issues/183))
+- The question after **Delete Corral** or **Close Tab** brought every Corral in front of the open windows for as long as it was shown. ([#195](https://github.com/guHe330/DexCorral/issues/195))
 - **Close Tab** showed the icons of the closed tab under the title of the next one. ([#183](https://github.com/guHe330/DexCorral/issues/183))
 - A file dropped on a Corral's header could land on an icon scrolled out of view beneath it. ([#183](https://github.com/guHe330/DexCorral/issues/183))
 - In a folder tab, a click that moved a few pixels could drop a file onto itself, starting a program with itself as argument. ([#183](https://github.com/guHe330/DexCorral/issues/183))
