@@ -261,8 +261,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
     case 6:
         if (App::GetInstance())
         {
-            // Seed just right of this corral and let App place it; `hwnd` is
-            // excluded so "right beside the source" stays available.
+            // Seed just right of this corral and let App place it
             RECT currentRect;
             GetWindowRect(hwnd, &currentRect);
 
@@ -271,7 +270,7 @@ void CorralWindow::ShowContextMenu(int x, int y)
             POINT desiredCenter = {currentRect.right + gap + size.cx / 2,
                                    currentRect.top + size.cy / 2};
 
-            App::GetInstance()->CreateCorralAt(desiredCenter, hwnd, true);
+            App::GetInstance()->CreateCorralAt(desiredCenter, true);
         }
         break;
     case 7:

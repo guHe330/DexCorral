@@ -138,11 +138,9 @@ public:
     /**
      * Creates a new corral centred on `desiredCenter`, nudged to the nearest
      * spot that does not overlap an existing corral. Every creation path goes
-     * through here, varying only the seed point; `exclude` drops one corral
-     * from the overlap test (the source, when creating from a corral's own menu
-     * or by detaching a tab).
+     * through here, varying only the seed point.
      */
-    void CreateCorralAt(POINT desiredCenter, HWND exclude = nullptr, bool promptForName = false);
+    void CreateCorralAt(POINT desiredCenter, bool promptForName = false);
 
     /// Creates a new virtual (non-file) corral, placed like CreateCorralAt
     void CreateVirtualCorralAt(POINT desiredCenter);
@@ -150,13 +148,11 @@ public:
     /**
      * Finds a center point for a new corral of the given size as close as
      * possible to desiredTopLeft while staying inside the work area of the
-     * monitor under that point and not overlapping any existing corral. The
-     * corral whose HWND equals `exclude` is ignored (pass the source window so
-     * a detached tab can sit right beside its origin). Falls back to the
-     * clamped desired position if no free spot exists or the nearest one is
-     * further away than the shift cap.
+     * monitor under that point and not overlapping any existing corral, however
+     * far that is from the desired position. Only on a monitor with no free
+     * spot of this size does it fall back to the clamped desired position.
      */
-    POINT FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height, HWND exclude = nullptr);
+    POINT FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height);
 
     /// DPI of the monitor under `pt` (96 when it cannot be determined).
     /// Usable before a window exists, unlike CorralWindow::Dpi.
