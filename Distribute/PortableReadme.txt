@@ -14,7 +14,7 @@ KEY INFORMATION
 
 Status:         Stable
 Version:        C++ Native (Win32)
-Binary Size:    ~1 MB (exe + dll)
+Binary Size:    ~1.4 MB (exe + dll)
 Platform:       Windows 11
 License:        GPL-3.0
 
@@ -70,7 +70,7 @@ Performance and Efficiency
 --------------------------
 * Native Code: Written in C++ using Win32 API for minimal resource usage and
   zero runtime overhead.
-* Small Footprint: Total binary size approx. 1 MB with no external
+* Small Footprint: Total binary size approx. 1.4 MB with no external
   dependencies required.
 * Fast Startup: Instant application launch without JIT compilation or managed
   runtime delays.
