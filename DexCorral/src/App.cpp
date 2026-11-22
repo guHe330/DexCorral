@@ -1792,7 +1792,7 @@ void App::ApplyLanguage(const std::string &langCode)
 
 void App::ShowCreationMenu(POINT pt)
 {
-    CreateCorralAt(pt, nullptr, true);
+    CreateCorralAt(pt, true);
 }
 
 // About dialog control ids
@@ -2335,14 +2335,14 @@ void App::StartUpdateCheck(bool userInitiated)
     UpdateChecker::StartAsyncCheck(messageWindow, WM_UPDATE_CHECK_DONE, userInitiated);
 }
 
-void App::CreateCorralAt(POINT desiredCenter, HWND exclude, bool promptForName)
+void App::CreateCorralAt(POINT desiredCenter, bool promptForName)
 {
     CorralWindowConfig newConfig = MakeDefaultCorralConfig();
     newConfig.Tabs.push_back(MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_NewCorral))));
 
     SIZE size = DefaultCorralSize(desiredCenter);
     POINT topLeft = {desiredCenter.x - size.cx / 2, desiredCenter.y - size.cy / 2};
-    POINT center = FindNearestFreeCorralPosition(topLeft, size.cx, size.cy, exclude);
+    POINT center = FindNearestFreeCorralPosition(topLeft, size.cx, size.cy);
 
     newConfig.Left = (double)(center.x - size.cx / 2);
     newConfig.Top = (double)(center.y - size.cy / 2);
@@ -2457,7 +2457,7 @@ CorralTabConfig App::MakeDefaultTabConfig(const std::string &title) const
     return t;
 }
 
-POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height, HWND exclude)
+POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int height)
 {
     // Work area of the monitor under the desired point (falls back to primary).
     RECT work;
@@ -2474,26 +2474,25 @@ POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int he
         work.bottom = GetSystemMetrics(SM_CYSCREEN);
     }
 
-    // Existing corral rects (current size, so rolled-up/expanded state is honoured),
-    // excluding the source window so a detached tab may sit right beside it.
+    // Existing corral rects (current size, so rolled-up/expanded state is honoured).
+    // The source of a new corral counts too: the seed point is beside it, and
+    // leaving it out let the new corral land on top of it when that point was taken.
     // Desktop icons are deliberately not avoided: PushDesktopIconsFromCorrals
     // already moves them out from under a corral.
     std::vector<RECT> existing;
     for (const auto &corral : corrals)
     {
-        if (!corral || corral->GetHWND() == exclude)
+        if (!corral)
             continue;
         RECT r;
         if (GetWindowRect(corral->GetHWND(), &r))
             existing.push_back(r);
     }
 
-    // Past roughly one corral-diagonal of displacement, landing where the user
-    // asked (overlapping) beats teleporting across the monitor.
-    const int maxShift = width + height;
-
+    // No cap on the distance: a new corral on top of another one hides it, and
+    // that is worse than one that appears further away than asked.
     POINT topLeft = LayoutMath::FindNearestFreeTopLeft(desiredTopLeft, width, height,
-                                                       work, existing, maxShift);
+                                                       work, existing, 0);
     return {topLeft.x + width / 2, topLeft.y + height / 2};
 }
 
@@ -2787,7 +2786,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         {
             POINT pt = {(int)(LONG)wParam, (int)(LONG)lParam};
             if (uMsg == WM_CREATE_CORRAL_AT)
-                app->CreateCorralAt(pt, nullptr, true);
+                app->CreateCorralAt(pt, true);
             else
                 app->CreateVirtualCorralAt(pt);
         }
