@@ -1117,6 +1117,22 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
     int hit = HitTestIcon(x, y);
     if (hit >= 0)
     {
+        // A share whose last answer is not fresh is asked first, off this
+        // thread: gone since, it would block here. The answer opens the icon.
+        if (!ShareJustAnswered())
+        {
+            WhenShareAnswers([this, path = icons[hit].fullPath]()
+                             {
+                                 const int i = IconIndexByPath(path);
+                                 if (i >= 0)
+                                 {
+                                     SelectSingle(i);
+                                     OpenSelection();
+                                 }
+                             });
+            return;
+        }
+
         // Virtual corral: double-clicking a sub-folder navigates into it inline.
         if (GetActiveTab().IsVirtual && icons[hit].isFolder)
         {
@@ -1428,6 +1444,13 @@ void CorralWindow::ShowShellContextMenu(int iconIndex, int screenX, int screenY)
 {
     if (iconIndex < 0 || iconIndex >= (int)icons.size())
         return;
+
+    if (!ShareJustAnswered()) // Building the menu reads the file: ask the share first
+    {
+        WhenShareAnswers([this, path = icons[iconIndex].fullPath, screenX, screenY]()
+                         { ShowShellContextMenu(IconIndexByPath(path), screenX, screenY); });
+        return;
+    }
 
     const auto &icon = icons[iconIndex];
 

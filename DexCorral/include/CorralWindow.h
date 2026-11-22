@@ -34,8 +34,10 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "PendingAction.h"
 #include "IconStamp.h"
 #include <memory>
+#include <functional>
 #include <set>
 #include "Config.h"
 #include "DesktopIcons.h"
@@ -694,16 +696,31 @@ private:
     // Network folders. Any call on a share that is offline can block for tens
     // of seconds, and this thread serves every corral. So whether the share
     // answers is asked on a throwaway thread, and the folder is only touched
-    // here while the last answer was yes. Asked again every NET_PROBE_MS.
+    // here while the last answer was yes. A share that answers is not asked on a
+    // schedule (a NAS must be able to sleep), only when something is wanted from it:
+    // the user does something in the tab, the folder reports a change, the pointer
+    // comes in. One that does not answer is asked again after NET_PROBE_MS, then
+    // after twice as long each time, up to NET_PROBE_MAX_MS.
     enum class NetState { Unknown, Reachable, Unreachable };
     NetState netState = NetState::Unknown;
     std::wstring netProbeRoot;     // The root folder netState is about
     bool netProbeInFlight = false; // One probe at a time: a blocked one must not pile up
     std::wstring netProbeAsked;    // The root the probe in flight was sent for
     LONG netProbeSeq = 0;          // Its number, so no other message passes for its answer
-    int netProbeCount = 0;
+    UINT netRetryMs = NET_PROBE_MS; // Pause before a share that said no is asked again
     ULONGLONG netProbeStarted = 0;     // Tick count of the probe in flight
     bool relistWhenReachable = false;  // The folder reported a change: re-list once the share has answered
+    // "Reachable" can be old, and a share can go away at any time.
+    // So the folder is touched on this thread only within NET_FRESH_MS of a yes.
+    // Otherwise the share is asked first, and the answer does what was asked.
+    ULONGLONG netAnsweredAt = 0; // Tick count of the last yes
+    static const ULONGLONG NET_FRESH_MS = 2000;
+    bool reloadWhenReachable = false; // A load of the tab was put off until the share has answered
+    PendingAction netPending;         // What the user asked for meanwhile: open, menu, delete, ...
+    static const ULONGLONG NET_ACTION_WAIT_MS = 5000;
+    bool ShareJustAnswered() const; // Also true for a tab that shows no network folder
+    void WhenShareAnswers(std::function<void()> action);
+    int IconIndexByPath(const std::wstring &path) const; // -1 if no icon shows that file
     // A share that answered last time but lets the current probe wait has most
     // likely just gone away: netState only changes when the probe gives up,
     // which takes SMB tens of seconds.
@@ -726,7 +743,11 @@ private:
     static const UINT_PTR DESKTOP_RETRY_TIMER_ID = 12;
     UINT desktopRetryMs = 0;
     static const UINT NET_PROBE_MS = 10000;
-    static const int NET_RELIST_EVERY = 6; // Re-list every 6th probe: change notifications are unreliable on a NAS
+    static const UINT NET_PROBE_MAX_MS = 300000;
+    // Change notifications are unreliable on a NAS: when the pointer comes in and
+    // the last listing is older than this, the folder is listed again.
+    static const ULONGLONG NET_RELIST_MS = 60000;
+    void OnPointerEntered();
 
     // Details-view column resize state
     bool isResizingColumn = false;
