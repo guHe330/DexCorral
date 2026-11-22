@@ -34,8 +34,10 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "PendingAction.h"
 #include "IconStamp.h"
 #include <memory>
+#include <functional>
 #include <set>
 #include "Config.h"
 #include "DesktopIcons.h"
@@ -704,6 +706,17 @@ private:
     int netProbeCount = 0;
     ULONGLONG netProbeStarted = 0;     // Tick count of the probe in flight
     bool relistWhenReachable = false;  // The folder reported a change: re-list once the share has answered
+    // "Reachable" is up to NET_PROBE_MS old, and a share can go away in between.
+    // So the folder is touched on this thread only within NET_FRESH_MS of a yes.
+    // Otherwise the share is asked first, and the answer does what was asked.
+    ULONGLONG netAnsweredAt = 0; // Tick count of the last yes
+    static const ULONGLONG NET_FRESH_MS = 2000;
+    bool reloadWhenReachable = false; // A load of the tab was put off until the share has answered
+    PendingAction netPending;         // What the user asked for meanwhile: open, menu, delete, ...
+    static const ULONGLONG NET_ACTION_WAIT_MS = 5000;
+    bool ShareJustAnswered() const; // Also true for a tab that shows no network folder
+    void WhenShareAnswers(std::function<void()> action);
+    int IconIndexByPath(const std::wstring &path) const; // -1 if no icon shows that file
     // A share that answered last time but lets the current probe wait has most
     // likely just gone away: netState only changes when the probe gives up,
     // which takes SMB tens of seconds.

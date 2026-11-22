@@ -578,8 +578,49 @@ bool CorralWindow::FolderKnownDead() const
            (netState == NetState::Unreachable || NetworkProbeOverdue());
 }
 
+bool CorralWindow::ShareJustAnswered() const
+{
+    if (!GetActiveTab().IsVirtual)
+        return true;
+    const std::wstring root = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+    if (!IsNetworkFolder(root))
+        return true;
+    return netProbeRoot == root && netState == NetState::Reachable &&
+           GetTickCount64() - netAnsweredAt < NET_FRESH_MS;
+}
+
+void CorralWindow::WhenShareAnswers(std::function<void()> action)
+{
+    netPending.Set(std::move(action), GetTickCount64());
+    StartNetworkProbe(); // One already on its way answers just as well
+}
+
+int CorralWindow::IconIndexByPath(const std::wstring &path) const
+{
+    for (size_t i = 0; i < icons.size(); i++)
+    {
+        if (!path.empty() && _wcsicmp(icons[i].fullPath.c_str(), path.c_str()) == 0)
+            return (int)i;
+    }
+    return -1;
+}
+
 void CorralWindow::LoadVirtualFolderIcons()
 {
+    // The share said yes, but not just now: it may be gone since, and listing
+    // it would block this thread. Ask first and keep what is shown; the answer
+    // loads. (A probe that is overdue is handled below: "connecting".)
+    {
+        const std::wstring shownRoot = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+        if (IsNetworkFolder(shownRoot) && netProbeRoot == shownRoot && netState == NetState::Reachable &&
+            !NetworkProbeOverdue() && !ShareJustAnswered())
+        {
+            reloadWhenReachable = true;
+            StartNetworkProbe();
+            return;
+        }
+    }
+
     // Set the loaded entries aside, by path. Whatever is not taken back in
     // the loop below is destroyed when this function returns.
     struct SetAside
@@ -1022,6 +1063,8 @@ void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
         return; // Not the answer being waited for
     netProbeInFlight = false;
     const std::wstring root = netProbeAsked;
+    // Taken out here: an answer that turns out to be about another folder drops it
+    const std::function<void()> asked = netPending.Take(GetTickCount64(), NET_ACTION_WAIT_MS);
 
     const bool onNetworkTab = GetActiveTab().IsVirtual && IsNetworkFolder(Utf8ToWide(GetActiveTab().VirtualFolderPath));
     if (!onNetworkTab)
@@ -1033,8 +1076,11 @@ void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
     }
 
     const NetState answer = reachable ? NetState::Reachable : NetState::Unreachable;
+    if (reachable)
+        netAnsweredAt = GetTickCount64();
     if (answer != netState)
     {
+        reloadWhenReachable = false;
         DllLog(L"Network folder '%s': %s", root.c_str(), reachable ? L"reachable" : L"not reachable");
         netState = answer;
         netProbeCount = 0;
@@ -1045,12 +1091,20 @@ void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
     else if (reachable)
     {
         const bool due = ++netProbeCount % NET_RELIST_EVERY == 0;
-        if (due || relistWhenReachable)
+        if (reloadWhenReachable)
+        {
+            reloadWhenReachable = false;
+            relistWhenReachable = false;
+            LoadFiles();
+        }
+        else if (due || relistWhenReachable)
         {
             relistWhenReachable = false;
             ReloadFolderContents();
         }
     }
+    if (reachable && asked)
+        asked(); // What the user asked for while the answer was outstanding
 }
 
 void CorralWindow::OnFolderContentsChanged()
