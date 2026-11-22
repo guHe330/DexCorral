@@ -524,6 +524,13 @@ void CorralWindow::ReloadActiveTab()
     // watchers, its icon size and spacing, its scroll position, its icons.
     // Also needed when the active index stays the same but the tab behind it
     // is another one (a tab was closed or detached).
+    // What is known about a share belongs to the tab shown before, even if the
+    // new one shows the same share: it is asked first, and nothing waits for it.
+    netProbeRoot.clear();
+    netState = NetState::Unknown;
+    reloadWhenReachable = false;
+    netPending = PendingAction();
+
     InitializeFolderWatcher(); // Drops the old watchers; starts new ones for a virtual tab
 
     iconSize = GetIconSizeForViewMode();
@@ -860,6 +867,11 @@ void CorralWindow::NavigateUp()
     CorralTabConfig &tab = GetActiveTab();
     if (tab.CurrentSubPath.empty())
         return;
+    if (!ShareJustAnswered())
+    {
+        WhenShareAnswers([this]() { NavigateUp(); });
+        return;
+    }
 
     // Strip trailing separators then the last path component
     std::string sub = tab.CurrentSubPath;
@@ -1031,6 +1043,13 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                     // StartShellDrag only returns once the drag is over.
                     if (window->GetActiveTab().IsVirtual)
                     {
+                        // The drag reads the files. Ask a share first; the next
+                        // mouse move after its answer starts the drag.
+                        if (!window->ShareJustAnswered())
+                        {
+                            window->StartNetworkProbe();
+                            return 0;
+                        }
                         window->StartShellDrag();
                         return 0;
                     }

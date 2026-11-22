@@ -434,6 +434,11 @@ void CorralWindow::OpenSelection()
     std::vector<int> sel = GetSelectedIndices();
     if (sel.empty())
         return;
+    if (!ShareJustAnswered())
+    {
+        WhenShareAnswers([this]() { OpenSelection(); });
+        return;
+    }
 
     // A single sub-folder navigates inline, matching the double-click behaviour.
     if (sel.size() == 1 && GetActiveTab().IsVirtual && icons[sel[0]].isFolder)
@@ -503,6 +508,11 @@ void CorralWindow::InvokeVerbOnSelection(const char *verb)
     std::vector<int> sel = GetSelectedIndices();
     if (sel.empty())
         return;
+    if (!ShareJustAnswered())
+    {
+        WhenShareAnswers([this, v = std::string(verb)]() { InvokeVerbOnSelection(v.c_str()); });
+        return;
+    }
 
     // Group by parent folder: GetUIObjectOf takes a PIDL array, but every PIDL in it
     // must be a child of the same folder. A corral tab can mix user desktop, public
@@ -582,6 +592,11 @@ void CorralWindow::InvokeVerbOnFolder(const char *verb)
     std::wstring path = GetActiveTab().IsVirtual ? GetVirtualCurrentPath() : GetDesktopPath();
     if (path.empty() || FolderKnownDead()) // A share that does not answer would block right here
         return;
+    if (!ShareJustAnswered())
+    {
+        WhenShareAnswers([this, v = std::string(verb)]() { InvokeVerbOnFolder(v.c_str()); });
+        return;
+    }
 
     LPITEMIDLIST pidl = nullptr;
     if (FAILED(SHParseDisplayName(path.c_str(), nullptr, &pidl, 0, nullptr)) || !pidl)
