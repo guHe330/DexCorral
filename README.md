@@ -62,7 +62,7 @@ Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 - Multi-monitor and resolution-aware layouts.
 - Pause from the tray menu: all Corrals step aside and the plain desktop is back, without restarting Explorer.
 - One settings window for language, update check, the Quick-Hide hotkey and debug logs.
-- Native C++ / Win32, ~1 MB executable + DLL, no runtime dependencies.
+- Native C++ / Win32, ~1.4 MB executable + DLL, no runtime dependencies.
 
 ## Requirements
 
