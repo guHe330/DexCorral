@@ -312,14 +312,25 @@ void CorralWindow::PinToBandTop()
         SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
+int CorralWindow::MessageBoxBehind(const wchar_t *body, const wchar_t *title, UINT flags)
+{
+    // The box is owned by this corral. Windows keeps an owner right behind its
+    // active popup, and would lift this corral and the others with it.
+    blockRaise++;
+    const int answer = MessageBoxW(hwnd, body, title, flags);
+    blockRaise--;
+    PinToBandTop(); // Whatever moved anyway goes back
+    return answer;
+}
+
 void CorralWindow::ActivateInPlace(bool foreground)
 {
-    blockRaise = true;
+    blockRaise++;
     if (foreground)
         SetForegroundWindow(hwnd);
     else
         SetFocus(hwnd);
-    blockRaise = false;
+    blockRaise--;
     PinToBandTop(); // Whatever moved anyway goes back, and this corral leads the band
 }
 

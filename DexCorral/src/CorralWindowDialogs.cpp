@@ -114,11 +114,11 @@ void CorralWindow::StartIconRename(int iconIndex)
         SetWindowSubclass(hEditControl, EditSubclassProc, 0, (DWORD_PTR)this);
 
         // Show and focus it; the popup comes to the front, the corrals stay behind
-        blockRaise = true;
+        blockRaise++;
         ShowWindow(hEditControl, SW_SHOW);
         SetForegroundWindow(hEditControl);
         SetFocus(hEditControl);
-        blockRaise = false;
+        blockRaise--;
     }
     else
     {
@@ -230,8 +230,8 @@ void CorralWindow::EndIconRename(bool save)
                 else
                 {
                     // Rename failed - could show error message
-                    MessageBoxW(hwnd, Tr(Str::Err_RenameFailedBody),
-                                Tr(Str::Err_RenameFailedTitle), MB_OK | MB_ICONERROR);
+                    MessageBoxBehind(Tr(Str::Err_RenameFailedBody), Tr(Str::Err_RenameFailedTitle),
+                                     MB_OK | MB_ICONERROR);
                 }
             }
         }
@@ -249,9 +249,9 @@ void CorralWindow::EndIconRename(bool save)
 
     if (editToDestroy)
     {
-        blockRaise = true; // Windows hands the activation back to the owning corral
+        blockRaise++; // Windows hands the activation back to the owning corral
         DestroyWindow(editToDestroy);
-        blockRaise = false;
+        blockRaise--;
     }
 
     if (hEditFont)

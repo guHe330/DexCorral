@@ -765,7 +765,10 @@ private:
     // Takes focus (or the foreground, for a menu) without coming to the front.
     // Activation raises every corral above other apps: all are owned by Progman.
     void ActivateInPlace(bool foreground = false);
-    static inline bool blockRaise = false; // App thread only
+    // A count, not a flag: a message box stays open while other code sets and clears it
+    static inline int blockRaise = 0; // App thread only
+    /// MessageBoxW owned by this corral. The corrals stay behind the other windows while it is open.
+    int MessageBoxBehind(const wchar_t *body, const wchar_t *title, UINT flags);
 
     // OLE drop target
     CorralDropTarget *dropTarget = nullptr;
