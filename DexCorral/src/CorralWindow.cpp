@@ -528,6 +528,7 @@ void CorralWindow::ReloadActiveTab()
     // new one shows the same share: it is asked first, and nothing waits for it.
     netProbeRoot.clear();
     netState = NetState::Unknown;
+    netRetryMs = NET_PROBE_MS;
     reloadWhenReachable = false;
     netPending = PendingAction();
 
@@ -958,6 +959,7 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (!window->mouseInsideWindow)
             {
                 window->mouseInsideWindow = true;
+                window->OnPointerEntered();
                 TRACKMOUSEEVENT tme = {sizeof(tme), TME_LEAVE, hwnd, 0};
                 TrackMouseEvent(&tme);
 

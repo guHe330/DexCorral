@@ -1077,27 +1077,35 @@ void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
 
     const NetState answer = reachable ? NetState::Reachable : NetState::Unreachable;
     if (reachable)
+    {
+        // No schedule for a share that answers: it is asked when something is wanted from it
         netAnsweredAt = GetTickCount64();
+        netRetryMs = NET_PROBE_MS;
+        KillTimer(hwnd, NET_PROBE_TIMER_ID);
+    }
+    else
+    {
+        SetTimer(hwnd, NET_PROBE_TIMER_ID, netRetryMs, nullptr);
+        netRetryMs = netRetryMs * 2 < NET_PROBE_MAX_MS ? netRetryMs * 2 : NET_PROBE_MAX_MS;
+    }
     if (answer != netState)
     {
         reloadWhenReachable = false;
         DllLog(L"Network folder '%s': %s", root.c_str(), reachable ? L"reachable" : L"not reachable");
         netState = answer;
-        netProbeCount = 0;
         relistWhenReachable = false;
         InitializeFolderWatcher(); // Starts the watchers when reachable, drops them when not
         LoadFiles();
     }
     else if (reachable)
     {
-        const bool due = ++netProbeCount % NET_RELIST_EVERY == 0;
         if (reloadWhenReachable)
         {
             reloadWhenReachable = false;
             relistWhenReachable = false;
             LoadFiles();
         }
-        else if (due || relistWhenReachable)
+        else if (relistWhenReachable)
         {
             relistWhenReachable = false;
             ReloadFolderContents();
@@ -1105,6 +1113,25 @@ void CorralWindow::OnNetworkProbeDone(LONG seq, bool reachable)
     }
     if (reachable && asked)
         asked(); // What the user asked for while the answer was outstanding
+}
+
+void CorralWindow::OnPointerEntered()
+{
+    if (!GetActiveTab().IsVirtual)
+        return;
+    const std::wstring root = Utf8ToWide(GetActiveTab().VirtualFolderPath);
+    if (!IsNetworkFolder(root) || netProbeRoot != root)
+        return;
+    if (netState != NetState::Reachable)
+    {
+        netRetryMs = NET_PROBE_MS; // Somebody is looking: do not make them wait out a long pause
+        StartNetworkProbe();
+    }
+    else if (GetTickCount64() - netAnsweredAt > NET_RELIST_MS)
+    {
+        relistWhenReachable = true;
+        StartNetworkProbe();
+    }
 }
 
 void CorralWindow::OnFolderContentsChanged()
