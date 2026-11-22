@@ -411,7 +411,9 @@ void CorralWindow::ShowRenameDialog()
     std::wstring currentTitle = Utf8ToWide(GetActiveTab().Title);
     wcsncpy_s(nameBuffer, currentTitle.c_str(), _TRUNCATE);
 
+    blockRaise++; // The prompt is owned by this corral: see MessageBoxBehind
     const INT_PTR result = PromptForName(hwnd, Tr(Str::Dlg_RenameTab), nameBuffer) ? IDOK : IDCANCEL;
+    blockRaise--;
     PinToBandTop();
 
     if (result == IDOK && wcslen(nameBuffer) > 0)
@@ -1499,12 +1501,14 @@ void CorralWindow::ShowAppearanceDialog()
     int originalSpacingX = config.IconSpacingXPercent;
     int originalSpacingY = config.IconSpacingYPercent;
 
+    blockRaise++; // Owned by this corral: see MessageBoxBehind
     INT_PTR result = DialogBoxIndirectParamW(
         GetModuleHandleW(nullptr),
         (DLGTEMPLATE *)dlgTemplate,
         hwnd,
         AppearanceDlgProc,
         (LPARAM)&dlgData);
+    blockRaise--;
     PinToBandTop();
 
     if (result != IDOK)

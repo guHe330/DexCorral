@@ -617,7 +617,10 @@ void CorralWindow::ChangeFolderPath()
     if (!GetActiveTab().IsVirtual)
         return;
 
+    blockRaise++; // The picker is owned by this corral: see MessageBoxBehind
     std::wstring newPath = BrowseForLocalFolder(hwnd, Tr(Str::Dlg_SelectVirtualFolder));
+    blockRaise--;
+    PinToBandTop();
     if (newPath.empty())
         return;
 
