@@ -51,12 +51,13 @@ Wallpaper above: **Matrix Rain Customizeable**, courtesy of Lively.
 <img src="docs/assets/screenshots/settings.png" alt="Settings window in light mode" width="270"> <img src="docs/assets/screenshots/appearance-icons-dark.png" alt="Appearance dialog in dark mode" width="255"> <img src="docs/assets/screenshots/menu-corral-dark.png" alt="Corral menu in dark mode" width="172">
 
 - Dialogs and menus follow the light or dark mode of Windows, or the one you choose.
+- Six ready-made looks, and a tab can follow the accent colour of Windows.
 - A look can be saved as a preset, loaded for one Corral or all, exported and imported.
 
 ### More features
 
 - Organize desktop icons into movable, resizable Corrals.
-- Per-Corral position lock against accidental moves.
+- Per-Corral position lock against accidental moves, and **Undo Last Move** for the ones that happen anyway.
 - Small, medium, large, and details views.
 - Catch-all Corral for new desktop items.
 - Multi-monitor and resolution-aware layouts.

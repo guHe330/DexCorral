@@ -4,6 +4,8 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-26
+
 ### Added
 - Presets of your own: **Save as...** in the Appearance dialog stores a look under a name. The same dialog loads a shipped or own preset for one Corral, and the settings window exports and imports your presets as a file. ([#167](https://github.com/guHe330/DexCorral/issues/167))
 - **Look** in the settings window: six ready-made looks (Automatic, Classic Blue, Light Glass, Dark Glass, Graphite, Compact). Choosing one shows it on an example Corral next to the window; **OK** puts it on every Corral and uses it for new ones. ([#164](https://github.com/guHe330/DexCorral/issues/164))

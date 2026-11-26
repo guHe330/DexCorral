@@ -67,20 +67,23 @@ The zip contains:
 <!-- Per-release, not cumulative: list only the changes since the last tag.
      Emptied after each release ships. -->
 
-- **Pause DexCorral** in the tray menu hides every Corral and shows all icons as ordinary desktop icons, without restarting Explorer. Choosing it again brings everything back; the pause is kept across sign-out and restart.
-- A settings window (**Settings...** in the tray menu) holds the language, the automatic update check, the Quick-Hide hotkey, debug logging and a button for the config folder. The hotkey is set by pressing the keys, and neither it nor debug logging needs `config.json` edited by hand any more.
-- The tray menu is shorter: **Language**, **Check for Updates Automatically** and **Open Config Folder** moved into the settings window.
-- A virtual Corral can show a folder on the network, a share or a mapped network drive. A share that does not answer no longer makes the other Corrals hang: the Corral shows "Folder unavailable" and fills again by itself when the share is back.
-- Right-clicking a Corral no longer brings every Corral in front of the open windows while the menu is shown, and a click on an icon no longer makes a Corral flash in front of a window.
-- A Corral keeps its look while an icon in it is renamed; only the name field appears over the label.
+- **Look** in the settings window: six ready-made looks (Automatic, Classic Blue, Light Glass, Dark Glass, Graphite, Compact), shown on an example Corral before you apply one to every Corral.
+- Presets of your own: **Save as...** in the Appearance dialog stores a look under a name, to load for one Corral or all. The settings window exports and imports them as a file.
+- **Windows accent color** in the Appearance dialog: a tab can take its background from the accent colour of Windows and follows it when it changes.
+- **Undo Last Move** in the right-click menu of every Corral takes back a move or resize, up to ten steps, together with the desktop icons it pushed out of the way.
+- A new look for the dialogs and menus: light or dark like Windows, or as you choose. The Appearance dialog is split into three pages and is a good third shorter.
+- Network folders: a share that goes away no longer freezes Explorer when you open something in its tab, and a share that answers is no longer asked every ten seconds, which could keep a NAS from going to sleep.
+- The Corrals stay behind the open windows while one of their dialogs or questions is shown.
+- A new Corral takes the nearest free place and no longer appears on top of another one.
+- Many fixes for drag and drop, renaming and the start of DexCorral with a missing desktop folder or a locked `config.json`.
 
 The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blob/main/docs/CHANGELOG.md).
 
 ### Known issues
 
 - Two files with the exact same filename on the user desktop and the Public desktop can't be told apart; DexCorral assumes the one on the user desktop.
-- A network folder is read on the thread all Corrals share. If a share stops answering between two reachability checks, Corrals can stall once until Windows gives up on it.
-- On some recent Windows 11 builds the desktop right-click menu no longer lists **New DexCorral** and **New Virtual DexCorral**. Both are in the tray menu and in the right-click menu of every Corral.
+- A network folder is read on the thread all Corrals share. If a share stops answering in the two seconds after DexCorral has checked it, or while the folder is being read, Corrals can stall once until Windows gives up on it.
+- On recent Windows 11 builds the desktop right-click menu no longer lists **New DexCorral** and **New Virtual DexCorral**. Hold Shift while right-clicking the desktop, or use the tray menu or the right-click menu of any Corral.
 - If Stardock Fences is started while DexCorral is already running, DexCorral can only tell you; it steps aside at the next sign-in.
 
 See [open issues](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+is%3Aopen+label%3Abug) for known bugs.

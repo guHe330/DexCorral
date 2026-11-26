@@ -65,6 +65,12 @@ User Interface
   system tray.
 * Network Folders: A virtual Corral can show a share or a mapped network
   drive; while the share does not answer it shows "Folder unavailable".
+* Looks and Presets: Six ready-made looks, a background that follows the
+  Windows accent color, and presets of your own to save, export and import.
+* Light and Dark: Dialogs and menus follow the mode of Windows, or the one
+  you choose.
+* Undo Last Move: Takes back an accidental move or resize of a Corral,
+  together with the desktop icons it pushed aside.
 
 Performance and Efficiency
 --------------------------
