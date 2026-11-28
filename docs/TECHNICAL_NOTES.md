@@ -19,7 +19,8 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | Key | Value | Why | Removed by the uninstaller |
 |---|---|---|---|
 | `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer and by `DexCorral.exe --register`, removed by `--unregister`. | Yes |
-| `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the **Language** choice in the settings window. | Yes |
+| `<root>\Software\DexCorral` | `Language` | The language chosen in Setup, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer. | Yes |
+| `HKCU\Software\DexCorral` | `Language` | The **Language** choice in the settings window, so that `DexCorral.exe`'s dialogs follow it too. Always per-user, and read before the `<root>` value; for a per-user install the two are the same value. | When you do not keep your configuration |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
 | `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | When you do not keep your configuration |
 | `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](USER_MANUAL.md#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | When you do not keep your configuration |
@@ -28,6 +29,8 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Second startup load path. No overlay is ever drawn. All-users installs only. | Yes |
+
+For a per-user install `<root>` is `HKCU`, so its uninstaller removes all of `HKCU\Software\DexCorral`. An all-users uninstall removes the `HKCU` values only for the account that runs it, and only when you do not keep your configuration; other accounts keep theirs.
 
 The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes. They are the reason an all-users registration needs Administrator rights; a per-user registration writes only to `HKCU` and needs none. Nothing else on the system is touched.
 

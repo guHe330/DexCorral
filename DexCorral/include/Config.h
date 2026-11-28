@@ -221,8 +221,8 @@ struct AppConfig
     long long LastUpdateCheckEpoch = 0;    // Unix time of the last check that got an answer (throttle)
 
     // UI language code ("en", "de"), set in the settings window.
-    // Empty = use the installer's choice (HKCU\Software\DexCorral\Language),
-    // falling back to English.
+    // Empty = use Software\DexCorral\Language from HKCU, then HKLM (written by
+    // the installer and the settings window), falling back to English.
     std::string Language = "";
 
     // Global hotkey that toggles quick-hide, e.g. "Ctrl+Alt+H" (see Hotkey.h for
