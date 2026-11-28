@@ -2273,7 +2273,7 @@ void CleanupCorralHook() {
     // WNDPROC is still ours. If another tool subclassed after us, restoring
     // would cut it out of the chain and break it; the safe move is to leave
     // our proc installed but inert (pure pass-through). The DLL never unloads
-    // while Explorer runs (DllCanUnloadNow → S_FALSE), so the proc stays valid.
+    // while Explorer runs (StartAppIfNeeded pins it), so the proc stays valid.
     if (g_hDesktopListView && g_OriginalListViewProc) {
         WNDPROC current = (WNDPROC)GetWindowLongPtrW(g_hDesktopListView, GWLP_WNDPROC);
         if (current == ListViewSubclassProc) {
