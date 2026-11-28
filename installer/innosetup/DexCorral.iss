@@ -731,6 +731,11 @@ begin
       // the other users' %APPDATA%, and should not: their settings are theirs.
       DelTree(ExpandConstant('{localappdata}\DexCorral'), True, True, True);
       DelTree(ExpandConstant('{userappdata}\DexCorral'), True, True, True);
+      // This account's settings in the registry too (Language, crash guard,
+      // Auto arrange). A me-only uninstall removes the key through [Registry]
+      // anyway; an all-users one left it, and its Language then overrode the
+      // language chosen for the next install.
+      RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, MarkerKey);
     end;
   end;
 end;
