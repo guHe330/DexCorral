@@ -2936,7 +2936,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
-    // Deferred catch-all adoption — waits out Explorer's inline rename
+    // Debounced config.json write (ScheduleConfigWrite)
     if (app && uMsg == WM_TIMER && wParam == CONFIG_WRITE_TIMER)
     {
         app->FlushConfigWrite();
@@ -2962,6 +2962,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    // Deferred catch-all adoption — waits out Explorer's inline rename
     if (app && uMsg == WM_TIMER && wParam == ADOPTION_TIMER)
     {
         app->ProcessPendingAdoptions();
