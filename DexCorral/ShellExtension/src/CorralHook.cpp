@@ -13,6 +13,7 @@
 #include "Version.h"
 #include "HookBridge.h"
 #include "AppMessages.h"
+#include "Strings.h"
 #include <Windows.h>
 #include <windowsx.h>
 #include <CommCtrl.h>
@@ -1176,7 +1177,7 @@ static void ShowAutoSortPopup() {
     g_hAutoSortPopupFont = CreateFontIndirectW(&ncm.lfMessageFont);
 
     // Static label
-    HWND label = CreateWindowExW(0, L"STATIC", L"Auto-sort moved your icon back.",
+    HWND label = CreateWindowExW(0, L"STATIC", Tr(Str::AutoSort_Body),
         WS_CHILD | WS_VISIBLE | SS_CENTER,
         S(8), S(8), w - S(16), S(20),
         g_hAutoSortPopup, nullptr, GetModuleHandleW(nullptr), nullptr);
@@ -1187,12 +1188,12 @@ static void ShowAutoSortPopup() {
     int totalW = S(POPUP_BTN_W) * 2 + gap;
     int startX = (w - totalW) / 2;
 
-    HWND disable = CreateWindowExW(0, L"BUTTON", L"Disable",
+    HWND disable = CreateWindowExW(0, L"BUTTON", Tr(Str::AutoSort_Disable),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         startX, btnY, S(POPUP_BTN_W), S(POPUP_BTN_H),
         g_hAutoSortPopup, (HMENU)(INT_PTR)IDC_DISABLE_BTN, GetModuleHandleW(nullptr), nullptr);
 
-    HWND keep = CreateWindowExW(0, L"BUTTON", L"Keep sorting",
+    HWND keep = CreateWindowExW(0, L"BUTTON", Tr(Str::AutoSort_Keep),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         startX + S(POPUP_BTN_W) + gap, btnY, S(POPUP_BTN_W), S(POPUP_BTN_H),
         g_hAutoSortPopup, (HMENU)(INT_PTR)IDC_KEEP_BTN, GetModuleHandleW(nullptr), nullptr);

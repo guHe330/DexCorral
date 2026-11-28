@@ -226,6 +226,13 @@ const wchar_t *const kEnglish[] = {
     /* Menu_RemoveFromCorral */    L"Remove from Corral",
     /* Menu_MoveToTab */           L"Move to Tab",
 
+    // Desktop right-click menu and auto-sort popup
+    /* Shell_NewCorralHelp */      L"Create a new Corral on the desktop",
+    /* Shell_NewVirtualCorralHelp */ L"Create a new virtual Corral that shows a folder",
+    /* AutoSort_Body */            L"Auto-sort moved your icon back.",
+    /* AutoSort_Disable */         L"Disable",
+    /* AutoSort_Keep */            L"Keep sorting",
+
     // Confirmations
     /* Confirm_CloseTabBody */     L"Close the tab \"{0}\"?\n\nIts icons go back to the desktop. No files are deleted.",
     /* Confirm_CloseVirtualTabBody */ L"Close the tab \"{0}\"?\n\nThe folder it shows and the files in it are not touched.",
@@ -543,6 +550,13 @@ const wchar_t *const kGerman[] = {
     /* Menu_DeleteCorral */        L"Corral löschen",
     /* Menu_RemoveFromCorral */    L"Aus dem Corral entfernen",
     /* Menu_MoveToTab */           L"In Tab verschieben",
+
+    // Desktop right-click menu and auto-sort popup
+    /* Shell_NewCorralHelp */      L"Ein neues Corral auf dem Desktop erstellen",
+    /* Shell_NewVirtualCorralHelp */ L"Ein neues virtuelles Corral erstellen, das einen Ordner zeigt",
+    /* AutoSort_Body */            L"Das Symbol wurde automatisch zurücksortiert.",
+    /* AutoSort_Disable */         L"Ausschalten",
+    /* AutoSort_Keep */            L"Beibehalten",
 
     // Confirmations
     /* Confirm_CloseTabBody */     L"Den Tab „{0}“ schließen?\n\nSeine Symbole kehren auf den Desktop zurück. Es werden keine Dateien gelöscht.",

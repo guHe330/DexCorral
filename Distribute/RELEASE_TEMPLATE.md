@@ -85,7 +85,7 @@ The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blo
 
 - Two files with the exact same filename on the user desktop and the Public desktop can't be told apart; DexCorral assumes the one on the user desktop.
 - A network folder is read on the thread all Corrals share. If a share stops answering in the two seconds after DexCorral has checked it, or while the folder is being read, Corrals can stall once until Windows gives up on it.
-- On recent Windows 11 builds the desktop right-click menu no longer lists **New DexCorral** and **New Virtual DexCorral**. Hold Shift while right-clicking the desktop, or use the tray menu or the right-click menu of any Corral.
+- On recent Windows 11 builds the desktop right-click menu no longer lists **Create New Corral** and **New Virtual Corral...**. Hold Shift while right-clicking the desktop, or use the tray menu or the right-click menu of any Corral.
 - If Stardock Fences is started while DexCorral is already running, DexCorral can only tell you; it steps aside at the next sign-in.
 
 See [open issues](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+is%3Aopen+label%3Abug) for known bugs.

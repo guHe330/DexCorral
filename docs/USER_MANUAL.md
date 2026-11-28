@@ -80,7 +80,7 @@ A local folder that is not there, for example on a USB drive that is not plugged
 ### Creating
 - Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab...**.
 - Choose **New Virtual Corral...** instead to pick a folder and create a Corral mirroring it.
-- The classic right-click menu of the desktop background offers **New DexCorral** and **New Virtual DexCorral** as well, and creates the Corral where you clicked. Hold **Shift** while you right-click the desktop to get that menu; see [Known Limitations](#known-limitations) for why.
+- The classic right-click menu of the desktop background offers **Create New Corral** and **New Virtual Corral...** as well, and creates the Corral where you clicked. Hold **Shift** while you right-click the desktop to get that menu; see [Known Limitations](#known-limitations) for why.
 
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
@@ -225,7 +225,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
-- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
+- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "Create New Corral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
 - **Create New Corral** / **New Virtual Corral...**.
 - **Show Desktop Icons**: toggle all native desktop icons. Not available while Quick-Hide is on; the check mark then shows what Quick-Hide gives back when it ends.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
@@ -256,7 +256,7 @@ Standby is also what DexCorral does when [Stardock Fences](#stardock-fences) is 
 - All your icons are ordinary desktop icons again. No Corrals are shown.
 - Your layout is safe. `config.json` is not changed, and everything comes back as it was.
 - The tray icon stays, with the tooltip "DexCorral is paused". Its menu shows why, and keeps About, User Manual, Settings and the update check.
-- The desktop right-click menu does not offer "New DexCorral".
+- The desktop right-click menu does not offer "Create New Corral".
 - It stays that way across restarts. DexCorral does not quietly try again at the next login.
 
 To leave a crash-guard standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. Installing a different DexCorral version also ends it, since a new build deserves a fresh attempt.
@@ -310,7 +310,7 @@ Which of the two you use is your choice. To use DexCorral, uninstall Stardock Fe
 
 - **Identical filenames on the user and Public desktop**: corral membership is stored as a bare filename, so DexCorral assumes the one on the user desktop. The same *display* name with different filenames (a folder `test` next to `test.txt`) is handled correctly.
 - **Network folders**: whether a share answers is checked in the background before DexCorral touches it, but the folder itself is read on the thread all Corrals share. If a share stops answering in the two seconds after such a check, or while the folder is being read, Corrals can stall once until Windows gives up on it. A new network Corral is empty until the first check has answered.
-- **"New DexCorral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Since the customizable context menu that Microsoft introduced with [KB5127936](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/10/kb5127936-windows-11-25h2-26h2-update) (October 2026, rolled out in phases; seen here after [KB5132061](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/11/kb5132061-windows-11-24h2-25h2-26h2-security-update), build 26200.9974), a plain right-click on the desktop shows the new menu, which does not list DexCorral. The registry setting that used to make the classic menu the default no longer has an effect there.
+- **"Create New Corral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Since the customizable context menu that Microsoft introduced with [KB5127936](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/10/kb5127936-windows-11-25h2-26h2-update) (October 2026, rolled out in phases; seen here after [KB5132061](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/11/kb5132061-windows-11-24h2-25h2-26h2-security-update), build 26200.9974), a plain right-click on the desktop shows the new menu, which does not list DexCorral. The registry setting that used to make the classic menu the default no longer has an effect there.
   - **Hold Shift and right-click the desktop**: this opens the classic menu with both entries. Microsoft describes it on the KB5127936 page: "To see more options, hold down Shift and right-click on your desktop."
   - Or create Corrals from the tray menu or from the right-click menu of any Corral.
 

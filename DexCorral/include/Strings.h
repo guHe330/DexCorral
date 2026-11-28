@@ -173,6 +173,14 @@ enum class Str
     Menu_RemoveFromCorral,       // "Remove from Corral"
     Menu_MoveToTab,              // "Move to Tab" (submenu listing the corral's other tabs)
 
+    // Desktop right-click menu and auto-sort popup (ShellExtension); the menu entries
+    // themselves reuse Menu_CreateNewCorral and Menu_NewVirtualCorral
+    Shell_NewCorralHelp,         // help text of Create New Corral
+    Shell_NewVirtualCorralHelp,  // help text of New Virtual Corral...
+    AutoSort_Body,               // "Auto-sort moved your icon back." (one line, about 280 px)
+    AutoSort_Disable,            // button: turn auto-sort off (about 80 px)
+    AutoSort_Keep,               // button: keep sorting (about 80 px)
+
     // Confirmations (CorralWindowCommands.cpp)
     Confirm_CloseTabBody,        // {0} = tab title; icons return to the desktop
     Confirm_CloseVirtualTabBody, // {0} = tab title; the folder is not touched

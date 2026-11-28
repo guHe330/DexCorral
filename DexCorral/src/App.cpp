@@ -131,7 +131,7 @@ static const UINT WM_DESKTOP_FILE_DELETED = WM_APP + 105;
 
 // DexCorralShellExt::InvokeCommand (ShellExtension.cpp) runs on EXPLORER'S OWN UI
 // thread — Explorer calls IContextMenu::InvokeCommand directly when the user picks
-// "New DexCorral"/"New Virtual DexCorral" from the desktop's native right-click menu.
+// "Create New Corral"/"New Virtual Corral..." from the desktop's native right-click menu.
 // It must not call CreateCorralAt/CreateVirtualCorralAt itself: those read/mutate
 // App::corrals (and create a new window), which belong to this thread. The click
 // point rides along as (wParam, lParam) so the corral appears where the user asked.
@@ -2869,7 +2869,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
-    // "New DexCorral" / "New Virtual DexCorral" picked from Explorer's own desktop
+    // "Create New Corral" / "New Virtual Corral..." picked from Explorer's own desktop
     // context menu — posted from DexCorralShellExt::InvokeCommand, which runs on
     // Explorer's UI thread (see WM_CREATE_CORRAL_AT comment above). The payload is
     // the invocation point in screen coordinates; the placement search runs here,
