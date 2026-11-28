@@ -2333,6 +2333,45 @@ IDropTarget *CorralWindow::BindIconDropTarget(int iconIndex)
     return target;
 }
 
+bool CorralWindow::CorralShellTakesDropAt(POINT screenPt, IDataObject *data, DWORD keyState)
+{
+    App *app = App::GetInstance();
+    if (!app || !data)
+        return false;
+    HWND root = GetAncestor(WindowFromPoint(screenPt), GA_ROOT);
+    for (const auto &corral : app->GetCorrals())
+    {
+        if (corral->GetHWND() != root)
+            continue;
+        // As CorralDropTarget::EffectAt decides, so the result is what the cursor showed
+        POINT client = screenPt;
+        ScreenToClient(root, &client);
+        // An inactive tab: EffectAt shows what that tab would take
+        const int tab = corral->HitTestTab(client.x, client.y);
+        if (tab >= 0 && tab != corral->config.ActiveTabIndex && tab < (int)corral->config.Tabs.size())
+            return corral->config.Tabs[tab].IsVirtual;
+        const int hit = corral->HitTestDropIcon(client.x, client.y);
+        if (hit >= 0 && corral->FolderAnswers()) // Binding blocks on a share that does not answer
+        {
+            if (IDropTarget *target = corral->BindIconDropTarget(hit))
+            {
+                DWORD effect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
+                bool takes = false;
+                if (SUCCEEDED(target->DragEnter(data, keyState | MK_LBUTTON, {screenPt.x, screenPt.y}, &effect)))
+                {
+                    takes = effect != DROPEFFECT_NONE;
+                    target->DragLeave();
+                }
+                target->Release();
+                if (takes)
+                    return true;
+            }
+        }
+        return corral->GetActiveTab().IsVirtual;
+    }
+    return false;
+}
+
 bool CorralWindow::DesktopIconTakesDropsAt(POINT screenPt, IDataObject *data, DWORD keyState)
 {
     const std::wstring name = DesktopIcons::GetVisibleIconParsingNameAt(screenPt.x, screenPt.y);
@@ -2458,8 +2497,11 @@ namespace
             POINT pt;
             GetCursorPos(&pt);
             App *app = App::GetInstance();
+            // On a Corral or the desktop the drag comes home (OnIconDragEnd puts
+            // it in place), unless the spot hands it to the shell, as the cursor showed
             if (app && app->IsPointOnCorralOrDesktop(pt) &&
-                !CorralWindow::DesktopIconTakesDropsAt(pt, data, keyState))
+                !CorralWindow::DesktopIconTakesDropsAt(pt, data, keyState) &&
+                !CorralWindow::CorralShellTakesDropAt(pt, data, keyState))
             {
                 releasedAtHome = true;
                 return DRAGDROP_S_CANCEL;

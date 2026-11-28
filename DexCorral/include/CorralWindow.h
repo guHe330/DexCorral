@@ -295,6 +295,9 @@ public:
     /// a drag out of a corral released there goes to that icon. With data, asks
     /// the icon whether it takes that data (at the release, not cached).
     static bool DesktopIconTakesDropsAt(POINT screenPt, IDataObject *data = nullptr, DWORD keyState = 0);
+    // A shell drag released on a Corral: true when its drop target hands the
+    // drop to the shell (an icon that takes these files, or a virtual tab's folder)
+    static bool CorralShellTakesDropAt(POINT screenPt, IDataObject *data, DWORD keyState);
 
 private:
     // Virtual corral support
