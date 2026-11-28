@@ -104,6 +104,7 @@ const wchar_t *const kEnglish[] = {
     /* Msg_PresetExportFailed */   L"The file could not be written.",
     /* Msg_NotAPresetFile */       L"This file does not contain DexCorral presets.",
     /* Msg_PresetsImported */      L"Presets imported: {0}",
+    /* Msg_PresetsNotImported */   L"Not imported: {0}. You can keep at most {1} presets of your own.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
@@ -415,6 +416,7 @@ const wchar_t *const kGerman[] = {
     /* Msg_PresetExportFailed */   L"Die Datei konnte nicht geschrieben werden.",
     /* Msg_NotAPresetFile */       L"Diese Datei enthält keine DexCorral-Vorlagen.",
     /* Msg_PresetsImported */      L"Importierte Vorlagen: {0}",
+    /* Msg_PresetsNotImported */   L"Nicht importiert: {0}. Sie können höchstens {1} eigene Vorlagen haben.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",

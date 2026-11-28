@@ -95,6 +95,7 @@ enum class Str
     Msg_PresetExportFailed,
     Msg_NotAPresetFile,
     Msg_PresetsImported,         // {0} = how many
+    Msg_PresetsNotImported,      // {0} = how many were left out, {1} = the limit
 
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby

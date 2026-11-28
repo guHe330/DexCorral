@@ -2109,15 +2109,20 @@ static void ImportPresets(HWND hDlg, SettingsDialogData *data)
         MessageBoxW(hDlg, Tr(Str::Msg_NotAPresetFile), Tr(Str::Title_Settings), MB_OK | MB_ICONWARNING);
         return;
     }
-    const int taken = Presets::Merge(*data->own, read);
+    int full = 0;
+    const int taken = Presets::Merge(*data->own, read, &full);
     if (taken > 0)
     {
         data->presetsChanged = true;
         data->demo.reset();
         SettingsFillLooks(hDlg, data); // Back to "keep the current look": the entries moved
     }
-    MessageBoxW(hDlg, TrFmt(Str::Msg_PresetsImported, std::to_wstring(taken)).c_str(), Tr(Str::Title_Settings),
-                MB_OK | MB_ICONINFORMATION);
+    std::wstring message = TrFmt(Str::Msg_PresetsImported, std::to_wstring(taken));
+    if (full > 0)
+        message += L"\n\n" + TrFmt(Str::Msg_PresetsNotImported, std::to_wstring(full),
+                                   std::to_wstring(Presets::MAX_OWN));
+    MessageBoxW(hDlg, message.c_str(), Tr(Str::Title_Settings),
+                MB_OK | (full > 0 ? MB_ICONWARNING : MB_ICONINFORMATION));
 }
 
 /// Where the demo Corral goes: beside the dialog, on whichever side has room

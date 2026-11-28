@@ -242,15 +242,20 @@ inline bool Remove(std::vector<LookPreset> &own, const std::string &name)
     return true;
 }
 
-/// Takes every preset of `from` into `own` through Upsert. Returns how many were taken.
-inline int Merge(std::vector<LookPreset> &own, const std::vector<LookPreset> &from)
+/// Takes every preset of `from` into `own` through Upsert. Returns how many were
+/// taken; `full`, if given, receives how many were left out because MAX_OWN was reached.
+inline int Merge(std::vector<LookPreset> &own, const std::vector<LookPreset> &from, int *full = nullptr)
 {
     int taken = 0;
+    if (full)
+        *full = 0;
     for (const auto &preset : from)
     {
         const UpsertResult r = Upsert(own, preset.Name, preset.Look);
         if (r == UpsertResult::Added || r == UpsertResult::Replaced)
             taken++;
+        else if (r == UpsertResult::Full && full)
+            (*full)++;
     }
     return taken;
 }
