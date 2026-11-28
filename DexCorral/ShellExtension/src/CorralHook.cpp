@@ -558,6 +558,7 @@ static bool EnsureDesktopFolderView() {
     IShellWindows* psw = nullptr;
     if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_LOCAL_SERVER,
                                 IID_PPV_ARGS(&psw))) || !psw) {
+        s_lastFailTick = GetTickCount() ? GetTickCount() : 1;
         return false;
     }
 
