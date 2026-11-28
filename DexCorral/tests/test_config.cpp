@@ -812,6 +812,33 @@ TEST_F(ConfigFiles, UnreadableFile_NotKept_HoldsSavesUntilTheCopyWorks) {
     EXPECT_NE(ReadText(path), broken);
 }
 
+TEST_F(ConfigFiles, OnlyLockedAtStart_IsNotWrittenOverOnceItReads) {
+    // Loaded from the backup because config.json could not be read nor kept;
+    // later it reads fine: it was newer than the backup and must survive
+    const std::wstring corrupt = Config::GetCorruptPath(path);
+    WriteText(corrupt, "older");
+    SetFileAttributesW(corrupt.c_str(), FILE_ATTRIBUTE_READONLY);
+    WriteText(path, "not json at all");
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    Config::LoadFrom(path, &status);
+    ASSERT_EQ(status, ConfigLoadStatus::NotKept);
+
+    ASSERT_TRUE(Config::SaveTo(path + L".good", OneCorral(7)));
+    const std::string good = ReadText(path + L".good");
+    WriteText(path, good);
+    DeleteFileW((path + L".good").c_str());
+    SetFileAttributesW(corrupt.c_str(), FILE_ATTRIBUTE_NORMAL);
+
+    EXPECT_FALSE(Config::SaveTo(path, OneCorral(1)));
+    EXPECT_TRUE(Config::SavesHeld());
+    EXPECT_EQ(ReadText(path), good);
+
+    // Deleting the file releases the hold (and leaves no held state behind)
+    DeleteFileW(path.c_str());
+    EXPECT_TRUE(Config::SaveTo(path, OneCorral(1)));
+    EXPECT_FALSE(Config::SavesHeld());
+}
+
 TEST_F(ConfigFiles, WrongType_CountsAsUnreadable) {
     // Valid JSON, but "Corrals" is not an array: must not be mistaken for a good file
     WriteText(path, "{ \"Corrals\": 5 }");
