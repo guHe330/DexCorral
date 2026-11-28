@@ -1381,6 +1381,10 @@ void CorralWindow::OnDpiChanged(UINT newDpi, const RECT *suggested)
         config.Height = savedHeight;
     }
 
+    // Before SetWindowPos: its WM_SIZE and WM_MOVE already render at the new DPI
+    iconSize = GetIconSizeForViewMode();
+    UpdateIconSpacingForViewMode();
+
     // MoveTo has already chosen the size for this DPI
     if (suggested && !isBeingPlaced)
     {
@@ -1389,8 +1393,8 @@ void CorralWindow::OnDpiChanged(UINT newDpi, const RECT *suggested)
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Icon size, grid spacing and the resolution of the loaded icon images are
-    // all fixed at load time, so a relayout alone would leave them at the old scale.
+    // The loaded icon images keep the resolution they were loaded at, so a
+    // relayout alone would leave them at the old scale.
     LoadFiles();
 }
 
