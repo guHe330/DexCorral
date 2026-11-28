@@ -1533,8 +1533,7 @@ void CorralWindow::ShowAppearanceDialog()
         currentTintStrength = originalTintStrength;
         config.IconSpacingXPercent = originalSpacingX;
         config.IconSpacingYPercent = originalSpacingY;
-        CalculateIconLayout();
-        UpdateLayeredContent();
+        RecalculateLayout(); // Not only CalculateIconLayout: the spacing preview changed the cached pixel spacing
         // A preset saved or deleted in the dialog stays so; the look is back as it was
         if (dlgData.presetsChanged && App::GetInstance())
             App::GetInstance()->SaveConfig();
