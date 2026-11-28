@@ -91,17 +91,17 @@ void CorralWindow::StartIconRename(int iconIndex)
     if (hEditControl)
     {
         // Set font to match the rendered icon label. The labels use the
-        // system icon title font (DPI-aware, SPI_GETICONTITLELOGFONT); a
-        // hardcoded -11px font would render much smaller on high-DPI displays.
+        // system icon title font (SPI_GETICONTITLELOGFONT) at this Corral's DPI.
         LOGFONTW iconLogFont = {};
-        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0))
+        if (SystemParametersInfoForDpi(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0,
+                                       GetDpiForWindow(hwnd)))
         {
             iconLogFont.lfQuality = CLEARTYPE_QUALITY;
             hEditFont = CreateFontIndirectW(&iconLogFont);
         }
         else
         {
-            hEditFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            hEditFont = CreateFontW(-Dpi(11), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                                     DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                                     CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         }

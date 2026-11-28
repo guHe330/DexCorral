@@ -618,17 +618,19 @@ void CorralWindow::UpdateLayeredContent()
 
     if (!icons.empty() && (!config.IsRolledUp || isHoverExpanded))
     {
-        // Use the system icon title font (DPI-aware, matches desktop icon labels)
+        // Use the system icon title font at this Corral's DPI (matches desktop icon labels);
+        // plain SystemParametersInfoW would return it at the primary monitor's DPI.
         LOGFONTW iconLogFont = {};
         HFONT iconFont;
-        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0))
+        if (SystemParametersInfoForDpi(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0,
+                                       GetDpiForWindow(hwnd)))
         {
             iconLogFont.lfQuality = CLEARTYPE_QUALITY;
             iconFont = CreateFontIndirectW(&iconLogFont);
         }
         else
         {
-            iconFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            iconFont = CreateFontW(-Dpi(11), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         }
