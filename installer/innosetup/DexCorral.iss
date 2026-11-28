@@ -46,9 +46,12 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog commandline
 ; An upgrade keeps the mode of the install it replaces
 UsePreviousPrivileges=yes
-; 64-bit only
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+; 64-bit x64 Windows only. Not x64compatible: on Windows on Arm Explorer is a
+; native ARM64 process and cannot load the x64 hook DLL.
+ArchitecturesAllowed=x64os
+ArchitecturesInstallIn64BitMode=x64os
+; Writes the Setup log that CurStepChanged copies to %APPDATA%\DexCorral
+SetupLogging=yes
 ; Installer appearance
 WizardStyle=modern
 ; Small branding icon shown in the top-right corner of every wizard page.
