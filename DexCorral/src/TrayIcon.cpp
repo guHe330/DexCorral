@@ -66,14 +66,25 @@ void TrayIcon::UpdateTooltip(const std::wstring &tooltip)
     Shell_NotifyIconW(NIM_MODIFY, &nid);
 }
 
-bool TrayIcon::ShowBalloon(const std::wstring &title, const std::wstring &text)
+bool TrayIcon::ShowBalloon(const std::wstring &title, const std::wstring &text, DWORD icon,
+                           const std::wstring &clickUrl)
 {
     if (!m_visible)
         return false;
     NOTIFYICONDATAW balloon = nid;
     balloon.uFlags = NIF_INFO;
-    balloon.dwInfoFlags = NIIF_WARNING;
+    balloon.dwInfoFlags = icon;
     wcsncpy_s(balloon.szInfoTitle, title.c_str(), _TRUNCATE);
     wcsncpy_s(balloon.szInfo, text.c_str(), _TRUNCATE);
-    return Shell_NotifyIconW(NIM_MODIFY, &balloon) != FALSE;
+    if (!Shell_NotifyIconW(NIM_MODIFY, &balloon))
+        return false;
+    m_clickUrl = clickUrl; // A new balloon replaces the old one, and what its click opened
+    return true;
+}
+
+std::wstring TrayIcon::TakeClickUrl()
+{
+    std::wstring url;
+    url.swap(m_clickUrl);
+    return url;
 }

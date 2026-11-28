@@ -34,11 +34,16 @@ public:
     bool Show();   // Returns true if the icon was successfully added/updated.
     void Hide();
     void UpdateTooltip(const std::wstring &tooltip);
-    bool ShowBalloon(const std::wstring &title, const std::wstring &text); // Notification balloon; icon must be visible
+    // Notification balloon; the tray icon must be visible. icon: NIIF_INFO or NIIF_WARNING.
+    // clickUrl is what a click on this balloon opens (see TakeClickUrl).
+    bool ShowBalloon(const std::wstring &title, const std::wstring &text, DWORD icon,
+                     const std::wstring &clickUrl = std::wstring());
+    std::wstring TakeClickUrl(); // The last balloon's clickUrl, once
     bool IsVisible() const { return m_visible; }
 
 private:
     HWND hwnd;
     NOTIFYICONDATAW nid;
     bool m_visible = false;
+    std::wstring m_clickUrl;
 };

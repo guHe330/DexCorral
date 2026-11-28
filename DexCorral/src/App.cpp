@@ -158,7 +158,8 @@ static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
     if (!s_SafeModeNoticePending || !tray || !tray->IsVisible())
         return;
     const bool conflict = (GetCorralHookStandbyReason() == HookStandbyReason::Conflict);
-    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(conflict ? Str::Conflict_StandbyBalloon : Str::SafeMode_Body)))
+    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(conflict ? Str::Conflict_StandbyBalloon : Str::SafeMode_Body),
+                         NIIF_WARNING))
     {
         s_SafeModeNoticePending = false;
         DllLog(L"App: safe mode tray notice shown");
@@ -175,7 +176,8 @@ static void ShowConfigNoticeIfPending(TrayIcon *tray)
         return;
     bool restored = (s_ConfigNoticePending == ConfigLoadStatus::RestoredFromBackup);
     if (tray->ShowBalloon(Tr(restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
-                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody)))
+                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
+                          restored ? NIIF_INFO : NIIF_WARNING))
     {
         s_ConfigNoticePending = ConfigLoadStatus::Ok;
         DllLog(L"App: unreadable-config tray notice shown (restored=%d)", restored ? 1 : 0);
@@ -411,7 +413,8 @@ void App::ActivateDesktop()
     // a file and would otherwise just find that nothing happens.
     if (!ApplyQuickHideHotkey() && trayIcon)
         trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
-                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)),
+                              NIIF_WARNING);
 
     // Restore corrals
     RestoreCorrals();
@@ -512,7 +515,7 @@ void App::ResumeFromStandby()
     {
         // The recorded failures are cleared either way, so the next start is a normal one
         if (trayIcon)
-            trayIcon->ShowBalloon(Tr(Str::Resume_FailedTitle), Tr(Str::Resume_FailedBody));
+            trayIcon->ShowBalloon(Tr(Str::Resume_FailedTitle), Tr(Str::Resume_FailedBody), NIIF_WARNING);
         return;
     }
 
@@ -2335,7 +2338,8 @@ void App::ShowSettings()
 
     if (!hotkeyOk && trayIcon)
         trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
-                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)),
+                              NIIF_WARNING);
     if (updatesSwitchedOn)
         StartUpdateCheck(true); // immediate confirmation that checking works
 }
@@ -2642,14 +2646,14 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 app->ToggleQuickHide();
             return 0;
         }
-        // User clicked the "update available" balloon — open the release page.
+        // User clicked a balloon: only the "update available" one opens something
         if (lParam == NIN_BALLOONUSERCLICK)
         {
-            if (!app->pendingUpdateUrl.empty())
+            if (app->trayIcon)
             {
-                ShellExecuteW(nullptr, L"open", app->pendingUpdateUrl.c_str(),
-                              nullptr, nullptr, SW_SHOWNORMAL);
-                app->pendingUpdateUrl.clear();
+                const std::wstring url = app->trayIcon->TakeClickUrl();
+                if (!url.empty())
+                    ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             }
             return 0;
         }
@@ -2758,10 +2762,9 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         {
             if (result->Success && result->UpdateAvailable)
             {
-                app->pendingUpdateUrl = result->ReleaseUrl;
                 app->trayIcon->ShowBalloon(
                     Tr(Str::Update_AvailableTitle),
-                    TrFmt(Str::Update_AvailableBody, result->LatestVersion));
+                    TrFmt(Str::Update_AvailableBody, result->LatestVersion), NIIF_INFO, result->ReleaseUrl);
             }
             else if (result->UserInitiated)
             {
@@ -2769,11 +2772,11 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 if (result->Success)
                     app->trayIcon->ShowBalloon(
                         Tr(Str::Update_UpToDateTitle),
-                        TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION));
+                        TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION), NIIF_INFO);
                 else
                     app->trayIcon->ShowBalloon(
                         Tr(Str::Update_FailedTitle),
-                        Tr(Str::Update_FailedBody));
+                        Tr(Str::Update_FailedBody), NIIF_WARNING);
             }
         }
         return 0;

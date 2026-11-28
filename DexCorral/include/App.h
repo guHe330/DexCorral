@@ -262,7 +262,6 @@ private:
     // Releases query; the result arrives as WM_UPDATE_CHECK_DONE. userInitiated
     // bypasses the 24h throttle and surfaces "up to date" / "couldn't check".
     void StartUpdateCheck(bool userInitiated);
-    std::wstring pendingUpdateUrl; // Release page opened when the update balloon is clicked
     bool updateRetryUsed = false;  // A failed automatic check is retried once per session
     void ShowCreationMenu(POINT pt);
 
