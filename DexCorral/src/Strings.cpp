@@ -185,8 +185,9 @@ const wchar_t *const kEnglish[] = {
     /* Dlg_SelectVirtualFolder */  L"Select Folder for Virtual Corral",
     /* Err_InvalidFolderSelected */L"Invalid folder selected.",
     /* Info_NetworkFolder */       L"This folder is on the network.\n\n"
-                                   L"While it cannot be reached, the Corral shows \"Folder unavailable\". It fills "
-                                   L"again by itself within a few seconds of the share coming back.",
+                                   L"While it cannot be reached, the Corral shows \"Folder unavailable\". Once the share "
+                                   L"answers again, it fills by itself: after five minutes at the latest, or right away "
+                                   L"when you move the pointer over the Corral.",
     /* Err_FolderNotExist */       L"The specified folder does not exist.",
     /* Err_PathNotFolder */        L"The specified path is not a folder.",
     /* Title_InvalidFolder */      L"Invalid Folder",
@@ -263,7 +264,8 @@ const wchar_t *const kEnglish[] = {
     /* Col_DateModified */         L"Date modified",
 
     // Corral header states
-    /* Hdr_FolderUnavailable */    L"Folder unavailable\nRight-click to relink",
+    /* Hdr_FolderUnavailable */    L"Folder unavailable\nRight-click > Change Folder...",
+    /* Hdr_ShareUnavailable */     L"Folder unavailable\nTrying again by itself",
     /* Hdr_FolderConnecting */     L"Connecting...",
 
     // File size units
@@ -493,7 +495,8 @@ const wchar_t *const kGerman[] = {
     /* Err_InvalidFolderSelected */L"Ungültiger Ordner ausgewählt.",
     /* Info_NetworkFolder */       L"Dieser Ordner liegt im Netzwerk.\n\n"
                                    L"Solange er nicht erreichbar ist, zeigt das Corral \"Ordner nicht verfügbar\". "
-                                   L"Wenige Sekunden nachdem die Freigabe wieder da ist, füllt es sich von selbst.",
+                                   L"Sobald die Freigabe wieder antwortet, füllt es sich von selbst: spätestens nach fünf Minuten, "
+                                   L"oder sofort, wenn Sie den Mauszeiger über das Corral bewegen.",
     /* Err_FolderNotExist */       L"Der angegebene Ordner existiert nicht.",
     /* Err_PathNotFolder */        L"Der angegebene Pfad ist kein Ordner.",
     /* Title_InvalidFolder */      L"Ungültiger Ordner",
@@ -570,7 +573,8 @@ const wchar_t *const kGerman[] = {
     /* Col_DateModified */         L"Änderungsdatum",
 
     // Corral header states
-    /* Hdr_FolderUnavailable */    L"Ordner nicht verfügbar\nRechtsklick zum Neuverknüpfen",
+    /* Hdr_FolderUnavailable */    L"Ordner nicht verfügbar\nRechtsklick > Ordner ändern...",
+    /* Hdr_ShareUnavailable */     L"Ordner nicht verfügbar\nNeuer Versuch folgt von selbst",
     /* Hdr_FolderConnecting */     L"Verbinde...",
 
     // File size units

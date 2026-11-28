@@ -589,9 +589,17 @@ void CorralWindow::UpdateLayeredContent()
         {
             RECT mr = {Dpi(12), GetIconAreaTop() + Dpi(8), w - Dpi(12), h - Dpi(8)};
             if (mr.bottom > mr.top)
-                drawHeaderText(Tr(virtualFolderMissing ? Str::Hdr_FolderUnavailable : Str::Hdr_FolderConnecting), -1,
+            {
+                // A share that does not answer is asked again by itself: no hint to point the tab elsewhere
+                const bool shareAway = netState == NetState::Unreachable &&
+                                       IsNetworkFolder(Utf8ToWide(GetActiveTab().VirtualFolderPath));
+                const Str text = !virtualFolderMissing ? Str::Hdr_FolderConnecting
+                                 : shareAway           ? Str::Hdr_ShareUnavailable
+                                                       : Str::Hdr_FolderUnavailable;
+                drawHeaderText(Tr(text), -1,
                                DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOPREFIX,
                                mr, virtualFolderMissing ? RGB(255, 210, 210) : RGB(230, 230, 230));
+            }
         }
 
         if (hHdrTheme)

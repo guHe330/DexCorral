@@ -216,7 +216,8 @@ enum class Str
     Col_DateModified,            // "Date modified"
 
     // Corral header states (CorralWindowRender.cpp)
-    Hdr_FolderUnavailable,       // "Folder unavailable\nRight-click to relink"
+    Hdr_FolderUnavailable,       // "Folder unavailable\nRight-click > Change Folder..."
+    Hdr_ShareUnavailable,        // "Folder unavailable\nTrying again by itself" (network share)
     Hdr_FolderConnecting,        // "Connecting..."
 
     // File size units (CorralWindowRender.cpp)
