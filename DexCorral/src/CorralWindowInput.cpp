@@ -2625,21 +2625,22 @@ void CorralWindow::OnIconDragEnd()
     if (iconDragOutside)
     {
 
-        // Check if dropped on another corral
+        // Check if dropped on another corral: the one the user sees on top there.
+        // One with a dialog open (disabled) takes nothing, and the icons stay put.
         CorralWindow *targetCorral = nullptr;
+        bool overDisabledCorral = false;
 
         if (app)
         {
+            HWND root = GetAncestor(WindowFromPoint(screenPt), GA_ROOT);
             for (const auto &other : app->GetCorrals())
             {
-                if (other.get() == this)
-                    continue;
-
-                RECT otherRect;
-                GetWindowRect(other->GetHWND(), &otherRect);
-                if (PtInRect(&otherRect, screenPt))
+                if (other.get() != this && other->GetHWND() == root)
                 {
-                    targetCorral = other.get();
+                    if (IsWindowEnabled(root))
+                        targetCorral = other.get();
+                    else
+                        overDisabledCorral = true;
                     break;
                 }
             }
@@ -2670,7 +2671,7 @@ void CorralWindow::OnIconDragEnd()
                 }
             }
         }
-        else
+        else if (!overDisabledCorral)
         {
             // Dropped outside all corrals - remove from this corral (back to desktop)
             removeDraggedFromTab();
