@@ -136,8 +136,9 @@ bool CorralWindow::HitTestScrollbarThumb(int x, int y) const
 
 void CorralWindow::OnMouseWheel(int delta)
 {
-    // Only scroll if content exceeds visible area
-    if (!NeedsScrollbar())
+    // Only scroll if content exceeds visible area, and not content a rolled-up
+    // Corral does not show
+    if (!NeedsScrollbar() || (config.IsRolledUp && !isHoverExpanded))
         return;
 
     // Scroll proportionally - multiply first to avoid integer truncation for small deltas
@@ -854,14 +855,19 @@ void CorralWindow::ApplyResizeSnap(int &newLeft, int &newTop, int &newWidth, int
 // Mouse event handlers
 // ============================================================================
 
-void CorralWindow::OnLeftButtonDown(int x, int y)
+void CorralWindow::CancelPendingRename()
 {
-    // A fresh click cancels any pending (deferred) rename.
     if (pendingRenameIcon >= 0)
     {
         KillTimer(hwnd, RENAME_TIMER_ID);
         pendingRenameIcon = -1;
     }
+}
+
+void CorralWindow::OnLeftButtonDown(int x, int y)
+{
+    // A fresh click cancels any pending (deferred) rename.
+    CancelPendingRename();
 
     // Check resize area first (but not when rolled up, and not when locked) — except
     // where the top edge would steal a click meant for a tab; see HitTestResizeAllowingTabs.
@@ -1101,11 +1107,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
 void CorralWindow::OnLeftButtonDblClick(int x, int y)
 {
     // A double-click cancels any pending (deferred) rename — the user wants to open.
-    if (pendingRenameIcon >= 0)
-    {
-        KillTimer(hwnd, RENAME_TIMER_ID);
-        pendingRenameIcon = -1;
-    }
+    CancelPendingRename();
 
     // Double-click on title bar toggles roll-up
     if (y < GetTitleBarHeight())
@@ -1341,6 +1343,8 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
 
 void CorralWindow::OnRightButtonDown(int x, int y)
 {
+    CancelPendingRename();
+
     // Check title bar first - don't let scrolled icons consume clicks here
     if (y < GetTitleBarHeight())
     {

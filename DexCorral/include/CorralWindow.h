@@ -680,6 +680,7 @@ private:
     // schedules a rename after the double-click time; a double-click cancels it and opens.
     int pendingRenameIcon = -1;
     static const UINT_PTR RENAME_TIMER_ID = 6;
+    void CancelPendingRename(); // Any other click or key cancels it
 
     // Virtual corral support
     std::unique_ptr<FolderWatcher> folderWatcher;

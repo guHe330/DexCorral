@@ -263,7 +263,7 @@ void CorralWindow::OnTypeAheadTimeout()
 
 void CorralWindow::OnChar(wchar_t ch)
 {
-    if (isRenamingIcon || ch < L' ' || icons.empty())
+    if (isRenamingIcon || ch < L' ' || icons.empty() || (config.IsRolledUp && !isHoverExpanded))
         return;
 
     typeAheadPrefix += (wchar_t)towlower(ch);
@@ -303,10 +303,20 @@ bool CorralWindow::OnKeyDown(WPARAM vk)
     bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     bool alt = (GetKeyState(VK_MENU) & 0x8000) != 0;
 
+    CancelPendingRename();
+
+    // Rolled up, the icons are not drawn: no key may open, delete or rename
+    // them. Switching tabs still works.
+    if (config.IsRolledUp && !isHoverExpanded &&
+        !(vk == VK_TAB || (ctrl && (vk == VK_PRIOR || vk == VK_NEXT))))
+        return false;
+
     switch (vk)
     {
     case VK_F2:
-        if (selectedIcon >= 0)
+        // The focused icon only if it is selected: Ctrl+arrow moves the focus
+        // without selecting, and F2 must not rename an icon that is not marked
+        if (selectedIcon >= 0 && IsSelected(selectedIcon))
         {
             StartIconRename(selectedIcon);
             return true;
