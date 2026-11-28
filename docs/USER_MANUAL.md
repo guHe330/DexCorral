@@ -279,7 +279,13 @@ All settings (corral layouts, tabs, colors, fonts, assigned files) are stored in
 %APPDATA%\DexCorral\config.json
 ```
 
-The format is forward- and backward-compatible: fields missing from an older config simply get default values. The file is written automatically; if you edit it by hand, do so while DexCorral is not running.
+The format is forward- and backward-compatible: fields missing from an older config simply get default values.
+
+The file is written automatically. DexCorral reads it only when it starts and writes its own settings back after every change, also while paused, so a hand edit made while it runs is lost at the next save. DexCorral runs inside Explorer and has no Exit, so to edit the file by hand:
+
+1. Edit and save `config.json` without touching any Corral in between.
+2. Right away, end Explorer, which ends DexCorral before it can save again: in PowerShell, `Stop-Process -Name explorer -Force`.
+3. Windows usually starts Explorer again within a few seconds; if not, run `Start-Process explorer.exe`. DexCorral reads your edit when it starts. An install for all users comes back with Explorer. One for you only does not: run `DexCorral.exe --startup` from its folder, or sign out and back in.
 
 Two more files can appear next to it:
 

@@ -62,4 +62,4 @@ Fences is recognised by its entry in Windows' list of installed programs and by 
 
 ## A Quick-Hide hotkey with the Win key
 
-The hotkey field of the settings window cannot take a combination with the Win key. Set it as `QuickHideHotkey` in `config.json` instead, for example `"QuickHideHotkey": "Win+Alt+D"`, then sign out and back in. The settings window leaves such a hotkey alone unless you enter a new one.
+The hotkey field of the settings window cannot take a combination with the Win key. Set it as `QuickHideHotkey` in `config.json` instead, for example `"QuickHideHotkey": "Win+Alt+D"`. An edit made while DexCorral runs is overwritten at its next save, so follow the steps under [Configuration](USER_MANUAL.md#configuration) in the User Manual; the hotkey works once DexCorral has started again. The settings window leaves such a hotkey alone unless you enter a new one.
