@@ -84,6 +84,22 @@ if ($Clean -and (Test-Path $buildDir)) {
     Remove-Item -Recurse -Force $buildDir
 }
 
+# A cache made with a Visual Studio that is gone (another edition, an update
+# that moved it) names tools that no longer exist, and CMake does not look
+# again: drop the cache, keep the build output and the fetched dependencies
+$cache = Join-Path $buildDir "CMakeCache.txt"
+if (Test-Path $cache) {
+    $missing = Select-String -Path $cache -Pattern '^CMAKE_(MAKE_PROGRAM|C_COMPILER|CXX_COMPILER):FILEPATH=(.+)$' |
+        ForEach-Object { $_.Matches[0].Groups[2].Value.Trim() } |
+        Where-Object { [IO.Path]::IsPathRooted($_) -and -not (Test-Path -LiteralPath $_) }
+    if ($missing) {
+        Write-Host "CMake cache names tools that no longer exist; configuring afresh:" -ForegroundColor Yellow
+        $missing | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        Remove-Item -Force $cache
+        Remove-Item -Recurse -Force (Join-Path $buildDir "CMakeFiles") -ErrorAction SilentlyContinue
+    }
+}
+
 # Create build directory
 if (!(Test-Path $buildDir)) {
     New-Item -ItemType Directory -Path $buildDir | Out-Null
