@@ -45,7 +45,7 @@ The second check sees only hives that are currently loaded, which in practice me
 - **`InstallScope`**: `machine` or `user`
 - **`Version`**: the `DEXCORRAL_VERSION` of the registering binary
 
-They exist for the cross-mode conflict detection above. The rest of `Software\DexCorral` is untouched by registration: `Language` from Setup and the settings window, and in `HKCU` the values DexCorral writes at runtime, the crash guard's `HookStartPending`, `GuardLastFailure`, `GuardStandby` and `GuardVersion`, plus `AutoArrange` and `ConflictNoticeShown`.
+They exist for the cross-mode conflict detection above. The rest of `Software\DexCorral` is untouched by registration: `Language` from Setup and the settings window, and in `HKCU` the values DexCorral writes at runtime, the crash guard's `HookStartPending`, `GuardLastFailure`, `GuardStandby` and `GuardVersion`, plus `AutoArrange`, `SortMode` and `ConflictNoticeShown`.
 
 ## Registry keys, by mode
 

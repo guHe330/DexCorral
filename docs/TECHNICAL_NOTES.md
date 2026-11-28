@@ -25,6 +25,7 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | When you do not keep your configuration |
 | `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](USER_MANUAL.md#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | When you do not keep your configuration |
 | `HKCU\Software\DexCorral` | `AutoArrange` | Whether **Auto arrange icons** is on for the desktop. DexCorral arranges the free icons itself and keeps Explorer's own setting off, so the choice has to be remembered here. | When you do not keep your configuration |
+| `HKCU\Software\DexCorral` | `SortMode` | The last desktop **Sort by** (0 none, 1 name, 2 size, 3 item type, 4 date modified), so auto-arrange keeps sorting that way after Explorer restarts. | When you do not keep your configuration |
 | `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
 | `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
@@ -51,6 +52,14 @@ The [User Manual](USER_MANUAL.md#when-dexcorral-pauses-itself) describes what th
 What counts as a crash: Explorer ending within a minute of DexCorral's start, without a clean shutdown. That includes Explorer being ended from Task Manager or a script, which is why a single one is only noted and forgotten again if nothing follows.
 
 For scripts: `DexCorral.exe --reset-guard` clears the guard's memory, the same as **Resume**, effective at the next start.
+
+## How the desktop Sort by and auto-arrange are recognised
+
+DexCorral sorts and auto-arranges the free desktop icons itself, so it has to know when you choose **Sort by** or **Auto arrange icons** in the desktop's right-click menu. Windows does not document the commands behind these entries, and their names differ by language.
+
+Around each command of that menu, DexCorral reads Explorer's sort column and its auto-arrange flag. A command that changes the sort column is a **Sort by**, the new column says which one; a command that switches Explorer's auto-arrange is the auto-arrange entry, and DexCorral gives Explorer its own setting back and switches its own. The command is then known for the rest of the session, which is what puts DexCorral's check mark on **Auto arrange icons** and lets the same **Sort by** chosen a second time sort again.
+
+The command numbers seen on Windows 11 are kept as the starting point and are used whenever Explorer's state cannot be read. With debug logging on, `dllmain.log` notes each command whose number differs from them.
 
 ## How Stardock Fences is recognised
 
