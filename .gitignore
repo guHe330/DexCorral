@@ -79,3 +79,6 @@ installer/**/*.pfx
 
 # Local maintenance scripts
 downloads.ps1
+
+# Personal editor settings
+.vscode/settings.json
