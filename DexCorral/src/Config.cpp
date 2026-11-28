@@ -55,15 +55,14 @@ std::string Config::GetConfigPath()
 
 namespace
 {
-    /// Replaces a colour that is not "#" followed by at least six hex digits.
-    /// Every reader parses these with sscanf("%x") into a local it does not
-    /// initialise, so a hand-edited "#zzzzzz" would paint from stack garbage.
-    void FixHexColor(std::string &hex, const std::string &fallback)
+    /// Replaces a colour that is not "#" followed by exactly `digits` hex digits
+    /// (8 for ARGB, 6 for RGB), the same rule as presets. Every reader parses
+    /// these with sscanf("%x") into a local it does not initialise, so a
+    /// hand-edited "#zzzzzz" would paint from stack garbage, and an ARGB reader
+    /// skips a 6-digit colour and paints its default instead.
+    void FixHexColor(std::string &hex, size_t digits, const std::string &fallback)
     {
-        bool ok = hex.size() >= 7 && hex[0] == '#';
-        for (size_t i = 1; ok && i < hex.size(); i++)
-            ok = isxdigit((unsigned char)hex[i]) != 0;
-        if (!ok)
+        if (!Presets::IsHexColor(hex, digits))
             hex = fallback;
     }
 } // namespace
@@ -115,16 +114,16 @@ void Config::Normalize(AppConfig &config)
     static const CorralWindowConfig defaultCorral;
     static const CorralTabConfig defaultTab;
 
-    FixHexColor(config.DefaultColorHex, defaultApp.DefaultColorHex);
-    FixHexColor(config.DefaultHeaderFontColor, defaultApp.DefaultHeaderFontColor);
-    FixHexColor(config.DefaultIconTintColor, defaultApp.DefaultIconTintColor);
+    FixHexColor(config.DefaultColorHex, 8, defaultApp.DefaultColorHex);
+    FixHexColor(config.DefaultHeaderFontColor, 6, defaultApp.DefaultHeaderFontColor);
+    FixHexColor(config.DefaultIconTintColor, 6, defaultApp.DefaultIconTintColor);
     for (auto &corral : config.Corrals)
     {
-        FixHexColor(corral.IconTintColor, defaultCorral.IconTintColor);
+        FixHexColor(corral.IconTintColor, 6, defaultCorral.IconTintColor);
         for (auto &tab : corral.Tabs)
         {
-            FixHexColor(tab.ColorHex, defaultTab.ColorHex);
-            FixHexColor(tab.HeaderFontColor, defaultTab.HeaderFontColor);
+            FixHexColor(tab.ColorHex, 8, defaultTab.ColorHex);
+            FixHexColor(tab.HeaderFontColor, 6, defaultTab.HeaderFontColor);
         }
     }
 

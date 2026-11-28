@@ -525,19 +525,46 @@ TEST(Normalize, ReplacesMalformedColors) {
     EXPECT_EQ(cfg.DefaultColorHex, AppConfig().DefaultColorHex);
 }
 
+TEST(Normalize, ReplacesColorsWithTheWrongNumberOfDigits) {
+    // The ARGB readers skip anything shorter than 8 digits, and more than 8
+    // overflow "%x": validation must agree with them.
+    AppConfig cfg;
+    CorralWindowConfig corral;
+    CorralTabConfig tab;
+    tab.ColorHex = "#FF0000";
+    tab.HeaderFontColor = "#FFFFFFFF";
+    corral.IconTintColor = "#0000FF0";
+    corral.Tabs.push_back(tab);
+    cfg.Corrals.push_back(corral);
+    cfg.DefaultColorHex = "#7F0000FF00";
+    cfg.DefaultHeaderFontColor = "#FFFFF";
+
+    Config::Normalize(cfg);
+
+    EXPECT_EQ(cfg.Corrals[0].Tabs[0].ColorHex, CorralTabConfig().ColorHex);
+    EXPECT_EQ(cfg.Corrals[0].Tabs[0].HeaderFontColor, CorralTabConfig().HeaderFontColor);
+    EXPECT_EQ(cfg.Corrals[0].IconTintColor, CorralWindowConfig().IconTintColor);
+    EXPECT_EQ(cfg.DefaultColorHex, AppConfig().DefaultColorHex);
+    EXPECT_EQ(cfg.DefaultHeaderFontColor, AppConfig().DefaultHeaderFontColor);
+}
+
 TEST(Normalize, KeepsValidColors) {
     AppConfig cfg;
     CorralWindowConfig corral;
     CorralTabConfig tab;
     tab.ColorHex = "#7F00ff00";
     tab.HeaderFontColor = "#abcDEF";
+    corral.IconTintColor = "#123456";
     corral.Tabs.push_back(tab);
     cfg.Corrals.push_back(corral);
+    cfg.DefaultColorHex = "#80FFFFFF";
 
     Config::Normalize(cfg);
 
     EXPECT_EQ(cfg.Corrals[0].Tabs[0].ColorHex, "#7F00ff00");
     EXPECT_EQ(cfg.Corrals[0].Tabs[0].HeaderFontColor, "#abcDEF");
+    EXPECT_EQ(cfg.Corrals[0].IconTintColor, "#123456");
+    EXPECT_EQ(cfg.DefaultColorHex, "#80FFFFFF");
 }
 
 TEST(Normalize, LeavesValidValuesAlone) {
