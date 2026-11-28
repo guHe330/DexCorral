@@ -1026,7 +1026,10 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         if (id == IDC_APPEARANCE_RESET)
         { // Reset to Defaults: every control goes to the style a new corral would get
             if (App *app = App::GetInstance())
+            {
                 AppearanceLoadLook(hDlg, data, app->GetDefaultAppearance());
+                data->presetLoaded = true; // A new Corral's tabs share one look, so OK gives it to every tab
+            }
             return TRUE;
         }
 
