@@ -57,6 +57,8 @@ namespace
             BYTE buffer[4096];
             OVERLAPPED overlapped = {};
             overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            bool watching = false; // A request was taken: the folder was being watched
+            bool deleted = false;  // While it was: it has ended by itself
 
             while (overlapped.hEvent && WaitForSingleObject(watch->stop, 0) != WAIT_OBJECT_0)
             {
@@ -67,11 +69,13 @@ namespace
                         FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
                         &bytesReturned, &overlapped, nullptr))
                 {
-                    // The folder was removed, renamed or unmounted. Nothing restarts the
-                    // watch, so at least leave a trace of why changes stopped arriving.
-                    DllLog(L"Folder watch: '%s' ended (error %lu)", watch->path.c_str(), GetLastError());
+                    // The folder was removed or unmounted (or never takes requests)
+                    const DWORD error = GetLastError();
+                    DllLog(L"Folder watch: '%s' ended (error %lu)", watch->path.c_str(), error);
+                    deleted = watching && error == ERROR_ACCESS_DENIED;
                     break;
                 }
+                watching = true;
 
                 HANDLE handles[2] = {watch->stop, overlapped.hEvent};
                 if (WaitForMultipleObjects(2, handles, FALSE, INFINITE) != WAIT_OBJECT_0 + 1)
@@ -87,11 +91,13 @@ namespace
                 // reloads the whole folder either way. Coalescing a burst is the
                 // receiver's job (a restarted timer), so the last event is never lost.
                 const BOOL completed = GetOverlappedResult(hDir, &overlapped, &bytesReturned, FALSE);
+                const DWORD error = completed ? ERROR_SUCCESS : GetLastError(); // Before the callback changes it
                 if (watch->changed)
-                    watch->changed();
+                    watch->changed(false);
                 if (!completed)
                 {
-                    DllLog(L"Folder watch: '%s' ended (error %lu)", watch->path.c_str(), GetLastError());
+                    DllLog(L"Folder watch: '%s' ended (error %lu)", watch->path.c_str(), error);
+                    deleted = error == ERROR_ACCESS_DENIED; // What a deleted folder reports
                     break; // A share that went away would otherwise report itself in a loop
                 }
                 ResetEvent(overlapped.hEvent);
@@ -100,6 +106,11 @@ namespace
             if (overlapped.hEvent)
                 CloseHandle(overlapped.hEvent);
             CloseHandle(hDir);
+
+            // Only a deleted folder, so that a file system that fails every request
+            // cannot make the owner restart the watch in a loop
+            if (deleted && watch->changed)
+                watch->changed(true);
         }
 
         CloseHandle(watch->stop);

@@ -291,6 +291,10 @@ public:
     static bool AnimationsEnabled();             // False when Windows' "Animation effects" setting is off
     void PromptRename();                         // Rename dialog for the active tab (also offered right after creation)
     static std::wstring GetPublicDesktopPath(); // The all-users desktop folder
+    /// True over a free desktop icon that takes drops (folder, Recycle Bin, app):
+    /// a drag out of a corral released there goes to that icon. With data, asks
+    /// the icon whether it takes that data (at the release, not cached).
+    static bool DesktopIconTakesDropsAt(POINT screenPt, IDataObject *data = nullptr, DWORD keyState = 0);
 
 private:
     // Virtual corral support
@@ -701,6 +705,7 @@ private:
     std::unique_ptr<FolderWatcher> parentWatcher; // Watches parent dir to catch rename/delete of current folder
     bool reuseUnchangedIcons = false;             // Set for a reload after a folder change only
     bool virtualFolderMissing = false;            // Root folder unavailable (deleted/renamed/moved)
+    bool folderWatchEnded = false;                // A folder watcher ended by itself: the next reload restarts them
     bool isDemo = false;                          // Demo Corral of the settings window (see constructor)
     bool virtualFolderConnecting = false;         // Network root: first answer about its share still outstanding
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;

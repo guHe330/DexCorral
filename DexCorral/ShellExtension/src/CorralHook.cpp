@@ -1233,6 +1233,7 @@ static void CALLBACK AutoSortTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, D
 // or to produce an identity snapshot of all desktop icons
 static UINT g_PositionIconsMsg = 0;
 static UINT g_IconSnapshotMsg = 0;
+static UINT g_ItemParsingNameMsg = 0;    // Shell identity of one item, for a drop on it
 static UINT g_InstallDropTargetMsg = 0;  // Hands the drop-target install to the desktop thread
 static void InstallDropTargetHook();
 
@@ -1255,6 +1256,15 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
         std::vector<DesktopIconInfo> snapshot;
         BuildIconSnapshot(hwnd, snapshot);
         HookBridge::SetIconSnapshot(snapshot);
+        return 1;
+    }
+
+    // App-requested parsing name of item wParam. Same module and process, so
+    // lParam is the app's std::wstring.
+    if (g_ItemParsingNameMsg != 0 && uMsg == g_ItemParsingNameMsg) {
+        wchar_t parsing[PARSING_NAME_CCH] = {};
+        if (!lParam || !GetItemParsingName((int)wParam, parsing, PARSING_NAME_CCH)) return 0;
+        *(std::wstring*)lParam = parsing;
         return 1;
     }
 
@@ -2234,6 +2244,7 @@ bool InitializeCorralHook() {
     // Registered messages for identity-based icon positioning and snapshots
     g_PositionIconsMsg = RegisterWindowMessageW(L"DexCorral_PositionIconsByPath");
     g_IconSnapshotMsg = RegisterWindowMessageW(L"DexCorral_GetIconSnapshot");
+    g_ItemParsingNameMsg = RegisterWindowMessageW(L"DexCorral_GetItemParsingName");
     g_InstallDropTargetMsg = RegisterWindowMessageW(L"DexCorral_InstallDropTarget");
 
     // Force initial read from HookBridge. g_HiddenIcons belongs to the desktop

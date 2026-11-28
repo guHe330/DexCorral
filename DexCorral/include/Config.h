@@ -287,7 +287,9 @@ enum class ConfigLoadStatus
     Ok,                 /// config.json read cleanly
     Missing,            /// No config.json (first run): defaults returned
     RestoredFromBackup, /// config.json unreadable, config.bak used instead
-    Reset               /// config.json unreadable and no usable backup: defaults returned
+    Reset,              /// config.json unreadable and no usable backup: defaults returned
+    NotKept             /// config.json unreadable and could not be copied to config.corrupt.json:
+                        /// config.bak or defaults returned, and saves are held (see SavesHeld)
 };
 
 class Config
@@ -301,10 +303,14 @@ public:
      * A file that cannot be parsed is never silently replaced by defaults: it is
      * copied to config.corrupt.json and the last config that loaded cleanly
      * (config.bak) is used instead. `status` reports which of those happened.
+     * If the copy fails, saves are held until a later save manages it.
      */
     static AppConfig Load(ConfigLoadStatus *status = nullptr);
     /// False when the file could not be written; the previous file is left intact
     static bool Save(const AppConfig &config);
+    /// True while an unreadable config.json is not yet kept as config.corrupt.json:
+    /// each save retries the copy first and fails without writing while it fails
+    static bool SavesHeld();
 
     /// Load/Save against an explicit path (the unit tests use a temp folder)
     static AppConfig LoadFrom(const std::wstring &path, ConfigLoadStatus *status = nullptr);

@@ -43,7 +43,7 @@ Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group
 
 The uninstaller removes only what its own install mode created, including every registry entry ([the full list](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder)). If you do not keep your configuration, your own settings under `HKCU\Software\DexCorral` go as well. Other accounts' settings are left alone.
 
-After uninstalling, icons that were inside Corrals reappear as normal desktop icons where their Corral was. The icons of the tabs that were not showing all sit on one spot in the middle of their Corral, one on top of another, so rearrange them: right-click the desktop > **Sort by > Name**.
+After uninstalling, icons that were inside Corrals reappear as normal desktop icons where their Corral was. The icons of the tabs that were not showing all sit on one spot in the middle of their Corral, one on top of another: the uninstaller cannot reach DexCorral inside Explorer to spread them out. To avoid this, choose **Pause DexCorral** in the tray menu before you uninstall, which places them beside their Corral. Otherwise rearrange them: right-click the desktop > **Sort by > Name**.
 
 Portable package: before you delete its folder, run `DexCorral.exe --unregister` with the same `--scope` you registered with (Windows asks for Administrator rights for `--scope=machine`). This also ends the start at sign-in. More on leftovers in the [Technical Notes](TECHNICAL_NOTES.md#removing-a-portable-package).
 
@@ -73,7 +73,7 @@ It is a live view of that folder, and its icons are the real files, so dragging 
 
 The folder can be on the network: a share (`\\nas\photos`) or a mapped network drive. DexCorral asks in the background whether the share answers, without making the other Corrals wait for it. Until the first answer is in, the Corral shows **Connecting...**. While the share does not answer, for example at sign-in before the NAS is up, the Corral shows **Folder unavailable** and asks again: after ten seconds, then after twice as long each time, up to five minutes. It also asks at once when you move the pointer over the Corral. A share that answers is left alone, so a NAS can go to sleep: DexCorral asks it only when you do something in the Corral or the folder reports a change. Because many network devices do not report changes reliably, a network folder is also read again when you move the pointer over its Corral and the last reading is more than a minute old. Reading a large folder over a slow connection can make all Corrals pause for that moment.
 
-A local folder that is not there, for example on a USB drive that is not plugged in, also shows **Folder unavailable**. DexCorral looks for it again after five seconds, then after twice as long each time, up to once a minute, and fills the Corral when it finds it. If the folder is gone for good, right-click the Corral and choose **Change Folder...**.
+A local folder that is not there, for example on a USB drive that is not plugged in, also shows **Folder unavailable**. DexCorral looks for it again after five seconds, then after twice as long each time, up to once a minute, and right away when a drive is plugged in. It fills the Corral when it finds it. If the folder is gone for good, right-click the Corral and choose **Change Folder...**.
 
 ## Managing Corrals
 
@@ -184,7 +184,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 - **Drop a file onto an icon** inside a Corral to invoke its target, e.g. drop a document onto an application's icon to open it with that app.
 - **Click the label of a selected icon** once more (or press F2) to rename it in place. If the name contains a character Windows does not allow, or another file already has it, DexCorral says so and leaves the name open for editing; Esc gives up.
 - **Select several icons** with Ctrl+click, Shift+click, Ctrl+A or by dragging a rectangle over them. Dragging one of the selected icons carries all of them: to another Corral, back out to the desktop, or to a new place in the same Corral.
-- **Drag an icon into another application or an Explorer window** and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it. Moving it into another folder takes the file off the desktop, and so out of the Corral.
+- **Drag an icon into another application or an Explorer window**, or onto a desktop folder, app or the Recycle Bin, and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it, the Recycle Bin takes it. Moving it into another folder takes the file off the desktop, and so out of the Corral. Dropped anywhere else on the desktop, a document's icon included, it leaves the Corral and stays on the desktop at that spot.
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
 
 ### Keyboard
@@ -227,7 +227,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
-- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "Create New Corral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
+- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing are placed on free spots beside their Corral. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "Create New Corral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
 - **Create New Corral** / **New Virtual Corral...**.
 - **Show Desktop Icons**: toggle all native desktop icons. Not available while Quick-Hide is on; the check mark then shows what Quick-Hide gives back when it ends.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
@@ -292,7 +292,7 @@ The file is written automatically. DexCorral reads it only when it starts and wr
 Two more files can appear next to it:
 
 - `config.bak` is a copy of the last `config.json` that loaded without errors, refreshed each time DexCorral starts.
-- `config.corrupt.json` is written when `config.json` cannot be read, for example after a hand edit with a stray comma. DexCorral then loads `config.bak` instead, keeps your unreadable file under this name so you can repair it, and shows a tray notification saying so. With no usable backup it starts with a fresh layout.
+- `config.corrupt.json` is written when `config.json` cannot be read, for example after a hand edit with a stray comma. DexCorral then loads `config.bak` instead, keeps your unreadable file under this name so you can repair it, and shows a tray notification saying so. With no usable backup it starts with a fresh layout. If even this copy cannot be made (another program holds the file), DexCorral says so and saves none of your changes until it can, so the file is never written over.
 
 Deleting `config.json` still means "start over": the backup is not restored in that case.
 

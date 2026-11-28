@@ -325,3 +325,32 @@ TEST(HoverBlendTextOpacity, ClampsOutOfRangeInputs) {
     EXPECT_EQ(HoverBlendTextOpacity(100, -10), 100);
     EXPECT_EQ(HoverBlendTextOpacity(100, 400), 255);
 }
+
+// ---------------------------------------------------------------------------
+// Legacy icon alpha from the AND mask
+// ---------------------------------------------------------------------------
+
+TEST(AlphaFromMask, BlackUnderClearMaskBitBecomesOpaque) {
+    // black opaque, red opaque, transparent (mask set)
+    DWORD color[3] = {0x00000000, 0x00FF0000, 0x00000000};
+    const DWORD mask[3] = {0x00000000, 0x00000000, 0x00FFFFFF};
+    EXPECT_TRUE(AlphaFromMask(color, mask, 3));
+    EXPECT_EQ(color[0], 0xFF000000u);
+    EXPECT_EQ(color[1], 0xFFFF0000u);
+    EXPECT_EQ(color[2], 0x00000000u);
+}
+
+TEST(AlphaFromMask, ColourUnderSetMaskBitIsClearedToPremultipliedTransparent) {
+    DWORD color[1] = {0x00123456};
+    const DWORD mask[1] = {0x00FFFFFF};
+    EXPECT_TRUE(AlphaFromMask(color, mask, 1));
+    EXPECT_EQ(color[0], 0u);
+}
+
+TEST(AlphaFromMask, IconWithOwnAlphaIsLeftAlone) {
+    DWORD color[2] = {0x00000000, 0x80404040};
+    const DWORD mask[2] = {0x00FFFFFF, 0x00000000};
+    EXPECT_FALSE(AlphaFromMask(color, mask, 2));
+    EXPECT_EQ(color[0], 0x00000000u);
+    EXPECT_EQ(color[1], 0x80404040u);
+}

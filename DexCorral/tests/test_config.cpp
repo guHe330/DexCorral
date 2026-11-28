@@ -684,7 +684,10 @@ protected:
 
     void TearDown() override {
         for (const wchar_t* name : {L"\\config.json", L"\\config.bak", L"\\config.corrupt.json", L"\\config.json.tmp"})
+        {
+            SetFileAttributesW((dir + name).c_str(), FILE_ATTRIBUTE_NORMAL);
             DeleteFileW((dir + name).c_str());
+        }
         RemoveDirectoryW(dir.c_str());
     }
 
@@ -785,6 +788,28 @@ TEST_F(ConfigFiles, UnreadableFile_WithoutBackup_ResetsAndKeepsTheBadFile) {
     EXPECT_EQ(status, ConfigLoadStatus::Reset);
     EXPECT_TRUE(c.Corrals.empty());
     EXPECT_TRUE(Exists(Config::GetCorruptPath(path)));
+}
+
+TEST_F(ConfigFiles, UnreadableFile_NotKept_HoldsSavesUntilTheCopyWorks) {
+    const std::wstring corrupt = Config::GetCorruptPath(path);
+    WriteText(corrupt, "older");
+    SetFileAttributesW(corrupt.c_str(), FILE_ATTRIBUTE_READONLY); // CopyFileW cannot replace it
+    const std::string broken = "not json at all";
+    WriteText(path, broken);
+
+    ConfigLoadStatus status = ConfigLoadStatus::Ok;
+    Config::LoadFrom(path, &status);
+    EXPECT_EQ(status, ConfigLoadStatus::NotKept);
+    EXPECT_TRUE(Config::SavesHeld());
+
+    EXPECT_FALSE(Config::SaveTo(path, OneCorral(1)));
+    EXPECT_EQ(ReadText(path), broken);
+
+    SetFileAttributesW(corrupt.c_str(), FILE_ATTRIBUTE_NORMAL);
+    EXPECT_TRUE(Config::SaveTo(path, OneCorral(1)));
+    EXPECT_FALSE(Config::SavesHeld());
+    EXPECT_EQ(ReadText(corrupt), broken);
+    EXPECT_NE(ReadText(path), broken);
 }
 
 TEST_F(ConfigFiles, WrongType_CountsAsUnreadable) {

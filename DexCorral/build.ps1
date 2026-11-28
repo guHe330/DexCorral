@@ -33,6 +33,9 @@ if (Test-Path $hookDll) {
         # kills every other signed-in user's desktop.
         $session = (Get-Process -Id $PID).SessionId
         $explorers = Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session
+        # Our own restart, not a crash: clear the crash guard's "hook just installed"
+        # flag first, as the installer's RestartExplorer does (CrashGuard.h).
+        Remove-ItemProperty -Path "HKCU:\Software\DexCorral" -Name "HookStartPending" -ErrorAction SilentlyContinue
         $explorers | Stop-Process -Force -ErrorAction SilentlyContinue
         $explorers | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
         # Winlogon usually restarts the shell by itself. Start it only if it stays
@@ -184,9 +187,15 @@ if ($exitCode -eq 0) {
     # and the Portable_DexCorral_<version>.zip produced by CI).
     $zipName = if ($releaseVersion) { "DexCorral_${releaseVersion}.zip" } else { "DexCorral.zip" }
     $zipPath = Join-Path $buildDir $zipName
+    # Same license files as the release workflow ships; MIT asks for its notice
+    # with every copy. Copied next to the binaries so the zip gets the shipped names.
+    Copy-Item (Join-Path $sourceDir "..\LICENSE") (Join-Path $buildDir "LICENSE") -Force
+    Copy-Item (Join-Path $sourceDir "include\nlohmann\LICENSE.MIT") (Join-Path $buildDir "LICENSE-nlohmann-json.txt") -Force
     $filesToZip = @(
         (Join-Path $buildDir "DexCorralHook.dll"),
-        (Join-Path $buildDir "DexCorral.exe")
+        (Join-Path $buildDir "DexCorral.exe"),
+        (Join-Path $buildDir "LICENSE"),
+        (Join-Path $buildDir "LICENSE-nlohmann-json.txt")
     ) | Where-Object { Test-Path $_ }
 
     if ($filesToZip.Count -gt 0) {

@@ -187,12 +187,13 @@ static bool ShowConfigNoticeIfPending(TrayIcon *tray)
     if (s_ConfigNoticePending == ConfigLoadStatus::Ok || !tray || !tray->IsVisible())
         return false;
     bool restored = (s_ConfigNoticePending == ConfigLoadStatus::RestoredFromBackup);
-    if (tray->ShowBalloon(Tr(restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
-                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
+    bool notKept = (s_ConfigNoticePending == ConfigLoadStatus::NotKept);
+    if (tray->ShowBalloon(Tr(notKept ? Str::Config_NotKeptTitle : restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
+                          Tr(notKept ? Str::Config_NotKeptBody : restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
                           restored ? NIIF_INFO : NIIF_WARNING))
     {
         s_ConfigNoticePending = ConfigLoadStatus::Ok;
-        DllLog(L"App: unreadable-config tray notice shown (restored=%d)", restored ? 1 : 0);
+        DllLog(L"App: unreadable-config tray notice shown (restored=%d, notKept=%d)", restored ? 1 : 0, notKept ? 1 : 0);
         return true;
     }
     return false;
@@ -402,6 +403,8 @@ const wchar_t *App::TrayTooltip() const
     return Tr(standbyReason != HookStandbyReason::None || config.Paused ? Str::Tray_TooltipPaused : Str::Tray_Tooltip);
 }
 
+static void AppendInactiveTabIcons(const CorralWindow &corral, std::vector<IconPositionRequest> &out);
+
 void App::SetPaused(bool pause)
 {
     if (!desktopActive || config.Paused == pause)
@@ -418,6 +421,19 @@ void App::SetPaused(bool pause)
     if (pause)
     {
         ClearMoveUndo(); // The icons are about to be laid out as a plain desktop
+
+        // The icons of the tabs not showing are all parked on their Corral's
+        // centre: move them out beside it onto free cells, the way icons make
+        // room for a new Corral. Un-pause parks them again.
+        CacheDesktopIconPositions(); // The free icons, which they must not land on
+        std::vector<IconPositionRequest> parked;
+        for (auto &corral : corrals)
+            AppendInactiveTabIcons(*corral, parked);
+        for (auto &icon : parked)
+            cachedDesktopIconPositions.push_back({icon.displayName, icon.parsingName, icon.pt});
+        PushDesktopIconsFromCorrals();
+        InvalidateDesktopIconCache();
+
         for (auto &corral : corrals)
             corral->Hide();
     }
@@ -634,10 +650,12 @@ void App::LoadConfig()
 {
     ConfigLoadStatus status = ConfigLoadStatus::Ok;
     config = Config::Load(&status);
-    if (status == ConfigLoadStatus::RestoredFromBackup || status == ConfigLoadStatus::Reset)
+    if (status != ConfigLoadStatus::Ok && status != ConfigLoadStatus::Missing)
     {
         DllLog(L"App::LoadConfig: config.json unreadable (%s)",
-               status == ConfigLoadStatus::RestoredFromBackup ? L"restored from config.bak" : L"no usable backup, defaults");
+               status == ConfigLoadStatus::RestoredFromBackup ? L"restored from config.bak"
+               : status == ConfigLoadStatus::Reset            ? L"no usable backup, defaults"
+                                                              : L"no copy kept, saves held");
         s_ConfigNoticePending = status;
     }
 }
@@ -698,6 +716,8 @@ void App::FlushConfigWrite()
     if (!Config::Save(config))
     {
         DllLog(L"App: config.json could not be written (error %lu); the change is not saved", GetLastError());
+        if (Config::SavesHeld())
+            return; // The NotKept notice already said so
         // Once a session: every later change fails the same way
         static bool told = false;
         if (!told)
@@ -1356,6 +1376,51 @@ void App::UpdateHookHiddenIcons()
     HookBridge::UpdateHiddenIcons(icons);
 }
 
+// Where the icons of a Corral's other tabs are parked: all at its centre
+// (they are not rendered), in desktop ListView client coords
+static void AppendInactiveTabIcons(const CorralWindow &corral, std::vector<IconPositionRequest> &out)
+{
+    RECT r;
+    if (!GetWindowRect(corral.GetHWND(), &r))
+        return;
+    HWND hListView = DesktopIcons::GetDesktopListView();
+    POINT center = {(r.left + r.right) / 2, (r.top + r.bottom) / 2};
+    if (hListView)
+    {
+        ScreenToClient(hListView, &center);
+    }
+
+    int activeTabIndex = corral.GetConfig().ActiveTabIndex;
+    for (int t = 0; t < (int)corral.GetConfig().Tabs.size(); t++)
+    {
+        if (t == activeTabIndex)
+            continue; // Already handled by GetIconScreenPositions
+        const auto &tab = corral.GetConfig().Tabs[t];
+        if (tab.IsVirtual)
+            continue;
+        for (const auto &fileUtf8 : tab.Files)
+        {
+            IconPositionRequest req;
+            if (CorralWindow::IsSpecialIconEntry(fileUtf8))
+            {
+                std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
+                req.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
+                req.parsingName = L"::" + clsid;
+            }
+            else
+            {
+                req.parsingName = ResolveDesktopFilePath(IconUtils::Utf8ToWide(fileUtf8));
+                req.displayName = DesktopIcons::GetShellDisplayName(req.parsingName);
+            }
+            if (!req.displayName.empty() || !req.parsingName.empty())
+            {
+                req.pt = {center.x, center.y};
+                out.push_back(std::move(req));
+            }
+        }
+    }
+}
+
 void App::PositionHiddenIconsUnderCorrals()
 {
     // Position hidden icons at per-icon screen positions matching their visual
@@ -1374,46 +1439,7 @@ void App::PositionHiddenIconsUnderCorrals()
         auto iconPositions = corral->GetIconScreenPositions();
         requests.insert(requests.end(), iconPositions.begin(), iconPositions.end());
 
-        // For non-active tabs, position icons at corral center (they're not rendered)
-        RECT r;
-        if (!GetWindowRect(corral->GetHWND(), &r))
-            continue;
-        HWND hListView = DesktopIcons::GetDesktopListView();
-        POINT center = {(r.left + r.right) / 2, (r.top + r.bottom) / 2};
-        if (hListView)
-        {
-            ScreenToClient(hListView, &center);
-        }
-
-        int activeTabIndex = corral->GetConfig().ActiveTabIndex;
-        for (int t = 0; t < (int)corral->GetConfig().Tabs.size(); t++)
-        {
-            if (t == activeTabIndex)
-                continue; // Already handled by GetIconScreenPositions
-            const auto &tab = corral->GetConfig().Tabs[t];
-            if (tab.IsVirtual)
-                continue;
-            for (const auto &fileUtf8 : tab.Files)
-            {
-                IconPositionRequest req;
-                if (CorralWindow::IsSpecialIconEntry(fileUtf8))
-                {
-                    std::wstring clsid = CorralWindow::GetSpecialIconClsid(fileUtf8);
-                    req.displayName = DesktopIcons::GetSpecialIconDisplayName(clsid);
-                    req.parsingName = L"::" + clsid;
-                }
-                else
-                {
-                    req.parsingName = ResolveDesktopFilePath(IconUtils::Utf8ToWide(fileUtf8));
-                    req.displayName = DesktopIcons::GetShellDisplayName(req.parsingName);
-                }
-                if (!req.displayName.empty() || !req.parsingName.empty())
-                {
-                    req.pt = {center.x, center.y};
-                    requests.push_back(std::move(req));
-                }
-            }
-        }
+        AppendInactiveTabIcons(*corral, requests);
     }
 
     if (!requests.empty())

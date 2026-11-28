@@ -160,6 +160,11 @@ const wchar_t *const kEnglish[] = {
     /* Config_ResetBody */         L"config.json could not be read and no backup was usable, so DexCorral started "
                                    L"with a fresh layout. The unreadable file was kept as config.corrupt.json in "
                                    L"%APPDATA%\\DexCorral.",
+    /* Config_NotKeptTitle */      L"DexCorral could not read or back up its configuration",
+    /* Config_NotKeptBody */       L"config.json in %APPDATA%\\DexCorral could not be read, and DexCorral could not "
+                                   L"keep a copy of it as config.corrupt.json. So that the file is not lost, your "
+                                   L"changes are not saved until that copy can be made. Check that no other program "
+                                   L"is using the file.",
     /* Save_FailedTitle */         L"DexCorral could not save your changes",
     /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral could not be written. Your changes last "
                                    L"until you sign out, but they are not saved. Check that the file is not "
@@ -483,6 +488,11 @@ const wchar_t *const kGerman[] = {
     /* Config_ResetBody */         L"config.json konnte nicht gelesen werden und es gab keine brauchbare Sicherung, "
                                    L"daher startet DexCorral mit einem neuen Layout. Die unlesbare Datei liegt als "
                                    L"config.corrupt.json in %APPDATA%\\DexCorral.",
+    /* Config_NotKeptTitle */      L"DexCorral konnte seine Konfiguration nicht lesen und nicht sichern",
+    /* Config_NotKeptBody */       L"config.json in %APPDATA%\\DexCorral konnte nicht gelesen werden, und DexCorral "
+                                   L"konnte keine Kopie davon als config.corrupt.json anlegen. Damit die Datei nicht "
+                                   L"verloren geht, werden Ihre Änderungen erst gespeichert, wenn diese Kopie "
+                                   L"möglich ist. Prüfen Sie, ob ein anderes Programm die Datei verwendet.",
     /* Save_FailedTitle */         L"DexCorral konnte Ihre Änderungen nicht speichern",
     /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral konnte nicht geschrieben werden. Ihre "
                                    L"Änderungen bleiben bis zur Abmeldung erhalten, werden aber nicht gespeichert. "
