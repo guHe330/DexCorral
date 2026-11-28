@@ -161,6 +161,9 @@ const wchar_t *const kEnglish[] = {
     /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral could not be written. Your changes last "
                                    L"until you sign out, but they are not saved. Check that the file is not "
                                    L"read-only.",
+    /* Hook_InactiveTitle */       L"DexCorral cannot hide desktop icons",
+    /* Hook_InactiveBody */        L"The desktop did not let DexCorral take over its icons, so the icons in your "
+                                   L"Corrals may also show on the desktop. Sign out and back in to try again.",
 
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Hotkey not available",
@@ -475,6 +478,10 @@ const wchar_t *const kGerman[] = {
     /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral konnte nicht geschrieben werden. Ihre "
                                    L"Änderungen bleiben bis zur Abmeldung erhalten, werden aber nicht gespeichert. "
                                    L"Prüfen Sie, ob die Datei schreibgeschützt ist.",
+    /* Hook_InactiveTitle */       L"DexCorral kann keine Desktopsymbole ausblenden",
+    /* Hook_InactiveBody */        L"DexCorral konnte die Symbole des Desktops nicht übernehmen, daher können die "
+                                   L"Symbole Ihrer Corrals zusätzlich auf dem Desktop zu sehen sein. Melden Sie "
+                                   L"sich ab und wieder an, um es erneut zu versuchen.",
 
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Tastenkürzel nicht verfügbar",

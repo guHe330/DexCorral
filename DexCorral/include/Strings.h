@@ -119,6 +119,8 @@ enum class Str
     Config_ResetBody,            // where the unreadable file was kept
     Save_FailedTitle,            // config.json could not be written
     Save_FailedBody,             // changes last until sign-out only; check read-only
+    Hook_InactiveTitle,          // the hook could not take over the desktop icons
+    Hook_InactiveBody,           // icons show twice; sign out and in to try again
 
     // Quick-hide hotkey could not be registered (App.cpp)
     Hotkey_FailedTitle,          // "Hotkey not available"

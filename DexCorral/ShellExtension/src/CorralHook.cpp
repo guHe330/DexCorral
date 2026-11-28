@@ -149,6 +149,10 @@ static void GoInertAfterException(const wchar_t* where, DWORD exceptionCode) {
         RedrawWindow(g_hDesktopListView, nullptr, nullptr,
                      RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
     }
+
+    // Never a null window: that would post the message to Explorer's own thread
+    if (HWND appWnd = HookBridge::GetAppMessageWindow())
+        PostMessageW(appWnd, WM_HOOK_INACTIVE, 0, 0);
 }
 
 // Per-message bookkeeping for the subclass SEH wrappers (UI thread only;

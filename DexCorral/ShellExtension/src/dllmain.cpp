@@ -109,6 +109,8 @@ static DWORD WINAPI HookRetryThread(LPVOID param) {
     }
 
     Log(L"HookRetryThread: Gave up after all retries");
+    if (HWND hAppMsg = HookBridge::GetAppMessageWindow())
+        PostMessageW(hAppMsg, WM_HOOK_INACTIVE, 0, 0);
     return 0;
 }
 

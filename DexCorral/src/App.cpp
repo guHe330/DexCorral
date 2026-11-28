@@ -2718,6 +2718,19 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         }
     }
 
+    // Corrals keep showing, but their icons may also show on the desktop: say so, once
+    if (app && uMsg == WM_HOOK_INACTIVE)
+    {
+        static bool told = false;
+        if (!told)
+        {
+            told = true;
+            s_Notices.emplace_back(Str::Hook_InactiveTitle, Tr(Str::Hook_InactiveBody));
+            ShowNextNotice(app->trayIcon.get(), hwnd);
+        }
+        return 0;
+    }
+
     if (app && uMsg == WM_STANDBY_DIALOG)
     {
         app->ShowStandbyExplanation();
