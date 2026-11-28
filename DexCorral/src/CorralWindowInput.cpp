@@ -1759,19 +1759,31 @@ namespace
                ia.nFileIndexHigh == ib.nFileIndexHigh && ia.nFileIndexLow == ib.nFileIndexLow;
     }
 
+    /// The last parent folder asked about in one pass over dropped items. They
+    /// mostly share one, and comparing folders opens them (maybe on a share).
+    struct ParentMemo
+    {
+        std::wstring parent;
+        bool onDesktop = false;
+    };
+
     /// True if `path` names an item directly on the user or the public desktop.
-    bool IsDesktopItem(const std::wstring &path)
+    bool IsDesktopItem(const std::wstring &path, ParentMemo &memo)
     {
         std::wstring parent = ParentOf(path);
-        return IsSameDirectory(parent, CorralWindow::GetDesktopPath()) ||
-               IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
+        if (!memo.parent.empty() && lstrcmpiW(parent.c_str(), memo.parent.c_str()) == 0)
+            return memo.onDesktop;
+        memo.onDesktop = IsSameDirectory(parent, CorralWindow::GetDesktopPath()) ||
+                         IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
+        memo.parent = std::move(parent);
+        return memo.onDesktop;
     }
 
     /// True if a CF_HDROP path names an existing item on the user or public desktop.
     /// Its folder counts, not just its name: a file elsewhere may share a desktop file's name.
-    bool IsHdropDesktopFile(const wchar_t *filePath)
+    bool IsHdropDesktopFile(const wchar_t *filePath, ParentMemo &memo)
     {
-        return IsDesktopItem(filePath) && GetFileAttributesW(filePath) != INVALID_FILE_ATTRIBUTES;
+        return IsDesktopItem(filePath, memo) && GetFileAttributesW(filePath) != INVALID_FILE_ATTRIBUTES;
     }
 
     /// True if at least one CF_HDROP file is a file on the desktop.
@@ -1783,6 +1795,7 @@ namespace
             return false;
 
         bool found = false;
+        ParentMemo memo;
         if (HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal))
         {
             UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
@@ -1791,7 +1804,7 @@ namespace
                 wchar_t filePath[MAX_PATH];
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
-                found = IsHdropDesktopFile(filePath);
+                found = IsHdropDesktopFile(filePath, memo);
             }
             GlobalUnlock(stg.hGlobal);
         }
@@ -2212,13 +2225,14 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         if (hDrop)
         {
             UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+            ParentMemo memo;
             for (UINT i = 0; i < fileCount; i++)
             {
                 wchar_t filePath[MAX_PATH];
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
 
-                if (IsHdropDesktopFile(filePath))
+                if (IsHdropDesktopFile(filePath, memo))
                     addEntry(WideToUtf8(NameOf(filePath)));
             }
             GlobalUnlock(stgHdrop.hGlobal);
@@ -2239,6 +2253,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         {
             LPCITEMIDLIST pidlParent = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[0]);
 
+            ParentMemo memo; // A shell ID list has one parent for all its items
             for (UINT i = 0; i < pida->cidl; i++)
             {
                 LPCITEMIDLIST pidlChild = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[i + 1]);
@@ -2256,7 +2271,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
                     std::wstring fsPath = pszPath;
                     CoTaskMemFree(pszPath);
 
-                    if (IsDesktopItem(fsPath))
+                    if (IsDesktopItem(fsPath, memo))
                     {
                         addEntry(WideToUtf8(NameOf(fsPath)));
                     }
