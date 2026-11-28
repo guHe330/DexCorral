@@ -187,9 +187,15 @@ if ($exitCode -eq 0) {
     # and the Portable_DexCorral_<version>.zip produced by CI).
     $zipName = if ($releaseVersion) { "DexCorral_${releaseVersion}.zip" } else { "DexCorral.zip" }
     $zipPath = Join-Path $buildDir $zipName
+    # Same license files as the release workflow ships; MIT asks for its notice
+    # with every copy. Copied next to the binaries so the zip gets the shipped names.
+    Copy-Item (Join-Path $sourceDir "..\LICENSE") (Join-Path $buildDir "LICENSE") -Force
+    Copy-Item (Join-Path $sourceDir "include\nlohmann\LICENSE.MIT") (Join-Path $buildDir "LICENSE-nlohmann-json.txt") -Force
     $filesToZip = @(
         (Join-Path $buildDir "DexCorralHook.dll"),
-        (Join-Path $buildDir "DexCorral.exe")
+        (Join-Path $buildDir "DexCorral.exe"),
+        (Join-Path $buildDir "LICENSE"),
+        (Join-Path $buildDir "LICENSE-nlohmann-json.txt")
     ) | Where-Object { Test-Path $_ }
 
     if ($filesToZip.Count -gt 0) {
