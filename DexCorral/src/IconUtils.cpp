@@ -89,6 +89,15 @@ namespace IconUtils
         return false;
     }
 
+    std::wstring FolderTitleFromPath(const std::wstring &path)
+    {
+        std::wstring trimmed = path;
+        while (trimmed.size() > 1 && (trimmed.back() == L'\\' || trimmed.back() == L'/'))
+            trimmed.pop_back();
+        const size_t slash = trimmed.find_last_of(L"\\/");
+        return slash == std::wstring::npos ? trimmed : trimmed.substr(slash + 1);
+    }
+
     std::wstring Utf8ToWide(const std::string &utf8)
     {
         if (utf8.empty())

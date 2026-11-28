@@ -116,7 +116,7 @@ Right-click a Corral's title bar or background:
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
 - **Rename Tab**: change the current tab's title.
 - **Appearance...**: open the appearance dialog (see below).
-- **Change Folder...**: for virtual tabs, point the tab at a different folder.
+- **Change Folder...**: for virtual tabs, point the tab at a different folder. A tab named after its folder takes the name of the new one; a name you gave the tab yourself stays.
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
 - **Sort By**: on a normal tab, sorts the icons once by **Name** or **Type**; you can still drag them into any order afterwards, and new icons are added at the end. On a virtual tab it sets the standing sort column and direction, in every view.
 - **Catch-All (receives new files)**: make this tab the catch-all for new desktop items.

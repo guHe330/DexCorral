@@ -147,6 +147,13 @@ TEST(ContainsPath, ComparesWithoutCase) {
     EXPECT_FALSE(ContainsPath({}, L"C:\\Stuff\\tool.exe"));
 }
 
+TEST(FolderTitleFromPath, NeverEmpty) {
+    EXPECT_EQ(FolderTitleFromPath(L"C:\\Users\\me\\Downloads"), L"Downloads");
+    EXPECT_EQ(FolderTitleFromPath(L"D:\\"), L"D:");
+    EXPECT_EQ(FolderTitleFromPath(L"D:\\Photos\\"), L"Photos");
+    EXPECT_EQ(FolderTitleFromPath(L"\\\\nas\\photos"), L"photos");
+}
+
 // --- Audit #185: one UTF-8 conversion for the whole program -------------------
 
 TEST(Utf8, RoundTripsTextOutsideAscii) {

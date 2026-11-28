@@ -2571,9 +2571,7 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     if (CorralWindow::IsNetworkFolder(folderPath))
         MessageBoxW(messageWindow, Tr(Str::Info_NetworkFolder), Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
 
-    // Extract folder name for title
-    size_t lastSlash = folderPath.find_last_of(L"\\/");
-    std::wstring folderName = (lastSlash != std::wstring::npos) ? folderPath.substr(lastSlash + 1) : folderPath;
+    std::wstring folderName = IconUtils::FolderTitleFromPath(folderPath);
 
     // Convert wide string to UTF-8
     std::string utf8Path = CorralWindow::WideToUtf8(folderPath);

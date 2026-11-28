@@ -63,4 +63,8 @@ namespace IconUtils
     /// True if `path` is one of `paths`, ignoring case.
     bool ContainsPath(const std::vector<std::wstring> &paths, const std::wstring &path);
 
+    /// The tab title for a virtual folder: its last component, or "D:" for
+    /// the drive root "D:\".
+    std::wstring FolderTitleFromPath(const std::wstring &path);
+
 } // namespace IconUtils

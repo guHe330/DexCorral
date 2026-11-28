@@ -32,6 +32,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "FolderWatcher.h"
+#include "IconUtils.h"
 #include "Strings.h"
 #include <shobjidl.h>
 #include <Shlwapi.h>
@@ -41,7 +42,7 @@
 // File-local helper functions for folder browsing
 // ============================================================================
 
-static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title)
+static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title, const std::wstring &startFolder)
 {
     std::wstring result;
 
@@ -60,6 +61,13 @@ static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title)
         if (SUCCEEDED(hr))
         {
             pfd->SetTitle(title);
+        }
+
+        IShellItem *start = nullptr;
+        if (!startFolder.empty() && SUCCEEDED(SHCreateItemFromParsingName(startFolder.c_str(), nullptr, IID_PPV_ARGS(&start))))
+        {
+            pfd->SetFolder(start);
+            start->Release();
         }
 
         hr = pfd->Show(hwndOwner);
@@ -616,8 +624,12 @@ void CorralWindow::ChangeFolderPath()
     if (!GetActiveTab().IsVirtual)
         return;
 
+    // Open the picker where the tab is now. Not on a share that may not answer:
+    // looking it up would hang this thread.
+    const std::wstring oldPath = Utf8ToWide(GetActiveTab().VirtualFolderPath);
     blockRaise++; // The picker is owned by this corral: see MessageBoxBehind
-    std::wstring newPath = BrowseForLocalFolder(hwnd, Tr(Str::Dlg_SelectVirtualFolder));
+    std::wstring newPath = BrowseForLocalFolder(hwnd, Tr(Str::Dlg_SelectVirtualFolder),
+                                                FolderAnswers() ? oldPath : std::wstring());
     blockRaise--;
     PinToBandTop();
     if (newPath.empty())
@@ -643,11 +655,14 @@ void CorralWindow::ChangeFolderPath()
     GetActiveTab().VirtualFolderPath = WideToUtf8(newPath);
     GetActiveTab().CurrentSubPath.clear();
 
-    // Update title to folder name
-    size_t lastSlash = newPath.find_last_of(L"\\/");
-    std::wstring folderName = (lastSlash != std::wstring::npos) ? newPath.substr(lastSlash + 1) : newPath;
-    GetActiveTab().Title = WideToUtf8(folderName);
-    SetWindowTextW(hwnd, folderName.c_str());
+    // The title follows the folder, unless the user gave the tab a name of their own
+    // (an empty title is what older versions gave a drive root)
+    if (GetActiveTab().Title.empty() || GetActiveTab().Title == WideToUtf8(IconUtils::FolderTitleFromPath(oldPath)))
+    {
+        std::wstring folderName = IconUtils::FolderTitleFromPath(newPath);
+        GetActiveTab().Title = WideToUtf8(folderName);
+        SetWindowTextW(hwnd, folderName.c_str());
+    }
 
     // Restart watcher with new path
     InitializeFolderWatcher();
