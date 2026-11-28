@@ -236,6 +236,10 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Every release now ships a machine-readable bill of materials (`DexCorral_<version>_sbom.cdx.json`, CycloneDX) listing what DexCorral is built from, with a checksum for each component, so you can check what is inside a build without taking our word for it. The build verifies that the bundled JSON library still matches its recorded checksum and that the document describes the version actually being released, and a weekly job watches for new upstream releases.
 - The test framework is now fetched by content hash rather than by tag, so a build cannot silently pick up a different version than the one it was checked against.
 
+## [1.0.23] - 2026-08-31
+
+Tagged but never released: the release build refused it because the bill of materials still named 1.0.22. The same changes shipped as 1.0.24 that day.
+
 ## [1.0.22] - 2026-08-27
 
 ### Added
@@ -317,6 +321,10 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Known Limitations
 - Corral membership is stored as a bare filename, so two files with the same name on the user and Public desktop cannot be told apart (the user-desktop one wins). Fixing it needs paths in the config plus a migration.
+
+## [1.0.18] - 2026-06-18
+
+Tagged, but no release was published from it. Its changes are listed under 1.0.19, which followed with a fix to the release build.
 
 ## [1.0.16] - 2026-03-07
 
