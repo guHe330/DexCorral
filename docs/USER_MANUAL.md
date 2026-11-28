@@ -60,7 +60,7 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 **Moving icons between tabs:** drag the icons onto the tab you want them in, in the same Corral or in another one, or right-click an icon and pick the tab from **Move to Tab**. When you drag something in from the desktop or an Explorer window, resting on a tab for half a second brings that tab forward, and dropping straight onto a tab works too.
 
 ### Catch-All
-One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
+One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically. No tab is the Catch-All until you pick one: open the tab, right-click the Corral and choose **Catch-All (receives new files)**. Until then new files stay on the desktop.
 
 ### Virtual Corrals
 A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes.

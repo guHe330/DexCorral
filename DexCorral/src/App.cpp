@@ -424,7 +424,7 @@ void App::ActivateDesktop()
 
     if (corrals.empty() && !config.FirstCorralSeeded)
     {
-        // First run: a default catch-all corral in the centre of the primary
+        // First run: a default corral in the centre of the primary
         // monitor's work area (work area, not screen: it must clear the taskbar).
         RECT work;
         if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0))
@@ -437,9 +437,7 @@ void App::ActivateDesktop()
         POINT centerPt = {(work.left + work.right) / 2, (work.top + work.bottom) / 2};
 
         CorralWindowConfig defaultConfig = MakeDefaultCorralConfig();
-        CorralTabConfig tab = MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_Desktop)));
-        tab.IsCatchAll = true; // First corral is catch-all
-        defaultConfig.Tabs.push_back(tab);
+        defaultConfig.Tabs.push_back(MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_Desktop))));
 
         SIZE size = DefaultCorralSize(centerPt);
         defaultConfig.Left = (double)(centerPt.x - size.cx / 2);
