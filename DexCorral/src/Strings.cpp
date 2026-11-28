@@ -655,9 +655,9 @@ const wchar_t *const kGerman[] = {
                                    L"Dieses System meldet Build {1}.\n\n"
                                    L"Windows 10 hat das Supportende erreicht; DexCorral ist darauf weder "
                                    L"getestet noch unterstützt.\n\n"
-                                   L"Wenn du trotzdem registrieren möchtest, auf eigene Gefahr:\n"
+                                   L"Wenn Sie trotzdem registrieren möchten, auf eigene Gefahr:\n"
                                    L"  DexCorral.exe --register --force\n\n"
-                                   L"Bitte melde keine Fehler von nicht unterstützten Windows-Versionen.",
+                                   L"Bitte melden Sie keine Fehler von nicht unterstützten Windows-Versionen.",
     /* Reg_NeedsElevation */       L"Eine systemweite Registrierung (alle Benutzer) schreibt nach "
                                    L"HKEY_LOCAL_MACHINE und benötigt Administratorrechte, die nicht erteilt wurden.\n\n"
                                    L"Für Ihr eigenes Konto braucht DexCorral keine Administratorrechte:\n"
@@ -667,7 +667,7 @@ const wchar_t *const kGerman[] = {
                                    L"Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, "
                                    L"werden die von DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt "
                                    L"gezeichnet.\n\n"
-                                   L"Welches der beiden du nutzt, entscheidest du: Stardock Fences deinstallieren "
+                                   L"Welches der beiden Sie nutzen, entscheiden Sie: Stardock Fences deinstallieren "
                                    L"und dies erneut ausführen, oder Fences behalten und auf DexCorral verzichten.\n\n"
                                    L"Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner "
                                    L"Verbindung zu Stardock.",
