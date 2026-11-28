@@ -45,7 +45,7 @@ The second check sees only hives that are currently loaded, which in practice me
 - **`InstallScope`**: `machine` or `user`
 - **`Version`**: the `DEXCORRAL_VERSION` of the registering binary
 
-They exist for the cross-mode conflict detection above. The rest of `Software\DexCorral` (`Language`, and the hook's runtime `HookStartPending` / `HookFailureCount`) is untouched by registration.
+They exist for the cross-mode conflict detection above. The rest of `Software\DexCorral` is untouched by registration: `Language` from Setup and the settings window, and in `HKCU` the values DexCorral writes at runtime, the crash guard's `HookStartPending`, `GuardLastFailure`, `GuardStandby` and `GuardVersion`, plus `AutoArrange` and `ConflictNoticeShown`.
 
 ## Registry keys, by mode
 
@@ -57,7 +57,7 @@ They exist for the cross-mode conflict detection above. The rest of `Software\De
 | `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | both | desktop right-click menu, and a load vector when the menu is opened |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | both | install marker, see above |
 | `<root>\Software\DexCorral` | `Language` | both | UI language, written by Setup, not by `--register` |
-| `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | both | login injection, written by Setup, not by `--register` |
+| `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | both | login injection, written by Setup and by `--register` |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | machine only | Explorer loads the DLL at startup |
 | `HKLM\SOFTWARE\…\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | machine only | second startup load vector, no overlay is ever drawn |
 
