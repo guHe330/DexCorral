@@ -52,7 +52,9 @@ namespace IconUtils
 
     bool IsValidNewFileName(const std::wstring &name)
     {
-        if (name.empty() || name == L"." || name == L"..")
+        // Windows strips a trailing dot or space from the name on disk, so the
+        // file would not get the name stored in the config (this covers "." and "..")
+        if (name.empty() || name.back() == L'.' || name.back() == L' ')
             return false;
         for (wchar_t c : name)
         {

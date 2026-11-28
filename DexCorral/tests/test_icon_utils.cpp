@@ -114,6 +114,14 @@ TEST(IsValidNewFileName, CharactersWindowsRefuses) {
         EXPECT_FALSE(IsValidNewFileName(name)) << "name: " << (name[0] ? "(see list)" : "(empty)");
 }
 
+TEST(IsValidNewFileName, ATrailingDotOrSpaceIsRefused) {
+    // Windows would save "notes." as "notes", out of step with the config
+    EXPECT_FALSE(IsValidNewFileName(L"notes."));
+    EXPECT_FALSE(IsValidNewFileName(L"notes "));
+    EXPECT_FALSE(IsValidNewFileName(L"notes.txt..."));
+    EXPECT_TRUE(IsValidNewFileName(L".notes"));
+}
+
 TEST(NameWithHiddenExtension, ReappendsTheExtensionTheUserCouldNotSee) {
     // "Chrome.lnk" is shown as "Chrome"; typing "Browser" must keep it a shortcut
     EXPECT_EQ(NameWithHiddenExtension(L"Chrome.lnk", L"Chrome", L"Browser"), L"Browser.lnk");
