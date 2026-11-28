@@ -54,19 +54,22 @@ TEST_F(GermanCatalog, EveryIdResolvesToNonEmptyGerman) {
 }
 
 TEST_F(GermanCatalog, PlaceholderParityWithEnglish) {
-    // Every {0} in an English string must appear the same number of times in
-    // the German one (and vice versa) so TrFmt substitutions never get lost.
+    // Every {0} and every {1} in an English string must appear the same number
+    // of times in the German one (and vice versa) so TrFmt substitutions never
+    // get lost. Counted apart: a sum would let "{0}..{0}" pass for "{0}..{1}".
     auto countToken = [](const std::wstring &s, const wchar_t *tok) {
         size_t n = 0, pos = 0;
         while ((pos = s.find(tok, pos)) != std::wstring::npos) { n++; pos += 3; }
         return n;
     };
     for (size_t i = 0; i < (size_t)Str::_Count; i++) {
-        SetLanguage(L"en");
-        size_t en = countToken(Tr((Str)i), L"{0}") + countToken(Tr((Str)i), L"{1}");
-        SetLanguage(L"de");
-        size_t de = countToken(Tr((Str)i), L"{0}") + countToken(Tr((Str)i), L"{1}");
-        EXPECT_EQ(en, de) << "placeholder count mismatch for Str id " << i;
+        for (const wchar_t *tok : {L"{0}", L"{1}"}) {
+            SetLanguage(L"en");
+            size_t en = countToken(Tr((Str)i), tok);
+            SetLanguage(L"de");
+            size_t de = countToken(Tr((Str)i), tok);
+            EXPECT_EQ(en, de) << "placeholder count mismatch for " << tok << " in Str id " << i;
+        }
     }
 }
 
