@@ -940,12 +940,13 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             cf.lStructSize = sizeof(CHOOSEFONTW);
             cf.hwndOwner = hDlg;
             cf.lpLogFont = &lf;
-            cf.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL;
+            // No style list: the header is always drawn semibold and upright
+            cf.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL | CF_NOSTYLESEL;
 
             if (ChooseFontW(&cf))
             {
                 data->fontName = lf.lfFaceName;
-                data->fontSize = cf.iPointSize / 10; // iPointSize is in 1/10 points
+                data->fontSize = (cf.iPointSize + 5) / 10; // iPointSize is in 1/10 points; only whole points are kept
                 data->fontChanged = true;
                 SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
 
