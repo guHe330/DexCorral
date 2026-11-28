@@ -552,9 +552,10 @@ void CorralWindow::UpdateLayeredContent()
             // Band background (semi-opaque dark, premultiplied)
             const BYTE hdrA = 200, hdrPm = (BYTE)((40 * 200) / 255);
             DWORD hdrBg = (hdrA << 24) | (hdrPm << 16) | (hdrPm << 8) | hdrPm;
+            const int bandInset = (borderAlpha > 0) ? 1 : 0; // keep the left and right border
             for (int y = headerTop; y < headerBottom && y < h; y++)
                 if (y >= 0)
-                    for (int x = 0; x < w; x++)
+                    for (int x = bandInset; x < w - bandInset; x++)
                         pixels[y * w + x] = hdrBg;
 
             auto cols = GetDetailsColumns();
