@@ -39,8 +39,10 @@ if (Test-Path $hookDll) {
 # Find Visual Studio installation
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if (Test-Path $vsWhere) {
-    $vsPath = & $vsWhere -latest -property installationPath
-    $vcvarsall = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+    # -products * includes Build Tools; -requires skips an instance without the C++ tools.
+    $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    # Null when nothing matches; the not-found check below reports it.
+    $vcvarsall = if ($vsPath) { Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat" } else { $null }
 } else {
     # Fallback to common paths
     $vcvarsall = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
@@ -52,9 +54,9 @@ if (Test-Path $vsWhere) {
     }
 }
 
-if (!(Test-Path $vcvarsall)) {
+if (!$vcvarsall -or !(Test-Path $vcvarsall)) {
     Write-Host "ERROR: vcvarsall.bat not found!" -ForegroundColor Red
-    Write-Host "Please install Visual Studio 2022 with 'Desktop development with C++' workload." -ForegroundColor Red
+    Write-Host "Please install Visual Studio 2022 (or its Build Tools) with the 'Desktop development with C++' workload." -ForegroundColor Red
     exit 1
 }
 
