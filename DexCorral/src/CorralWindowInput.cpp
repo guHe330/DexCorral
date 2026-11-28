@@ -31,6 +31,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "IconUtils.h"
+#include "LayoutMath.h"
 #include "Strings.h"
 #include <windowsx.h>
 #include <shellapi.h>
@@ -2613,6 +2614,13 @@ void CorralWindow::OnIconDragEnd()
     if (ownTab == config.ActiveTabIndex)
         ownTab = -1;
 
+    const bool onOtherIcon = dropTargetIndex >= 0 && dropTargetIndex < (int)icons.size() &&
+                             std::find(dragged.begin(), dragged.end(), dropTargetIndex) == dragged.end();
+    // Released on the empty space after the last icon: the block goes to the end
+    const bool toEnd = dropTargetIndex < 0 && !icons.empty() &&
+                       ownPt.y >= GetIconAreaTop() &&
+                       LayoutMath::IsPastLastCell(icons.back().rect, {ownPt.x, ownPt.y + scrollPosition});
+
     // Check if dragged outside the corral
     if (iconDragOutside)
     {
@@ -2740,14 +2748,14 @@ void CorralWindow::OnIconDragEnd()
         // Dropped on another tab of this corral
         MoveEntriesToTab(names, ownTab);
     }
-    else if (dropTargetIndex >= 0 && dropTargetIndex < (int)icons.size() &&
-             std::find(dragged.begin(), dragged.end(), dropTargetIndex) == dragged.end())
+    else if (onOtherIcon || toEnd)
     {
         // Reorder within corral: the dragged block goes in front of the icon it
-        // was dropped on, keeping its own order.
-        std::string targetName = icons[dropTargetIndex].fileName;
+        // was dropped on, or to the end when dropped past the last one, keeping
+        // its own order.
+        std::string targetName = onOtherIcon ? icons[dropTargetIndex].fileName : std::string();
         removeDraggedFromTab();
-        auto insertAt = std::find(files.begin(), files.end(), targetName);
+        auto insertAt = onOtherIcon ? std::find(files.begin(), files.end(), targetName) : files.end();
         files.insert(insertAt, names.begin(), names.end());
 
         LoadFiles();

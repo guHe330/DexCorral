@@ -96,6 +96,12 @@ namespace LayoutMath
     int FindNeighbor(const std::vector<IconCell> &cells, int current, NavDirection dir);
 
     /**
+     * True when `pt` lies after the cell `last` in reading order: below it, or
+     * level with it and to its right. A drop there goes to the end of the tab.
+     */
+    bool IsPastLastCell(const RECT &last, POINT pt);
+
+    /**
      * Computes grid layout for SmallIcons / MediumIcons / LargeIcons view.
      *
      * Icons are placed left-to-right, wrapping to the next row when the next
