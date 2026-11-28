@@ -22,6 +22,7 @@
 #include <exdisp.h>   // IShellWindows — route to the desktop's IFolderView
 #include <initguid.h> // Define PKEY_* constants in this TU (DECLSPEC_SELECTANY)
 #include <propkey.h>
+#include "DesktopSort.h"
 #include <oleidl.h>
 #include <ole2.h>
 #include <stdio.h>
@@ -55,18 +56,6 @@ static std::vector<int8_t> g_HiddenByIndex;
 static void InvalidateHiddenIndexCache() {
     g_HiddenByIndex.clear();
 }
-
-// Desktop sort modes — we own desktop sorting entirely.
-// Explorer's LVS_AUTOARRANGE is permanently off; sort commands are executed
-// by the hook so hidden icons never participate in layout.
-enum class DesktopSortMode
-{
-    PositionOrder, // Keep current position order, just remove gaps (compaction)
-    Name,
-    Size,
-    Type,
-    Date
-};
 
 // Auto-sort popup state
 static const UINT_PTR AUTOSORT_TIMER_ID = 9901;
@@ -105,6 +94,23 @@ static void SaveOurAutoArrange() {
                     REG_DWORD, &data, sizeof(data));
 }
 static DesktopSortMode g_LastSortMode = DesktopSortMode::PositionOrder; // Last sort the user applied
+
+// The last Sort by, kept next to AutoArrange: auto-arrange keeps sorting by it
+// after Explorer restarts
+static const wchar_t* const SORT_MODE_REGVAL = L"SortMode"; // REG_DWORD, DesktopSortMode
+
+static void LoadLastSortMode() {
+    DWORD data = 0, size = sizeof(data);
+    if (RegGetValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, SORT_MODE_REGVAL,
+                     RRF_RT_REG_DWORD, nullptr, &data, &size) == ERROR_SUCCESS)
+        g_LastSortMode = SortModeFromStored(data);
+}
+
+static void SaveLastSortMode() {
+    DWORD data = (DWORD)g_LastSortMode;
+    RegSetKeyValueW(HKEY_CURRENT_USER, CRASH_GUARD_REGKEY, SORT_MODE_REGVAL,
+                    REG_DWORD, &data, sizeof(data));
+}
 
 
 // ============================================================================
@@ -1488,8 +1494,13 @@ static LRESULT CALLBACK ListViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam
 // menu captions (English shell UI; on localized systems the captions won't
 // match and the numeric fallbacks stay in effect).
 //
+// Sort and auto-arrange are also recognised by their effect, in any language:
+// a menu command that changes IFolderView2's primary sort column is a Sort by,
+// one that flips FWF_AUTOARRANGE in its folder flags is the auto-arrange
+// toggle. Its id is then adopted, so the check mark and a repeated Sort by of
+// the same column (no visible effect) work from then on.
+//
 // Detecting toggle state after WM_COMMAND:
-//   Auto arrange: GetWindowLongPtrW(ListView, GWL_STYLE) & LVS_AUTOARRANGE
 //   Align to grid: SendMessageW(ListView, LVM_GETEXTENDEDLISTVIEWSTYLE, 0, 0)
 //                   & LVS_EX_SNAPTOGRID
 //
@@ -1500,6 +1511,14 @@ static LRESULT CALLBACK ListViewSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam
 static UINT g_CmdAutoArrange = 28785;
 static UINT g_CmdAlignToGrid = 28788;
 static UINT g_CmdSortCommands[4] = { 31492, 31493, 31494, 31495 }; // Name, Size, Item type, Date modified
+
+// Take a command id seen on this Windows build in place of the expected one
+static void AdoptCommandId(UINT& target, UINT id, const wchar_t* what) {
+    if (target == id) return;
+    DllLog(L"Desktop menu: %s command id is %u on this Windows build (expected %u) — adopting it",
+           what, id, target);
+    target = id;
+}
 
 // Menu caption with '&' accelerator markers and trailing shortcut text removed
 static bool GetMenuCaption(HMENU hMenu, int pos, wchar_t* buf, int cch) {
@@ -1556,11 +1575,43 @@ static void ResolveDesktopMenuCommandIds(HMENU hMenu) {
             }
         }
 
-        if (target && *target != id) {
-            DllLog(L"ResolveDesktopMenuCommandIds: %s command id is %u on this Windows build (expected %u) — adopting menu value",
-                   what, id, *target);
-            *target = id;
-        }
+        if (target) AdoptCommandId(*target, id, what);
+    }
+}
+
+// The desktop's IFolderView2, or nullptr; the caller releases it
+static IFolderView2* GetDesktopFolderView2() {
+    if (!EnsureDesktopFolderView()) return nullptr;
+    IFolderView2* fv2 = nullptr;
+    if (FAILED(g_pDesktopFolderView->QueryInterface(IID_PPV_ARGS(&fv2)))) return nullptr;
+    return fv2;
+}
+
+// What a menu command can change in Explorer's view, read before and after it
+struct DesktopViewState {
+    SORTCOLUMN sort = {};    // Primary sort column; PKEY_Null when there is none
+    bool haveSort = false;
+    DWORD flags = 0;         // FOLDERFLAGS
+    bool haveFlags = false;
+};
+
+static DesktopViewState ReadDesktopViewState(IFolderView2* fv2) {
+    DesktopViewState s;
+    if (!fv2) return s;
+    int count = 0;
+    if (SUCCEEDED(fv2->GetSortColumnCount(&count)))
+        s.haveSort = count <= 0 || SUCCEEDED(fv2->GetSortColumns(&s.sort, 1));
+    s.haveFlags = SUCCEEDED(fv2->GetCurrentFolderFlags(&s.flags));
+    return s;
+}
+
+// Auto-arrange is ours: flip it, remember it, compact when it comes on
+static void ToggleOurAutoArrange() {
+    g_OurAutoArrange = !g_OurAutoArrange;
+    SaveOurAutoArrange();
+    Log(L"  Auto arrange toggled to %s (ours)", g_OurAutoArrange ? L"ON" : L"OFF");
+    if (g_OurAutoArrange) {
+        ScheduleCompaction(g_hDesktopListView, L"AutoArrange ON");
     }
 }
 
@@ -1603,40 +1654,66 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
 
         // Auto-arrange: we own this — swallow the command, toggle our flag
         if (cmdId == g_CmdAutoArrange) {
-            g_OurAutoArrange = !g_OurAutoArrange;
-            SaveOurAutoArrange();
-            Log(L"  Auto arrange toggled to %s (ours, Explorer not notified)", g_OurAutoArrange ? L"ON" : L"OFF");
-            if (g_OurAutoArrange) {
-                // Turning ON: compact immediately
-                ScheduleCompaction(g_hDesktopListView, L"AutoArrange ON");
-            }
+            ToggleOurAutoArrange();
             return 0;  // Swallow — Explorer never sees this
         }
+
+        int sortIdx = -1;
+        for (int i = 0; i < 4; i++) {
+            if (cmdId == g_CmdSortCommands[i]) { sortIdx = i; break; }
+        }
+
+        // Read Explorer's sort column and folder flags around a menu command
+        // (no notification code, no control), so a sort or auto-arrange is
+        // recognised whatever its id. Not around a command that runs inside
+        // another one: the outer one compares.
+        static bool s_probing = false;
+        IFolderView2* fv2 = (notifyCode == 0 && lParam == 0 && !s_probing && !g_InsideCustomSort)
+            ? GetDesktopFolderView2() : nullptr;
+        const DesktopViewState before = ReadDesktopViewState(fv2);
+        if (fv2) s_probing = true;
+        LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+        if (fv2) s_probing = false;
+        const DesktopViewState after = ReadDesktopViewState(fv2);
+
+        // Auto-arrange under an unknown id reached Explorer: give Explorer its
+        // own flag back and toggle ours, as the swallowed command would have
+        if (before.haveFlags && after.haveFlags && ((before.flags ^ after.flags) & FWF_AUTOARRANGE)) {
+            HRESULT hr = fv2->SetCurrentFolderFlags(FWF_AUTOARRANGE, before.flags);
+            fv2->Release();
+            Log(L"  Command %u flipped Explorer's auto-arrange (restored, hr=0x%08X)", cmdId, (unsigned)hr);
+            AdoptCommandId(g_CmdAutoArrange, cmdId, L"auto-arrange");
+            ToggleOurAutoArrange();
+            EnsureExplorerAutoArrangeOff();
+            return result;
+        }
+
+        // Sort: by the column Explorer switched to; by id when that cannot be
+        // read or did not change (the same Sort by again)
+        DesktopSortMode sortMode = DesktopSortMode::PositionOrder;
+        if (before.haveSort && after.haveSort && SortColumnChanged(before.sort, after.sort)) {
+            sortMode = SortModeForKey(after.sort.propkey);
+            if (sortMode != DesktopSortMode::PositionOrder)
+                AdoptCommandId(g_CmdSortCommands[(int)sortMode - 1], cmdId, L"sort");
+        }
+        if (fv2) fv2->Release();
+        if (sortMode == DesktopSortMode::PositionOrder && sortIdx >= 0)
+            sortMode = (DesktopSortMode)(sortIdx + 1); // Name, Size, Type, Date follow PositionOrder
 
         // Sort commands: the hook sorts the desktop itself.
         // Explorer is forwarded the command only so its internal sort state stays
         // consistent — it cannot reposition icons (LVS_AUTOARRANGE stays off and
         // WM_STYLECHANGING blocks re-enabling). Hidden icons never participate.
-        int sortIdx = -1;
-        for (int i = 0; i < 4; i++) {
-            if (cmdId == g_CmdSortCommands[i]) { sortIdx = i; break; }
-        }
-        if (sortIdx >= 0) {
-            static const DesktopSortMode sortModes[] = {
-                DesktopSortMode::Name, DesktopSortMode::Size,
-                DesktopSortMode::Type, DesktopSortMode::Date
-            };
-            const wchar_t* sortNames[] = { L"Name", L"Size", L"Item type", L"Date modified" };
-            Log(L"  Sort by %s — sorting in-hook (Explorer does not reposition)", sortNames[sortIdx]);
-
-            LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+        if (sortMode != DesktopSortMode::PositionOrder) {
+            Log(L"  Sort mode %d — sorting in-hook (Explorer does not reposition)", (int)sortMode);
             EnsureExplorerAutoArrangeOff();
 
             // Win11 Explorer sorts its item list internally (no LVM_SORTITEMS),
             // which reindexes items — the per-index memo is stale
             InvalidateHiddenIndexCache();
 
-            g_LastSortMode = sortModes[sortIdx];
+            g_LastSortMode = sortMode;
+            SaveLastSortMode();
             g_InsideCustomSort = true;
             CompactVisibleIcons(g_hDesktopListView, g_LastSortMode);
             g_InsideCustomSort = false;
@@ -1647,9 +1724,7 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
             return result;
         }
 
-        // All other commands: let Explorer handle, then compact if needed
-        LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
-
+        // All other commands: Explorer handled them above, compact if needed
         bool needsCompaction = false;
         if (cmdId == g_CmdAlignToGrid) {
             LRESULT exStyle = CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
@@ -2250,11 +2325,12 @@ bool InitializeCorralHook() {
         g_OurAutoArrange = explorerAutoArrange;
         SaveOurAutoArrange();
     }
+    LoadLastSortMode();
     if (explorerAutoArrange) {
         SetWindowLongPtrW(g_hDesktopListView, GWL_STYLE, lvStyle & ~LVS_AUTOARRANGE);
     }
-    Log(L"InitializeCorralHook: Took over auto-arrange (ours %s, Explorer's was %s)",
-        g_OurAutoArrange ? L"ON" : L"OFF", explorerAutoArrange ? L"ON" : L"OFF");
+    Log(L"InitializeCorralHook: Took over auto-arrange (ours %s, Explorer's was %s, sort mode %d)",
+        g_OurAutoArrange ? L"ON" : L"OFF", explorerAutoArrange ? L"ON" : L"OFF", (int)g_LastSortMode);
 
     // Register popup window class for auto-sort dialog
     RegisterAutoSortPopupClass();
