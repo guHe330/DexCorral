@@ -40,9 +40,7 @@ Deleting the folder of a portable package leaves its registry entries behind. Ru
 
 ## Leftovers of old versions
 
-Upgrading from 1.0.27 or earlier? Those versions registered without any notion of scope. The installer clears the old entries for you; for a portable install, run `DexCorral.exe --cleanup-legacy` once as Administrator.
-
-Versions up to 1.0.27 wrote the COM registration through `HKEY_CLASSES_ROOT` instead, with no per-user option. `DexCorral.exe --cleanup-legacy`, run once as Administrator, removes what those versions left behind; the installer does it for you.
+Upgrading from 1.0.27 or earlier? Those versions registered without any notion of scope, writing the COM registration through `HKEY_CLASSES_ROOT`. The installer clears the old entries for you; for a portable install, run `DexCorral.exe --cleanup-legacy` once as Administrator.
 
 Early versions had a **Hide shortcut arrows** option, removed since. If you switched it on back then and want the arrows back, delete the value `29` under `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons` in `HKLM` or `HKCU`, whichever holds it, and restart Explorer.
 
