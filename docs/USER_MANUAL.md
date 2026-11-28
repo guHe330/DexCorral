@@ -43,7 +43,7 @@ Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group
 
 The uninstaller removes only what its own install mode created, including every registry entry ([the full list](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder)). If you do not keep your configuration, your own settings under `HKCU\Software\DexCorral` go as well. Other accounts' settings are left alone.
 
-After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
+After uninstalling, icons that were inside Corrals reappear as normal desktop icons where their Corral was. The icons of the tabs that were not showing all sit on one spot in the middle of their Corral, one on top of another, so rearrange them: right-click the desktop > **Sort by > Name**.
 
 Portable package: before you delete its folder, run `DexCorral.exe --unregister` with the same `--scope` you registered with (Windows asks for Administrator rights for `--scope=machine`). This also ends the start at sign-in. More on leftovers in the [Technical Notes](TECHNICAL_NOTES.md#removing-a-portable-package).
 
@@ -60,7 +60,7 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 **Moving icons between tabs:** drag the icons onto the tab you want them in, in the same Corral or in another one, or right-click an icon and pick the tab from **Move to Tab**. When you drag something in from the desktop or an Explorer window, resting on a tab for half a second brings that tab forward, and dropping straight onto a tab works too.
 
 ### Catch-All
-One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically.
+One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically. No tab is the Catch-All until you pick one: open the tab, right-click the Corral and choose **Catch-All (receives new files)**. Until then new files stay on the desktop.
 
 ### Virtual Corrals
 A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes.
@@ -73,6 +73,8 @@ It is a live view of that folder, and its icons are the real files, so dragging 
 
 The folder can be on the network: a share (`\\nas\photos`) or a mapped network drive. DexCorral asks in the background whether the share answers, without making the other Corrals wait for it. Until the first answer is in, the Corral shows **Connecting...**. While the share does not answer, for example at sign-in before the NAS is up, the Corral shows **Folder unavailable** and asks again: after ten seconds, then after twice as long each time, up to five minutes. It also asks at once when you move the pointer over the Corral. A share that answers is left alone, so a NAS can go to sleep: DexCorral asks it only when you do something in the Corral or the folder reports a change. Because many network devices do not report changes reliably, a network folder is also read again when you move the pointer over its Corral and the last reading is more than a minute old. Reading a large folder over a slow connection can make all Corrals pause for that moment.
 
+A local folder that is not there, for example on a USB drive that is not plugged in, also shows **Folder unavailable**. DexCorral looks for it again after five seconds, then after twice as long each time, up to once a minute, and fills the Corral when it finds it. If the folder is gone for good, right-click the Corral and choose **Change Folder...**.
+
 ## Managing Corrals
 
 ### Creating
@@ -83,7 +85,8 @@ The folder can be on the network: a share (`\\nas\photos`) or a mapped network d
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
 - Moved or resized one by accident? Right-click any Corral and choose **Undo Last Move**. The Corral goes back to where it was, and so do the desktop icons it pushed out of the way; an icon you have moved by hand since stays where you put it. Choose it again to go further back, up to ten steps through the last moves and resizes of all Corrals. The steps are forgotten when you sign out, pause DexCorral or change the set of monitors.
-- Drag any **edge or corner** to resize. While moving or resizing, Corrals snap to screen edges and align to other Corrals on the same monitor.
+- Drag any **edge or corner** to resize. While moving or resizing, Corrals snap to screen edges and align to other Corrals on the same monitor. Hold **Shift** while dragging to turn snapping off.
+- Drop a Corral onto another Corral's **title bar** to merge the two. DexCorral asks first. On Yes, the tabs of the Corral you dragged move into the other one, which keeps its place, size, Lock and other settings. On No, the dragged Corral goes back to where it came from. **Detach Tab** splits a tab off into its own Corral again.
 - Corrals are immune to **Win+D / Show Desktop**: they stay visible with your desktop.
 
 ### Lock Position
@@ -114,7 +117,7 @@ Right-click a Corral's title bar or background:
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
 - **Rename Tab**: change the current tab's title.
 - **Appearance...**: open the appearance dialog (see below).
-- **Change Folder...**: for virtual tabs, point the tab at a different folder.
+- **Change Folder...**: for virtual tabs, point the tab at a different folder. A tab named after its folder takes the name of the new one; a name you gave the tab yourself stays.
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
 - **Sort By**: on a normal tab, sorts the icons once by **Name** or **Type**; you can still drag them into any order afterwards, and new icons are added at the end. On a virtual tab it sets the standing sort column and direction, in every view.
 - **Catch-All (receives new files)**: make this tab the catch-all for new desktop items.
@@ -177,7 +180,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 ### Using
 - **Double-click** an icon to open it.
 - **Drop a file onto an icon** inside a Corral to invoke its target, e.g. drop a document onto an application's icon to open it with that app.
-- **Double-click an icon's label** to rename it in place.
+- **Click the label of a selected icon** once more (or press F2) to rename it in place.
 - **Select several icons** with Ctrl+click, Shift+click, Ctrl+A or by dragging a rectangle over them. Dragging one of the selected icons carries all of them: to another Corral, back out to the desktop, or to a new place in the same Corral.
 - **Drag an icon into another application or an Explorer window** and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it. Moving it into another folder takes the file off the desktop, and so out of the Corral.
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
@@ -222,9 +225,9 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
-- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
+- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
 - **Create New Corral** / **New Virtual Corral**.
-- **Show Desktop Icons**: toggle all native desktop icons.
+- **Show Desktop Icons**: toggle all native desktop icons. Not available while Quick-Hide is on; the check mark then shows what Quick-Hide gives back when it ends.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
 - **Settings...**: opens the settings window, see below.
 - **Check for Updates Now**: asks GitHub once, right now, whether a newer version exists, without switching the automatic check on.
@@ -239,7 +242,7 @@ The settings window holds the options that apply to DexCorral as a whole. Change
 - **Windows and menus**: whether DexCorral's dialogs and menus are light or dark. **Like Windows** follows the app mode set in Windows; **Light** and **Dark** override it.
 - **Look**: a list of ready-made looks: **Automatic (Windows accent color)**, **Classic Blue** (the look DexCorral starts with), **Light Glass**, **Dark Glass**, **Graphite** and **Compact**. Choosing one shows it on an example Corral next to the settings window; the example cannot be clicked and disappears with the window. **OK** puts the look on every Corral and every tab and uses it for new Corrals; this replaces looks you tuned by hand in the Appearance dialog and cannot be undone. **Keep current look** and **Cancel** change nothing. Presets you saved yourself in the Appearance dialog are in the list too.
 - **Export presets...** and **Import presets...**: write your own presets to a file and read such a file, to carry looks to another PC or to share them. Importing replaces an own preset of the same name and takes effect at once.
-- **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API once every 24 hours whether a newer version exists and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
+- **Check for Updates Automatically**: off by default. When on, DexCorral asks the GitHub Releases API whether a newer version exists, at start if the last check is 24 hours old or older and then once every 24 hours while it runs, and shows a tray balloon if so. It never downloads or installs anything. See [Privacy](PRIVACY.md#the-update-check) for exactly what the request sends.
 - **Quick-Hide hotkey**: see [Quick-Hide](#quick-hide).
 - **Write debug logs**: off by default. Switch it on before reproducing a problem you want to report. Logging starts at once; to capture DexCorral's start as well, leave it on and sign out and back in. A debug log that passes 2 MB is renamed to `<name>.log.old` and started again, so at most two files of that size exist per log.
 - **Open Config Folder**: opens `%APPDATA%\DexCorral` in Explorer, where `config.json`, its backup and any debug logs live.

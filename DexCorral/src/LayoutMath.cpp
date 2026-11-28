@@ -151,6 +151,11 @@ namespace LayoutMath
         return best;
     }
 
+    bool IsPastLastCell(const RECT &last, POINT pt)
+    {
+        return pt.y >= last.bottom || (pt.y >= last.top && pt.x >= last.right);
+    }
+
     std::vector<IconCell> ComputeGridLayout(
         int iconCount, int clientWidth, int iconAreaTop,
         int iconSize, int iconSpacingX, int iconSpacingY,

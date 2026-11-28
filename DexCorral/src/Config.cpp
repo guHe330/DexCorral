@@ -55,15 +55,14 @@ std::string Config::GetConfigPath()
 
 namespace
 {
-    /// Replaces a colour that is not "#" followed by at least six hex digits.
-    /// Every reader parses these with sscanf("%x") into a local it does not
-    /// initialise, so a hand-edited "#zzzzzz" would paint from stack garbage.
-    void FixHexColor(std::string &hex, const std::string &fallback)
+    /// Replaces a colour that is not "#" followed by exactly `digits` hex digits
+    /// (8 for ARGB, 6 for RGB), the same rule as presets. Every reader parses
+    /// these with sscanf("%x") into a local it does not initialise, so a
+    /// hand-edited "#zzzzzz" would paint from stack garbage, and an ARGB reader
+    /// skips a 6-digit colour and paints its default instead.
+    void FixHexColor(std::string &hex, size_t digits, const std::string &fallback)
     {
-        bool ok = hex.size() >= 7 && hex[0] == '#';
-        for (size_t i = 1; ok && i < hex.size(); i++)
-            ok = isxdigit((unsigned char)hex[i]) != 0;
-        if (!ok)
+        if (!Presets::IsHexColor(hex, digits))
             hex = fallback;
     }
 } // namespace
@@ -115,16 +114,16 @@ void Config::Normalize(AppConfig &config)
     static const CorralWindowConfig defaultCorral;
     static const CorralTabConfig defaultTab;
 
-    FixHexColor(config.DefaultColorHex, defaultApp.DefaultColorHex);
-    FixHexColor(config.DefaultHeaderFontColor, defaultApp.DefaultHeaderFontColor);
-    FixHexColor(config.DefaultIconTintColor, defaultApp.DefaultIconTintColor);
+    FixHexColor(config.DefaultColorHex, 8, defaultApp.DefaultColorHex);
+    FixHexColor(config.DefaultHeaderFontColor, 6, defaultApp.DefaultHeaderFontColor);
+    FixHexColor(config.DefaultIconTintColor, 6, defaultApp.DefaultIconTintColor);
     for (auto &corral : config.Corrals)
     {
-        FixHexColor(corral.IconTintColor, defaultCorral.IconTintColor);
+        FixHexColor(corral.IconTintColor, 6, defaultCorral.IconTintColor);
         for (auto &tab : corral.Tabs)
         {
-            FixHexColor(tab.ColorHex, defaultTab.ColorHex);
-            FixHexColor(tab.HeaderFontColor, defaultTab.HeaderFontColor);
+            FixHexColor(tab.ColorHex, 8, defaultTab.ColorHex);
+            FixHexColor(tab.HeaderFontColor, 6, defaultTab.HeaderFontColor);
         }
     }
 
@@ -133,15 +132,30 @@ void Config::Normalize(AppConfig &config)
     config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultHeaderFontOpacity);
     config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultIconLabelOpacity);
 
+    // The rest to the ranges of the Appearance dialog's sliders, and the font
+    // size to what the font picker accepts, so nothing the UI can set changes
+    config.DefaultTitleBarHeight = std::clamp(config.DefaultTitleBarHeight, 20, 64);
+    config.DefaultIconOpacity = std::clamp(config.DefaultIconOpacity, 5, 255);
+    config.DefaultIconTintStrength = std::clamp(config.DefaultIconTintStrength, 0, 255);
+    config.DefaultIconSpacingXPercent = std::clamp(config.DefaultIconSpacingXPercent, 50, 200);
+    config.DefaultIconSpacingYPercent = std::clamp(config.DefaultIconSpacingYPercent, 50, 200);
+    config.DefaultHeaderFontSize = std::clamp(config.DefaultHeaderFontSize, 1, 1638);
+
     for (auto &corral : config.Corrals)
     {
         corral.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(corral.HeaderOpacity);
         corral.BorderOpacity = ChromeAlpha::ClampBorderOpacity(corral.BorderOpacity);
         corral.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(corral.IconLabelOpacity);
+        corral.TitleBarHeight = std::clamp(corral.TitleBarHeight, 20, 64);
+        corral.IconOpacity = std::clamp(corral.IconOpacity, 5, 255);
+        corral.IconTintStrength = std::clamp(corral.IconTintStrength, 0, 255);
+        corral.IconSpacingXPercent = std::clamp(corral.IconSpacingXPercent, 50, 200);
+        corral.IconSpacingYPercent = std::clamp(corral.IconSpacingYPercent, 50, 200);
 
         for (auto &tab : corral.Tabs)
         {
             tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity);
+            tab.HeaderFontSize = std::clamp(tab.HeaderFontSize, 1, 1638);
         }
     }
 
@@ -298,7 +312,9 @@ bool Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
         if (!MoveFileExW(wTmp.c_str(), wPath.c_str(),
                          MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
         {
+            const DWORD error = GetLastError(); // The caller logs the move's error, not the cleanup's
             DeleteFileW(wTmp.c_str()); // leave the existing config intact
+            SetLastError(error);
             return false;
         }
         return true;

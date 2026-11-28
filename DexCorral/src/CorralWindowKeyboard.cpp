@@ -179,6 +179,7 @@ void CorralWindow::EnsureIconVisible(int index)
     const RECT &r = icons[index].rect;
     int visibleTop = GetIconAreaTop();
     int visibleHeight = GetVisibleHeight();
+    const int before = scrollPosition;
 
     if (r.top - scrollPosition < visibleTop)
         scrollPosition = r.top - visibleTop;
@@ -186,6 +187,8 @@ void CorralWindow::EnsureIconVisible(int index)
         scrollPosition = r.bottom - visibleHeight;
 
     ClampScrollPosition();
+    if (scrollPosition != before)
+        RepositionHiddenIconsSoon();
 }
 
 // ============================================================================
@@ -275,10 +278,7 @@ void CorralWindow::ScrollByPage(bool down)
     scrollPosition += down ? page : -page;
     ClampScrollPosition();
     UpdateLayeredContent();
-
-    // Debounced reposition of real desktop icons, as for the mouse wheel
-    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
-    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+    RepositionHiddenIconsSoon();
 }
 
 void CorralWindow::ShowContextMenuForFocusedIcon()
@@ -604,7 +604,9 @@ void CorralWindow::InvokeVerbOnSelection(const char *verb)
         return;
 
     // Shell dialogs (delete confirmation, properties) need a foreground owner; the
-    // corral is normally pinned to the bottom, so restore that afterwards.
+    // corral is normally pinned to the bottom, so restore that afterwards. They are
+    // owned by this corral and would lift every corral: see MessageBoxBehind.
+    blockRaise++;
     SetForegroundWindow(hwnd);
 
     for (auto &group : groups)
@@ -631,6 +633,7 @@ void CorralWindow::InvokeVerbOnSelection(const char *verb)
             CoTaskMemFree(full);
         CoTaskMemFree(group.first);
     }
+    blockRaise--;
 
     PinToBandTop();
 
@@ -664,8 +667,10 @@ void CorralWindow::InvokeVerbOnFolder(const char *verb)
         IContextMenu *menu = nullptr;
         if (SUCCEEDED(folder->CreateViewObject(hwnd, IID_IContextMenu, (void **)&menu)) && menu)
         {
+            blockRaise++; // Shell dialogs are owned by this corral: see MessageBoxBehind
             SetForegroundWindow(hwnd);
             InvokeVerb(hwnd, menu, verb);
+            blockRaise--;
             PinToBandTop();
             menu->Release();
         }

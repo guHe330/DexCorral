@@ -35,6 +35,10 @@
 /// Hook installed, or its hidden-icon state changed: the app re-syncs positions
 constexpr UINT WM_HOOK_READY = WM_APP + 100;
 
+/// The hook gave up waiting for the desktop, or went inert after a fault:
+/// no icon is hidden this session, and the app says so
+constexpr UINT WM_HOOK_INACTIVE = WM_APP + 110;
+
 /// SHChangeNotify delivery for SHCNE_UPDATEIMAGE (e.g. Recycle Bin full/empty)
 constexpr UINT WM_SHELL_IMAGE_CHANGED = WM_APP + 101;
 

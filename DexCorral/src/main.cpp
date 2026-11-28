@@ -145,7 +145,7 @@ static int InferScopeFromExePath(const wchar_t *exePath)
 // Windows loads DexCorralHook.dll into Explorer's address space as a result.
 // The WakeHookProc inside the DLL calls StartAppIfNeeded(), which starts the App
 // (corrals, tray icon, hook). We then unhook and exit; the DLL stays resident in
-// Explorer because DllCanUnloadNow() returns S_FALSE.
+// Explorer because StartAppIfNeeded pins it (GET_MODULE_HANDLE_EX_FLAG_PIN).
 //
 static int DoStartup(const wchar_t* dllPath, bool silent)
 {

@@ -22,9 +22,9 @@
 /**
  * UpdateLogic.h - The update check's decisions, without the network
  *
- * Version parsing and comparison, and the check that a release URL may be
- * handed to ShellExecuteW. Header-only so the unit tests can cover them
- * without linking WinHTTP; UpdateChecker.cpp is the only production user.
+ * Version parsing and comparison, the check that a release URL may be
+ * handed to ShellExecuteW, and when the automatic check is due. Header-only
+ * so the unit tests can cover them without linking WinHTTP.
  */
 
 #pragma once
@@ -105,5 +105,14 @@ inline bool IsTrustedReleaseUrl(const std::string &url)
             return false;
     }
     return true;
+}
+
+/// Whether an automatic check is due, given the time now and that of the last
+/// successful check (Unix seconds, 0 = never): a day or more ago, or in the
+/// future, which only a clock that was wrong then can have left behind.
+inline bool IsAutoCheckDue(long long now, long long lastCheck)
+{
+    const long long kDaySeconds = 24LL * 60 * 60;
+    return lastCheck == 0 || now < lastCheck || now - lastCheck >= kDaySeconds;
 }
 } // namespace UpdateLogic

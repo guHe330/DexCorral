@@ -48,7 +48,8 @@ namespace IconUtils
     std::string WideToUtf8(const std::wstring &wide);
 
     /// True if `name` can be the new name of a file that stays in its folder:
-    /// not empty, not "." or "..", none of \ / : * ? " < > | and no control
+    /// not empty, not ending in a dot or space (Windows would strip it, and
+    /// "." and ".." with it), none of \ / : * ? " < > | and no control
     /// character. A typed "..\\x" must not move the file somewhere else.
     bool IsValidNewFileName(const std::wstring &name);
 
@@ -61,5 +62,9 @@ namespace IconUtils
 
     /// True if `path` is one of `paths`, ignoring case.
     bool ContainsPath(const std::vector<std::wstring> &paths, const std::wstring &path);
+
+    /// The tab title for a virtual folder: its last component, or "D:" for
+    /// the drive root "D:\".
+    std::wstring FolderTitleFromPath(const std::wstring &path);
 
 } // namespace IconUtils

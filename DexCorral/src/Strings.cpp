@@ -67,6 +67,8 @@ const wchar_t *const kEnglish[] = {
     /* Settings_Hotkey */          L"Quick-Hide hotkey",
     /* Settings_HotkeyHint */      L"Click the field and press the keys, for example Ctrl+Alt+H. "
                                    L"Backspace removes the hotkey.",
+    /* Settings_HotkeyWinHint */   L"config.json sets {0}, which this field cannot show. "
+                                   L"Press other keys in the field to replace it.",
     /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
     /* Settings_DebugLogging */    L"Write debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
@@ -102,6 +104,7 @@ const wchar_t *const kEnglish[] = {
     /* Msg_PresetExportFailed */   L"The file could not be written.",
     /* Msg_NotAPresetFile */       L"This file does not contain DexCorral presets.",
     /* Msg_PresetsImported */      L"Presets imported: {0}",
+    /* Msg_PresetsNotImported */   L"Not imported: {0}. You can keep at most {1} presets of your own.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral is paused - right-click for details",
@@ -155,6 +158,13 @@ const wchar_t *const kEnglish[] = {
     /* Config_ResetBody */         L"config.json could not be read and no backup was usable, so DexCorral started "
                                    L"with a fresh layout. The unreadable file was kept as config.corrupt.json in "
                                    L"%APPDATA%\\DexCorral.",
+    /* Save_FailedTitle */         L"DexCorral could not save your changes",
+    /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral could not be written. Your changes last "
+                                   L"until you sign out, but they are not saved. Check that the file is not "
+                                   L"read-only.",
+    /* Hook_InactiveTitle */       L"DexCorral cannot hide desktop icons",
+    /* Hook_InactiveBody */        L"The desktop did not let DexCorral take over its icons, so the icons in your "
+                                   L"Corrals may also show on the desktop. Sign out and back in to try again.",
 
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Hotkey not available",
@@ -183,8 +193,9 @@ const wchar_t *const kEnglish[] = {
     /* Dlg_SelectVirtualFolder */  L"Select Folder for Virtual Corral",
     /* Err_InvalidFolderSelected */L"Invalid folder selected.",
     /* Info_NetworkFolder */       L"This folder is on the network.\n\n"
-                                   L"While it cannot be reached, the Corral shows \"Folder unavailable\". It fills "
-                                   L"again by itself within a few seconds of the share coming back.",
+                                   L"While it cannot be reached, the Corral shows \"Folder unavailable\". Once the share "
+                                   L"answers again, it fills by itself: after five minutes at the latest, or right away "
+                                   L"when you move the pointer over the Corral.",
     /* Err_FolderNotExist */       L"The specified folder does not exist.",
     /* Err_PathNotFolder */        L"The specified path is not a folder.",
     /* Title_InvalidFolder */      L"Invalid Folder",
@@ -221,6 +232,8 @@ const wchar_t *const kEnglish[] = {
     /* Confirm_DeleteCorralBody */ L"Delete this corral?\n\nIts icons go back to the desktop. No files are deleted.",
     /* Confirm_DeleteVirtualCorralBody */ L"Delete this corral?\n\nThe folder it shows and the files in it are not touched.",
     /* Confirm_DeleteCorralTitle */L"Delete Corral",
+    /* Confirm_MergeCorralsBody */ L"Merge the two corrals?\n\nThe tabs of the corral you dragged move into the other one, which keeps its place and settings. Detach Tab splits a tab off again.",
+    /* Confirm_MergeCorralsTitle */L"Merge Corrals",
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Rename Tab",
@@ -261,7 +274,8 @@ const wchar_t *const kEnglish[] = {
     /* Col_DateModified */         L"Date modified",
 
     // Corral header states
-    /* Hdr_FolderUnavailable */    L"Folder unavailable\nRight-click to relink",
+    /* Hdr_FolderUnavailable */    L"Folder unavailable\nRight-click > Change Folder...",
+    /* Hdr_ShareUnavailable */     L"Folder unavailable\nTrying again by itself",
     /* Hdr_FolderConnecting */     L"Connecting...",
 
     // File size units
@@ -364,6 +378,8 @@ const wchar_t *const kGerman[] = {
     /* Settings_Hotkey */          L"Tastenkürzel für Schnell-Ausblenden",
     /* Settings_HotkeyHint */      L"In das Feld klicken und die Tasten drücken, zum Beispiel Strg+Alt+H. "
                                    L"Die Rücktaste entfernt das Tastenkürzel.",
+    /* Settings_HotkeyWinHint */   L"In config.json ist {0} festgelegt, das dieses Feld nicht anzeigen kann. "
+                                   L"Andere Tasten im Feld ersetzen es.",
     /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg, Alt oder Umschalt und dazu einen Buchstaben, "
                                    L"eine Ziffer oder eine Funktionstaste.",
     /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
@@ -400,6 +416,7 @@ const wchar_t *const kGerman[] = {
     /* Msg_PresetExportFailed */   L"Die Datei konnte nicht geschrieben werden.",
     /* Msg_NotAPresetFile */       L"Diese Datei enthält keine DexCorral-Vorlagen.",
     /* Msg_PresetsImported */      L"Importierte Vorlagen: {0}",
+    /* Msg_PresetsNotImported */   L"Nicht importiert: {0}. Sie können höchstens {1} eigene Vorlagen haben.",
 
     // Standby: DexCorral deliberately not running
     /* Tray_TooltipPaused */       L"DexCorral ist pausiert - Rechtsklick für Details",
@@ -459,6 +476,14 @@ const wchar_t *const kGerman[] = {
     /* Config_ResetBody */         L"config.json konnte nicht gelesen werden und es gab keine brauchbare Sicherung, "
                                    L"daher startet DexCorral mit einem neuen Layout. Die unlesbare Datei liegt als "
                                    L"config.corrupt.json in %APPDATA%\\DexCorral.",
+    /* Save_FailedTitle */         L"DexCorral konnte Ihre Änderungen nicht speichern",
+    /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral konnte nicht geschrieben werden. Ihre "
+                                   L"Änderungen bleiben bis zur Abmeldung erhalten, werden aber nicht gespeichert. "
+                                   L"Prüfen Sie, ob die Datei schreibgeschützt ist.",
+    /* Hook_InactiveTitle */       L"DexCorral kann keine Desktopsymbole ausblenden",
+    /* Hook_InactiveBody */        L"DexCorral konnte die Symbole des Desktops nicht übernehmen, daher können die "
+                                   L"Symbole Ihrer Corrals zusätzlich auf dem Desktop zu sehen sein. Melden Sie "
+                                   L"sich ab und wieder an, um es erneut zu versuchen.",
 
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Tastenkürzel nicht verfügbar",
@@ -489,7 +514,8 @@ const wchar_t *const kGerman[] = {
     /* Err_InvalidFolderSelected */L"Ungültiger Ordner ausgewählt.",
     /* Info_NetworkFolder */       L"Dieser Ordner liegt im Netzwerk.\n\n"
                                    L"Solange er nicht erreichbar ist, zeigt das Corral \"Ordner nicht verfügbar\". "
-                                   L"Wenige Sekunden nachdem die Freigabe wieder da ist, füllt es sich von selbst.",
+                                   L"Sobald die Freigabe wieder antwortet, füllt es sich von selbst: spätestens nach fünf Minuten, "
+                                   L"oder sofort, wenn Sie den Mauszeiger über das Corral bewegen.",
     /* Err_FolderNotExist */       L"Der angegebene Ordner existiert nicht.",
     /* Err_PathNotFolder */        L"Der angegebene Pfad ist kein Ordner.",
     /* Title_InvalidFolder */      L"Ungültiger Ordner",
@@ -526,6 +552,8 @@ const wchar_t *const kGerman[] = {
     /* Confirm_DeleteCorralBody */ L"Dieses Corral löschen?\n\nSeine Symbole kehren auf den Desktop zurück. Es werden keine Dateien gelöscht.",
     /* Confirm_DeleteVirtualCorralBody */ L"Dieses Corral löschen?\n\nDer angezeigte Ordner und seine Dateien bleiben unverändert.",
     /* Confirm_DeleteCorralTitle */L"Corral löschen",
+    /* Confirm_MergeCorralsBody */ L"Die beiden Corrals zusammenführen?\n\nDie Tabs des gezogenen Corrals kommen in das andere Corral, das seinen Platz und seine Einstellungen behält. Mit „Tab abtrennen“ lösen Sie einen Tab wieder heraus.",
+    /* Confirm_MergeCorralsTitle */L"Corrals zusammenführen",
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Tab umbenennen",
@@ -566,7 +594,8 @@ const wchar_t *const kGerman[] = {
     /* Col_DateModified */         L"Änderungsdatum",
 
     // Corral header states
-    /* Hdr_FolderUnavailable */    L"Ordner nicht verfügbar\nRechtsklick zum Neuverknüpfen",
+    /* Hdr_FolderUnavailable */    L"Ordner nicht verfügbar\nRechtsklick > Ordner ändern...",
+    /* Hdr_ShareUnavailable */     L"Ordner nicht verfügbar\nNeuer Versuch folgt von selbst",
     /* Hdr_FolderConnecting */     L"Verbinde...",
 
     // File size units

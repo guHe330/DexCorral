@@ -167,25 +167,28 @@ inline std::string CleanName(std::string name)
     return name;
 }
 
+/// "#" and exactly `digits` hex digits: 8 for an ARGB colour, 6 for RGB.
+/// The readers need that many (fewer is ignored, more overflows "%x").
+inline bool IsHexColor(const std::string &s, size_t digits)
+{
+    if (s.size() != digits + 1 || s[0] != '#')
+        return false;
+    return std::all_of(s.begin() + 1, s.end(), [](unsigned char c) { return isxdigit(c) != 0; });
+}
+
 /// A look from outside (an imported file, a hand-edited config) with every
 /// value brought into the range the Appearance dialog offers. A colour that
 /// is not a colour becomes the stock one.
 inline AppearanceSettings Sanitize(AppearanceSettings look)
 {
     const AppearanceSettings stock = Classic();
-    auto isHex = [](const std::string &s, size_t digits)
-    {
-        if (s.size() != digits + 1 || s[0] != '#')
-            return false;
-        return std::all_of(s.begin() + 1, s.end(), [](unsigned char c) { return isxdigit(c) != 0; });
-    };
     auto clamp = [](int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); };
 
-    if (!isHex(look.ColorHex, 8))
+    if (!IsHexColor(look.ColorHex, 8))
         look.ColorHex = stock.ColorHex;
-    if (!isHex(look.HeaderFontColor, 6))
+    if (!IsHexColor(look.HeaderFontColor, 6))
         look.HeaderFontColor = stock.HeaderFontColor;
-    if (!isHex(look.IconTintColor, 6))
+    if (!IsHexColor(look.IconTintColor, 6))
         look.IconTintColor = stock.IconTintColor;
     if (look.HeaderFontName.empty() || Characters(look.HeaderFontName) > 31) // LF_FACESIZE - 1
         look.HeaderFontName = stock.HeaderFontName;
@@ -239,15 +242,20 @@ inline bool Remove(std::vector<LookPreset> &own, const std::string &name)
     return true;
 }
 
-/// Takes every preset of `from` into `own` through Upsert. Returns how many were taken.
-inline int Merge(std::vector<LookPreset> &own, const std::vector<LookPreset> &from)
+/// Takes every preset of `from` into `own` through Upsert. Returns how many were
+/// taken; `full`, if given, receives how many were left out because MAX_OWN was reached.
+inline int Merge(std::vector<LookPreset> &own, const std::vector<LookPreset> &from, int *full = nullptr)
 {
     int taken = 0;
+    if (full)
+        *full = 0;
     for (const auto &preset : from)
     {
         const UpsertResult r = Upsert(own, preset.Name, preset.Look);
         if (r == UpsertResult::Added || r == UpsertResult::Replaced)
             taken++;
+        else if (r == UpsertResult::Full && full)
+            (*full)++;
     }
     return taken;
 }

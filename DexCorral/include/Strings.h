@@ -61,6 +61,7 @@ enum class Str
     Title_Settings,              // window title
     Settings_Hotkey,             // label of the Quick-Hide hotkey field
     Settings_HotkeyHint,         // how to use the field
+    Settings_HotkeyWinHint,      // the hint instead, when config.json sets a Win hotkey the field cannot show; {0} = it
     Settings_HotkeyUnsupported,  // message: the key pressed cannot be a hotkey
     Settings_DebugLogging,       // checkbox
     Settings_DebugHint,          // what the logs are for and where they go
@@ -94,6 +95,7 @@ enum class Str
     Msg_PresetExportFailed,
     Msg_NotAPresetFile,
     Msg_PresetsImported,         // {0} = how many
+    Msg_PresetsNotImported,      // {0} = how many were left out, {1} = the limit
 
     // Standby: DexCorral deliberately not running (App.cpp)
     Tray_TooltipPaused,          // tray tooltip while in standby
@@ -116,6 +118,10 @@ enum class Str
     Config_RestoredBody,         // where the unreadable file was kept
     Config_ResetTitle,           // no usable backup, fresh layout
     Config_ResetBody,            // where the unreadable file was kept
+    Save_FailedTitle,            // config.json could not be written
+    Save_FailedBody,             // changes last until sign-out only; check read-only
+    Hook_InactiveTitle,          // the hook could not take over the desktop icons
+    Hook_InactiveBody,           // icons show twice; sign out and in to try again
 
     // Quick-hide hotkey could not be registered (App.cpp)
     Hotkey_FailedTitle,          // "Hotkey not available"
@@ -175,6 +181,8 @@ enum class Str
     Confirm_DeleteCorralBody,    // icons return to the desktop
     Confirm_DeleteVirtualCorralBody, // the folder is not touched
     Confirm_DeleteCorralTitle,   // "Delete Corral"
+    Confirm_MergeCorralsBody,    // a dragged corral dropped on another's title bar
+    Confirm_MergeCorralsTitle,   // "Merge Corrals"
 
     // Rename dialog / file rename (CorralWindowDialogs.cpp)
     Dlg_RenameTab,               // "Rename Tab" (also shown right after creating a corral or tab)
@@ -215,7 +223,8 @@ enum class Str
     Col_DateModified,            // "Date modified"
 
     // Corral header states (CorralWindowRender.cpp)
-    Hdr_FolderUnavailable,       // "Folder unavailable\nRight-click to relink"
+    Hdr_FolderUnavailable,       // "Folder unavailable\nRight-click > Change Folder..."
+    Hdr_ShareUnavailable,        // "Folder unavailable\nTrying again by itself" (network share)
     Hdr_FolderConnecting,        // "Connecting..."
 
     // File size units (CorralWindowRender.cpp)

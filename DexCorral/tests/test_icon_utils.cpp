@@ -114,6 +114,14 @@ TEST(IsValidNewFileName, CharactersWindowsRefuses) {
         EXPECT_FALSE(IsValidNewFileName(name)) << "name: " << (name[0] ? "(see list)" : "(empty)");
 }
 
+TEST(IsValidNewFileName, ATrailingDotOrSpaceIsRefused) {
+    // Windows would save "notes." as "notes", out of step with the config
+    EXPECT_FALSE(IsValidNewFileName(L"notes."));
+    EXPECT_FALSE(IsValidNewFileName(L"notes "));
+    EXPECT_FALSE(IsValidNewFileName(L"notes.txt..."));
+    EXPECT_TRUE(IsValidNewFileName(L".notes"));
+}
+
 TEST(NameWithHiddenExtension, ReappendsTheExtensionTheUserCouldNotSee) {
     // "Chrome.lnk" is shown as "Chrome"; typing "Browser" must keep it a shortcut
     EXPECT_EQ(NameWithHiddenExtension(L"Chrome.lnk", L"Chrome", L"Browser"), L"Browser.lnk");
@@ -137,6 +145,13 @@ TEST(ContainsPath, ComparesWithoutCase) {
     EXPECT_TRUE(ContainsPath(paths, L"c:\\stuff\\TOOL.EXE"));
     EXPECT_FALSE(ContainsPath(paths, L"C:\\Stuff\\other.exe"));
     EXPECT_FALSE(ContainsPath({}, L"C:\\Stuff\\tool.exe"));
+}
+
+TEST(FolderTitleFromPath, NeverEmpty) {
+    EXPECT_EQ(FolderTitleFromPath(L"C:\\Users\\me\\Downloads"), L"Downloads");
+    EXPECT_EQ(FolderTitleFromPath(L"D:\\"), L"D:");
+    EXPECT_EQ(FolderTitleFromPath(L"D:\\Photos\\"), L"Photos");
+    EXPECT_EQ(FolderTitleFromPath(L"\\\\nas\\photos"), L"photos");
 }
 
 // --- Audit #185: one UTF-8 conversion for the whole program -------------------

@@ -296,8 +296,10 @@ TEST(Presets, MergeReplacesSameNamesAndStopsWhenFull)
     std::vector<LookPreset> many;
     for (size_t i = 0; i < Presets::MAX_OWN + 5; i++)
         many.push_back({"m" + std::to_string(i), changed});
-    EXPECT_EQ(Presets::Merge(own, many), (int)(Presets::MAX_OWN - 2));
+    int full = -1;
+    EXPECT_EQ(Presets::Merge(own, many, &full), (int)(Presets::MAX_OWN - 2));
     EXPECT_EQ(own.size(), Presets::MAX_OWN);
+    EXPECT_EQ(full, 7); // 55 offered, room for 48
 }
 
 TEST(Presets, SanitizeKeepsALongFontNameInAnotherScript)

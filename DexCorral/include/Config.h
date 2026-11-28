@@ -116,7 +116,7 @@ struct CorralWindowConfig
     int TitleBarHeight = 32;               // Header height in pixels (20-64), applies to all tabs
     int HeaderOpacity = 240;               // Header/tab-strip opacity (20-255); inactive tabs are derived from it
     int BorderOpacity = 255;               // Corral border opacity (0=frameless, 255=opaque)
-    int IconOpacity = 255;                 // Icon transparency (0=invisible, 255=opaque)
+    int IconOpacity = 255;                 // Icon opacity (5-255, 255=opaque)
     int IconLabelOpacity = 255;            // Icon label text opacity (0=labels hidden, 255=opaque)
     std::string IconTintColor = "#000000"; // Tint color for icons (RGB hex)
     int IconTintStrength = 0;              // Tint strength (0=none, 255=full overlay)
@@ -218,7 +218,7 @@ struct AppConfig
     // Update check (opt-in, off by default). Checks the GitHub Releases API at
     // most once per 24h on startup and notifies via a tray balloon — no auto-download.
     bool CheckForUpdates = false;
-    long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
+    long long LastUpdateCheckEpoch = 0;    // Unix time of the last check that got an answer (throttle)
 
     // UI language code ("en", "de"), set in the settings window.
     // Empty = use the installer's choice (HKCU\Software\DexCorral\Language),
@@ -315,7 +315,8 @@ public:
     static std::wstring GetCorruptPath(const std::wstring &configPath);
 
     /**
-     * Clamps loaded values into their usable ranges.
+     * Clamps loaded values into the ranges the UI offers and replaces
+     * malformed colours with the defaults.
      *
      * Called by Load() on every config read. Guards against hand-edited files:
      * a HeaderOpacity below the floor would produce a corral that is invisible

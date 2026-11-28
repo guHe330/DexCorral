@@ -252,9 +252,9 @@ void CorralWindow::GetDesktopIconSpacing(int &spacingX, int &spacingY)
 
         if (desktopSpacingX > 0 && desktopSpacingY > 0)
         {
-            // GetDesktopIconSize() returns logical pixels; Dpi() scales to physical.
-            // Both desktopSpacing and iconSize are now in physical pixels.
-            int desktopIconSizePhysical = Dpi(GetDesktopIconSize());
+            // GetDesktopIconSize() returns logical pixels; scale it with the ListView's
+            // own DPI (not this Corral's) so the ratio below is DPI-free.
+            int desktopIconSizePhysical = MulDiv(GetDesktopIconSize(), (int)GetDpiForWindow(hListView), 96);
             if (desktopIconSizePhysical > 0)
             {
                 // Scale proportionally: keep the same ratio as the desktop grid
@@ -622,41 +622,16 @@ void CorralWindow::MergeWith(CorralWindow *other)
     if (!other || other == this)
         return;
 
-    // This (the dragged window) is the survivor, but the user dropped it onto
-    // `other` — the drop target. Adopt the target's position and size so merging
-    // a small corral into a larger one keeps the larger geometry instead of
-    // shrinking the result to the dragged window's size. (Skip if the target is
-    // rolled up, where its rect is only a title bar.)
-    if (!other->GetConfig().IsRolledUp)
-    {
-        RECT otherRect;
-        if (GetWindowRect(other->GetHWND(), &otherRect))
-        {
-            config.Left = otherRect.left;
-            config.Top = otherRect.top;
-            config.Width = otherRect.right - otherRect.left;
-            config.Height = otherRect.bottom - otherRect.top;
-            savedHeight = config.Height; // keep roll-up restore height in sync
-            SetWindowPos(hwnd, nullptr,
-                         (int)config.Left, (int)config.Top,
-                         (int)config.Width, (int)config.Height,
-                         SWP_NOZORDER | SWP_NOACTIVATE);
-            RecalculateLayout();
-
-            // In the target's place for every set of monitors, not only this one
-            config.Layouts = other->GetConfig().Layouts;
-        }
-    }
-    SyncConfigFromWindow(true); // The user dropped it here
-
-    // Copy all tabs from other to this
+    // This is the drop target and survives as it is: its place, size, Lock and
+    // other settings stay. Only the tabs of `other` (the dragged Corral) join it.
+    const int firstMerged = (int)config.Tabs.size();
     for (const auto &tab : other->GetConfig().Tabs)
     {
         config.Tabs.push_back(tab);
     }
 
     // Switch to the first merged tab
-    SetActiveTab((int)config.Tabs.size() - (int)other->GetConfig().Tabs.size());
+    SetActiveTab(firstMerged);
 
     // Remove the other corral
     if (App::GetInstance())
@@ -664,8 +639,7 @@ void CorralWindow::MergeWith(CorralWindow *other)
         App::GetInstance()->RemoveCorral(&other->GetConfig());
     }
 
-    // Repaint at the adopted geometry (SetActiveTab only reloads when the active
-    // index actually changes, so refresh explicitly).
+    // SetActiveTab only reloads when the active index actually changes
     UpdateLayeredContent();
 }
 
@@ -1001,7 +975,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                                          x >= scrollbarRegionLeft &&
                                          y >= window->GetIconAreaTop();
 
-            window->isScrollbarHovered = isOverScrollbarRegion;
+            // Mid-drag the bar stays wide: collapsing it changes the thumb's scale
+            window->isScrollbarHovered = isOverScrollbarRegion || window->isDraggingScrollbar;
 
             // Redraw if hover state changed
             if (wasHovered != window->isScrollbarHovered)
@@ -1156,6 +1131,17 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (window->OnKeyDown(wParam))
                 return 0;
             break;
+        case WM_SYSKEYDOWN:
+            // Alt+Enter comes as a system key. Every other Alt key stays with
+            // DefWindowProc (Alt+F4, Alt+Space).
+            if (wParam == VK_RETURN && window->OnKeyDown(wParam))
+                return 0;
+            break;
+        case WM_SYSCHAR:
+            // The character of a handled Alt+Enter: DefWindowProc would beep for it
+            if (wParam == VK_RETURN)
+                return 0;
+            break;
         case WM_CHAR:
             window->OnChar((wchar_t)wParam);
             return 0;
@@ -1216,8 +1202,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (wParam == DESKTOP_RETRY_TIMER_ID)
             {
                 KillTimer(hwnd, DESKTOP_RETRY_TIMER_ID);
-                if (!window->GetActiveTab().IsVirtual)
-                    window->LoadFiles(); // Arms the timer again if the desktop still does not answer
+                if (!window->GetActiveTab().IsVirtual || window->virtualFolderMissing)
+                    window->LoadFiles(); // Arms the timer again if the folder still does not answer
                 return 0;
             }
             if (wParam == NET_PROBE_TIMER_ID)
@@ -1381,6 +1367,10 @@ void CorralWindow::OnDpiChanged(UINT newDpi, const RECT *suggested)
         config.Height = savedHeight;
     }
 
+    // Before SetWindowPos: its WM_SIZE and WM_MOVE already render at the new DPI
+    iconSize = GetIconSizeForViewMode();
+    UpdateIconSpacingForViewMode();
+
     // MoveTo has already chosen the size for this DPI
     if (suggested && !isBeingPlaced)
     {
@@ -1389,8 +1379,8 @@ void CorralWindow::OnDpiChanged(UINT newDpi, const RECT *suggested)
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Icon size, grid spacing and the resolution of the loaded icon images are
-    // all fixed at load time, so a relayout alone would leave them at the old scale.
+    // The loaded icon images keep the resolution they were loaded at, so a
+    // relayout alone would leave them at the old scale.
     LoadFiles();
 }
 

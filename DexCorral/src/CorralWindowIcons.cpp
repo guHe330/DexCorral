@@ -651,6 +651,7 @@ void CorralWindow::LoadVirtualFolderIcons()
     }
 
     ClearIcons();
+    const bool wasMissing = virtualFolderMissing;
     virtualFolderMissing = false;
     virtualFolderConnecting = false;
 
@@ -661,7 +662,8 @@ void CorralWindow::LoadVirtualFolderIcons()
     // A network folder is only touched while its share is known to answer
     // (see netState). Until then: "connecting", and "unavailable" once the answer is no.
     const std::wstring root = Utf8ToWide(tab.VirtualFolderPath);
-    if (IsNetworkFolder(root))
+    const bool isNetwork = IsNetworkFolder(root);
+    if (isNetwork)
     {
         if (netProbeRoot != root)
         {
@@ -685,7 +687,20 @@ void CorralWindow::LoadVirtualFolderIcons()
     if (!IsExistingDirectory(root))
     {
         virtualFolderMissing = true;
+        // Nothing reports a drive plugged in or a folder made again: look later
+        // (a share has its own probe)
+        if (hwnd && !isNetwork)
+        {
+            desktopRetryMs = desktopRetryMs ? (std::min)(desktopRetryMs * 2, 60000u) : 5000u;
+            SetTimer(hwnd, DESKTOP_RETRY_TIMER_ID, desktopRetryMs, nullptr);
+        }
         return;
+    }
+    if (!isNetwork)
+    {
+        desktopRetryMs = 0;
+        if (wasMissing)
+            InitializeFolderWatcher(); // The watchers on the folder that was gone have ended
     }
 
     // Current sub-folder gone: auto-navigate up to the nearest existing ancestor.
@@ -758,6 +773,9 @@ void CorralWindow::LoadVirtualFolderIcons()
             continue;
         }
         ci.stamp = stamp;
+        // Sort By Size and Date need these in every view, not only in Details
+        ci.fileSize = stamp.size;
+        ci.modifiedTime = stamp.writeTime;
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
         // for known file types" and strips .lnk
@@ -830,6 +848,17 @@ void CorralWindow::SortVirtualIcons()
     const CorralTabConfig &tab = GetActiveTab();
     int col = tab.DetailsSortColumn;
     bool asc = tab.DetailsSortAscending;
+
+    // Only Details loads the type names: fetch them when another view sorts by type
+    if (col == 1)
+    {
+        for (auto &icon : icons)
+        {
+            SHFILEINFOW sfi = {};
+            if (icon.fileType.empty() && SHGetFileInfoW(icon.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_TYPENAME))
+                icon.fileType = sfi.szTypeName;
+        }
+    }
 
     // The selection is held as indices: it moves with its files
     const SelectionByFile selected = SaveSelectionByFile();
@@ -1006,10 +1035,13 @@ void CorralWindow::InitializeFolderWatcher()
     // Watch the parent folder too: a rename/delete of the current folder itself is
     // reported to its parent, not to the folder we are viewing.
     size_t slash = folderPath.find_last_of(L"\\/");
-    if (slash != std::wstring::npos && slash > 0)
+    // A drive root itself ("D:\") has no parent to watch.
+    if (slash != std::wstring::npos && slash > 0 && slash + 1 < folderPath.size())
     {
         std::wstring parentPath = folderPath.substr(0, slash);
-        // Skip degenerate parents like "C:" (drive root has no separate parent dir to watch).
+        // A folder right on a drive: its parent is the root "D:\", not "D:"
+        if (parentPath.size() == 2 && parentPath[1] == L':')
+            parentPath += L'\\';
         if (parentPath.size() > 2)
         {
             parentWatcher = std::make_unique<FolderWatcher>();

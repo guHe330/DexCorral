@@ -225,6 +225,18 @@ TEST(FindNeighbor, Grid_RaggedLastRow_FallsToNearestColumn) {
     EXPECT_EQ(FindNeighbor(cells, 4, NavDirection::Up),   1);
 }
 
+TEST(IsPastLastCell, GridLastRow) {
+    // 3 columns, 5 icons -> rows [0 1 2] [3 4]
+    int ch;
+    auto cells = ComputeGridLayout(5, 300, 0, 32, 90, 70, 8, 8, ch);
+    const RECT &last = cells[4].rect;
+    EXPECT_TRUE(IsPastLastCell(last, {last.right + 5, last.top + 5}));  // Right of it, same row
+    EXPECT_TRUE(IsPastLastCell(last, {cells[0].rect.left, last.bottom})); // Below the last row
+    EXPECT_FALSE(IsPastLastCell(last, {last.left + 5, last.top + 5}));  // On the cell itself
+    EXPECT_FALSE(IsPastLastCell(last, {cells[3].rect.left + 5, last.top + 5})); // On the one before
+    EXPECT_FALSE(IsPastLastCell(last, {last.right + 5, last.top - 5}));  // Right of the row above
+}
+
 TEST(FindNeighbor, SingleColumn) {
     // clientWidth only fits one column
     int ch;

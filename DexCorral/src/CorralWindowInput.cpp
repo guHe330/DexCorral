@@ -31,6 +31,7 @@
 #include "App.h"
 #include "DesktopIcons.h"
 #include "IconUtils.h"
+#include "LayoutMath.h"
 #include "Strings.h"
 #include <windowsx.h>
 #include <shellapi.h>
@@ -147,10 +148,7 @@ void CorralWindow::OnMouseWheel(int delta)
     scrollPosition -= scrollAmount;
     ClampScrollPosition();
     UpdateLayeredContent();
-
-    // Debounced reposition of real desktop icons to match new scroll state
-    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
-    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+    RepositionHiddenIconsSoon();
 }
 
 void CorralWindow::StartScrollbarDrag(int y)
@@ -195,11 +193,14 @@ void CorralWindow::EndScrollbarDrag()
     {
         isDraggingScrollbar = false;
         ReleaseCapture();
-
-        // Reposition real desktop icons to match final scroll state
-        KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
-        SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+        RepositionHiddenIconsSoon();
     }
+}
+
+void CorralWindow::RepositionHiddenIconsSoon()
+{
+    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
 }
 
 void CorralWindow::ClampScrollPosition()
@@ -269,6 +270,8 @@ int CorralWindow::HitTestResizeAllowingTabs(int x, int y)
     int hit = HitTestResize(x, y);
     if (hit == HTTOP && HitTestTab(x, y) >= 0)
         return 0; // The tab owns these pixels
+    if (hit && HitTestTabGrip(x, y) >= 0)
+        return 0; // The first tab's reorder grip reaches the left edge; the cursor shows a move there
     return hit;
 }
 
@@ -332,22 +335,23 @@ void CorralWindow::DoResize(int screenX, int screenY)
         newHeight += dy;
     }
 
-    // Minimum size constraints
-    if (newWidth < 100)
+    // Minimum size constraints (logical, so the header still fits at high DPI)
+    const int minWidth = Dpi(100), minHeight = Dpi(80);
+    if (newWidth < minWidth)
     {
         if (resizeMode == HTLEFT || resizeMode == HTTOPLEFT || resizeMode == HTBOTTOMLEFT)
         {
-            newLeft = resizeStartRect.right - 100;
+            newLeft = resizeStartRect.right - minWidth;
         }
-        newWidth = 100;
+        newWidth = minWidth;
     }
-    if (newHeight < 80)
+    if (newHeight < minHeight)
     {
         if (resizeMode == HTTOP || resizeMode == HTTOPLEFT || resizeMode == HTTOPRIGHT)
         {
-            newTop = resizeStartRect.bottom - 80;
+            newTop = resizeStartRect.bottom - minHeight;
         }
-        newHeight = 80;
+        newHeight = minHeight;
     }
 
     // Apply snap to resize unless Shift is held
@@ -387,10 +391,23 @@ void CorralWindow::DoWindowDrag(int screenX, int screenY)
     if (!isDragging || !PastDragThreshold(dragStart, screenX, screenY))
         return;
 
-    int newLeft = screenX - (dragStart.x - dragStartRect.left);
-    int newTop = screenY - (dragStart.y - dragStartRect.top);
-    int width = dragStartRect.right - dragStartRect.left;
-    int height = dragStartRect.bottom - dragStartRect.top;
+    // Crossing to a monitor with another DPI resizes the window mid-drag (OnDpiChanged),
+    // so snap with the current size and scale the grab offset along with it.
+    RECT current;
+    GetWindowRect(hwnd, &current);
+    int width = current.right - current.left;
+    int height = current.bottom - current.top;
+    // Width is the scale: a roll-up animation changes only the height.
+    int startWidth = dragStartRect.right - dragStartRect.left;
+    int grabX = dragStart.x - dragStartRect.left;
+    int grabY = dragStart.y - dragStartRect.top;
+    if (startWidth > 0)
+    {
+        grabX = MulDiv(grabX, width, startWidth);
+        grabY = MulDiv(grabY, width, startWidth);
+    }
+    int newLeft = screenX - grabX;
+    int newTop = screenY - grabY;
 
     // Apply snap unless Shift is held
     if (!(GetKeyState(VK_SHIFT) & 0x8000))
@@ -833,21 +850,22 @@ void CorralWindow::ApplyResizeSnap(int &newLeft, int &newTop, int &newWidth, int
     }
 
     // Enforce minimum size (adjusting position for left/top edge resizing)
-    if (newWidth < 100)
+    const int minWidth = Dpi(100), minHeight = Dpi(80);
+    if (newWidth < minWidth)
     {
         if (resizingLeft)
         {
-            newLeft -= (100 - newWidth);
+            newLeft -= (minWidth - newWidth);
         }
-        newWidth = 100;
+        newWidth = minWidth;
     }
-    if (newHeight < 80)
+    if (newHeight < minHeight)
     {
         if (resizingTop)
         {
-            newTop -= (80 - newHeight);
+            newTop -= (minHeight - newHeight);
         }
-        newHeight = 80;
+        newHeight = minHeight;
     }
 }
 
@@ -936,6 +954,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 scrollPosition -= iconSpacingY;
                 ClampScrollPosition();
                 UpdateLayeredContent();
+                RepositionHiddenIconsSoon();
                 return;
             }
 
@@ -946,6 +965,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 scrollPosition += iconSpacingY;
                 ClampScrollPosition();
                 UpdateLayeredContent();
+                RepositionHiddenIconsSoon();
                 return;
             }
         }
@@ -981,6 +1001,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 scrollPosition = (int)((float)clickOffset / thumbRange * scrollRange);
                 ClampScrollPosition();
                 UpdateLayeredContent();
+                RepositionHiddenIconsSoon();
             }
         }
         return;
@@ -1108,6 +1129,16 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
 {
     // A double-click cancels any pending (deferred) rename — the user wants to open.
     CancelPendingRename();
+
+    // On a button (nav up, scrollbar, column header) the second of two fast clicks
+    // is just another click: going up two folders must not roll the Corral up.
+    RECT nb = IsNavBackVisible() ? GetNavBackButtonRect() : RECT{};
+    POINT p = {x, y};
+    if (PtInRect(&nb, p) || HitTestScrollbar(x, y) || HitTestDetailsHeader(x, y) >= 0)
+    {
+        OnLeftButtonDown(x, y);
+        return;
+    }
 
     // Double-click on title bar toggles roll-up
     if (y < GetTitleBarHeight())
@@ -1303,15 +1334,21 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
         POINT pt;
         GetCursorPos(&pt);
         App *app = App::GetInstance();
+        // A Corral with a dialog open (rename, appearance, a question) is
+        // disabled. Merging would delete it while that dialog's code runs.
+        auto canMergeInto = [this, app](const CorralWindow *c)
+        {
+            for (const auto &other : app->GetCorrals())
+                if (other.get() == c)
+                    return c != this && IsWindowEnabled(c->GetHWND());
+            return false;
+        };
+        CorralWindow *target = nullptr;
         if (app && dragMoved)
         {
             for (const auto &other : app->GetCorrals())
             {
-                if (other.get() == this)
-                    continue;
-                // A Corral with a dialog open (rename, appearance, a question) is
-                // disabled. Merging would delete it while that dialog's code runs.
-                if (!IsWindowEnabled(other->GetHWND()))
+                if (!canMergeInto(other.get()))
                     continue;
 
                 RECT otherRect;
@@ -1320,10 +1357,32 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
                 // If dropped on another window's title bar, merge
                 if (PtInRect(&otherRect, pt) && (pt.y - otherRect.top < other->GetTitleBarHeight()))
                 {
-                    MergeWith(other.get());
-                    return; // The other Corral is gone now; nothing more to do here
+                    target = other.get();
+                    break;
                 }
             }
+        }
+        if (target)
+        {
+            // The drag becomes an undo step that either answer takes back: on No
+            // this Corral returns to where it came from, on Yes the icons it
+            // pushed on the way go back before it joins the target.
+            app->CommitMoveUndo(this, true);
+            const bool merge = MessageBoxBehind(Tr(Str::Confirm_MergeCorralsBody), Tr(Str::Confirm_MergeCorralsTitle),
+                                                MB_YESNO | MB_ICONQUESTION) == IDYES &&
+                               canMergeInto(target); // The box ran a message loop: the target may be gone
+            if (merge)
+                Hide(); // Not seen jumping back first
+            const bool undone = app->UndoLastMove(this);
+            if (merge)
+            {
+                app->InvalidateDesktopIconCache(); // When nothing was undone, Commit left it valid
+                target->MergeWith(this);
+                return; // This Corral is gone now; nothing more to do here
+            }
+            if (undone)
+                return;
+            // No step to take back (another drag came first): it stays where it was dropped
         }
 
         SyncConfigFromWindow(dragMoved);
@@ -1698,7 +1757,14 @@ namespace
                IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
     }
 
-    /// True if at least one CF_HDROP file is, by name, a file on the desktop.
+    /// True if a CF_HDROP path names an existing item on the user or public desktop.
+    /// Its folder counts, not just its name: a file elsewhere may share a desktop file's name.
+    bool IsHdropDesktopFile(const wchar_t *filePath)
+    {
+        return IsDesktopItem(filePath) && GetFileAttributesW(filePath) != INVALID_FILE_ATTRIBUTES;
+    }
+
+    /// True if at least one CF_HDROP file is a file on the desktop.
     bool HdropHasDesktopFile(IDataObject *data)
     {
         FORMATETC fmt = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
@@ -1709,17 +1775,13 @@ namespace
         bool found = false;
         if (HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal))
         {
-            std::wstring desktop = CorralWindow::GetDesktopPath();
-            std::wstring publicDesktop = CorralWindow::GetPublicDesktopPath();
             UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
             for (UINT i = 0; i < count && !found; i++)
             {
                 wchar_t filePath[MAX_PATH];
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
-                std::wstring name = NameOf(filePath);
-                found = GetFileAttributesW((desktop + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES ||
-                        GetFileAttributesW((publicDesktop + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES;
+                found = IsHdropDesktopFile(filePath);
             }
             GlobalUnlock(stg.hGlobal);
         }
@@ -1887,11 +1949,20 @@ bool CorralDropTarget::IconTakesDrops(int iconIndex)
     return iconAnswer;
 }
 
-void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt, bool forDrop)
+void CorralDropTarget::SyncFolderTarget(DWORD grfKeyState, POINTL pt, bool forDrop, int iconIndex)
 {
-    // The active tab can change while a drag is in flight, so the folder target
-    // follows whatever the corral is showing right now.
-    std::wstring wanted = owner->GetActiveTab().IsVirtual ? owner->GetVirtualCurrentPath() : L"";
+    // The target follows what is under the drag: the icon, or else the folder the
+    // corral is showing right now (the active tab can change while a drag is in flight).
+    std::wstring wanted;
+    if (iconIndex >= 0)
+    {
+        const CorralIcon &icon = owner->icons[iconIndex];
+        wanted = icon.isSpecialIcon ? L"::" + icon.clsid : icon.fullPath;
+    }
+    else if (owner->GetActiveTab().IsVirtual)
+    {
+        wanted = owner->GetVirtualCurrentPath();
+    }
     if (folderTarget && lstrcmpiW(wanted.c_str(), folderTargetPath.c_str()) == 0)
         return;
 
@@ -1953,16 +2024,14 @@ DWORD CorralDropTarget::EffectAt(DWORD grfKeyState, POINTL pt)
     }
 
     // Over an icon the drop goes to that item (open with / move into folder),
-    // whatever kind of tab this is.
+    // whatever kind of tab this is. A virtual tab is its folder. Either way the
+    // shell's own target decides, so the cursor shows move/copy/link exactly as
+    // it would in Explorer: a folder on the same volume moves.
     const int hit = owner->HitTestDropIcon(clientPt.x, clientPt.y);
-    if (hit >= 0 && IconTakesDrops(hit))
-        return DROPEFFECT_COPY;
-
-    if (owner->GetActiveTab().IsVirtual)
+    const bool onIcon = hit >= 0 && IconTakesDrops(hit);
+    if (onIcon || owner->GetActiveTab().IsVirtual)
     {
-        // A virtual tab is its folder: let the folder decide, so the cursor
-        // shows move/copy/link exactly as it would over an Explorer window.
-        SyncFolderTarget(grfKeyState, pt);
+        SyncFolderTarget(grfKeyState, pt, false, onIcon ? hit : -1);
         if (!folderTarget)
             return DROPEFFECT_NONE;
         DWORD effect = allowedEffects;
@@ -1972,6 +2041,7 @@ DWORD CorralDropTarget::EffectAt(DWORD grfKeyState, POINTL pt)
     }
 
     // Normal tab, empty space: the item joins the corral
+    ReleaseFolderTarget(true); // The icon the drag was over, if any
     return hasDropData ? DROPEFFECT_LINK : DROPEFFECT_NONE;
 }
 
@@ -2034,25 +2104,31 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
     LogCorralDrop(L"Drop: screen=(%d,%d) client=(%d,%d) hitIcon=%d",
                   pt.x, pt.y, clientPt.x, clientPt.y, hit);
 
-    bool takenByIcon = false;
-    if (hit >= 0)
+    allowedEffects = *pdwEffect;
+    if (hit >= 0 && IconTakesDrops(hit)) // As the cursor showed: see EffectAt
     {
-        // dragKeyState is from the last DragOver, so it still has the mouse
-        // button in it; by the time Drop is called the button is up, and the
-        // icon's own drop target needs it to tell a right-drag from a left one.
-        LogCorralDrop(L"Drop: on icon %d -> OnDropOnIcon", hit);
-        takenByIcon = owner->OnDropOnIcon(pDataObj, hit, dragKeyState, grfKeyState, pt, *pdwEffect);
+        // The icon's drop target is normally bound from DragOver already. If it
+        // is bound here, its DragEnter gets dragKeyState: that is from the last
+        // DragOver and still has the mouse button in it, which tells a
+        // right-drag (menu) from a left one; grfKeyState no longer does.
+        SyncFolderTarget(dragKeyState, pt, true, hit);
+        if (folderTarget)
+        {
+            LogCorralDrop(L"Drop: on icon %d -> its drop target '%s'", hit, folderTargetPath.c_str());
+            if (FAILED(folderTarget->Drop(pDataObj, grfKeyState, pt, pdwEffect)))
+                *pdwEffect = DROPEFFECT_NONE;
+            // Drop ends the target's session; it must not get a DragLeave too.
+            ReleaseFolderTarget(false);
+            EndDragSession();
+            return S_OK; // *pdwEffect is what the icon's target did
+        }
+        LogCorralDrop(L"Drop: icon %d takes no drops", hit);
     }
 
-    if (takenByIcon)
-    {
-        *pdwEffect = DROPEFFECT_COPY;
-    }
     // An icon that takes no drops (a document) is just a place in the tab, as
     // in an Explorer window: the drop is for the tab.
-    else if (owner->GetActiveTab().IsVirtual)
+    if (owner->GetActiveTab().IsVirtual)
     {
-        allowedEffects = *pdwEffect;
         SyncFolderTarget(grfKeyState, pt, true);
         if (folderTarget)
         {
@@ -2096,9 +2172,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
     if (GetActiveTab().IsVirtual)
         return;
 
-    bool changed = false;
-    std::wstring desktopPath = GetDesktopPath();
-    std::wstring publicDesktopPath = GetPublicDesktopPath();
+    std::vector<std::string> added;
 
     auto addEntry = [&](const std::string &entryUtf8)
     {
@@ -2108,9 +2182,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         if (std::find(files.begin(), files.end(), entryUtf8) != files.end())
             return;
         files.push_back(entryUtf8);
-        changed = true;
-        if (App::GetInstance())
-            App::GetInstance()->RemoveFileFromOtherCorrals(Utf8ToWide(entryUtf8), &GetActiveTab());
+        added.push_back(entryUtf8);
     };
 
     FORMATETC fmtShellIdList = {ShellIdListFormat(), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
@@ -2118,7 +2190,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
 
     // CF_HDROP: only for a source that offers no shell ID list. It carries bare
     // paths, and the desktop shell resolves .lnk shortcuts in it (it gives the
-    // target path), so all it can do is match names against the desktop.
+    // target path), so all it can do is take the files that lie on the desktop.
     FORMATETC fmtHdrop = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
     STGMEDIUM stgHdrop = {};
 
@@ -2134,16 +2206,8 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
 
-                std::wstring fileName = NameOf(filePath);
-                std::wstring userPath = desktopPath + L"\\" + fileName;
-                std::wstring pubPath = publicDesktopPath + L"\\" + fileName;
-                if (GetFileAttributesW(userPath.c_str()) == INVALID_FILE_ATTRIBUTES &&
-                    GetFileAttributesW(pubPath.c_str()) == INVALID_FILE_ATTRIBUTES)
-                {
-                    continue;
-                }
-
-                addEntry(WideToUtf8(fileName));
+                if (IsHdropDesktopFile(filePath))
+                    addEntry(WideToUtf8(NameOf(filePath)));
             }
             GlobalUnlock(stgHdrop.hGlobal);
         }
@@ -2223,8 +2287,10 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         ReleaseStgMedium(&stgShellIdList);
     }
 
-    if (changed)
+    if (!added.empty())
     {
+        if (App::GetInstance())
+            App::GetInstance()->RemoveFilesFromOtherCorrals(added, &GetActiveTab());
         LoadFiles();
         if (App::GetInstance())
         {
@@ -2256,62 +2322,6 @@ IDropTarget *CorralWindow::BindIconDropTarget(int iconIndex)
 }
 
 // ============================================================================
-// OnDropOnIcon - drop a file onto a corral icon (shell-execute / open with)
-// ============================================================================
-
-bool CorralWindow::OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
-                                DWORD dropKeyState, POINTL pt, DWORD allowedEffects)
-{
-    // What the drag source permits; a source that says nothing gets the usual three
-    if (allowedEffects == DROPEFFECT_NONE)
-        allowedEffects = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
-
-    if (iconIndex < 0 || iconIndex >= (int)icons.size())
-        return false;
-
-    bool forwarded = false;
-    const auto &targetIcon = icons[iconIndex];
-
-    // Get the target icon's IDropTarget via the shell and forward the drop.
-    // This replicates Explorer's behavior: dropping onto an exe opens the file,
-    // dropping onto a folder moves/copies the file, dropping onto a shortcut
-    // invokes the shortcut's target with the dropped file, etc.
-    std::wstring targetPath;
-    if (targetIcon.isSpecialIcon)
-    {
-        targetPath = L"::" + targetIcon.clsid;
-    }
-    else
-    {
-        targetPath = targetIcon.fullPath;
-    }
-
-    LogCorralDrop(L"OnDropOnIcon: icon=%d target='%s' special=%d",
-                  iconIndex, targetPath.c_str(), targetIcon.isSpecialIcon);
-
-    if (IDropTarget *pDropTarget = BindIconDropTarget(iconIndex))
-    {
-        LogCorralDrop(L"OnDropOnIcon: got IDropTarget, forwarding drop");
-        // Hand the icon's drop target the real keys and position, as the
-        // desktop would: Ctrl copies, Shift moves, Ctrl+Shift links, and a
-        // right-drag gets its menu, at the pointer. A fixed MK_LBUTTON at
-        // (0,0) ignored all of that.
-        DWORD dwEffect = allowedEffects;
-        pDropTarget->DragEnter(pDataObj, enterKeyState, pt, &dwEffect);
-        dwEffect = allowedEffects;
-        pDropTarget->Drop(pDataObj, dropKeyState, pt, &dwEffect);
-        pDropTarget->Release();
-        forwarded = true;
-        LogCorralDrop(L"OnDropOnIcon: drop forwarded, effect=0x%X", dwEffect);
-    }
-    else
-    {
-        LogCorralDrop(L"OnDropOnIcon: the item takes no drops");
-    }
-    return forwarded;
-}
-
-// ============================================================================
 // Icon reordering
 // ============================================================================
 
@@ -2320,19 +2330,8 @@ void CorralWindow::OnIconDrag(int x, int y)
     if (!isDraggingIcon || draggedIconIndex < 0)
         return;
 
-    // Find which icon slot we're over. icons[i].rect is in unscrolled content
-    // coordinates, so adjust for scroll the same way HitTestIcon does.
-    int newDropTarget = -1;
-    POINT pt = {x, y + scrollPosition};
-
-    for (int i = 0; i < (int)icons.size(); i++)
-    {
-        if (PtInRect(&icons[i].rect, pt))
-        {
-            newDropTarget = i;
-            break;
-        }
-    }
+    // Find which icon slot we're over (not one scrolled out under the header)
+    int newDropTarget = HitTestIcon(x, y);
 
     // Over one of this corral's other tabs: dropping there moves the icons to it.
     // The tab's reorder grip doubles as the "you are over this tab" cue.
@@ -2566,25 +2565,33 @@ void CorralWindow::OnIconDragEnd()
     if (ownTab == config.ActiveTabIndex)
         ownTab = -1;
 
+    const bool onOtherIcon = dropTargetIndex >= 0 && dropTargetIndex < (int)icons.size() &&
+                             std::find(dragged.begin(), dragged.end(), dropTargetIndex) == dragged.end();
+    // Released on the empty space after the last icon: the block goes to the end
+    const bool toEnd = dropTargetIndex < 0 && !icons.empty() &&
+                       ownPt.y >= GetIconAreaTop() &&
+                       LayoutMath::IsPastLastCell(icons.back().rect, {ownPt.x, ownPt.y + scrollPosition});
+
     // Check if dragged outside the corral
     if (iconDragOutside)
     {
 
-        // Check if dropped on another corral
+        // Check if dropped on another corral: the one the user sees on top there.
+        // One with a dialog open (disabled) takes nothing, and the icons stay put.
         CorralWindow *targetCorral = nullptr;
+        bool overDisabledCorral = false;
 
         if (app)
         {
+            HWND root = GetAncestor(WindowFromPoint(screenPt), GA_ROOT);
             for (const auto &other : app->GetCorrals())
             {
-                if (other.get() == this)
-                    continue;
-
-                RECT otherRect;
-                GetWindowRect(other->GetHWND(), &otherRect);
-                if (PtInRect(&otherRect, screenPt))
+                if (other.get() != this && other->GetHWND() == root)
                 {
-                    targetCorral = other.get();
+                    if (IsWindowEnabled(root))
+                        targetCorral = other.get();
+                    else
+                        overDisabledCorral = true;
                     break;
                 }
             }
@@ -2615,7 +2622,7 @@ void CorralWindow::OnIconDragEnd()
                 }
             }
         }
-        else
+        else if (!overDisabledCorral)
         {
             // Dropped outside all corrals - remove from this corral (back to desktop)
             removeDraggedFromTab();
@@ -2693,14 +2700,14 @@ void CorralWindow::OnIconDragEnd()
         // Dropped on another tab of this corral
         MoveEntriesToTab(names, ownTab);
     }
-    else if (dropTargetIndex >= 0 && dropTargetIndex < (int)icons.size() &&
-             std::find(dragged.begin(), dragged.end(), dropTargetIndex) == dragged.end())
+    else if (onOtherIcon || toEnd)
     {
         // Reorder within corral: the dragged block goes in front of the icon it
-        // was dropped on, keeping its own order.
-        std::string targetName = icons[dropTargetIndex].fileName;
+        // was dropped on, or to the end when dropped past the last one, keeping
+        // its own order.
+        std::string targetName = onOtherIcon ? icons[dropTargetIndex].fileName : std::string();
         removeDraggedFromTab();
-        auto insertAt = std::find(files.begin(), files.end(), targetName);
+        auto insertAt = onOtherIcon ? std::find(files.begin(), files.end(), targetName) : files.end();
         files.insert(insertAt, names.begin(), names.end());
 
         LoadFiles();

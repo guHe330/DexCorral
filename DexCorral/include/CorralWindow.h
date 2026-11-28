@@ -75,8 +75,9 @@ public:
 private:
     /// Effect to show at this point: per-icon, per-folder (virtual tab) or "join the corral"
     DWORD EffectAt(DWORD grfKeyState, POINTL pt);
-    /// Binds (or rebinds) folderTarget to the folder the active virtual tab shows
-    void SyncFolderTarget(DWORD grfKeyState, POINTL pt, bool forDrop = false);
+    /// Binds (or rebinds) folderTarget to the icon at iconIndex, or with -1 to the
+    /// folder the active virtual tab shows
+    void SyncFolderTarget(DWORD grfKeyState, POINTL pt, bool forDrop = false, int iconIndex = -1);
     bool IconTakesDrops(int iconIndex); /// Asked once per icon the drag rests on, not per DragOver
     std::wstring iconAsked;             /// The icon IconTakesDrops last asked about
     bool iconAnswer = false;
@@ -89,8 +90,8 @@ private:
     IDataObject *dragData = nullptr;     /// Data of the drag in flight (held for rebinding)
     DWORD allowedEffects = 0;            /// Effects the drag source permits
     DWORD dragKeyState = 0;              /// Keys and buttons at the last DragEnter/DragOver
-    IDropTarget *folderTarget = nullptr; /// The shell's drop target for a virtual tab's folder
-    std::wstring folderTargetPath;       /// Folder that folderTarget is bound to
+    IDropTarget *folderTarget = nullptr; /// The shell's drop target for the icon under the drag or a virtual tab's folder
+    std::wstring folderTargetPath;       /// Icon or folder that folderTarget is bound to
     int springTab = -1;                  /// Inactive tab the drag is resting on, or -1
     DWORD springStart = 0;               /// Tick count when the drag arrived on springTab
 };
@@ -350,12 +351,8 @@ private:
     void OnLeftButtonDblClick(int x, int y);
     void OnRightButtonDown(int x, int y);
     void OnDrop(IDataObject *pDataObj);                      // OLE drop handler (replaces OnDropFiles)
-    /// Drop onto a corral icon: forwarded to that item's own shell drop target
     /// The item's own shell drop target, or nullptr if it takes no drops (a document)
     IDropTarget *BindIconDropTarget(int iconIndex);
-    /// False if that item takes no drops: the drop is then for the tab
-    bool OnDropOnIcon(IDataObject *pDataObj, int iconIndex, DWORD enterKeyState,
-                      DWORD dropKeyState, POINTL pt, DWORD allowedEffects);
 
     friend class CorralDropTarget;
 
@@ -417,6 +414,7 @@ private:
     void DoScrollbarDrag(int y);
     void EndScrollbarDrag();
     void ClampScrollPosition();
+    void RepositionHiddenIconsSoon(); // Debounced: the parked desktop icons follow the scroll
 
     void LoadIconImages();
     void ClearIcons();
@@ -750,6 +748,7 @@ private:
     static const UINT_PTR NET_PROBE_TIMER_ID = 11;
     // The desktop folder did not answer when a normal tab was loaded: its icons
     // could not be shown. Tried again after a pause that doubles up to a minute.
+    // Also used for the local folder of a virtual tab that is not there.
     static const UINT_PTR DESKTOP_RETRY_TIMER_ID = 12;
     UINT desktopRetryMs = 0;
     static const UINT NET_PROBE_MS = 10000;

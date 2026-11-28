@@ -383,11 +383,11 @@ void CorralWindow::UpdateLayeredContent()
                 }
 
                 RECT tabRect = GetTabRect(i);
-                tabRect.left += 6;
-                tabRect.right -= 6;
+                tabRect.left += Dpi(6);
+                tabRect.right -= Dpi(6);
                 if (i == (int)config.Tabs.size() - 1)
                     tabRect.right -= lockReserve;
-                tabRect.top += 2;
+                tabRect.top += Dpi(2);
 
                 DrawTextW(titles.DC(), wtitle.c_str(), (int)wtitle.length(), &tabRect,
                           DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
@@ -589,9 +589,17 @@ void CorralWindow::UpdateLayeredContent()
         {
             RECT mr = {Dpi(12), GetIconAreaTop() + Dpi(8), w - Dpi(12), h - Dpi(8)};
             if (mr.bottom > mr.top)
-                drawHeaderText(Tr(virtualFolderMissing ? Str::Hdr_FolderUnavailable : Str::Hdr_FolderConnecting), -1,
+            {
+                // A share that does not answer is asked again by itself: no hint to point the tab elsewhere
+                const bool shareAway = netState == NetState::Unreachable &&
+                                       IsNetworkFolder(Utf8ToWide(GetActiveTab().VirtualFolderPath));
+                const Str text = !virtualFolderMissing ? Str::Hdr_FolderConnecting
+                                 : shareAway           ? Str::Hdr_ShareUnavailable
+                                                       : Str::Hdr_FolderUnavailable;
+                drawHeaderText(Tr(text), -1,
                                DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOPREFIX,
                                mr, virtualFolderMissing ? RGB(255, 210, 210) : RGB(230, 230, 230));
+            }
         }
 
         if (hHdrTheme)
@@ -618,17 +626,19 @@ void CorralWindow::UpdateLayeredContent()
 
     if (!icons.empty() && (!config.IsRolledUp || isHoverExpanded))
     {
-        // Use the system icon title font (DPI-aware, matches desktop icon labels)
+        // Use the system icon title font at this Corral's DPI (matches desktop icon labels);
+        // plain SystemParametersInfoW would return it at the primary monitor's DPI.
         LOGFONTW iconLogFont = {};
         HFONT iconFont;
-        if (SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0))
+        if (SystemParametersInfoForDpi(SPI_GETICONTITLELOGFONT, sizeof(iconLogFont), &iconLogFont, 0,
+                                       GetDpiForWindow(hwnd)))
         {
             iconLogFont.lfQuality = CLEARTYPE_QUALITY;
             iconFont = CreateFontIndirectW(&iconLogFont);
         }
         else
         {
-            iconFont = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            iconFont = CreateFontW(-Dpi(11), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         }
@@ -673,7 +683,8 @@ void CorralWindow::UpdateLayeredContent()
         HBITMAP iconTempBmp = nullptr;
         HBITMAP iconTempOldBmp = nullptr;
         DWORD *iconTempPixels = nullptr;
-        const int ICON_TEMP_SIZE = (iconSize > ICON_TEMP_SIZE_THRESHOLD) ? iconSize : ICON_TEMP_SIZE_THRESHOLD;
+        // Details draws Dpi(ICON_SIZE_DETAILS) at the current DPI, which iconSize lags until LoadFiles
+        const int ICON_TEMP_SIZE = (std::max)({iconSize, Dpi(ICON_SIZE_DETAILS), ICON_TEMP_SIZE_THRESHOLD});
         if (useTempIcon)
         {
             BITMAPINFO iconBmi = {};
@@ -1001,13 +1012,13 @@ void CorralWindow::UpdateLayeredContent()
                 if (drawTop >= visibleTop && drawBottom <= visibleBottom)
                 {
                     // Draw name (bright white)
-                    RECT nameRect = {nameCol, drawTop, typeCol - 4, drawBottom};
+                    RECT nameRect = {nameCol, drawTop, typeCol - Dpi(4), drawBottom};
                     drawShadowedText(icon.displayName.c_str(), (int)icon.displayName.length(),
                                      DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
                                      nameRect, RGB(255, 255, 255));
 
                     // Draw type
-                    RECT typeRect = {typeCol, drawTop, sizeCol - 4, drawBottom};
+                    RECT typeRect = {typeCol, drawTop, sizeCol - Dpi(4), drawBottom};
                     drawShadowedText(icon.fileType.c_str(), (int)icon.fileType.length(),
                                      DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
                                      typeRect, RGB(255, 255, 255));
@@ -1030,7 +1041,7 @@ void CorralWindow::UpdateLayeredContent()
                     {
                         sizeStr = std::to_wstring(icon.fileSize / (1024 * 1024 * 1024)) + Tr(Str::Unit_GB);
                     }
-                    RECT sizeRect = {sizeCol, drawTop, dateCol - 4, drawBottom};
+                    RECT sizeRect = {sizeCol, drawTop, dateCol - Dpi(4), drawBottom};
                     drawShadowedText(sizeStr.c_str(), (int)sizeStr.length(),
                                      DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                                      sizeRect, RGB(255, 255, 255));
@@ -1042,7 +1053,7 @@ void CorralWindow::UpdateLayeredContent()
                     FileTimeToSystemTime(&localTime, &sysTime);
                     wchar_t dateStr[32];
                     swprintf_s(dateStr, L"%02d/%02d/%04d", sysTime.wMonth, sysTime.wDay, sysTime.wYear);
-                    RECT dateRect = {dateCol, drawTop, syncCol - 4, drawBottom};
+                    RECT dateRect = {dateCol, drawTop, syncCol - Dpi(4), drawBottom};
                     drawShadowedText(dateStr, -1,
                                      DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                                      dateRect, RGB(255, 255, 255));
@@ -1077,7 +1088,7 @@ void CorralWindow::UpdateLayeredContent()
                         default:
                             break;
                         }
-                        RECT syncRect = {syncCol, drawTop, icon.rect.right - 4, drawBottom};
+                        RECT syncRect = {syncCol, drawTop, icon.rect.right - Dpi(4), drawBottom};
                         drawShadowedText(syncSymbol, -1,
                                          DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                                          syncRect, syncColor);
@@ -1399,9 +1410,10 @@ void CorralWindow::UpdateLayeredContent()
             DWORD arrowTriPixel = (arrowTriAlpha << 24) | (arrowTriPmR << 16) | (arrowTriPmG << 8) | arrowTriPmB;
 
             // Simple triangle drawing (up arrow)
-            for (int dy = -2; dy <= 2; dy++)
+            const int arrowTri = Dpi(2);
+            for (int dy = -arrowTri; dy <= arrowTri; dy++)
             {
-                int width = 2 - abs(dy);
+                int width = arrowTri - abs(dy);
                 for (int dx = -width; dx <= width; dx++)
                 {
                     int x = arrowCenterX + dx;
@@ -1414,9 +1426,9 @@ void CorralWindow::UpdateLayeredContent()
             }
 
             // Simple triangle drawing (down arrow)
-            for (int dy = -2; dy <= 2; dy++)
+            for (int dy = -arrowTri; dy <= arrowTri; dy++)
             {
-                int width = 2 - abs(dy);
+                int width = arrowTri - abs(dy);
                 for (int dx = -width; dx <= width; dx++)
                 {
                     int x = arrowCenterX + dx;
@@ -1462,19 +1474,20 @@ void CorralWindow::UpdateLayeredContent()
     if (!config.IsRolledUp)
     {
         DWORD gripPixel = (255 << 24) | (150 << 16) | (150 << 8) | 150;
-        for (int i = 0; i < 8; i++)
+        const int gripLen = Dpi(8), gripInset = Dpi(2);
+        for (int i = 0; i < gripLen; i++)
         {
-            int x = w - 2;
-            int y = h - 10 + i;
+            int x = w - gripInset;
+            int y = h - gripInset - gripLen + i;
             if (x >= 0 && x < w && y >= 0 && y < h)
             {
                 pixels[y * w + x] = gripPixel;
             }
         }
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < gripLen; i++)
         {
-            int x = w - 10 + i;
-            int y = h - 2;
+            int x = w - gripInset - gripLen + i;
+            int y = h - gripInset;
             if (x >= 0 && x < w && y >= 0 && y < h)
             {
                 pixels[y * w + x] = gripPixel;

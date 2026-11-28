@@ -19,17 +19,29 @@ Alongside your corral names, positions and tab settings, `config.json` **holds t
 **Off by default.** Enable it with **Check for Updates Automatically** in the settings window (tray menu, **Settings...**); 
 **Check for Updates Now** runs a single check without turning anything on.
 
-While enabled, at startup and at most once every 24 hours, DexCorral makes one HTTPS
-request. If that request fails, for example because the network is not up yet, it is
-repeated once five minutes later:
+While enabled, DexCorral makes one HTTPS request when it starts, if the last check that
+got an answer (automatic or **Check for Updates Now**) is 24 hours old or older, and
+again each time it becomes 24 hours old while DexCorral runs; DexCorral looks once an
+hour whether that time has come. A last check dated in the future, which a wrong clock
+can leave behind, does not hold the next one back. Switching the setting on runs one
+check right away. If an automatic request fails, for example because the network is not
+up yet, the first failure since DexCorral started is retried five minutes later; after
+that DexCorral tries once an hour until a request succeeds:
 
 ```
 GET https://api.github.com/repos/guHe330/DexCorral/releases/latest
 ```
 
 - It **sends nothing about you or your machine**: no version, no identifier, no
-  configuration. The request carries `DexCorral-UpdateCheck` as its user agent and
-  nothing else.
+  configuration, no cookies. Besides what Windows puts into every HTTPS request, such
+  as the host name `api.github.com`, it carries three fixed headers, the same on every
+  PC. The last two ask GitHub for its documented API format:
+
+  ```
+  User-Agent: DexCorral-UpdateCheck
+  Accept: application/vnd.github+json
+  X-GitHub-Api-Version: 2022-11-28
+  ```
 - GitHub necessarily sees your IP address and the time, exactly as if you had opened the
   releases page in a browser. That is GitHub's to handle, under [their privacy
   statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).

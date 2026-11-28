@@ -109,6 +109,8 @@ static DWORD WINAPI HookRetryThread(LPVOID param) {
     }
 
     Log(L"HookRetryThread: Gave up after all retries");
+    if (HWND hAppMsg = HookBridge::GetAppMessageWindow())
+        PostMessageW(hAppMsg, WM_HOOK_INACTIVE, 0, 0);
     return 0;
 }
 
@@ -239,7 +241,7 @@ void StartAppIfNeeded(const wchar_t* caller) {
 // Called by DexCorral.exe --startup via SetWindowsHookEx(WH_GETMESSAGE, ..., explorerThreadId).
 // Windows injects this DLL into Explorer's address space. On the first message processed by
 // Explorer's Progman thread, this proc fires, starts the App, and returns. DexCorral.exe
-// then calls UnhookWindowsHookEx and exits — the DLL stays resident (DllCanUnloadNow → S_FALSE).
+// then calls UnhookWindowsHookEx and exits — the DLL stays resident because StartAppIfNeeded pins it.
 extern "C" __declspec(dllexport) LRESULT CALLBACK WakeHookProc(int code, WPARAM wParam, LPARAM lParam)
 {
     // Only call StartAppIfNeeded once — g_AppStarted goes 0→1 on first call and
@@ -270,7 +272,8 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {
 }
 
 STDAPI DllCanUnloadNow() {
-    // Never unload while Explorer is running — our hook is active
+    // Never unload while Explorer is running — our hook is active. This only
+    // stops COM from freeing the DLL; the pin in StartAppIfNeeded keeps it loaded.
     return S_FALSE;
 }
 

@@ -149,6 +149,10 @@ static void GoInertAfterException(const wchar_t* where, DWORD exceptionCode) {
         RedrawWindow(g_hDesktopListView, nullptr, nullptr,
                      RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
     }
+
+    // Never a null window: that would post the message to Explorer's own thread
+    if (HWND appWnd = HookBridge::GetAppMessageWindow())
+        PostMessageW(appWnd, WM_HOOK_INACTIVE, 0, 0);
 }
 
 // Per-message bookkeeping for the subclass SEH wrappers (UI thread only;
@@ -303,19 +307,18 @@ static void GuardLog(const wchar_t* format, ...) {
     wchar_t* appData = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)) || !appData)
         return;
-    wchar_t dir[MAX_PATH];
-    wchar_t path[MAX_PATH];
-    swprintf_s(dir, L"%s\\DexCorral", appData);
-    swprintf_s(path, L"%s\\guard.log", dir);
+    // Not swprintf_s into a MAX_PATH buffer: it ends Explorer when the path does not fit
+    const std::wstring dir = std::wstring(appData) + L"\\DexCorral";
+    const std::wstring path = dir + L"\\guard.log";
     CoTaskMemFree(appData);
-    CreateDirectoryW(dir, nullptr);
+    CreateDirectoryW(dir.c_str(), nullptr);
 
     // Keep it small: start over once it passes 64 KB
     WIN32_FILE_ATTRIBUTE_DATA info = {};
-    bool startOver = GetFileAttributesExW(path, GetFileExInfoStandard, &info) &&
+    bool startOver = GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info) &&
                      (info.nFileSizeHigh != 0 || info.nFileSizeLow > 64 * 1024);
 
-    HANDLE hFile = CreateFileW(path, startOver ? GENERIC_WRITE : FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+    HANDLE hFile = CreateFileW(path.c_str(), startOver ? GENERIC_WRITE : FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
                                startOver ? CREATE_ALWAYS : OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
         return;
@@ -558,6 +561,7 @@ static bool EnsureDesktopFolderView() {
     IShellWindows* psw = nullptr;
     if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_LOCAL_SERVER,
                                 IID_PPV_ARGS(&psw))) || !psw) {
+        s_lastFailTick = GetTickCount() ? GetTickCount() : 1;
         return false;
     }
 
@@ -2273,7 +2277,7 @@ void CleanupCorralHook() {
     // WNDPROC is still ours. If another tool subclassed after us, restoring
     // would cut it out of the chain and break it; the safe move is to leave
     // our proc installed but inert (pure pass-through). The DLL never unloads
-    // while Explorer runs (DllCanUnloadNow → S_FALSE), so the proc stays valid.
+    // while Explorer runs (StartAppIfNeeded pins it), so the proc stays valid.
     if (g_hDesktopListView && g_OriginalListViewProc) {
         WNDPROC current = (WNDPROC)GetWindowLongPtrW(g_hDesktopListView, GWLP_WNDPROC);
         if (current == ListViewSubclassProc) {
@@ -2324,7 +2328,11 @@ void CleanupCorralHook() {
 }
 
 void MarkCorralHookCleanExit() {
-    MarkHookSessionStable(L"clean shutdown");
+    // MarkHookSessionStable without its logging: that asks the shell for a
+    // folder and opens files, which must not happen under the loader lock
+    if (!g_CrashSentinelArmed) return;
+    g_CrashSentinelArmed = false;
+    WriteGuardState(CrashGuardAfterStableSession(ReadGuardState()));
 }
 
 bool IsCorralHookActive() { return g_HookActive; }

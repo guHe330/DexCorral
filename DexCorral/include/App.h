@@ -67,8 +67,8 @@ public:
     /// Removes a corral and all its tabs
     void RemoveCorral(CorralWindowConfig *config);
 
-    /// Removes a file from all corrals except the specified tab
-    void RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab);
+    /// Removes files (config entry names) from all corrals except the specified tab
+    void RemoveFilesFromOtherCorrals(const std::vector<std::string> &fileNames, CorralTabConfig *exceptTab);
 
     /// Refreshes all corrals' content (folder contents, icons, etc.)
     void RefreshAllCorrals();
@@ -218,7 +218,8 @@ public:
     void BeginMoveUndo(CorralWindow *corral);
     void CommitMoveUndo(CorralWindow *corral, bool moved);
     bool CanUndoMove() const { return !moveUndoStack.empty(); }
-    void UndoLastMove();
+    /// `only`: undo only if the last step is that Corral's. True if a step was undone.
+    bool UndoLastMove(CorralWindow *only = nullptr);
 
     void UpdateHookHiddenIcons();           // Push hidden icon list to shared memory
     void PositionHiddenIconsUnderCorrals(); // Reposition hidden icons to match corral scroll state
@@ -261,7 +262,6 @@ private:
     // Releases query; the result arrives as WM_UPDATE_CHECK_DONE. userInitiated
     // bypasses the 24h throttle and surfaces "up to date" / "couldn't check".
     void StartUpdateCheck(bool userInitiated);
-    std::wstring pendingUpdateUrl; // Release page opened when the update balloon is clicked
     bool updateRetryUsed = false;  // A failed automatic check is retried once per session
     void ShowCreationMenu(POINT pt);
 

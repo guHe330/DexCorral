@@ -39,6 +39,7 @@
 #include "Version.h"
 #include "../resources/resource.h"
 #include "UpdateChecker.h"
+#include "UpdateLogic.h"
 #include "Strings.h"
 #include "LayoutMath.h"
 #include "Presets.h"
@@ -90,9 +91,18 @@ static const UINT DISPLAY_CHANGE_SETTLE_MS = 1500;
 static const UINT_PTR CONFIG_WRITE_TIMER = 7;
 static const UINT CONFIG_WRITE_DELAY_MS = 500;
 
+// The next queued tray notice goes up when the shell reports the balloon on
+// screen gone, or after this long if it never does
+static const UINT_PTR NOTICE_TIMER = 9;
+static const UINT NOTICE_FALLBACK_MS = 30000;
+
 // One retry of a failed automatic update check
 static const UINT_PTR UPDATE_RETRY_TIMER = 5;
 static const UINT UPDATE_RETRY_MS = 5 * 60 * 1000;
+// Hourly look at whether the automatic update check is due again (once a day):
+// Explorer, and with it DexCorral, can run for weeks across sleep and resume
+static const UINT_PTR UPDATE_DAILY_TIMER = 10;
+static const UINT UPDATE_DAILY_POLL_MS = 60 * 60 * 1000;
 static const UINT CONFLICT_POLL_MS = 15000;
 static const UINT ADOPTION_POLL_MS = 800;
 
@@ -153,33 +163,71 @@ static HANDLE g_AppStopEvent = nullptr;
 // get added after retries during early Explorer startup).
 static bool s_SafeModeNoticePending = false;
 
-static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
+static bool ShowSafeModeNoticeIfPending(TrayIcon *tray)
 {
     if (!s_SafeModeNoticePending || !tray || !tray->IsVisible())
-        return;
+        return false;
     const bool conflict = (GetCorralHookStandbyReason() == HookStandbyReason::Conflict);
-    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(conflict ? Str::Conflict_StandbyBalloon : Str::SafeMode_Body)))
+    if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(conflict ? Str::Conflict_StandbyBalloon : Str::SafeMode_Body),
+                         NIIF_WARNING))
     {
         s_SafeModeNoticePending = false;
         DllLog(L"App: safe mode tray notice shown");
+        return true;
     }
+    return false;
 }
 
 // Unreadable-config tray notice — armed by LoadConfig when config.json could not
 // be parsed, and shown the same way: once the tray icon is actually visible.
 static ConfigLoadStatus s_ConfigNoticePending = ConfigLoadStatus::Ok;
 
-static void ShowConfigNoticeIfPending(TrayIcon *tray)
+static bool ShowConfigNoticeIfPending(TrayIcon *tray)
 {
     if (s_ConfigNoticePending == ConfigLoadStatus::Ok || !tray || !tray->IsVisible())
-        return;
+        return false;
     bool restored = (s_ConfigNoticePending == ConfigLoadStatus::RestoredFromBackup);
     if (tray->ShowBalloon(Tr(restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
-                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody)))
+                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
+                          restored ? NIIF_INFO : NIIF_WARNING))
     {
         s_ConfigNoticePending = ConfigLoadStatus::Ok;
         DllLog(L"App: unreadable-config tray notice shown (restored=%d)", restored ? 1 : 0);
+        return true;
     }
+    return false;
+}
+
+// Other warnings that must not get lost: title and text, oldest first
+static std::vector<std::pair<Str, std::wstring>> s_Notices;
+static bool s_NoticeOnScreen = false;
+
+// Shows the next waiting notice once the tray icon is visible. One at a time:
+// a balloon replaces the one on screen, so the next waits until the shell
+// reports it gone (NIN_BALLOONTIMEOUT and the like) or NOTICE_TIMER fires.
+static void ShowNextNotice(TrayIcon *tray, HWND hwnd)
+{
+    if (s_NoticeOnScreen || !tray || !tray->IsVisible())
+        return;
+    bool shown = ShowSafeModeNoticeIfPending(tray) || ShowConfigNoticeIfPending(tray);
+    if (!shown && !s_Notices.empty() &&
+        tray->ShowBalloon(Tr(s_Notices.front().first), s_Notices.front().second, NIIF_WARNING))
+    {
+        s_Notices.erase(s_Notices.begin());
+        shown = true;
+    }
+    if (shown)
+    {
+        s_NoticeOnScreen = true;
+        SetTimer(hwnd, NOTICE_TIMER, NOTICE_FALLBACK_MS, nullptr);
+    }
+}
+
+static void NoticeGone(TrayIcon *tray, HWND hwnd)
+{
+    KillTimer(hwnd, NOTICE_TIMER);
+    s_NoticeOnScreen = false;
+    ShowNextNotice(tray, hwnd);
 }
 
 // Entry point called from the DLL worker thread
@@ -275,8 +323,12 @@ void App::Initialize()
 
     // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
     // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
-    // injected into Explorer's process.
-    HICON icon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+    // injected into Explorer's process. Loaded at the small-icon size the tray
+    // shows: LoadIconW gives the 32 px one, which the shell scales down blurry.
+    // Not LR_SHARED, whose cache hands back whichever size was loaded first;
+    // the icon lives as long as the tray icon, for the whole session.
+    HICON icon = (HICON)LoadImageW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON), IMAGE_ICON,
+                                   GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);
     if (!icon)
         icon = LoadIconW(nullptr, IDI_APPLICATION);
     // Standby was decided by the hook before this thread started
@@ -308,7 +360,6 @@ void App::Initialize()
                             &noticed, sizeof(noticed));
         } else {
             s_SafeModeNoticePending = true;
-            ShowSafeModeNoticeIfPending(trayIcon.get());
         }
     }
 
@@ -320,14 +371,14 @@ void App::Initialize()
         } else {
             // Carried over from an earlier start: a reminder is enough
             s_SafeModeNoticePending = true;
-            ShowSafeModeNoticeIfPending(trayIcon.get());
         }
     }
 
-    // config.json was unreadable: say so rather than leaving the user to wonder
-    // where their corrals went
-    ShowConfigNoticeIfPending(trayIcon.get());
+    // The reminder above, and config.json was unreadable: say so rather than
+    // leaving the user to wonder where their corrals went
+    ShowNextNotice(trayIcon.get(), messageWindow);
 
+    SetTimer(messageWindow, UPDATE_DAILY_TIMER, UPDATE_DAILY_POLL_MS, nullptr);
     if (standbyReason != HookStandbyReason::None)
     {
         // Nothing that shows a corral, hides an icon or touches the desktop
@@ -409,9 +460,14 @@ void App::ActivateDesktop()
     // and off without it. A combination that is not valid, or that Windows or
     // another program already holds, is worth a notice: the user typed it into
     // a file and would otherwise just find that nothing happens.
-    if (!ApplyQuickHideHotkey() && trayIcon)
-        trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
-                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+    // Queued: at sign-in the tray icon may not be there yet, and a config
+    // notice may be on screen.
+    if (!ApplyQuickHideHotkey())
+    {
+        s_Notices.emplace_back(Str::Hotkey_FailedTitle,
+                               TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+        ShowNextNotice(trayIcon.get(), messageWindow);
+    }
 
     // Restore corrals
     RestoreCorrals();
@@ -424,7 +480,7 @@ void App::ActivateDesktop()
 
     if (corrals.empty() && !config.FirstCorralSeeded)
     {
-        // First run: a default catch-all corral in the centre of the primary
+        // First run: a default corral in the centre of the primary
         // monitor's work area (work area, not screen: it must clear the taskbar).
         RECT work;
         if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0))
@@ -437,9 +493,7 @@ void App::ActivateDesktop()
         POINT centerPt = {(work.left + work.right) / 2, (work.top + work.bottom) / 2};
 
         CorralWindowConfig defaultConfig = MakeDefaultCorralConfig();
-        CorralTabConfig tab = MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_Desktop)));
-        tab.IsCatchAll = true; // First corral is catch-all
-        defaultConfig.Tabs.push_back(tab);
+        defaultConfig.Tabs.push_back(MakeDefaultTabConfig(CorralWindow::WideToUtf8(Tr(Str::Name_Desktop))));
 
         SIZE size = DefaultCorralSize(centerPt);
         defaultConfig.Left = (double)(centerPt.x - size.cx / 2);
@@ -450,6 +504,10 @@ void App::ActivateDesktop()
         auto corral = std::make_unique<CorralWindow>(defaultConfig);
         corral->Show();
         corrals.push_back(std::move(corral));
+        // A new corral must not sit on the desktop icons beneath it
+        CacheDesktopIconPositions();
+        PushDesktopIconsFromCorrals();
+        InvalidateDesktopIconCache();
 
         config.FirstCorralSeeded = true;
         SaveConfig();
@@ -510,7 +568,7 @@ void App::ResumeFromStandby()
     {
         // The recorded failures are cleared either way, so the next start is a normal one
         if (trayIcon)
-            trayIcon->ShowBalloon(Tr(Str::Resume_FailedTitle), Tr(Str::Resume_FailedBody));
+            trayIcon->ShowBalloon(Tr(Str::Resume_FailedTitle), Tr(Str::Resume_FailedBody), NIIF_WARNING);
         return;
     }
 
@@ -638,7 +696,17 @@ void App::FlushConfigWrite()
     if (messageWindow)
         KillTimer(messageWindow, CONFIG_WRITE_TIMER);
     if (!Config::Save(config))
+    {
         DllLog(L"App: config.json could not be written (error %lu); the change is not saved", GetLastError());
+        // Once a session: every later change fails the same way
+        static bool told = false;
+        if (!told)
+        {
+            told = true;
+            s_Notices.emplace_back(Str::Save_FailedTitle, Tr(Str::Save_FailedBody));
+            ShowNextNotice(trayIcon.get(), messageWindow);
+        }
+    }
 }
 
 void App::RestoreCorrals()
@@ -799,10 +867,10 @@ void App::CommitMoveUndo(CorralWindow *corral, bool moved)
     UndoMove::PushCapped(moveUndoStack, std::move(record), MOVE_UNDO_DEPTH);
 }
 
-void App::UndoLastMove()
+bool App::UndoLastMove(CorralWindow *only)
 {
-    if (moveUndoStack.empty())
-        return;
+    if (moveUndoStack.empty() || (only && moveUndoStack.back().corral != only))
+        return false;
     MoveUndoRecord record = std::move(moveUndoStack.back());
     moveUndoStack.pop_back();
     pendingMoveUndo = {};
@@ -827,6 +895,7 @@ void App::UndoLastMove()
     InvalidateDesktopIconCache();
     PositionHiddenIconsUnderCorrals();
     SaveConfig();
+    return true;
 }
 
 bool App::BeginHoverExpand(CorralWindow *corral)
@@ -848,19 +917,20 @@ void App::EndHoverExpand(CorralWindow *corral)
         hoverExpandedCorral = nullptr;
 }
 
-void App::RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab)
+void App::RemoveFilesFromOtherCorrals(const std::vector<std::string> &fileNames, CorralTabConfig *exceptTab)
 {
-    std::string fileNameStr = CorralWindow::WideToUtf8(fileName);
-
+    // All names in one pass: one save and one reload, not one per dropped item
     bool changed = false;
     for (auto &corral : corrals)
     {
         auto &corralConfig = corral->GetConfig();
         for (auto &tab : corralConfig.Tabs)
         {
-            if (&tab != exceptTab)
+            if (&tab == exceptTab)
+                continue;
+            for (const std::string &fileName : fileNames)
             {
-                auto it = std::find(tab.Files.begin(), tab.Files.end(), fileNameStr);
+                auto it = std::find(tab.Files.begin(), tab.Files.end(), fileName);
                 if (it != tab.Files.end())
                 {
                     tab.Files.erase(it);
@@ -1698,8 +1768,12 @@ void App::ShowTrayMenu()
     AppendMenuW(menu, MF_STRING, 1, Tr(Str::Menu_CreateNewCorral));
     AppendMenuW(menu, MF_STRING, 5, Tr(Str::Menu_NewVirtualCorral));
 
-    // Icon visibility toggle
-    UINT flags = DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED;
+    // Icon visibility toggle. Not during quick-hide: it hid the icons and puts
+    // back the state shown here when it ends, which a toggle now would undo.
+    UINT flags = (quickHideActive ? desktopIconsVisibleBeforeQuickHide : DesktopIcons::AreIconsVisible())
+                     ? MF_CHECKED : MF_UNCHECKED;
+    if (quickHideActive)
+        flags |= MF_GRAYED;
     AppendMenuW(menu, MF_STRING | flags, 2, Tr(Str::Menu_ShowDesktopIcons));
 
     // Quick-hide toggle (same as double-clicking an empty desktop spot)
@@ -1817,6 +1891,10 @@ static const WORD IDC_ABOUT_LICENSE = 303;
 // Where the footer band of the About dialog begins (dialog units)
 static const int ABOUT_FOOTER_TOP = 100;
 
+// The open About and Settings dialogs, brought forward when picked again
+static HWND s_AboutDialog = nullptr;
+static HWND s_SettingsDialog = nullptr;
+
 static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -1830,6 +1908,7 @@ static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM 
         DialogSkin::Attach(hDlg, ABOUT_FOOTER_TOP);
         // Opened from the tray menu, with no owner window to bring it forward
         SetForegroundWindow(hDlg);
+        s_AboutDialog = hDlg;
         return TRUE;
     }
     case WM_COMMAND:
@@ -1863,7 +1942,11 @@ void App::ShowAbout()
     // The tray menu stays reachable while the dialog is up; one About is enough
     static bool showing = false;
     if (showing)
+    {
+        if (s_AboutDialog)
+            SetForegroundWindow(s_AboutDialog);
         return;
+    }
     showing = true;
 
     std::wstring aboutText = TrFmt(Str::About_Body, DEXCORRAL_VERSION);
@@ -1884,6 +1967,7 @@ void App::ShowAbout()
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 180, BTN_Y, BTN_W, BTN_H, IDOK, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
 
     DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr, AboutDlgProc, 0);
+    s_AboutDialog = nullptr;
     showing = false;
 }
 
@@ -1918,7 +2002,8 @@ struct SettingsDialogData
     unsigned hotkeyWord = 0;     /// Hot key control word (see Hotkey.h)
     unsigned hotkeyBaseline = 0; /// The word the control reported before the user touched it
     bool hotkeyChanged = false;
-    int theme = 0;                      /// 0 = like Windows, 1 = light, 2 = dark
+    std::wstring winHotkey;      /// A Win hotkey from config.json, which the field cannot show; else empty
+    int theme = 0;                     /// 0 = like Windows, 1 = light, 2 = dark
     int look = 0;                       /// 0 = keep the current look, else an entry of the Look list (SettingsLookAt)
     std::vector<LookPreset> *own = nullptr; /// The user's presets; import changes them at once
     std::vector<LookPreset> listed;     /// The own presets as the Look list shows them: another dialog may change `own` meanwhile
@@ -2034,15 +2119,20 @@ static void ImportPresets(HWND hDlg, SettingsDialogData *data)
         MessageBoxW(hDlg, Tr(Str::Msg_NotAPresetFile), Tr(Str::Title_Settings), MB_OK | MB_ICONWARNING);
         return;
     }
-    const int taken = Presets::Merge(*data->own, read);
+    int full = 0;
+    const int taken = Presets::Merge(*data->own, read, &full);
     if (taken > 0)
     {
         data->presetsChanged = true;
         data->demo.reset();
         SettingsFillLooks(hDlg, data); // Back to "keep the current look": the entries moved
     }
-    MessageBoxW(hDlg, TrFmt(Str::Msg_PresetsImported, std::to_wstring(taken)).c_str(), Tr(Str::Title_Settings),
-                MB_OK | MB_ICONINFORMATION);
+    std::wstring message = TrFmt(Str::Msg_PresetsImported, std::to_wstring(taken));
+    if (full > 0)
+        message += L"\n\n" + TrFmt(Str::Msg_PresetsNotImported, std::to_wstring(full),
+                                   std::to_wstring(Presets::MAX_OWN));
+    MessageBoxW(hDlg, message.c_str(), Tr(Str::Title_Settings),
+                MB_OK | (full > 0 ? MB_ICONWARNING : MB_ICONINFORMATION));
 }
 
 /// Where the demo Corral goes: beside the dialog, on whichever side has room
@@ -2149,11 +2239,14 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
 
         DialogSkin::Attach(hDlg, SETTINGS_FOOTER_TOP);
         DialogSkin::MakeHint(hDlg, IDC_SET_LOOK_HINT);
+        if (!data->winHotkey.empty())
+            SetDlgItemTextW(hDlg, IDC_SET_HOTKEY_HINT, TrFmt(Str::Settings_HotkeyWinHint, data->winHotkey).c_str());
         DialogSkin::MakeHint(hDlg, IDC_SET_HOTKEY_HINT);
         DialogSkin::MakeHint(hDlg, IDC_SET_DEBUG_HINT);
 
         // Opened from the tray menu, with no owner window to bring it forward
         SetForegroundWindow(hDlg);
+        s_SettingsDialog = hDlg;
         return TRUE;
     }
     case WM_MOVE:
@@ -2229,7 +2322,11 @@ void App::ShowSettings()
     // The tray menu stays reachable while the dialog is up; one is enough
     static bool showing = false;
     if (showing)
+    {
+        if (s_SettingsDialog)
+            SetForegroundWindow(s_SettingsDialog);
         return;
+    }
     showing = true;
 
     SettingsDialogData data;
@@ -2242,7 +2339,10 @@ void App::ShowSettings()
     data.debugLogging = config.DebugLogging;
     HotkeySpec current; // Stays empty when none is set or the text is not valid
     ParseHotkey(config.QuickHideHotkey, current);
-    data.hotkeyWord = HotkeyToControlWord(current);
+    if (current.modifiers & MOD_WIN) // The field would show it without the Win key: leave it empty, name it in the hint
+        data.winHotkey = FormatHotkey(current, Tr(Str::Key_Ctrl), Tr(Str::Key_Shift));
+    else
+        data.hotkeyWord = HotkeyToControlWord(current);
     data.demoAllowed = desktopActive;
     data.theme = DialogSkin::ThemeOverride(config.Theme) + 1;
     data.own = &config.Presets;
@@ -2287,6 +2387,7 @@ void App::ShowSettings()
 
     const INT_PTR result = DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr,
                                                    SettingsDlgProc, (LPARAM)&data);
+    s_SettingsDialog = nullptr;
     showing = false;
     data.demo.reset(); // Closed some other way than by its buttons
     if (result != IDOK)
@@ -2325,7 +2426,8 @@ void App::ShowSettings()
 
     if (!hotkeyOk && trayIcon)
         trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
-                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)),
+                              NIIF_WARNING);
     if (updatesSwitchedOn)
         StartUpdateCheck(true); // immediate confirmation that checking works
 }
@@ -2335,11 +2437,8 @@ void App::StartUpdateCheck(bool userInitiated)
     if (!userInitiated)
     {
         // Automatic check: only when opted in, and at most once per 24h.
-        if (!config.CheckForUpdates)
-            return;
-        long long now = (long long)time(nullptr);
-        const long long kDaySeconds = 24LL * 60 * 60;
-        if (config.LastUpdateCheckEpoch != 0 && now - config.LastUpdateCheckEpoch < kDaySeconds)
+        if (!config.CheckForUpdates ||
+            !UpdateLogic::IsAutoCheckDue((long long)time(nullptr), config.LastUpdateCheckEpoch))
             return;
         // The 24h stamp is written when the answer arrives (WM_UPDATE_CHECK_DONE),
         // so a check that failed does not count as the day's check.
@@ -2366,6 +2465,10 @@ void App::CreateCorralAt(POINT desiredCenter, bool promptForName)
     corral->Show();
     CorralWindow *created = corral.get();
     corrals.push_back(std::move(corral));
+    // A new corral must not sit on the desktop icons beneath it
+    CacheDesktopIconPositions();
+    PushDesktopIconsFromCorrals();
+    InvalidateDesktopIconCache();
     SaveConfig();
 
     // A corral the user just asked for is named on the spot instead of sitting
@@ -2565,9 +2668,7 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     if (CorralWindow::IsNetworkFolder(folderPath))
         MessageBoxW(messageWindow, Tr(Str::Info_NetworkFolder), Tr(Str::App_Name), MB_OK | MB_ICONINFORMATION);
 
-    // Extract folder name for title
-    size_t lastSlash = folderPath.find_last_of(L"\\/");
-    std::wstring folderName = (lastSlash != std::wstring::npos) ? folderPath.substr(lastSlash + 1) : folderPath;
+    std::wstring folderName = IconUtils::FolderTitleFromPath(folderPath);
 
     // Convert wide string to UTF-8
     std::string utf8Path = CorralWindow::WideToUtf8(folderPath);
@@ -2593,6 +2694,10 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
     corrals.push_back(std::move(corral));
+    // A new corral must not sit on the desktop icons beneath it
+    CacheDesktopIconPositions();
+    PushDesktopIconsFromCorrals();
+    InvalidateDesktopIconCache();
     SaveConfig();
 }
 
@@ -2626,17 +2731,36 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 app->ToggleQuickHide();
             return 0;
         }
-        // User clicked the "update available" balloon — open the release page.
+        // User clicked a balloon: only the "update available" one opens something
         if (lParam == NIN_BALLOONUSERCLICK)
         {
-            if (!app->pendingUpdateUrl.empty())
+            if (app->trayIcon)
             {
-                ShellExecuteW(nullptr, L"open", app->pendingUpdateUrl.c_str(),
-                              nullptr, nullptr, SW_SHOWNORMAL);
-                app->pendingUpdateUrl.clear();
+                const std::wstring url = app->trayIcon->TakeClickUrl();
+                if (!url.empty())
+                    ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             }
+            NoticeGone(app->trayIcon.get(), hwnd);
             return 0;
         }
+        if (lParam == NIN_BALLOONTIMEOUT || lParam == NIN_BALLOONHIDE)
+        {
+            NoticeGone(app->trayIcon.get(), hwnd);
+            return 0;
+        }
+    }
+
+    // Corrals keep showing, but their icons may also show on the desktop: say so, once
+    if (app && uMsg == WM_HOOK_INACTIVE)
+    {
+        static bool told = false;
+        if (!told)
+        {
+            told = true;
+            s_Notices.emplace_back(Str::Hook_InactiveTitle, Tr(Str::Hook_InactiveBody));
+            ShowNextNotice(app->trayIcon.get(), hwnd);
+        }
+        return 0;
     }
 
     if (app && uMsg == WM_STANDBY_DIALOG)
@@ -2723,29 +2847,27 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     if (app && uMsg == WM_UPDATE_CHECK_DONE)
     {
         std::unique_ptr<UpdateCheckResult> result((UpdateCheckResult *)lParam);
-        if (result && !result->UserInitiated)
+        // A manual check that got an answer counts too: the hourly look would
+        // otherwise ask again within the hour after the check is switched on
+        if (result && result->Success)
         {
-            if (result->Success)
-            {
-                app->config.LastUpdateCheckEpoch = (long long)time(nullptr);
-                app->SaveConfig();
-            }
-            else if (!app->updateRetryUsed)
-            {
-                // The automatic check runs at sign-in, often before the network
-                // is up. Try once more a little later instead of waiting a day.
-                app->updateRetryUsed = true;
-                SetTimer(hwnd, UPDATE_RETRY_TIMER, UPDATE_RETRY_MS, nullptr);
-            }
+            app->config.LastUpdateCheckEpoch = (long long)time(nullptr);
+            app->SaveConfig();
+        }
+        else if (result && !result->UserInitiated && !app->updateRetryUsed)
+        {
+            // The automatic check runs at sign-in, often before the network
+            // is up. Try once more a little later instead of waiting an hour.
+            app->updateRetryUsed = true;
+            SetTimer(hwnd, UPDATE_RETRY_TIMER, UPDATE_RETRY_MS, nullptr);
         }
         if (result && app->trayIcon)
         {
             if (result->Success && result->UpdateAvailable)
             {
-                app->pendingUpdateUrl = result->ReleaseUrl;
                 app->trayIcon->ShowBalloon(
                     Tr(Str::Update_AvailableTitle),
-                    TrFmt(Str::Update_AvailableBody, result->LatestVersion));
+                    TrFmt(Str::Update_AvailableBody, result->LatestVersion), NIIF_INFO, result->ReleaseUrl);
             }
             else if (result->UserInitiated)
             {
@@ -2753,11 +2875,11 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 if (result->Success)
                     app->trayIcon->ShowBalloon(
                         Tr(Str::Update_UpToDateTitle),
-                        TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION));
+                        TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION), NIIF_INFO);
                 else
                     app->trayIcon->ShowBalloon(
                         Tr(Str::Update_FailedTitle),
-                        Tr(Str::Update_FailedBody));
+                        Tr(Str::Update_FailedBody), NIIF_WARNING);
             }
         }
         return 0;
@@ -2860,10 +2982,22 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    if (app && uMsg == WM_TIMER && wParam == NOTICE_TIMER)
+    {
+        NoticeGone(app->trayIcon.get(), hwnd);
+        return 0;
+    }
+
     if (app && uMsg == WM_TIMER && wParam == UPDATE_RETRY_TIMER)
     {
         KillTimer(hwnd, UPDATE_RETRY_TIMER);
         app->StartUpdateCheck(false);
+        return 0;
+    }
+
+    if (app && uMsg == WM_TIMER && wParam == UPDATE_DAILY_TIMER)
+    {
+        app->StartUpdateCheck(false); // Does nothing unless switched on and due
         return 0;
     }
 
@@ -2887,8 +3021,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         if (app && app->trayIcon && app->trayIcon->Show()) {
             KillTimer(hwnd, TRAY_RETRY_TIMER);
             DllLog(L"App: TRAY_RETRY_TIMER — tray icon added successfully");
-            ShowSafeModeNoticeIfPending(app->trayIcon.get());
-            ShowConfigNoticeIfPending(app->trayIcon.get());
+            NoticeGone(app->trayIcon.get(), hwnd);
         }
         return 0;
     }
@@ -2899,9 +3032,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         DllLog(L"App: WM_TASKBARCREATED — Explorer restarted, retrying tray icon");
         if (app->trayIcon)
         {
-            app->trayIcon->Show();
-            ShowSafeModeNoticeIfPending(app->trayIcon.get());
-            ShowConfigNoticeIfPending(app->trayIcon.get());
+            // The new taskbar knows no icon of ours, even when the old one did:
+            // forget it and add it again (NIM_MODIFY alone would fail quietly)
+            app->trayIcon->Hide();
+            if (!app->trayIcon->Show())
+                SetTimer(hwnd, TRAY_RETRY_TIMER, 500, nullptr);
+            NoticeGone(app->trayIcon.get(), hwnd); // A balloon on the old taskbar is gone with it
         }
         return 0;
     }
