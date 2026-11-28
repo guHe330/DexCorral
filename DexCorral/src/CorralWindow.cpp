@@ -171,6 +171,19 @@ CorralWindow::CorralWindow(const CorralWindowConfig &cfg, HWND demoOwner)
 
 CorralWindow::~CorralWindow()
 {
+    // An inline rename still open (one kept open after a bad name, say) would go
+    // with this window, and its WM_KILLFOCUS ran EndIconRename on the dying
+    // Corral, which pinned it back as the band top. Close it quietly first.
+    if (hEditControl)
+    {
+        RemoveWindowSubclass(hEditControl, EditSubclassProc, 0);
+        DestroyWindow(hEditControl);
+        hEditControl = nullptr;
+        isRenamingIcon = false;
+    }
+    if (hEditFont)
+        DeleteObject(hEditFont);
+
     // Drop any App-side references to this window (band top, hover-expand owner)
     if (App::GetInstance())
         App::GetInstance()->ForgetCorral(this);
