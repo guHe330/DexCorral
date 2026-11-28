@@ -281,6 +281,7 @@ Because DexCorral hooks Explorer's desktop directly:
 
 - Icons inside Corrals are invisible to desktop hit-testing, rubber-band selection, and keyboard navigation, so you can't accidentally select or disturb them.
 - Desktop **Sort by** and auto-arrange never move Corral-owned icons, and visible icons are compacted so sorting leaves no gaps where hidden icons used to be.
+- Auto-arrange keeps the last **Sort by** you chose, also after Explorer restarts or you sign in again.
 - Corral-owned icons are immune to repositioning by Explorer or third-party tools: only DexCorral moves them.
 
 ## Configuration

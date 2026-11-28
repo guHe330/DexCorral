@@ -149,6 +149,7 @@ add_executable(DexCorralTests
     tests/test_folder_watcher.cpp
     tests/test_pending_action.cpp
     tests/test_extension_list.cpp
+    tests/test_desktop_sort.cpp
     src/LayoutMath.cpp
     src/IconUtils.cpp
     src/FolderWatcher.cpp
