@@ -143,6 +143,8 @@ jobs:
         Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "package/"
         Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
+        # MIT asks for its notice with every copy, binaries included.
+        Copy-Item "DexCorral/include/nlohmann/LICENSE.MIT" -Destination "package/LICENSE-nlohmann-json.txt"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
 
         # Create zip. The version goes in the filename so downloaded

@@ -61,6 +61,7 @@ The zip contains:
 - `DexCorral.exe`: registration tool
 - `DexCorralHook.dll`: Explorer shell extension
 - `LICENSE`: GPL-3.0 license
+- `LICENSE-nlohmann-json.txt`: MIT license of nlohmann/json, which is built into DexCorral
 - `readme.txt`: quick start guide
 
 ### What's New

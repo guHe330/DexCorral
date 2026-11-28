@@ -172,6 +172,7 @@ PACKAGE CONTENTS
 * DexCorral.exe       - Registration tool
 * DexCorralHook.dll   - Explorer shell extension (all app logic)
 * LICENSE             - GPL-3.0 License
+* LICENSE-nlohmann-json.txt - MIT License of nlohmann/json, built into DexCorral
 * readme.txt          - This file
 
 ================================================================================
@@ -189,7 +190,7 @@ LICENSE
 This project is licensed under the GPL-3.0 License - see the LICENSE file for
 details.
 
-Third-party: nlohmann/json v3.12.0 (MIT License)
+Third-party: nlohmann/json v3.12.0 (MIT License) - see LICENSE-nlohmann-json.txt
 https://github.com/nlohmann/json
 
 ================================================================================
