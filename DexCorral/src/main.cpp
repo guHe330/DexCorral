@@ -83,6 +83,42 @@ static bool IsProcessElevated()
     return ok && elevation.TokenIsElevated != 0;
 }
 
+// Runs this exe again elevated (UAC prompt) with the given arguments and waits.
+// Returns its exit code, or -1 when it did not start (the prompt was declined).
+static int RunElevated(const wchar_t *exePath, const std::wstring &args)
+{
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    sei.lpVerb = L"runas";
+    sei.lpFile = exePath;
+    sei.lpParameters = args.c_str();
+    sei.nShow = SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&sei) || !sei.hProcess)
+        return -1;
+    WaitForSingleObject(sei.hProcess, INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(sei.hProcess, &code);
+    CloseHandle(sei.hProcess);
+    return (int)code;
+}
+
+// The login start, the same value the installer writes (DexCorral.iss,
+// [Registry]). Kept in step with the registration so a portable copy starts at
+// sign-in, and so unregistering really stops DexCorral from coming back.
+static void SetRunEntry(int scope, const wchar_t *exePath, bool on)
+{
+    const HKEY root = scope == kScopeMachine ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER;
+    const wchar_t *key = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    if (!on)
+    {
+        RegDeleteKeyValueW(root, key, L"DexCorral");
+        return;
+    }
+    const std::wstring cmd = L"\"" + std::wstring(exePath) + L"\" --startup --silent";
+    RegSetKeyValueW(root, key, L"DexCorral", REG_SZ, cmd.c_str(),
+                    (DWORD)((cmd.size() + 1) * sizeof(wchar_t)));
+}
+
 // Machine scope when the exe sits under %ProgramFiles%, user scope otherwise.
 // Only used when no --scope was passed; both installers pass one explicitly.
 static int InferScopeFromExePath(const wchar_t *exePath)
@@ -194,9 +230,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     bool silent        = false;
     bool force         = false;
     int  scope         = -1;   // -1 = not given, infer from the exe's location
+    std::wstring args;         // For an elevated rerun; all are plain flags
 
     for (int i = 1; i < argc; i++)
     {
+        args += (args.empty() ? L"" : L" ") + std::wstring(argv[i]);
         if      (_wcsicmp(argv[i], L"--register")   == 0 || _wcsicmp(argv[i], L"-register")   == 0) doRegister   = true;
         else if (_wcsicmp(argv[i], L"--unregister") == 0 || _wcsicmp(argv[i], L"-unregister") == 0) doUnregister = true;
         else if (_wcsicmp(argv[i], L"--startup")    == 0 || _wcsicmp(argv[i], L"-startup")    == 0) doStartup    = true;
@@ -283,12 +321,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         }
     }
 
-    // ── HKLM work needs elevation; say so before touching anything ────────────
+    // ── HKLM work needs elevation; ask for it before touching anything ────────
     // --cleanup-legacy always qualifies: the keys it removes are all in HKLM/HKCR,
-    // so unelevated it would report success having done nothing.
+    // so unelevated it would report success having done nothing. Interactive
+    // runs (the Start Menu entries of an all-users install, a portable copy)
+    // ask through UAC; the elevated copy shows its own result. --silent never
+    // prompts.
     if ((doCleanupOld || ((doRegister || doUnregister) && scope == kScopeMachine)) &&
         !IsProcessElevated())
     {
+        const int code = silent ? -1 : RunElevated(exePath, args);
+        if (code >= 0)
+            return code;
         if (!silent)
             MessageBoxW(nullptr, Tr(Str::Reg_NeedsElevation), Tr(Str::App_Name), MB_ICONERROR);
         return 1;
@@ -329,7 +373,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             hr = fn(scope);
             if (SUCCEEDED(hr))
             {
-                if (!silent)
+                SetRunEntry(scope, exePath, true);
+                // A per-user registration has no load path Explorer reads at its
+                // own start, so start it now instead of asking for a restart.
+                // Setup (--silent) starts it itself, after its Explorer restart.
+                if (!silent && scope == kScopeUser)
+                {
+                    DoStartup(dllPath, false);
+                    MessageBoxW(nullptr, Tr(Str::Reg_RegisterSuccessUser),
+                                Tr(Str::App_Name), MB_ICONINFORMATION);
+                }
+                else if (!silent)
                     MessageBoxW(nullptr,
                                 Tr(Str::Reg_RegisterSuccess),
                                 Tr(Str::App_Name), MB_ICONINFORMATION);
@@ -358,6 +412,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             hr = fn(scope);
             if (SUCCEEDED(hr))
             {
+                SetRunEntry(scope, exePath, false);
                 if (!silent)
                     MessageBoxW(nullptr,
                                 Tr(Str::Reg_UnregisterSuccess),

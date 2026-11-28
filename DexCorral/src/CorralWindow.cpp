@@ -472,6 +472,8 @@ void CorralWindow::MoveTo(int left, int top, int width, int height)
 
 void CorralWindow::LoadFiles()
 {
+    // A reload (folder change, desktop change, F5) keeps what the user selected
+    const SelectionByFile selected = SaveSelectionByFile();
     if (GetActiveTab().IsVirtual)
     {
         LoadVirtualFolderIcons();
@@ -480,6 +482,7 @@ void CorralWindow::LoadFiles()
     {
         LoadIconImages();
     }
+    RestoreSelectionByFile(selected);
     CalculateIconLayout();
     UpdateLayeredContent();
 }

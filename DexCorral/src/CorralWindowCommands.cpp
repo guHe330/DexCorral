@@ -680,14 +680,12 @@ void CorralWindow::StartHoverExpand()
 
     RECT rect;
     GetWindowRect(hwnd, &rect);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    // Determine expand direction based on screen position
-    // If expanding downward would go off screen, expand upward
+    // Expand upward when downward would leave the work area of the Corral's
+    // own monitor (which already excludes the taskbar)
+    MONITORINFO mi = {sizeof(mi)};
+    GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
     int expandedHeight = (int)savedHeight;
-    int bottomIfDown = rect.top + expandedHeight;
-
-    expandUpward = (bottomIfDown > screenHeight - 50); // 50px buffer for taskbar
+    expandUpward = rect.top + expandedHeight > mi.rcWork.bottom;
 
     animationStartHeight = rect.bottom - rect.top;
     animationTargetHeight = expandedHeight;

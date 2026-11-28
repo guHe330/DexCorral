@@ -114,11 +114,12 @@ INSTALLATION (PORTABLE)
    (Stardock and Fences are trademarks of Stardock; DexCorral is not
    affiliated with Stardock.)
 
-3. Restart Explorer or log out/in for the shell extension to load.
+3. Just for you, DexCorral starts right away. For all users, restart Explorer
+   or sign out and back in. Either way it then starts at every sign-in.
 
 To uninstall, run DexCorral.exe --unregister with the same --scope you
-registered with (as Administrator for --scope=machine), restart Explorer, then
-delete this folder. Deleting the folder on its own leaves the shell extension
+registered with (Windows asks for Administrator rights for --scope=machine),
+restart Explorer, then delete this folder. Deleting the folder on its own leaves the shell extension
 registered and pointing at a DLL that is gone, so run --unregister first.
 
 Coming from 1.0.27 or earlier? Those versions registered without any notion of
@@ -131,10 +132,12 @@ To also remove your settings:
   Remove-Item "HKCU:\Software\DexCorral" -Recurse -Force
 
 DexCorral writes nothing else outside its own folder. The registry entries are
-the shell extension's COM registration (removed by --unregister), which goes to
-HKCU with --scope=user and HKLM with --scope=machine, and, under
+the shell extension's COM registration and the start at sign-in (both removed
+by --unregister), which go to HKCU with --scope=user and HKLM with
+--scope=machine, and, under
 HKCU\Software\DexCorral, your language choice and the crash guard's memory. The
-full list is in the User Manual, "What DexCorral writes outside its own folder".
+full list is in the Technical Notes, "What DexCorral writes outside its own
+folder".
 
 IF DEXCORRAL PAUSES ITSELF: when Explorer crashes twice within two minutes
 while DexCorral is starting, DexCorral stops trying. All icons are back on the

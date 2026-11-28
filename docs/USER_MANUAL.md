@@ -30,10 +30,10 @@ The two cannot be installed side by side. Setup checks for the other kind before
 1. Download `Portable_DexCorral_<version>.zip` and extract it to any folder.
 2. Open a command prompt in that folder and run the one-time registration:
    - Just for you: `DexCorral.exe --register --scope=user`, no Administrator rights needed.
-   - For all users: `DexCorral.exe --register --scope=machine`, from a command prompt opened **as Administrator**.
+   - For all users: `DexCorral.exe --register --scope=machine`. Windows asks for Administrator rights.
 
    Without `--scope`, DexCorral picks machine scope if the folder is under `Program Files` and user scope otherwise. On an unsupported Windows version this stops with a message instead of registering. Adding `--force` registers anyway, unsupported and untested.
-3. Run `DexCorral.exe --startup` to start DexCorral in the current session, or restart Explorer / log out and back in.
+3. Just for you, DexCorral starts right away. For all users, restart Explorer or sign out and back in. Either way the registration also makes it start at every sign-in.
 
 Run `DexCorral.exe` with no arguments for the full list of options.
 
@@ -41,11 +41,11 @@ Run `DexCorral.exe` with no arguments for the full list of options.
 
 Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group's **Uninstall DexCorral** entry. The uninstaller asks whether to **keep your configuration** (corral layouts and appearance settings). Choose *Yes* if you plan to reinstall later. It then unregisters the shell extension and restarts Explorer to fully unload.
 
-The uninstaller removes only what its own install mode created, including every registry entry ([the full list](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder)). Other accounts' settings in their `%APPDATA%\DexCorral` are left alone.
+The uninstaller removes only what its own install mode created, including every registry entry ([the full list](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder)). If you do not keep your configuration, your own settings under `HKCU\Software\DexCorral` go as well. Other accounts' settings are left alone.
 
 After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
 
-Portable package: before you delete its folder, run `DexCorral.exe --unregister` with the same `--scope` you registered with (as Administrator for `--scope=machine`). More on leftovers in the [Technical Notes](TECHNICAL_NOTES.md#removing-a-portable-package).
+Portable package: before you delete its folder, run `DexCorral.exe --unregister` with the same `--scope` you registered with (Windows asks for Administrator rights for `--scope=machine`). This also ends the start at sign-in. More on leftovers in the [Technical Notes](TECHNICAL_NOTES.md#removing-a-portable-package).
 
 ## Core Concepts
 
@@ -314,6 +314,6 @@ Which of the two you use is your choice. To use DexCorral, uninstall Stardock Fe
 ## Troubleshooting
 
 - **SmartScreen / antivirus warnings**: the binaries are currently unsigned, so Windows reports the publisher as unknown. Code signing is planned. In the meantime every release publishes SHA-256 checksums and a GitHub build provenance attestation, so you can verify a download rather than taking it on trust: see the release page for both, and `gh attestation verify <file> --repo guHe330/DexCorral` to check the attestation.
-- **Corrals don't appear after install**: right-click the desktop once to wake the shell, or log out and back in (the Start-with-Windows entry re-injects DexCorral at login).
-- **Desktop icons misbehave**: restarting Explorer resets the hook: `Stop-Process -Name explorer -Force; Start-Process explorer.exe` in PowerShell, or via Task Manager.
+- **Corrals don't appear after install**: sign out and back in (the start at sign-in brings DexCorral in), or run `DexCorral.exe --startup` from the install folder.
+- **Desktop icons misbehave**: restarting Explorer resets the hook: `Stop-Process -Name explorer -Force; Start-Process explorer.exe` in PowerShell, or via Task Manager. An install for all users comes back with Explorer. One for you only does not: run `DexCorral.exe --startup` from its folder afterwards, or sign out and back in.
 - **Bug reports**: please file issues at the [GitHub issue tracker](https://github.com/guHe330/DexCorral/issues).

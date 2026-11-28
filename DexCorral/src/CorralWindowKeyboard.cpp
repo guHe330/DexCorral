@@ -56,6 +56,50 @@ std::vector<int> CorralWindow::GetSelectedIndices() const
     return result;
 }
 
+// Special shell icons have no path; their fileName ("shell:{CLSID}") is unique
+static std::wstring IconKey(const CorralIcon &icon)
+{
+    return icon.fullPath.empty() ? CorralWindow::Utf8ToWide(icon.fileName) : icon.fullPath;
+}
+
+CorralWindow::SelectionByFile CorralWindow::SaveSelectionByFile() const
+{
+    SelectionByFile saved;
+    auto key = [this](int i) { return i >= 0 && i < (int)icons.size() ? IconKey(icons[i]) : std::wstring(); };
+    for (int i : selection)
+        if (i >= 0 && i < (int)icons.size())
+            saved.selected.insert(IconKey(icons[i]));
+    saved.focus = key(selectedIcon);
+    saved.anchor = key(selectionAnchor);
+    saved.rename = key(pendingRenameIcon);
+    return saved;
+}
+
+void CorralWindow::RestoreSelectionByFile(const SelectionByFile &saved)
+{
+    selection.clear();
+    selectedIcon = selectionAnchor = -1;
+    int rename = -1;
+    for (int i = 0; i < (int)icons.size(); i++)
+    {
+        const std::wstring k = IconKey(icons[i]);
+        if (k.empty())
+            continue; // Would match "none" below
+        if (saved.selected.count(k))
+            selection.insert(i);
+        if (k == saved.focus)
+            selectedIcon = i;
+        if (k == saved.anchor)
+            selectionAnchor = i;
+        if (k == saved.rename)
+            rename = i;
+    }
+    if (pendingRenameIcon >= 0 && rename < 0)
+        CancelPendingRename(); // Its file is gone
+    else
+        pendingRenameIcon = rename;
+}
+
 void CorralWindow::ClearSelection()
 {
     selection.clear();
@@ -263,7 +307,7 @@ void CorralWindow::OnTypeAheadTimeout()
 
 void CorralWindow::OnChar(wchar_t ch)
 {
-    if (isRenamingIcon || ch < L' ' || icons.empty())
+    if (isRenamingIcon || ch < L' ' || icons.empty() || (config.IsRolledUp && !isHoverExpanded))
         return;
 
     typeAheadPrefix += (wchar_t)towlower(ch);
@@ -303,10 +347,20 @@ bool CorralWindow::OnKeyDown(WPARAM vk)
     bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     bool alt = (GetKeyState(VK_MENU) & 0x8000) != 0;
 
+    CancelPendingRename();
+
+    // Rolled up, the icons are not drawn: no key may open, delete or rename
+    // them. Switching tabs still works.
+    if (config.IsRolledUp && !isHoverExpanded &&
+        !(vk == VK_TAB || (ctrl && (vk == VK_PRIOR || vk == VK_NEXT))))
+        return false;
+
     switch (vk)
     {
     case VK_F2:
-        if (selectedIcon >= 0)
+        // The focused icon only if it is selected: Ctrl+arrow moves the focus
+        // without selecting, and F2 must not rename an icon that is not marked
+        if (selectedIcon >= 0 && IsSelected(selectedIcon))
         {
             StartIconRename(selectedIcon);
             return true;
@@ -581,8 +635,10 @@ void CorralWindow::InvokeVerbOnSelection(const char *verb)
     PinToBandTop();
 
     // Deleted entries are pruned by the reload. The folder watcher / DesktopMonitor
-    // would get here eventually; this just makes it immediate.
-    LoadFiles();
+    // would get here eventually; this just makes it immediate. Copy, cut and
+    // properties change nothing in the folder.
+    if (strcmp(verb, "delete") == 0)
+        LoadFiles();
 }
 
 void CorralWindow::InvokeVerbOnFolder(const char *verb)

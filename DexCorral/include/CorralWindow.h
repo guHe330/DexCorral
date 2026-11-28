@@ -537,6 +537,15 @@ private:
     int selectionAnchor = -1;
     int hoveredIcon = -1;
 
+    // The indices above, by file, across a sort or reload that reorders `icons`
+    struct SelectionByFile
+    {
+        std::set<std::wstring> selected;
+        std::wstring focus, anchor, rename;
+    };
+    SelectionByFile SaveSelectionByFile() const;
+    void RestoreSelectionByFile(const SelectionByFile &saved);
+
     // Rubber-band selection (drag on empty corral space)
     bool isRubberBanding = false;
     POINT rubberBandStart = {};   // Content coords (scroll applied)
@@ -680,6 +689,7 @@ private:
     // schedules a rename after the double-click time; a double-click cancels it and opens.
     int pendingRenameIcon = -1;
     static const UINT_PTR RENAME_TIMER_ID = 6;
+    void CancelPendingRename(); // Any other click or key cancels it
 
     // Virtual corral support
     std::unique_ptr<FolderWatcher> folderWatcher;

@@ -11,8 +11,10 @@
 ; conflict checks in [Code] enforce that.
 ;
 ; Silent installs pick the mode with Inno's own switch:
-;   DexCorral_x.y.z_Setup.exe /VERYSILENT /ALLUSERS
-;   DexCorral_x.y.z_Setup.exe /VERYSILENT /CURRENTUSER
+;   DexCorral_x.y.z_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /ALLUSERS
+;   DexCorral_x.y.z_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /CURRENTUSER
+; /SUPPRESSMSGBOXES answers every question with its default: keep the
+; configuration on uninstall, do not remove an install of the other mode.
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
@@ -46,9 +48,12 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog commandline
 ; An upgrade keeps the mode of the install it replaces
 UsePreviousPrivileges=yes
-; 64-bit only
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+; 64-bit x64 Windows only. Not x64compatible: on Windows on Arm Explorer is a
+; native ARM64 process and cannot load the x64 hook DLL.
+ArchitecturesAllowed=x64os
+ArchitecturesInstallIn64BitMode=x64os
+; Writes the Setup log that CurStepChanged copies to %APPDATA%\DexCorral
+SetupLogging=yes
 ; Installer appearance
 WizardStyle=modern
 ; Small branding icon shown in the top-right corner of every wizard page.
@@ -226,8 +231,10 @@ begin
     Exit;
   end;
   Cmd := RemoveQuotes(Cmd);
-  Log('Conflict: running ' + Cmd + ' /VERYSILENT');
-  Result := Exec(Cmd, '/VERYSILENT /NORESTART', '', SW_SHOW, ewWaitUntilTerminated, ResultCode)
+  // /SUPPRESSMSGBOXES: the keep-the-configuration question would block a
+  // silent uninstaller. Its default keeps it; both modes share it anyway.
+  Log('Conflict: running ' + Cmd + ' /VERYSILENT /SUPPRESSMSGBOXES');
+  Result := Exec(Cmd, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_SHOW, ewWaitUntilTerminated, ResultCode)
             and (ResultCode = 0);
   Log('Conflict: other uninstaller finished ok=' + BoolToStr(Result) + ' code=' + IntToStr(ResultCode));
   // The uninstaller spawns a copy of itself and returns early; give it a moment
@@ -254,7 +261,7 @@ begin
   if ActiveLanguage = 'german' then
     Msg := 'DexCorral ist bereits für alle Benutzer dieses PCs installiert:' + #13#10 +
            '  ' + Dir + '  (Version ' + Version + ')' + #13#10 + #13#10 +
-           'Eine Installation nur für dich würde diese Version für dein Konto verdecken. ' +
+           'Eine Installation nur für Sie würde diese Version für Ihr Konto verdecken. ' +
            'Beide Varianten teilen sich dieselbe Registrierung und dürfen nicht nebeneinander bestehen.' + #13#10 + #13#10 +
            'Die vorhandene Installation jetzt entfernen und fortfahren? ' +
            '(Dafür sind Administratorrechte erforderlich.)'
@@ -266,7 +273,7 @@ begin
            'Remove the existing installation now and continue? ' +
            '(This needs administrator rights.)';
 
-  if MsgBox(Msg, mbConfirmation, MB_YESNO) <> IDYES then begin
+  if SuppressibleMsgBox(Msg, mbConfirmation, MB_YESNO, IDNO) <> IDYES then begin
     if ActiveLanguage = 'german' then
       Result := 'Installation abgebrochen: DexCorral ist bereits für alle Benutzer installiert.'
     else
@@ -277,10 +284,10 @@ begin
   if not RunOtherUninstaller(HKLM64) then begin
     if ActiveLanguage = 'german' then
       Result := 'Die vorhandene systemweite Installation konnte nicht entfernt werden. ' +
-                'Bitte deinstalliere DexCorral über "Apps & Features" und starte Setup erneut.'
+                'Bitte deinstallieren Sie DexCorral unter "Installierte Apps" und starten Sie Setup erneut.'
     else
       Result := 'The existing all-users installation could not be removed. ' +
-                'Please uninstall DexCorral from "Apps & Features" and run Setup again.';
+                'Please uninstall DexCorral from "Installed apps" and run Setup again.';
     Exit;
   end;
 
@@ -323,16 +330,17 @@ begin
     Msg := 'Auf diesem PC ist DexCorral bereits für einzelne Benutzer installiert:' + #13#10 + #13#10 +
            Found + #13#10 +
            'Diese Installationen verdecken die systemweite Version für die betreffenden Konten. ' +
-           'Nur der jeweilige Benutzer kann sie entfernen (über "Apps & Features").' + #13#10 + #13#10 +
+           'Nur der jeweilige Benutzer kann sie entfernen (unter "Installierte Apps").' + #13#10 + #13#10 +
            'Trotzdem für alle Benutzer installieren?'
   else
     Msg := 'DexCorral is already installed for individual users on this PC:' + #13#10 + #13#10 +
            Found + #13#10 +
            'Those installations will shadow this all-users version for the accounts that own ' +
-           'them. Only the user in question can remove one, from "Apps & Features".' + #13#10 + #13#10 +
+           'them. Only the user in question can remove one, from "Installed apps".' + #13#10 + #13#10 +
            'Install for all users anyway?';
 
-  if MsgBox(Msg, mbConfirmation, MB_YESNO) <> IDYES then begin
+  // Only a warning: a silent deployment goes ahead
+  if SuppressibleMsgBox(Msg, mbConfirmation, MB_YESNO, IDYES) <> IDYES then begin
     if ActiveLanguage = 'german' then
       Result := 'Installation abgebrochen.'
     else
@@ -507,7 +515,7 @@ begin
     Msg := 'DexCorral kann nicht installiert werden, solange Stardock Fences auf diesem PC installiert ist.' + #13#10 + #13#10 +
            'Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, werden die von ' +
            'DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt gezeichnet.' + #13#10 + #13#10 +
-           'Welches der beiden du nutzt, entscheidest du: Stardock Fences deinstallieren und Setup erneut ' +
+           'Welches der beiden Sie nutzen, entscheiden Sie: Stardock Fences deinstallieren und Setup erneut ' +
            'starten, oder Fences behalten und auf DexCorral verzichten.' + #13#10 + #13#10 +
            'Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner Verbindung zu Stardock.'
   else
@@ -598,13 +606,21 @@ begin
       Log('Step 1 result: DexCorral.exe --register exited with code=' + IntToStr(ResultCode));
       if ResultCode <> 0 then begin
         Log('Step 1 ERROR: registration failed.');
-        MsgBox('Shell extension registration failed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 +
-               'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK);
+        if ActiveLanguage = 'german' then
+          SuppressibleMsgBox('Die Shell-Erweiterung konnte nicht registriert werden (Exitcode ' + IntToStr(ResultCode) + ').' + #13#10 +
+                 'Führen Sie "DexCorral.exe --register ' + GetScopeArg('') + '" von Hand aus.', mbError, MB_OK, IDOK)
+        else
+          SuppressibleMsgBox('Shell extension registration failed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 +
+                 'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK, IDOK);
       end;
     end else begin
       Log('Step 1 ERROR: Failed to launch DexCorral.exe --register (exe missing?)');
-      MsgBox('Could not run DexCorral.exe to register the shell extension.' + #13#10 +
-             'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK);
+      if ActiveLanguage = 'german' then
+        SuppressibleMsgBox('DexCorral.exe konnte zum Registrieren der Shell-Erweiterung nicht gestartet werden.' + #13#10 +
+               'Führen Sie "DexCorral.exe --register ' + GetScopeArg('') + '" von Hand aus.', mbError, MB_OK, IDOK)
+      else
+        SuppressibleMsgBox('Could not run DexCorral.exe to register the shell extension.' + #13#10 +
+               'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK, IDOK);
     end;
 
     // Restart Explorer now that the new files are in place. On an upgrade the
@@ -668,6 +684,25 @@ var
   ExePath: String;
 begin
   if CurUninstallStep = usUninstall then begin
+    // Ask whether to keep the user's configuration files first, while the
+    // desktop is still there: the manual promises this order. A silent
+    // uninstall (/SUPPRESSMSGBOXES) keeps them.
+    // (ActiveLanguage returns the language chosen at install time)
+    if ActiveLanguage = 'german' then
+      g_KeepConfig := SuppressibleMsgBox(
+        'Möchten Sie Ihre DexCorral-Konfiguration behalten?' + #13#10 + #13#10 +
+        'Ihre Corral-Layouts und Darstellungseinstellungen sind gespeichert unter:' + #13#10 +
+        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
+        'Klicken Sie auf Ja, um sie zu behalten, oder auf Nein, um alles zu löschen.',
+        mbConfirmation, MB_YESNO, IDYES) = IDYES
+    else
+      g_KeepConfig := SuppressibleMsgBox(
+        'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
+        'Your corral layouts and appearance settings are stored in:' + #13#10 +
+        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
+        'Click Yes to keep them for future use, or No to delete everything.',
+        mbConfirmation, MB_YESNO, IDYES) = IDYES;
+
     Exec('taskkill', '/F /IM DexCorral.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(500);
 
@@ -688,23 +723,6 @@ begin
 
     // Restart Explorer to unload the DLL before the files are removed
     RestartExplorer;
-
-    // Ask whether to keep the user's configuration files
-    // (ActiveLanguage returns the language chosen at install time)
-    if ActiveLanguage = 'german' then
-      g_KeepConfig := MsgBox(
-        'Möchten Sie Ihre DexCorral-Konfiguration behalten?' + #13#10 + #13#10 +
-        'Ihre Corral-Layouts und Darstellungseinstellungen sind gespeichert unter:' + #13#10 +
-        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
-        'Klicken Sie auf Ja, um sie zu behalten, oder auf Nein, um alles zu löschen.',
-        mbConfirmation, MB_YESNO) = IDYES
-    else
-      g_KeepConfig := MsgBox(
-        'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
-        'Your corral layouts and appearance settings are stored in:' + #13#10 +
-        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
-        'Click Yes to keep them for future use, or No to delete everything.',
-        mbConfirmation, MB_YESNO) = IDYES;
   end;
 
   if CurUninstallStep = usPostUninstall then begin
@@ -713,6 +731,11 @@ begin
       // the other users' %APPDATA%, and should not: their settings are theirs.
       DelTree(ExpandConstant('{localappdata}\DexCorral'), True, True, True);
       DelTree(ExpandConstant('{userappdata}\DexCorral'), True, True, True);
+      // This account's settings in the registry too (Language, crash guard,
+      // Auto arrange). A me-only uninstall removes the key through [Registry]
+      // anyway; an all-users one left it, and its Language then overrode the
+      // language chosen for the next install.
+      RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, MarkerKey);
     end;
   end;
 end;
