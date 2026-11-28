@@ -252,9 +252,9 @@ void CorralWindow::GetDesktopIconSpacing(int &spacingX, int &spacingY)
 
         if (desktopSpacingX > 0 && desktopSpacingY > 0)
         {
-            // GetDesktopIconSize() returns logical pixels; Dpi() scales to physical.
-            // Both desktopSpacing and iconSize are now in physical pixels.
-            int desktopIconSizePhysical = Dpi(GetDesktopIconSize());
+            // GetDesktopIconSize() returns logical pixels; scale it with the ListView's
+            // own DPI (not this Corral's) so the ratio below is DPI-free.
+            int desktopIconSizePhysical = MulDiv(GetDesktopIconSize(), (int)GetDpiForWindow(hListView), 96);
             if (desktopIconSizePhysical > 0)
             {
                 // Scale proportionally: keep the same ratio as the desktop grid
