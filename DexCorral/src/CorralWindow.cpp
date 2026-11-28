@@ -1130,6 +1130,17 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             if (window->OnKeyDown(wParam))
                 return 0;
             break;
+        case WM_SYSKEYDOWN:
+            // Alt+Enter comes as a system key. Every other Alt key stays with
+            // DefWindowProc (Alt+F4, Alt+Space).
+            if (wParam == VK_RETURN && window->OnKeyDown(wParam))
+                return 0;
+            break;
+        case WM_SYSCHAR:
+            // The character of a handled Alt+Enter: DefWindowProc would beep for it
+            if (wParam == VK_RETURN)
+                return 0;
+            break;
         case WM_CHAR:
             window->OnChar((wchar_t)wParam);
             return 0;
