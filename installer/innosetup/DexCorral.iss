@@ -11,8 +11,10 @@
 ; conflict checks in [Code] enforce that.
 ;
 ; Silent installs pick the mode with Inno's own switch:
-;   DexCorral_x.y.z_Setup.exe /VERYSILENT /ALLUSERS
-;   DexCorral_x.y.z_Setup.exe /VERYSILENT /CURRENTUSER
+;   DexCorral_x.y.z_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /ALLUSERS
+;   DexCorral_x.y.z_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /CURRENTUSER
+; /SUPPRESSMSGBOXES answers every question with its default: keep the
+; configuration on uninstall, do not remove an install of the other mode.
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
@@ -229,8 +231,10 @@ begin
     Exit;
   end;
   Cmd := RemoveQuotes(Cmd);
-  Log('Conflict: running ' + Cmd + ' /VERYSILENT');
-  Result := Exec(Cmd, '/VERYSILENT /NORESTART', '', SW_SHOW, ewWaitUntilTerminated, ResultCode)
+  // /SUPPRESSMSGBOXES: the keep-the-configuration question would block a
+  // silent uninstaller. Its default keeps it; both modes share it anyway.
+  Log('Conflict: running ' + Cmd + ' /VERYSILENT /SUPPRESSMSGBOXES');
+  Result := Exec(Cmd, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_SHOW, ewWaitUntilTerminated, ResultCode)
             and (ResultCode = 0);
   Log('Conflict: other uninstaller finished ok=' + BoolToStr(Result) + ' code=' + IntToStr(ResultCode));
   // The uninstaller spawns a copy of itself and returns early; give it a moment
@@ -269,7 +273,7 @@ begin
            'Remove the existing installation now and continue? ' +
            '(This needs administrator rights.)';
 
-  if MsgBox(Msg, mbConfirmation, MB_YESNO) <> IDYES then begin
+  if SuppressibleMsgBox(Msg, mbConfirmation, MB_YESNO, IDNO) <> IDYES then begin
     if ActiveLanguage = 'german' then
       Result := 'Installation abgebrochen: DexCorral ist bereits für alle Benutzer installiert.'
     else
@@ -335,7 +339,8 @@ begin
            'them. Only the user in question can remove one, from "Apps & Features".' + #13#10 + #13#10 +
            'Install for all users anyway?';
 
-  if MsgBox(Msg, mbConfirmation, MB_YESNO) <> IDYES then begin
+  // Only a warning: a silent deployment goes ahead
+  if SuppressibleMsgBox(Msg, mbConfirmation, MB_YESNO, IDYES) <> IDYES then begin
     if ActiveLanguage = 'german' then
       Result := 'Installation abgebrochen.'
     else
@@ -601,13 +606,21 @@ begin
       Log('Step 1 result: DexCorral.exe --register exited with code=' + IntToStr(ResultCode));
       if ResultCode <> 0 then begin
         Log('Step 1 ERROR: registration failed.');
-        MsgBox('Shell extension registration failed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 +
-               'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK);
+        if ActiveLanguage = 'german' then
+          SuppressibleMsgBox('Die Shell-Erweiterung konnte nicht registriert werden (Exitcode ' + IntToStr(ResultCode) + ').' + #13#10 +
+                 'Führen Sie "DexCorral.exe --register ' + GetScopeArg('') + '" von Hand aus.', mbError, MB_OK, IDOK)
+        else
+          SuppressibleMsgBox('Shell extension registration failed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 +
+                 'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK, IDOK);
       end;
     end else begin
       Log('Step 1 ERROR: Failed to launch DexCorral.exe --register (exe missing?)');
-      MsgBox('Could not run DexCorral.exe to register the shell extension.' + #13#10 +
-             'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK);
+      if ActiveLanguage = 'german' then
+        SuppressibleMsgBox('DexCorral.exe konnte zum Registrieren der Shell-Erweiterung nicht gestartet werden.' + #13#10 +
+               'Führen Sie "DexCorral.exe --register ' + GetScopeArg('') + '" von Hand aus.', mbError, MB_OK, IDOK)
+      else
+        SuppressibleMsgBox('Could not run DexCorral.exe to register the shell extension.' + #13#10 +
+               'Try running "DexCorral.exe --register ' + GetScopeArg('') + '" manually.', mbError, MB_OK, IDOK);
     end;
 
     // Restart Explorer now that the new files are in place. On an upgrade the
