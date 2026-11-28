@@ -44,15 +44,15 @@ if ($cmakeExe) {
         $minor = [int]$versionParts[1]
 
         if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 15)) {
-            Write-Host "      ✓ CMake $cmakeVersion via $cmakeSource (minimum 3.15 required)" -ForegroundColor Green
+            Write-Host "      [OK] CMake $cmakeVersion via $cmakeSource (minimum 3.15 required)" -ForegroundColor Green
         } else {
-            Write-Host "      ✗ CMake $cmakeVersion is too old (minimum 3.15 required)" -ForegroundColor Red
+            Write-Host "      [X] CMake $cmakeVersion is too old (minimum 3.15 required)" -ForegroundColor Red
             Write-Host "        Install: winget install Kitware.CMake" -ForegroundColor Gray
             $allGood = $false
         }
     }
 } else {
-    Write-Host "      ✗ CMake not found (checked PATH and Visual Studio installation)" -ForegroundColor Red
+    Write-Host "      [X] CMake not found (checked PATH and Visual Studio installation)" -ForegroundColor Red
     Write-Host "        Install via VS Installer: add 'C++ CMake tools for Windows' component" -ForegroundColor Gray
     Write-Host "        Or standalone: winget install Kitware.CMake" -ForegroundColor Gray
     $allGood = $false
@@ -71,7 +71,7 @@ foreach ($version in $vsVersions) {
             # Check for C++ tools
             $vcToolsPath = "$vsPath\VC\Tools\MSVC"
             if (Test-Path $vcToolsPath) {
-                Write-Host "      ✓ Visual Studio $version $edition with C++ tools" -ForegroundColor Green
+                Write-Host "      [OK] Visual Studio $version $edition with C++ tools" -ForegroundColor Green
                 $vsFound = $true
                 break
             }
@@ -81,7 +81,7 @@ foreach ($version in $vsVersions) {
 }
 
 if (-not $vsFound) {
-    Write-Host "      ✗ Visual Studio 2019/2022 with C++ tools not found" -ForegroundColor Red
+    Write-Host "      [X] Visual Studio 2019/2022 with C++ tools not found" -ForegroundColor Red
     Write-Host "        Download: https://visualstudio.microsoft.com/downloads/" -ForegroundColor Gray
     Write-Host "        Required: Desktop development with C++ workload" -ForegroundColor Gray
     $allGood = $false
@@ -91,9 +91,9 @@ if (-not $vsFound) {
 Write-Host "`n[3/4] Checking Git (optional)..." -ForegroundColor Yellow
 try {
     $gitVersion = git --version 2>&1
-    Write-Host "      ✓ $gitVersion" -ForegroundColor Green
+    Write-Host "      [OK] $gitVersion" -ForegroundColor Green
 } catch {
-    Write-Host "      ⚠ Git not found (optional)" -ForegroundColor DarkYellow
+    Write-Host "      [!] Git not found (optional)" -ForegroundColor DarkYellow
     Write-Host "        Install: winget install Git.Git" -ForegroundColor Gray
 }
 
@@ -105,12 +105,12 @@ if (Test-Path $sdkPath) {
                    Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } |
                    Select-Object -Last 1
     if ($sdkVersions) {
-        Write-Host "      ✓ Windows SDK $($sdkVersions.Name)" -ForegroundColor Green
+        Write-Host "      [OK] Windows SDK $($sdkVersions.Name)" -ForegroundColor Green
     } else {
-        Write-Host "      ⚠ Windows SDK found but version unclear" -ForegroundColor DarkYellow
+        Write-Host "      [!] Windows SDK found but version unclear" -ForegroundColor DarkYellow
     }
 } else {
-    Write-Host "      ⚠ Windows SDK not found at standard location" -ForegroundColor DarkYellow
+    Write-Host "      [!] Windows SDK not found at standard location" -ForegroundColor DarkYellow
     Write-Host "        (Usually installed with Visual Studio)" -ForegroundColor Gray
 }
 
@@ -120,7 +120,7 @@ Write-Host "`n[Info] PowerShell Version: $($PSVersionTable.PSVersion)" -Foregrou
 # Summary
 Write-Host "`n========================================" -ForegroundColor Cyan
 if ($allGood) {
-    Write-Host "✓ All required tools are installed!" -ForegroundColor Green
+    Write-Host "[OK] All required tools are installed!" -ForegroundColor Green
     Write-Host "`nYou can now build DexCorral:" -ForegroundColor White
     Write-Host "  .\build.ps1" -ForegroundColor Cyan
     Write-Host "`nOr manually:" -ForegroundColor White
@@ -129,7 +129,7 @@ if ($allGood) {
     Write-Host "  cmake .. -G ""Visual Studio 17 2022"" -A x64" -ForegroundColor Gray
     Write-Host "  cmake --build . --config Release" -ForegroundColor Gray
 } else {
-    Write-Host "✗ Some required tools are missing" -ForegroundColor Red
+    Write-Host "[X] Some required tools are missing" -ForegroundColor Red
     Write-Host "`nPlease install missing tools and run this script again." -ForegroundColor Yellow
     Write-Host "`nQuick install commands:" -ForegroundColor White
     Write-Host "  winget install Kitware.CMake" -ForegroundColor Gray
