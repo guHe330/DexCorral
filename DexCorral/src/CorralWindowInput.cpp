@@ -387,10 +387,23 @@ void CorralWindow::DoWindowDrag(int screenX, int screenY)
     if (!isDragging || !PastDragThreshold(dragStart, screenX, screenY))
         return;
 
-    int newLeft = screenX - (dragStart.x - dragStartRect.left);
-    int newTop = screenY - (dragStart.y - dragStartRect.top);
-    int width = dragStartRect.right - dragStartRect.left;
-    int height = dragStartRect.bottom - dragStartRect.top;
+    // Crossing to a monitor with another DPI resizes the window mid-drag (OnDpiChanged),
+    // so snap with the current size and scale the grab offset along with it.
+    RECT current;
+    GetWindowRect(hwnd, &current);
+    int width = current.right - current.left;
+    int height = current.bottom - current.top;
+    // Width is the scale: a roll-up animation changes only the height.
+    int startWidth = dragStartRect.right - dragStartRect.left;
+    int grabX = dragStart.x - dragStartRect.left;
+    int grabY = dragStart.y - dragStartRect.top;
+    if (startWidth > 0)
+    {
+        grabX = MulDiv(grabX, width, startWidth);
+        grabY = MulDiv(grabY, width, startWidth);
+    }
+    int newLeft = screenX - grabX;
+    int newTop = screenY - grabY;
 
     // Apply snap unless Shift is held
     if (!(GetKeyState(VK_SHIFT) & 0x8000))
