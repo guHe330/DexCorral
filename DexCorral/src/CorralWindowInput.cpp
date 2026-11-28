@@ -2137,7 +2137,9 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
     // in an Explorer window: the drop is for the tab.
     if (owner->GetActiveTab().IsVirtual)
     {
-        SyncFolderTarget(grfKeyState, pt, true);
+        // Bound only now (a tab brought forward, a share not asked yet): its
+        // DragEnter needs the button still in the keys, as for an icon above
+        SyncFolderTarget(dragKeyState, pt, true);
         if (folderTarget)
         {
             LogCorralDrop(L"Drop: virtual tab -> folder drop target '%s'", folderTargetPath.c_str());
