@@ -161,7 +161,8 @@ namespace LayoutMath
      * `desiredTopLeft` that fits inside `work` and overlaps none of `occupied`.
      *
      * The desired position is clamped into the work area and tried first; if it
-     * is taken, the work area is scanned on a coarse grid for the nearest free
+     * is taken, the work area is scanned on a coarse grid, plus the spots flush
+     * against its edges and against each occupied rect, for the nearest free
      * spot. `maxShift` caps how far that spot may sit from the clamped desired
      * position — beyond it, appearing where the user asked (overlapping) beats
      * teleporting across the monitor, so the clamped desired position is

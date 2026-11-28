@@ -267,13 +267,33 @@ namespace LayoutMath
         if (fits(dl, dt))
             return {dl, dt};
 
-        // Scan on a coarse grid, nearest by squared distance of the top-left.
+        // Scan a coarse grid plus the spots flush against the work-area edges and
+        // each occupied rect (a gap with less than a grid step to spare is off the
+        // grid), nearest by squared distance of the top-left.
         const int step = 16;
+        std::vector<int> lefts = {dl, (int)work.right - width};
+        std::vector<int> tops = {dt, (int)work.bottom - height};
+        for (int left = (int)work.left; left + width <= (int)work.right; left += step)
+            lefts.push_back(left);
+        for (int top = (int)work.top; top + height <= (int)work.bottom; top += step)
+            tops.push_back(top);
+        for (const auto &r : occupied)
+        {
+            lefts.insert(lefts.end(), {(int)r.right, (int)r.left - width});
+            tops.insert(tops.end(), {(int)r.bottom, (int)r.top - height});
+        }
+        // Sorted, so ties still go to the top-most, then left-most spot
+        for (auto *v : {&lefts, &tops})
+        {
+            std::sort(v->begin(), v->end());
+            v->erase(std::unique(v->begin(), v->end()), v->end());
+        }
+
         long long bestDist = -1;
         int bestL = dl, bestT = dt;
-        for (int top = (int)work.top; top + height <= (int)work.bottom; top += step)
+        for (int top : tops)
         {
-            for (int left = (int)work.left; left + width <= (int)work.right; left += step)
+            for (int left : lefts)
             {
                 if (!fits(left, top))
                     continue;
