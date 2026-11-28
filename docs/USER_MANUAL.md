@@ -78,8 +78,8 @@ A local folder that is not there, for example on a USB drive that is not plugged
 ## Managing Corrals
 
 ### Creating
-- Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab**.
-- Choose **New Virtual Corral** instead to pick a folder and create a Corral mirroring it.
+- Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab...**.
+- Choose **New Virtual Corral...** instead to pick a folder and create a Corral mirroring it.
 - The classic right-click menu of the desktop background offers **New DexCorral** and **New Virtual DexCorral** as well, and creates the Corral where you clicked. Hold **Shift** while you right-click the desktop to get that menu; see [Known Limitations](#known-limitations) for why.
 
 ### Moving and Resizing
@@ -115,7 +115,7 @@ Right-click a Corral's title bar or background:
 
 - **Add Tab**: add a new tab to this Corral and name it.
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
-- **Rename Tab**: change the current tab's title.
+- **Rename Tab...**: change the current tab's title.
 - **Appearance...**: open the appearance dialog (see below).
 - **Change Folder...**: for virtual tabs, point the tab at a different folder. A tab named after its folder takes the name of the new one; a name you gave the tab yourself stays.
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
@@ -125,7 +125,7 @@ Right-click a Corral's title bar or background:
 - **Show Desktop Icons**: toggle visibility of all native desktop icons.
 - **Lock Position**: freeze this Corral so it cannot be moved or resized by mouse (see above).
 - **Expand on Hover**: whether this Corral, when rolled up, opens under a resting mouse (see [Roll-Up](#roll-up)).
-- **Create New Corral / New Virtual Corral**: same as the tray menu.
+- **Create New Corral / New Virtual Corral...**: same as the tray menu.
 - **Close Tab / Delete Corral**: remove the current tab, or the whole Corral if it's the last tab. Contained icons return to the desktop.
 
 ### Appearance Dialog
@@ -226,7 +226,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
 - **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
-- **Create New Corral** / **New Virtual Corral**.
+- **Create New Corral** / **New Virtual Corral...**.
 - **Show Desktop Icons**: toggle all native desktop icons. Not available while Quick-Hide is on; the check mark then shows what Quick-Hide gives back when it ends.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
 - **Settings...**: opens the settings window, see below.

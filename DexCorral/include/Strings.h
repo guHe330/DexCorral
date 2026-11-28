@@ -47,7 +47,7 @@ enum class Str
     Menu_UserManual,             // "User Manual" (opens the manual in the browser)
     Menu_OpenConfigFolder,       // "Open Config Folder"
     Menu_CreateNewCorral,        // "Create New Corral"
-    Menu_NewVirtualCorral,       // "New Virtual Corral"
+    Menu_NewVirtualCorral,       // "New Virtual Corral..." (opens a folder picker)
     Menu_ShowDesktopIcons,       // "Show Desktop Icons"
     Menu_QuickHideEverything,    // "Quick-Hide Everything"
     Key_Ctrl,                    // "Ctrl" as the keyboard labels it (German: "Strg")
@@ -151,7 +151,7 @@ enum class Str
     // Corral context menu (CorralWindowCommands.cpp, CorralWindowInput.cpp)
     Menu_AddTab,                 // "Add Tab"
     Menu_DetachTab,              // "Detach Tab"
-    Menu_RenameTab,              // "Rename Tab"
+    Menu_RenameTab,              // "Rename Tab..."
     Menu_Appearance,             // "Appearance..."
     Menu_ChangeFolder,           // "Change Folder..."
     Menu_View,                   // "View"
