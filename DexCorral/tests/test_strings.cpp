@@ -149,3 +149,20 @@ TEST_F(GermanCatalog, AppearanceAccessKeysAreUniquePerPage) {
         }
     }
 }
+
+TEST_F(GermanCatalog, SettingsAccessKeysAreUnique) {
+    const std::vector<Str> shown = {Str::Menu_Language, Str::Settings_Theme, Str::Settings_Look,
+                                    Str::Btn_ExportPresets, Str::Btn_ImportPresets, Str::Menu_CheckUpdatesAuto,
+                                    Str::Settings_Hotkey, Str::Settings_DebugLogging, Str::Menu_OpenConfigFolder};
+    for (const wchar_t *lang : {L"en", L"de"}) {
+        SetLanguage(lang);
+        std::wstring seen;
+        for (Str id : shown) {
+            const wchar_t *amp = wcschr(Tr(id), L'&');
+            ASSERT_NE(amp, nullptr) << "no access key in Str id " << (int)id;
+            const wchar_t k = (wchar_t)towupper(amp[1]);
+            EXPECT_EQ(seen.find(k), std::wstring::npos) << "access key used twice for Str id " << (int)id;
+            seen += k;
+        }
+    }
+}

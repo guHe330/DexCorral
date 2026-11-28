@@ -2347,6 +2347,7 @@ void App::ShowSettings()
     // Layout in dialog units, one option per block with its explanation below it
     const short DLG_W = 260, DLG_H = SETTINGS_FOOTER_TOP + 28, W = 236;
     const DWORD label = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX;
+    const DWORD fieldLabel = label & ~SS_NOPREFIX; // Its access key moves to the field after it
     const DWORD check = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
 
     WORD dlgTemplate[2 * DIALOG_TEMPLATE_BUFFER_SIZE / sizeof(WORD)] = {};
@@ -2355,13 +2356,13 @@ void App::ShowSettings()
                                17, DLG_W, DLG_H, Tr(Str::Title_Settings)); // 17 = the AddDlgItem calls below
 
     const short X = 12, FIELD_X = 96, BTN_Y = SETTINGS_FOOTER_TOP + 7;
-    p = AddDlgItem(p, label, X, 16, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
+    p = AddDlgItem(p, fieldLabel, X, 16, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Menu_Language));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 14, 152, 60,
                    IDC_SET_LANGUAGE, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, label, X, 38, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Theme));
+    p = AddDlgItem(p, fieldLabel, X, 38, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Theme));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 36, 152, 60,
                    IDC_SET_THEME, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
-    p = AddDlgItem(p, label, X, 60, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
+    p = AddDlgItem(p, fieldLabel, X, 60, 80, 8, (WORD)-1, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Look));
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FIELD_X, 58, 152, 120,
                    IDC_SET_LOOK, 0xFFFF, DLG_CLASS_COMBOBOX, nullptr);
     p = AddDlgItem(p, label, X, 76, W, 18, IDC_SET_LOOK_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_LookHint));
@@ -2370,7 +2371,7 @@ void App::ShowSettings()
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, X + 120, 98, 116, 14, IDC_SET_IMPORT, 0xFFFF,
                    DLG_CLASS_BUTTON, Tr(Str::Btn_ImportPresets));
     p = AddDlgItem(p, check, X, 124, W, 12, IDC_SET_UPDATES, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Menu_CheckUpdatesAuto));
-    p = AddDlgItem(p, label, X, 144, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
+    p = AddDlgItem(p, fieldLabel, X, 144, W, 8, IDC_SET_HOTKEY_LABEL, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_Hotkey));
     // (the hot key control sits here, see SETTINGS_HOTKEY_RECT)
     p = AddDlgItem(p, label, X, 175, W, 18, IDC_SET_HOTKEY_HINT, 0xFFFF, DLG_CLASS_STATIC, Tr(Str::Settings_HotkeyHint));
     p = AddDlgItem(p, check, X, 201, W, 12, IDC_SET_DEBUG, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Settings_DebugLogging));

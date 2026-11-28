@@ -45,7 +45,7 @@ enum class Str
     Tray_Tooltip,                // "DexCorral - double-click here or on the desktop to hide everything"
     Menu_About,                  // "About"
     Menu_UserManual,             // "User Manual" (opens the manual in the browser)
-    Menu_OpenConfigFolder,       // "Open Config Folder"
+    Menu_OpenConfigFolder,       // "Open Config Folder" (button in the settings window)
     Menu_CreateNewCorral,        // "Create New Corral"
     Menu_NewVirtualCorral,       // "New Virtual Corral..." (opens a folder picker)
     Menu_ShowDesktopIcons,       // "Show Desktop Icons"
@@ -57,7 +57,8 @@ enum class Str
     Menu_Language,               // "Language" (label in the settings window)
     Menu_Settings,               // "Settings..." (tray menu)
 
-    // Settings window (App.cpp)
+    // Settings window (App.cpp). Its labels, checkboxes and buttons, also the Menu_* ones it
+    // shows, carry a unique '&' access key per language (a test checks it)
     Title_Settings,              // window title
     Settings_Hotkey,             // label of the Quick-Hide hotkey field
     Settings_HotkeyHint,         // how to use the field
