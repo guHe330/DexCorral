@@ -227,7 +227,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 - **User Manual**: opens this manual on GitHub in your browser.
 - **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
 - **Create New Corral** / **New Virtual Corral**.
-- **Show Desktop Icons**: toggle all native desktop icons.
+- **Show Desktop Icons**: toggle all native desktop icons. Not available while Quick-Hide is on; the check mark then shows what Quick-Hide gives back when it ends.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
 - **Settings...**: opens the settings window, see below.
 - **Check for Updates Now**: asks GitHub once, right now, whether a newer version exists, without switching the automatic check on.
