@@ -269,6 +269,8 @@ int CorralWindow::HitTestResizeAllowingTabs(int x, int y)
     int hit = HitTestResize(x, y);
     if (hit == HTTOP && HitTestTab(x, y) >= 0)
         return 0; // The tab owns these pixels
+    if (hit && HitTestTabGrip(x, y) >= 0)
+        return 0; // The first tab's reorder grip reaches the left edge; the cursor shows a move there
     return hit;
 }
 
