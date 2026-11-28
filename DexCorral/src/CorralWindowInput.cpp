@@ -2378,19 +2378,8 @@ void CorralWindow::OnIconDrag(int x, int y)
     if (!isDraggingIcon || draggedIconIndex < 0)
         return;
 
-    // Find which icon slot we're over. icons[i].rect is in unscrolled content
-    // coordinates, so adjust for scroll the same way HitTestIcon does.
-    int newDropTarget = -1;
-    POINT pt = {x, y + scrollPosition};
-
-    for (int i = 0; i < (int)icons.size(); i++)
-    {
-        if (PtInRect(&icons[i].rect, pt))
-        {
-            newDropTarget = i;
-            break;
-        }
-    }
+    // Find which icon slot we're over (not one scrolled out under the header)
+    int newDropTarget = HitTestIcon(x, y);
 
     // Over one of this corral's other tabs: dropping there moves the icons to it.
     // The tab's reorder grip doubles as the "you are over this tab" cue.
