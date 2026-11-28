@@ -147,10 +147,7 @@ void CorralWindow::OnMouseWheel(int delta)
     scrollPosition -= scrollAmount;
     ClampScrollPosition();
     UpdateLayeredContent();
-
-    // Debounced reposition of real desktop icons to match new scroll state
-    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
-    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+    RepositionHiddenIconsSoon();
 }
 
 void CorralWindow::StartScrollbarDrag(int y)
@@ -195,11 +192,14 @@ void CorralWindow::EndScrollbarDrag()
     {
         isDraggingScrollbar = false;
         ReleaseCapture();
-
-        // Reposition real desktop icons to match final scroll state
-        KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
-        SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+        RepositionHiddenIconsSoon();
     }
+}
+
+void CorralWindow::RepositionHiddenIconsSoon()
+{
+    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
+    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
 }
 
 void CorralWindow::ClampScrollPosition()
@@ -953,6 +953,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 scrollPosition -= iconSpacingY;
                 ClampScrollPosition();
                 UpdateLayeredContent();
+                RepositionHiddenIconsSoon();
                 return;
             }
 
@@ -963,6 +964,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 scrollPosition += iconSpacingY;
                 ClampScrollPosition();
                 UpdateLayeredContent();
+                RepositionHiddenIconsSoon();
                 return;
             }
         }
@@ -998,6 +1000,7 @@ void CorralWindow::OnLeftButtonDown(int x, int y)
                 scrollPosition = (int)((float)clickOffset / thumbRange * scrollRange);
                 ClampScrollPosition();
                 UpdateLayeredContent();
+                RepositionHiddenIconsSoon();
             }
         }
         return;

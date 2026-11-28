@@ -417,6 +417,7 @@ private:
     void DoScrollbarDrag(int y);
     void EndScrollbarDrag();
     void ClampScrollPosition();
+    void RepositionHiddenIconsSoon(); // Debounced: the parked desktop icons follow the scroll
 
     void LoadIconImages();
     void ClearIcons();

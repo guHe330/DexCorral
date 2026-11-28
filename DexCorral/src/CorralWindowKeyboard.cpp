@@ -179,6 +179,7 @@ void CorralWindow::EnsureIconVisible(int index)
     const RECT &r = icons[index].rect;
     int visibleTop = GetIconAreaTop();
     int visibleHeight = GetVisibleHeight();
+    const int before = scrollPosition;
 
     if (r.top - scrollPosition < visibleTop)
         scrollPosition = r.top - visibleTop;
@@ -186,6 +187,8 @@ void CorralWindow::EnsureIconVisible(int index)
         scrollPosition = r.bottom - visibleHeight;
 
     ClampScrollPosition();
+    if (scrollPosition != before)
+        RepositionHiddenIconsSoon();
 }
 
 // ============================================================================
@@ -275,10 +278,7 @@ void CorralWindow::ScrollByPage(bool down)
     scrollPosition += down ? page : -page;
     ClampScrollPosition();
     UpdateLayeredContent();
-
-    // Debounced reposition of real desktop icons, as for the mouse wheel
-    KillTimer(hwnd, SCROLL_REPOSITION_TIMER_ID);
-    SetTimer(hwnd, SCROLL_REPOSITION_TIMER_ID, SCROLL_REPOSITION_DEBOUNCE_MS, nullptr);
+    RepositionHiddenIconsSoon();
 }
 
 void CorralWindow::ShowContextMenuForFocusedIcon()
