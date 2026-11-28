@@ -335,8 +335,9 @@ void CorralWindow::DoResize(int screenX, int screenY)
         newHeight += dy;
     }
 
-    // Minimum size constraints (logical, so the header still fits at high DPI)
-    const int minWidth = Dpi(100), minHeight = Dpi(80);
+    // Minimum size constraints (logical, so the header still fits at high DPI;
+    // never below a tall Details column header)
+    const int minWidth = Dpi(100), minHeight = (std::max)(Dpi(80), GetIconAreaTop() + Dpi(8));
     if (newWidth < minWidth)
     {
         if (resizeMode == HTLEFT || resizeMode == HTTOPLEFT || resizeMode == HTBOTTOMLEFT)
@@ -849,8 +850,8 @@ void CorralWindow::ApplyResizeSnap(int &newLeft, int &newTop, int &newWidth, int
         newBottom = newTop + newHeight;
     }
 
-    // Enforce minimum size (adjusting position for left/top edge resizing)
-    const int minWidth = Dpi(100), minHeight = Dpi(80);
+    // Enforce minimum size (adjusting position for left/top edge resizing), as in DoResize
+    const int minWidth = Dpi(100), minHeight = (std::max)(Dpi(80), GetIconAreaTop() + Dpi(8));
     if (newWidth < minWidth)
     {
         if (resizingLeft)
