@@ -166,7 +166,7 @@ Header opacity fades the title bar and tab strip independently of the Corral fil
 #### Text opacity
 The tab title and the icon labels fade on their own sliders, so text can be dialled back without touching what is behind it, or turned off entirely for a Corral that is just icons.
 
-- **Header label** fades the active tab's title. It is a per-tab setting, like the font face and color, even though the slider sits with the per-Corral ones.
+- **Header label**, on the Header page, fades the active tab's title. It is a per-tab setting, like the font face and color just above it.
 - **Icon label** fades every icon caption in the Corral.
 - Both go all the way to invisible. Nothing is lost: the header still drags, rolls up and right-clicks with no title on it, and icons stay visible and clickable with no captions.
 - Both fade in on hover along with the icons, border and header, on the same timing. Text set to 0% is therefore not gone: it appears when you move the mouse over the Corral and fades back out when you leave.
