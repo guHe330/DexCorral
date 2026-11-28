@@ -187,12 +187,13 @@ static bool ShowConfigNoticeIfPending(TrayIcon *tray)
     if (s_ConfigNoticePending == ConfigLoadStatus::Ok || !tray || !tray->IsVisible())
         return false;
     bool restored = (s_ConfigNoticePending == ConfigLoadStatus::RestoredFromBackup);
-    if (tray->ShowBalloon(Tr(restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
-                          Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
+    bool notKept = (s_ConfigNoticePending == ConfigLoadStatus::NotKept);
+    if (tray->ShowBalloon(Tr(notKept ? Str::Config_NotKeptTitle : restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
+                          Tr(notKept ? Str::Config_NotKeptBody : restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
                           restored ? NIIF_INFO : NIIF_WARNING))
     {
         s_ConfigNoticePending = ConfigLoadStatus::Ok;
-        DllLog(L"App: unreadable-config tray notice shown (restored=%d)", restored ? 1 : 0);
+        DllLog(L"App: unreadable-config tray notice shown (restored=%d, notKept=%d)", restored ? 1 : 0, notKept ? 1 : 0);
         return true;
     }
     return false;
@@ -634,10 +635,12 @@ void App::LoadConfig()
 {
     ConfigLoadStatus status = ConfigLoadStatus::Ok;
     config = Config::Load(&status);
-    if (status == ConfigLoadStatus::RestoredFromBackup || status == ConfigLoadStatus::Reset)
+    if (status != ConfigLoadStatus::Ok && status != ConfigLoadStatus::Missing)
     {
         DllLog(L"App::LoadConfig: config.json unreadable (%s)",
-               status == ConfigLoadStatus::RestoredFromBackup ? L"restored from config.bak" : L"no usable backup, defaults");
+               status == ConfigLoadStatus::RestoredFromBackup ? L"restored from config.bak"
+               : status == ConfigLoadStatus::Reset            ? L"no usable backup, defaults"
+                                                              : L"no copy kept, saves held");
         s_ConfigNoticePending = status;
     }
 }
@@ -698,6 +701,8 @@ void App::FlushConfigWrite()
     if (!Config::Save(config))
     {
         DllLog(L"App: config.json could not be written (error %lu); the change is not saved", GetLastError());
+        if (Config::SavesHeld())
+            return; // The NotKept notice already said so
         // Once a session: every later change fails the same way
         static bool told = false;
         if (!told)

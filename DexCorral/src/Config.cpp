@@ -221,6 +221,24 @@ namespace
                                 : path;
         return base + suffix;
     }
+
+    /// A config.json that could not be read nor copied to config.corrupt.json.
+    /// SaveTo writes nothing over it until that copy succeeds.
+    std::wstring s_UnkeptPath;
+
+    /// Sets the unreadable file aside; true once it is kept (or gone, so there is nothing to keep)
+    bool KeepUnreadableFile(const std::wstring &path)
+    {
+        if (!CopyFileW(path.c_str(), Config::GetCorruptPath(path).c_str(), FALSE) &&
+            GetLastError() != ERROR_FILE_NOT_FOUND)
+        {
+            s_UnkeptPath = path;
+            return false;
+        }
+        if (s_UnkeptPath == path)
+            s_UnkeptPath.clear();
+        return true;
+    }
 } // namespace
 
 std::wstring Config::GetBackupPath(const std::wstring &configPath)
@@ -266,15 +284,15 @@ AppConfig Config::LoadFrom(const std::wstring &path, ConfigLoadStatus *status)
 
     // The next save replaces config.json, so set the unreadable file aside first:
     // a hand edit with one stray comma should be fixable, not gone.
-    CopyFileW(path.c_str(), GetCorruptPath(path).c_str(), FALSE);
+    const bool kept = KeepUnreadableFile(path);
 
     if (ReadConfigFile(GetBackupPath(path), loaded) == ReadResult::Good)
     {
-        *status = ConfigLoadStatus::RestoredFromBackup;
+        *status = kept ? ConfigLoadStatus::RestoredFromBackup : ConfigLoadStatus::NotKept;
         return loaded;
     }
 
-    *status = ConfigLoadStatus::Reset;
+    *status = kept ? ConfigLoadStatus::Reset : ConfigLoadStatus::NotKept;
     return AppConfig();
 }
 
@@ -283,8 +301,18 @@ bool Config::Save(const AppConfig &config)
     return SaveTo(Utf8ToWide(GetConfigPath()), config);
 }
 
+bool Config::SavesHeld()
+{
+    return !s_UnkeptPath.empty();
+}
+
 bool Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
 {
+    // The unreadable file is the only copy of the user's last layout: retry
+    // setting it aside, and write nothing over it until that works
+    if (wPath == s_UnkeptPath && !KeepUnreadableFile(wPath))
+        return false;
+
     std::wstring wTmp = wPath + L".tmp";
 
     try

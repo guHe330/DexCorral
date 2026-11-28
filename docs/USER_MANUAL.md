@@ -292,7 +292,7 @@ The file is written automatically. DexCorral reads it only when it starts and wr
 Two more files can appear next to it:
 
 - `config.bak` is a copy of the last `config.json` that loaded without errors, refreshed each time DexCorral starts.
-- `config.corrupt.json` is written when `config.json` cannot be read, for example after a hand edit with a stray comma. DexCorral then loads `config.bak` instead, keeps your unreadable file under this name so you can repair it, and shows a tray notification saying so. With no usable backup it starts with a fresh layout.
+- `config.corrupt.json` is written when `config.json` cannot be read, for example after a hand edit with a stray comma. DexCorral then loads `config.bak` instead, keeps your unreadable file under this name so you can repair it, and shows a tray notification saying so. With no usable backup it starts with a fresh layout. If even this copy cannot be made (another program holds the file), DexCorral says so and saves none of your changes until it can, so the file is never written over.
 
 Deleting `config.json` still means "start over": the backup is not restored in that case.
 
