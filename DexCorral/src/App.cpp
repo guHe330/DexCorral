@@ -1881,6 +1881,10 @@ static const WORD IDC_ABOUT_LICENSE = 303;
 // Where the footer band of the About dialog begins (dialog units)
 static const int ABOUT_FOOTER_TOP = 100;
 
+// The open About and Settings dialogs, brought forward when picked again
+static HWND s_AboutDialog = nullptr;
+static HWND s_SettingsDialog = nullptr;
+
 static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -1894,6 +1898,7 @@ static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM 
         DialogSkin::Attach(hDlg, ABOUT_FOOTER_TOP);
         // Opened from the tray menu, with no owner window to bring it forward
         SetForegroundWindow(hDlg);
+        s_AboutDialog = hDlg;
         return TRUE;
     }
     case WM_COMMAND:
@@ -1927,7 +1932,11 @@ void App::ShowAbout()
     // The tray menu stays reachable while the dialog is up; one About is enough
     static bool showing = false;
     if (showing)
+    {
+        if (s_AboutDialog)
+            SetForegroundWindow(s_AboutDialog);
         return;
+    }
     showing = true;
 
     std::wstring aboutText = TrFmt(Str::About_Body, DEXCORRAL_VERSION);
@@ -1948,6 +1957,7 @@ void App::ShowAbout()
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 180, BTN_Y, BTN_W, BTN_H, IDOK, 0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_OK));
 
     DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr, AboutDlgProc, 0);
+    s_AboutDialog = nullptr;
     showing = false;
 }
 
@@ -2221,6 +2231,7 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
 
         // Opened from the tray menu, with no owner window to bring it forward
         SetForegroundWindow(hDlg);
+        s_SettingsDialog = hDlg;
         return TRUE;
     }
     case WM_MOVE:
@@ -2296,7 +2307,11 @@ void App::ShowSettings()
     // The tray menu stays reachable while the dialog is up; one is enough
     static bool showing = false;
     if (showing)
+    {
+        if (s_SettingsDialog)
+            SetForegroundWindow(s_SettingsDialog);
         return;
+    }
     showing = true;
 
     SettingsDialogData data;
@@ -2357,6 +2372,7 @@ void App::ShowSettings()
 
     const INT_PTR result = DialogBoxIndirectParamW(HookBridge::GetDllModule(), (DLGTEMPLATE *)dlgTemplate, nullptr,
                                                    SettingsDlgProc, (LPARAM)&data);
+    s_SettingsDialog = nullptr;
     showing = false;
     data.demo.reset(); // Closed some other way than by its buttons
     if (result != IDOK)
