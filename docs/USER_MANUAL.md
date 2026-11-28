@@ -43,7 +43,7 @@ Uninstall from **Settings > Apps > Installed apps**, or via the Start Menu group
 
 The uninstaller removes only what its own install mode created, including every registry entry ([the full list](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder)). If you do not keep your configuration, your own settings under `HKCU\Software\DexCorral` go as well. Other accounts' settings are left alone.
 
-After uninstalling, icons that were inside Corrals reappear as normal desktop icons; you may want to rearrange them (right-click desktop > **Sort by > Name**).
+After uninstalling, icons that were inside Corrals reappear as normal desktop icons where their Corral was. The icons of the tabs that were not showing all sit on one spot in the middle of their Corral, one on top of another, so rearrange them: right-click the desktop > **Sort by > Name**.
 
 Portable package: before you delete its folder, run `DexCorral.exe --unregister` with the same `--scope` you registered with (Windows asks for Administrator rights for `--scope=machine`). This also ends the start at sign-in. More on leftovers in the [Technical Notes](TECHNICAL_NOTES.md#removing-a-portable-package).
 
@@ -225,7 +225,7 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
-- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
+- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
 - **Create New Corral** / **New Virtual Corral**.
 - **Show Desktop Icons**: toggle all native desktop icons.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
