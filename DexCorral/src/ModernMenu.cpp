@@ -231,6 +231,39 @@ LRESULT CALLBACK OwnerProc(HWND w, UINT msg, WPARAM wParam, LPARAM lParam, UINT_
             return TRUE;
         }
     }
+    else if (msg == WM_MENUCHAR)
+    {
+        // Windows matches typed letters only against entries it draws itself:
+        // for ours, pick the entries whose text starts with the letter, as a plain menu does
+        HMENU menu = (HMENU)lParam;
+        const WCHAR typed = (WCHAR)(UINT_PTR)CharUpperW((LPWSTR)(UINT_PTR)LOWORD(wParam));
+        std::vector<int> matches;
+        int current = -1;
+        bool ours = false;
+        const int count = GetMenuItemCount(menu);
+        for (int i = 0; i < count; i++)
+        {
+            MENUITEMINFOW info = {sizeof(info)};
+            info.fMask = MIIM_DATA | MIIM_STATE;
+            if (!GetMenuItemInfoW(menu, i, TRUE, &info) || !s->Owns((const Entry *)info.dwItemData))
+                continue;
+            ours = true;
+            const Entry *entry = (const Entry *)info.dwItemData;
+            if (info.fState & MFS_HILITE)
+                current = i;
+            if (!entry->separator && !(info.fState & MFS_DISABLED) && !entry->text.empty() &&
+                (WCHAR)(UINT_PTR)CharUpperW((LPWSTR)(UINT_PTR)entry->text[0]) == typed)
+                matches.push_back(i);
+        }
+        if (ours && matches.size() == 1)
+            return MAKELRESULT(matches[0], MNC_EXECUTE);
+        if (ours && !matches.empty())
+        {
+            // Several entries share the letter: each press moves to the next one
+            auto next = std::upper_bound(matches.begin(), matches.end(), current);
+            return MAKELRESULT(next != matches.end() ? *next : matches[0], MNC_SELECT);
+        }
+    }
     return DefSubclassProc(w, msg, wParam, lParam);
 }
 } // namespace
