@@ -450,6 +450,10 @@ void App::ActivateDesktop()
         auto corral = std::make_unique<CorralWindow>(defaultConfig);
         corral->Show();
         corrals.push_back(std::move(corral));
+        // A new corral must not sit on the desktop icons beneath it
+        CacheDesktopIconPositions();
+        PushDesktopIconsFromCorrals();
+        InvalidateDesktopIconCache();
 
         config.FirstCorralSeeded = true;
         SaveConfig();
@@ -2373,6 +2377,10 @@ void App::CreateCorralAt(POINT desiredCenter, bool promptForName)
     corral->Show();
     CorralWindow *created = corral.get();
     corrals.push_back(std::move(corral));
+    // A new corral must not sit on the desktop icons beneath it
+    CacheDesktopIconPositions();
+    PushDesktopIconsFromCorrals();
+    InvalidateDesktopIconCache();
     SaveConfig();
 
     // A corral the user just asked for is named on the spot instead of sitting
@@ -2598,6 +2606,10 @@ void App::CreateVirtualCorralAt(POINT desiredCenter)
     auto corral = std::make_unique<CorralWindow>(newConfig);
     corral->Show();
     corrals.push_back(std::move(corral));
+    // A new corral must not sit on the desktop icons beneath it
+    CacheDesktopIconPositions();
+    PushDesktopIconsFromCorrals();
+    InvalidateDesktopIconCache();
     SaveConfig();
 }
 
