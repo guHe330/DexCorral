@@ -90,6 +90,11 @@ static const UINT DISPLAY_CHANGE_SETTLE_MS = 1500;
 static const UINT_PTR CONFIG_WRITE_TIMER = 7;
 static const UINT CONFIG_WRITE_DELAY_MS = 500;
 
+// The next queued tray notice goes up when the shell reports the balloon on
+// screen gone, or after this long if it never does
+static const UINT_PTR NOTICE_TIMER = 9;
+static const UINT NOTICE_FALLBACK_MS = 30000;
+
 // One retry of a failed automatic update check
 static const UINT_PTR UPDATE_RETRY_TIMER = 5;
 static const UINT UPDATE_RETRY_MS = 5 * 60 * 1000;
@@ -153,27 +158,29 @@ static HANDLE g_AppStopEvent = nullptr;
 // get added after retries during early Explorer startup).
 static bool s_SafeModeNoticePending = false;
 
-static void ShowSafeModeNoticeIfPending(TrayIcon *tray)
+static bool ShowSafeModeNoticeIfPending(TrayIcon *tray)
 {
     if (!s_SafeModeNoticePending || !tray || !tray->IsVisible())
-        return;
+        return false;
     const bool conflict = (GetCorralHookStandbyReason() == HookStandbyReason::Conflict);
     if (tray->ShowBalloon(Tr(Str::SafeMode_Title), Tr(conflict ? Str::Conflict_StandbyBalloon : Str::SafeMode_Body),
                          NIIF_WARNING))
     {
         s_SafeModeNoticePending = false;
         DllLog(L"App: safe mode tray notice shown");
+        return true;
     }
+    return false;
 }
 
 // Unreadable-config tray notice — armed by LoadConfig when config.json could not
 // be parsed, and shown the same way: once the tray icon is actually visible.
 static ConfigLoadStatus s_ConfigNoticePending = ConfigLoadStatus::Ok;
 
-static void ShowConfigNoticeIfPending(TrayIcon *tray)
+static bool ShowConfigNoticeIfPending(TrayIcon *tray)
 {
     if (s_ConfigNoticePending == ConfigLoadStatus::Ok || !tray || !tray->IsVisible())
-        return;
+        return false;
     bool restored = (s_ConfigNoticePending == ConfigLoadStatus::RestoredFromBackup);
     if (tray->ShowBalloon(Tr(restored ? Str::Config_RestoredTitle : Str::Config_ResetTitle),
                           Tr(restored ? Str::Config_RestoredBody : Str::Config_ResetBody),
@@ -181,7 +188,41 @@ static void ShowConfigNoticeIfPending(TrayIcon *tray)
     {
         s_ConfigNoticePending = ConfigLoadStatus::Ok;
         DllLog(L"App: unreadable-config tray notice shown (restored=%d)", restored ? 1 : 0);
+        return true;
     }
+    return false;
+}
+
+// Other warnings that must not get lost: title and text, oldest first
+static std::vector<std::pair<Str, std::wstring>> s_Notices;
+static bool s_NoticeOnScreen = false;
+
+// Shows the next waiting notice once the tray icon is visible. One at a time:
+// a balloon replaces the one on screen, so the next waits until the shell
+// reports it gone (NIN_BALLOONTIMEOUT and the like) or NOTICE_TIMER fires.
+static void ShowNextNotice(TrayIcon *tray, HWND hwnd)
+{
+    if (s_NoticeOnScreen || !tray || !tray->IsVisible())
+        return;
+    bool shown = ShowSafeModeNoticeIfPending(tray) || ShowConfigNoticeIfPending(tray);
+    if (!shown && !s_Notices.empty() &&
+        tray->ShowBalloon(Tr(s_Notices.front().first), s_Notices.front().second, NIIF_WARNING))
+    {
+        s_Notices.erase(s_Notices.begin());
+        shown = true;
+    }
+    if (shown)
+    {
+        s_NoticeOnScreen = true;
+        SetTimer(hwnd, NOTICE_TIMER, NOTICE_FALLBACK_MS, nullptr);
+    }
+}
+
+static void NoticeGone(TrayIcon *tray, HWND hwnd)
+{
+    KillTimer(hwnd, NOTICE_TIMER);
+    s_NoticeOnScreen = false;
+    ShowNextNotice(tray, hwnd);
 }
 
 // Entry point called from the DLL worker thread
@@ -310,7 +351,6 @@ void App::Initialize()
                             &noticed, sizeof(noticed));
         } else {
             s_SafeModeNoticePending = true;
-            ShowSafeModeNoticeIfPending(trayIcon.get());
         }
     }
 
@@ -322,13 +362,12 @@ void App::Initialize()
         } else {
             // Carried over from an earlier start: a reminder is enough
             s_SafeModeNoticePending = true;
-            ShowSafeModeNoticeIfPending(trayIcon.get());
         }
     }
 
-    // config.json was unreadable: say so rather than leaving the user to wonder
-    // where their corrals went
-    ShowConfigNoticeIfPending(trayIcon.get());
+    // The reminder above, and config.json was unreadable: say so rather than
+    // leaving the user to wonder where their corrals went
+    ShowNextNotice(trayIcon.get(), messageWindow);
 
     if (standbyReason != HookStandbyReason::None)
     {
@@ -411,10 +450,14 @@ void App::ActivateDesktop()
     // and off without it. A combination that is not valid, or that Windows or
     // another program already holds, is worth a notice: the user typed it into
     // a file and would otherwise just find that nothing happens.
-    if (!ApplyQuickHideHotkey() && trayIcon)
-        trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
-                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)),
-                              NIIF_WARNING);
+    // Queued: at sign-in the tray icon may not be there yet, and a config
+    // notice may be on screen.
+    if (!ApplyQuickHideHotkey())
+    {
+        s_Notices.emplace_back(Str::Hotkey_FailedTitle,
+                               TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
+        ShowNextNotice(trayIcon.get(), messageWindow);
+    }
 
     // Restore corrals
     RestoreCorrals();
@@ -2655,6 +2698,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 if (!url.empty())
                     ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             }
+            NoticeGone(app->trayIcon.get(), hwnd);
+            return 0;
+        }
+        if (lParam == NIN_BALLOONTIMEOUT || lParam == NIN_BALLOONHIDE)
+        {
+            NoticeGone(app->trayIcon.get(), hwnd);
             return 0;
         }
     }
@@ -2879,6 +2928,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         return 0;
     }
 
+    if (app && uMsg == WM_TIMER && wParam == NOTICE_TIMER)
+    {
+        NoticeGone(app->trayIcon.get(), hwnd);
+        return 0;
+    }
+
     if (app && uMsg == WM_TIMER && wParam == UPDATE_RETRY_TIMER)
     {
         KillTimer(hwnd, UPDATE_RETRY_TIMER);
@@ -2906,8 +2961,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         if (app && app->trayIcon && app->trayIcon->Show()) {
             KillTimer(hwnd, TRAY_RETRY_TIMER);
             DllLog(L"App: TRAY_RETRY_TIMER — tray icon added successfully");
-            ShowSafeModeNoticeIfPending(app->trayIcon.get());
-            ShowConfigNoticeIfPending(app->trayIcon.get());
+            NoticeGone(app->trayIcon.get(), hwnd);
         }
         return 0;
     }
@@ -2923,8 +2977,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             app->trayIcon->Hide();
             if (!app->trayIcon->Show())
                 SetTimer(hwnd, TRAY_RETRY_TIMER, 500, nullptr);
-            ShowSafeModeNoticeIfPending(app->trayIcon.get());
-            ShowConfigNoticeIfPending(app->trayIcon.get());
+            NoticeGone(app->trayIcon.get(), hwnd); // A balloon on the old taskbar is gone with it
         }
         return 0;
     }
