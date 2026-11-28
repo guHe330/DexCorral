@@ -478,13 +478,16 @@ void CorralWindow::UpdateLayeredContent()
     // ---- Lock Position badge ----
     // Composited over the title bar in the last tab's header colour and opacity, so
     // it reads as part of the header rather than an overlay pasted on top of it.
+    // Floored at LOCK_GLYPH_ALPHA_MIN: it is the only sign that moving and
+    // resizing are off, so hidden titles must not hide it too.
     if (lockRect.right > lockRect.left && !config.Tabs.empty())
     {
         const int lw = lockRect.right - lockRect.left;
         const int lh = lockRect.bottom - lockRect.top;
         const int ti = (int)config.Tabs.size() - 1;
-        const int lockAlpha = ChromeAlpha::HoverBlendTextOpacity(config.Tabs[ti].HeaderFontOpacity,
-                                                                 currentTextHover);
+        const int lockAlpha = (std::max)(LOCK_GLYPH_ALPHA_MIN,
+                                         ChromeAlpha::HoverBlendTextOpacity(config.Tabs[ti].HeaderFontOpacity,
+                                                                            currentTextHover));
         if (lockAlpha > 0)
         {
             LockGlyph glyph(lw, lh);

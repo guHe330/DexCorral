@@ -90,6 +90,11 @@ constexpr int INACTIVE_TAB_ALPHA_MIN = 10;
 constexpr int INACTIVE_TAB_RGB_SCALE_MAX_PERCENT = 50;
 constexpr int INACTIVE_TAB_RGB_SCALE_MIN_PERCENT = 25;
 
+/// Minimum opacity of the Lock Position padlock (128/255, ~50%)
+/// The padlock follows the header text opacity, but it is the only sign that
+/// a corral cannot be moved or resized, so it stays visible with titles at 0.
+constexpr int LOCK_GLYPH_ALPHA_MIN = 128;
+
 /// Default border opacity (255, fully opaque) — the previous hard-coded value
 constexpr int BORDER_OPACITY_DEFAULT = 255;
 
