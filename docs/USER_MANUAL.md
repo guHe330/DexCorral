@@ -120,10 +120,12 @@ Right-click a Corral's title bar or background:
 - **Change Folder...**: for virtual tabs, point the tab at a different folder. A tab named after its folder takes the name of the new one; a name you gave the tab yourself stays.
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
 - **Sort By**: on a normal tab, sorts the icons once by **Name** or **Type**; you can still drag them into any order afterwards, and new icons are added at the end. On a virtual tab it sets the standing sort column and direction, in every view.
-- **Catch-All (receives new files)**: make this tab the catch-all for new desktop items.
-- **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral.
+- **Catch-All (receives new files)**: make this tab the catch-all for new desktop items (normal tabs only).
+- **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral (normal tabs only).
 - **Show Desktop Icons**: toggle visibility of all native desktop icons.
+- **Exclude from Quick-Hide**: keep this Corral visible while [Quick-Hide](#quick-hide) hides everything else.
 - **Lock Position**: freeze this Corral so it cannot be moved or resized by mouse (see above).
+- **Undo Last Move**: put the last moved or resized Corral back (see [Moving and Resizing](#moving-and-resizing)).
 - **Expand on Hover**: whether this Corral, when rolled up, opens under a resting mouse (see [Roll-Up](#roll-up)).
 - **Create New Corral / New Virtual Corral...**: same as the tray menu.
 - **Close Tab / Delete Corral**: remove the current tab, or the whole Corral if it's the last tab. Contained icons return to the desktop.
