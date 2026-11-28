@@ -218,7 +218,8 @@ public:
     /// Returns top Y coordinate of icon area (title bar + optional details header)
     int GetIconAreaTop() const { return Dpi(config.TitleBarHeight + 4) + GetDetailsHeaderHeight(); }
 
-    /// Recalculates icon layout based on window size and view mode
+    /// Recalculates icon layout based on window size and view mode; a rolled-up
+    /// Corral first takes the current header height
     void RecalculateLayout();
 
     /// Sets current window opacity (0-255, clamped to minimum 5)

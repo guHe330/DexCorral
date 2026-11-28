@@ -1204,6 +1204,8 @@ void CorralWindow::CalculateIconLayout()
 
 void CorralWindow::RecalculateLayout()
 {
+    if (!isHoverExpanded && !isAnimating)
+        FitRolledUpHeight(); // The header height may have changed
     UpdateIconSpacingForViewMode();
     CalculateIconLayout();
     UpdateLayeredContent();
