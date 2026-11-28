@@ -1484,12 +1484,12 @@ void CorralWindow::UpdateLayeredContent()
         }
     }
 
-    // Resize grip (bottom-right corner, skip when rolled up).
-    // Deliberately unaffected by BorderOpacity: the grip is the corral's resize
-    // affordance, not part of the frame. A frameless corral (border at 0) still
+    // Resize grip (bottom-right corner, skip when rolled up or locked: neither
+    // can be resized). Deliberately unaffected by BorderOpacity: the grip is the
+    // corral's resize affordance, not part of the frame. A frameless corral (border at 0) still
     // needs somewhere visible to grab, so the grip stays at full strength while
     // the frame around it fades away. Confirmed as wanted in UAT of #1.
-    if (!config.IsRolledUp)
+    if (!config.IsRolledUp && !config.IsLocked)
     {
         DWORD gripPixel = (255 << 24) | (150 << 16) | (150 << 8) | 150;
         const int gripLen = Dpi(8), gripInset = Dpi(2);
