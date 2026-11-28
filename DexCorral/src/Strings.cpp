@@ -286,6 +286,8 @@ const wchar_t *const kEnglish[] = {
                                    L"  1. Open Task Manager\n"
                                    L"  2. Find 'Windows Explorer'\n"
                                    L"  3. Right-click > Restart",
+    /* Reg_RegisterSuccessUser */  L"DexCorral is registered for your account and running now.\n\n"
+                                   L"It starts again at every sign-in.",
     /* Reg_RegisterFailed */       L"Failed to register shell extension.\n\nTry running as Administrator.",
     /* Reg_UnregisterProcMissing */L"DexCorralUnregister not found in DexCorralHook.dll.",
     /* Reg_UnregisterSuccess */    L"DexCorral shell extension unregistered successfully.\n\n"
@@ -302,12 +304,13 @@ const wchar_t *const kEnglish[] = {
                                    L"  DexCorral.exe --force        Register on an unsupported Windows version\n\n"
                                    L"Scope (applies to --register and --unregister):\n"
                                    L"  --scope=user      This user only, HKCU, no admin rights needed\n"
-                                   L"  --scope=machine   All users, HKLM, must run as Administrator\n"
+                                   L"  --scope=machine   All users, HKLM, asks for Administrator rights\n"
                                    L"  --cleanup-legacy  Remove registry keys from installs before 1.0.28\n\n"
                                    L"Without --scope the scope is inferred: under Program Files means machine.\n"
                                    L"The two scopes share one CLSID and must not both be installed.\n\n"
                                    L"DexCorral requires Windows 11; Windows 10 is unsupported and untested.\n"
-                                   L"After registration, restart Explorer or use --startup to activate.",
+                                   L"Registering for this user starts DexCorral at once and at every sign-in.\n"
+                                   L"For all users, restart Explorer or sign out and back in.",
     /* Reg_NeedsWin11 */           L"DexCorral requires Windows 11 (build {0} or newer).\n"
                                    L"This system reports build {1}.\n\n"
                                    L"Windows 10 is end of life and DexCorral is neither tested nor "
@@ -316,9 +319,8 @@ const wchar_t *const kEnglish[] = {
                                    L"  DexCorral.exe --register --force\n\n"
                                    L"Please do not file bug reports from unsupported Windows versions.",
     /* Reg_NeedsElevation */       L"A machine-wide (all users) registration writes to HKEY_LOCAL_MACHINE "
-                                   L"and needs Administrator rights.\n\n"
-                                   L"Run this command from an elevated prompt, or install DexCorral for "
-                                   L"your account only:\n"
+                                   L"and needs Administrator rights, which were not granted.\n\n"
+                                   L"To use DexCorral for your account only, no Administrator rights are needed:\n"
                                    L"  DexCorral.exe --register --scope=user",
     /* Conflict_Refuse */          L"DexCorral cannot be set up while {0} is installed on this PC.\n\n"
                                    L"Both programs take over the desktop icon view. With Fences running, the "
@@ -589,6 +591,8 @@ const wchar_t *const kGerman[] = {
                                    L"  1. Task-Manager öffnen\n"
                                    L"  2. 'Windows-Explorer' suchen\n"
                                    L"  3. Rechtsklick > Neu starten",
+    /* Reg_RegisterSuccessUser */  L"DexCorral ist für Ihr Konto registriert und läuft jetzt.\n\n"
+                                   L"Es startet bei jeder Anmeldung wieder.",
     /* Reg_RegisterFailed */       L"Die Shell-Erweiterung konnte nicht registriert werden.\n\nVersuchen Sie es als Administrator.",
     /* Reg_UnregisterProcMissing */L"DexCorralUnregister wurde in DexCorralHook.dll nicht gefunden.",
     /* Reg_UnregisterSuccess */    L"Die DexCorral-Shell-Erweiterung wurde erfolgreich deregistriert.\n\n"
@@ -605,12 +609,13 @@ const wchar_t *const kGerman[] = {
                                    L"  DexCorral.exe --force        Auf einer nicht unterstützten Windows-Version registrieren\n\n"
                                    L"Gültigkeitsbereich (für --register und --unregister):\n"
                                    L"  --scope=user      Nur dieser Benutzer, HKCU, keine Administratorrechte nötig\n"
-                                   L"  --scope=machine   Alle Benutzer, HKLM, muss als Administrator laufen\n"
+                                   L"  --scope=machine   Alle Benutzer, HKLM, fragt nach Administratorrechten\n"
                                    L"  --cleanup-legacy  Registry-Schlüssel von Installationen vor 1.0.28 entfernen\n\n"
                                    L"Ohne --scope wird der Bereich abgeleitet: unter Programme bedeutet machine.\n"
                                    L"Beide Bereiche teilen sich eine CLSID und dürfen nicht gleichzeitig installiert sein.\n\n"
                                    L"DexCorral benötigt Windows 11; Windows 10 wird nicht unterstützt und ist ungetestet.\n"
-                                   L"Nach der Registrierung den Explorer neu starten oder --startup verwenden.",
+                                   L"Eine Registrierung für diesen Benutzer startet DexCorral sofort und bei jeder Anmeldung.\n"
+                                   L"Für alle Benutzer den Explorer neu starten oder ab- und wieder anmelden.",
     /* Reg_NeedsWin11 */           L"DexCorral benötigt Windows 11 (Build {0} oder neuer).\n"
                                    L"Dieses System meldet Build {1}.\n\n"
                                    L"Windows 10 hat das Supportende erreicht; DexCorral ist darauf weder "
@@ -619,9 +624,8 @@ const wchar_t *const kGerman[] = {
                                    L"  DexCorral.exe --register --force\n\n"
                                    L"Bitte melde keine Fehler von nicht unterstützten Windows-Versionen.",
     /* Reg_NeedsElevation */       L"Eine systemweite Registrierung (alle Benutzer) schreibt nach "
-                                   L"HKEY_LOCAL_MACHINE und benötigt Administratorrechte.\n\n"
-                                   L"Führe den Befehl in einer Eingabeaufforderung als Administrator aus, "
-                                   L"oder installiere DexCorral nur für dein Konto:\n"
+                                   L"HKEY_LOCAL_MACHINE und benötigt Administratorrechte, die nicht erteilt wurden.\n\n"
+                                   L"Für Ihr eigenes Konto braucht DexCorral keine Administratorrechte:\n"
                                    L"  DexCorral.exe --register --scope=user",
     /* Conflict_Refuse */          L"DexCorral kann nicht eingerichtet werden, solange {0} auf diesem PC "
                                    L"installiert ist.\n\n"

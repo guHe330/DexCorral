@@ -27,7 +27,8 @@ static const wchar_t* SUBKEY_MARKER      = L"Software\\DexCorral";
 
 // Machine-scope-only load vectors. Explorer reads both from HKLM only; there is
 // no HKCU equivalent, so a user-scope install relies on the Run key injection
-// (DexCorral.exe --startup) and the context menu handler instead.
+// (DexCorral.exe --startup, written by Setup and by DexCorral.exe --register)
+// and the classic context menu handler instead.
 static const wchar_t* SUBKEY_STS     = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SharedTaskScheduler";
 static const wchar_t* SUBKEY_OVERLAY = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellIconOverlayIdentifiers\\ DexCorral";
 static const wchar_t* SUBKEY_SSODL   = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellServiceObjectDelayLoad";
