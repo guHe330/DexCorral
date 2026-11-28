@@ -384,6 +384,9 @@ void CorralWindow::UpdateLayeredContent()
 
                 RECT tabRect = GetTabRect(i);
                 tabRect.left += Dpi(6);
+                // With more than one tab the reorder grip shows at the left edge on hover
+                if (config.Tabs.size() > 1)
+                    tabRect.left = (std::max)(tabRect.left, GetTabGripRect(i).right);
                 tabRect.right -= Dpi(6);
                 if (i == (int)config.Tabs.size() - 1)
                     tabRect.right -= lockReserve;
