@@ -675,7 +675,8 @@ void CorralWindow::UpdateLayeredContent()
         HBITMAP iconTempBmp = nullptr;
         HBITMAP iconTempOldBmp = nullptr;
         DWORD *iconTempPixels = nullptr;
-        const int ICON_TEMP_SIZE = (iconSize > ICON_TEMP_SIZE_THRESHOLD) ? iconSize : ICON_TEMP_SIZE_THRESHOLD;
+        // Details draws Dpi(ICON_SIZE_DETAILS) at the current DPI, which iconSize lags until LoadFiles
+        const int ICON_TEMP_SIZE = (std::max)({iconSize, Dpi(ICON_SIZE_DETAILS), ICON_TEMP_SIZE_THRESHOLD});
         if (useTempIcon)
         {
             BITMAPINFO iconBmi = {};
