@@ -10,6 +10,7 @@ $allGood = $true
 Write-Host "[1/4] Checking CMake..." -ForegroundColor Yellow
 $cmakeExe = $null
 $cmakeSource = ""
+$vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 
 # 1. Try cmake on PATH first
 try {
@@ -22,9 +23,8 @@ try {
 
 # 2. If not on PATH, look inside the Visual Studio installation
 if (-not $cmakeExe) {
-    $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     if (Test-Path $vsWhere) {
-        $vsInstallPath = & $vsWhere -latest -property installationPath 2>$null
+        $vsInstallPath = & $vsWhere -latest -products * -property installationPath 2>$null
         if ($vsInstallPath) {
             $vsCmake = Join-Path $vsInstallPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
             if (Test-Path $vsCmake) {
@@ -61,27 +61,18 @@ if ($cmakeExe) {
 # Check Visual Studio
 Write-Host "`n[2/4] Checking Visual Studio..." -ForegroundColor Yellow
 $vsFound = $false
-$vsVersions = @("2022", "2019")
-$vsEditions = @("Enterprise", "Professional", "Community", "BuildTools")
-
-foreach ($version in $vsVersions) {
-    foreach ($edition in $vsEditions) {
-        $vsPath = "C:\Program Files\Microsoft Visual Studio\$version\$edition"
-        if (Test-Path $vsPath) {
-            # Check for C++ tools
-            $vcToolsPath = "$vsPath\VC\Tools\MSVC"
-            if (Test-Path $vcToolsPath) {
-                Write-Host "      [OK] Visual Studio $version $edition with C++ tools" -ForegroundColor Green
-                $vsFound = $true
-                break
-            }
-        }
+# Same query as build.ps1, so both scripts agree on Build Tools, VS 2026 and
+# installs outside the default folder.
+if (Test-Path $vsWhere) {
+    $vsName = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName 2>$null
+    if ($vsName) {
+        Write-Host "      [OK] $vsName with C++ tools" -ForegroundColor Green
+        $vsFound = $true
     }
-    if ($vsFound) { break }
 }
 
 if (-not $vsFound) {
-    Write-Host "      [X] Visual Studio 2019/2022 with C++ tools not found" -ForegroundColor Red
+    Write-Host "      [X] Visual Studio or Build Tools with C++ tools not found" -ForegroundColor Red
     Write-Host "        Download: https://visualstudio.microsoft.com/downloads/" -ForegroundColor Gray
     Write-Host "        Required: Desktop development with C++ workload" -ForegroundColor Gray
     $allGood = $false
