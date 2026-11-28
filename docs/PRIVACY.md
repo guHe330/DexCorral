@@ -14,7 +14,7 @@ Everything stays on your PC.
 | The crash guard's decisions, written whether or not debug logging is on | `%AppData%\DexCorral\guard.log` |
 | Setup's own log, copied there at the end of an install | `%AppData%\DexCorral\install.log` |
 
-Alongside your corral names, positions and tab settings, `config.json` **holds the full path of every file you have organized into a corral**. That is how corrals survive a restart. It never leaves your PC on its own, but it is also the file [CONTRIBUTING.md](CONTRIBUTING.md) asks for in bug reports, so read it over and redact before attaching it to a public issue.
+Alongside your corral names, positions and tab settings, `config.json` **holds the name of every file you have organized into a corral, and the full path of every folder a virtual tab shows**. That is how corrals survive a restart. It never leaves your PC on its own, but it is also the file [CONTRIBUTING.md](CONTRIBUTING.md) asks for in bug reports, so read it over and redact before attaching it to a public issue.
 
 ## The update check
 

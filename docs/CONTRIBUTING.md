@@ -16,7 +16,7 @@ A partial report beats no report. If a field does not apply, leave it empty and 
 
 **Windows 11 only.** Bugs reported from Windows 10 are closed as out of scope, including ones hit after bypassing the version check with `--force`. The override exists so you can experiment, not so you can file reports from there.
 
-For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest route to a fix. It lists your corral names, positions and the paths of the files you have organized, so look it over and redact anything you would rather not publish.
+For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest route to a fix. It lists your corral names and positions, the names of the files you have organized and the full paths of the folders your virtual tabs show, so look it over and redact anything you would rather not publish.
 
 ## Testing is a contribution
 
