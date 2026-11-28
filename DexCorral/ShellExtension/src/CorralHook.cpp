@@ -955,9 +955,12 @@ static void CompactVisibleIcons(HWND hwnd, DesktopSortMode mode = DesktopSortMod
             });
     }
 
-    // Get work area for grid layout
+    // Get work area for grid layout. It is in screen coordinates; item
+    // positions are ListView client coordinates, whose origin is the virtual
+    // screen's and not the primary monitor's when a monitor sits left or above.
     RECT workArea = {};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+    MapWindowPoints(nullptr, hwnd, (POINT *)&workArea, 2);
 
     int maxRows = (workArea.bottom - workArea.top) / spacingY;
     if (maxRows < 1) maxRows = 20;
