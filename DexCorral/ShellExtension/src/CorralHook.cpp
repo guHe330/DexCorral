@@ -1259,12 +1259,12 @@ static LRESULT CALLBACK ListViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARAM wP
         return 1;
     }
 
-    // App-requested parsing name of item wParam. Same module and process, so
-    // lParam is the app's std::wstring.
+    // App-requested parsing name of item wParam, handed over through HookBridge.
+    // lParam is never used: any process can send a registered message.
     if (g_ItemParsingNameMsg != 0 && uMsg == g_ItemParsingNameMsg) {
         wchar_t parsing[PARSING_NAME_CCH] = {};
-        if (!lParam || !GetItemParsingName((int)wParam, parsing, PARSING_NAME_CCH)) return 0;
-        *(std::wstring*)lParam = parsing;
+        if (!GetItemParsingName((int)wParam, parsing, PARSING_NAME_CCH)) return 0;
+        HookBridge::SetItemParsingName(parsing);
         return 1;
     }
 

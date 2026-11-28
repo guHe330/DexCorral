@@ -129,10 +129,10 @@ std::wstring DesktopIcons::GetVisibleIconParsingNameAt(int screenX, int screenY)
 
     // Only the hook can name an item (returns 1 when handled)
     static UINT parsingNameMsg = RegisterWindowMessageW(L"DexCorral_GetItemParsingName");
-    std::wstring name;
-    if (SendMessageW(hListView, parsingNameMsg, hit, (LPARAM)&name) != 1)
+    HookBridge::TakeItemParsingName(); // Nothing left over from an earlier answer
+    if (SendMessageW(hListView, parsingNameMsg, hit, 0) != 1)
         return L"";
-    return name;
+    return HookBridge::TakeItemParsingName();
 }
 
 void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions)

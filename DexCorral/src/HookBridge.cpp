@@ -130,6 +130,24 @@ void HookBridge::TakeIconSnapshot(std::vector<DesktopIconInfo> &out)
     LeaveCriticalSection(&s_Lock);
 }
 
+static std::wstring s_ItemParsingName;
+
+void HookBridge::SetItemParsingName(const std::wstring &name)
+{
+    EnterCriticalSection(&s_Lock);
+    s_ItemParsingName = name;
+    LeaveCriticalSection(&s_Lock);
+}
+
+std::wstring HookBridge::TakeItemParsingName()
+{
+    EnterCriticalSection(&s_Lock);
+    std::wstring name;
+    name.swap(s_ItemParsingName);
+    LeaveCriticalSection(&s_Lock);
+    return name;
+}
+
 void HookBridge::SetIconPositionRequests(const std::vector<IconPositionRequest> &requests)
 {
     EnterCriticalSection(&s_Lock);

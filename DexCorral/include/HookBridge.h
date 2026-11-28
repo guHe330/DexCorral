@@ -82,6 +82,11 @@ public:
     static void SetIconSnapshot(const std::vector<DesktopIconInfo> &icons);
     static void TakeIconSnapshot(std::vector<DesktopIconInfo> &out);
 
+    // Parsing name of one desktop item, written by the hook on the Explorer UI
+    // thread (DexCorral_GetItemParsingName registered message), taken by the app
+    static void SetItemParsingName(const std::wstring &name);
+    static std::wstring TakeItemParsingName();
+
     // --- Called by CorralHook.cpp (Explorer UI thread) ---
 
     // Returns the current version counter (cheap read, no lock)
