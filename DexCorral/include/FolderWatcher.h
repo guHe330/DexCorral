@@ -33,11 +33,16 @@
  * the thread every Corral lives on. Consequences for the callback: it is called
  * on the watch thread, it may be called once more after Stop(), and so it must
  * own what it uses (a window handle by value, not a pointer to the window).
+ *
+ * When the watched folder is deleted, the watch ends and calls back once more
+ * with ended = true: a folder made again under the same name needs a new
+ * Start(). No other ending is reported (a folder that cannot be opened, a file
+ * system that takes no requests), so restarting on "ended" cannot loop.
  */
 class FolderWatcher
 {
 public:
-    using ChangeCallback = std::function<void()>;
+    using ChangeCallback = std::function<void(bool ended)>;
 
     FolderWatcher() = default;
     ~FolderWatcher() { Stop(); }

@@ -42,6 +42,7 @@
 #include "Strings.h"
 #include "../resources/resource.h"
 #include <windowsx.h>
+#include <Dbt.h>
 #include <ShlObj.h>
 #include <string>
 #include <algorithm>
@@ -1241,11 +1242,20 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
             }
             break;
         case WM_FOLDER_CHANGED:
+            if (wParam)
+                window->folderWatchEnded = true; // The reload starts a new watch (a folder deleted and made again)
             // Reload once the folder has been quiet for a moment: restarting
             // the timer on every event turns a burst (an archive being
             // extracted) into one reload that sees all of it.
             SetTimer(hwnd, FOLDER_RELOAD_TIMER_ID, FOLDER_RELOAD_DELAY_MS, nullptr);
             return 0;
+        case WM_DEVICECHANGE:
+            // Sent to top-level windows, which a Corral is. A drive just plugged in
+            // may hold the missing folder: look now, not at the next retry.
+            if (wParam == DBT_DEVICEARRIVAL && lParam && window->desktopRetryMs &&
+                ((DEV_BROADCAST_HDR *)lParam)->dbch_devicetype == DBT_DEVTYP_VOLUME)
+                SetTimer(hwnd, DESKTOP_RETRY_TIMER_ID, 0, nullptr);
+            break;
         case WM_NET_PROBE_DONE:
             window->OnNetworkProbeDone((LONG)lParam, wParam != 0);
             return 0;

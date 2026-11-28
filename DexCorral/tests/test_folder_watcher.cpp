@@ -17,6 +17,7 @@ class WatchedFolder : public ::testing::Test {
 protected:
     std::wstring dir;
     std::atomic<int> changes{0};
+    std::atomic<int> endings{0};
 
     void SetUp() override {
         wchar_t temp[MAX_PATH];
@@ -64,7 +65,7 @@ protected:
 TEST_F(WatchedFolder, ReportsAChange) {
     FolderWatcher watcher;
     watcher.SetPath(dir);
-    watcher.SetChangeCallback([this] { changes++; });
+    watcher.SetChangeCallback([this](bool) { changes++; });
     watcher.Start();
 
     EXPECT_TRUE(TouchUntilChange(5000));
@@ -73,7 +74,7 @@ TEST_F(WatchedFolder, ReportsAChange) {
 TEST_F(WatchedFolder, IsQuietAfterStop) {
     FolderWatcher watcher;
     watcher.SetPath(dir);
-    watcher.SetChangeCallback([this] { changes++; });
+    watcher.SetChangeCallback([this](bool) { changes++; });
     watcher.Start();
     Sleep(200);
     watcher.Stop();
@@ -86,7 +87,7 @@ TEST_F(WatchedFolder, IsQuietAfterStop) {
 TEST_F(WatchedFolder, StopAndRestartKeepWorking) {
     FolderWatcher watcher;
     watcher.SetPath(dir);
-    watcher.SetChangeCallback([this] { changes++; });
+    watcher.SetChangeCallback([this](bool) { changes++; });
     watcher.Start();
     watcher.Stop();
     watcher.Stop(); // Twice is harmless
@@ -98,9 +99,46 @@ TEST_F(WatchedFolder, StopAndRestartKeepWorking) {
 TEST_F(WatchedFolder, AFolderThatDoesNotExistIsNotAnError) {
     FolderWatcher watcher;
     watcher.SetPath(dir + L"\\missing");
-    watcher.SetChangeCallback([this] { changes++; });
+    watcher.SetChangeCallback([this](bool) { changes++; });
     watcher.Start();
     Sleep(100);
     watcher.Stop();
     EXPECT_EQ(changes, 0);
+}
+
+TEST_F(WatchedFolder, SaysOnceWhenTheFolderIsDeleted) {
+    FolderWatcher watcher;
+    watcher.SetPath(dir);
+    watcher.SetChangeCallback([this](bool ended) { ended ? endings++ : changes++; });
+    watcher.Start();
+    ASSERT_TRUE(TouchUntilChange(5000));
+
+    DeleteFileW((dir + L"\\a.txt").c_str());
+    // A scanner may still hold the file for a moment, which keeps the folder from going
+    bool removed = false;
+    for (int tries = 0; tries < 100 && !(removed = RemoveDirectoryW(dir.c_str())); tries++)
+        Sleep(20);
+    ASSERT_TRUE(removed);
+    for (DWORD waited = 0; waited < 5000 && endings == 0; waited += 20)
+        Sleep(20);
+    EXPECT_EQ(endings, 1);
+
+    // Made again under the same name: a new Start() watches it
+    ASSERT_TRUE(CreateDirectoryW(dir.c_str(), nullptr));
+    watcher.Stop();
+    changes = 0;
+    watcher.Start();
+    EXPECT_TRUE(TouchUntilChange(5000));
+    EXPECT_EQ(endings, 1);
+}
+
+TEST_F(WatchedFolder, StopIsNotAnEnding) {
+    FolderWatcher watcher;
+    watcher.SetPath(dir);
+    watcher.SetChangeCallback([this](bool ended) { ended ? endings++ : changes++; });
+    watcher.Start();
+    ASSERT_TRUE(TouchUntilChange(5000));
+    watcher.Stop();
+    Sleep(100);
+    EXPECT_EQ(endings, 0);
 }

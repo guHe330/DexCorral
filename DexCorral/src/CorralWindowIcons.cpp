@@ -742,7 +742,7 @@ void CorralWindow::LoadVirtualFolderIcons()
     if (!isNetwork)
     {
         desktopRetryMs = 0;
-        if (wasMissing)
+        if (wasMissing || folderWatchEnded)
             InitializeFolderWatcher(); // The watchers on the folder that was gone have ended
     }
 
@@ -1050,6 +1050,7 @@ void CorralWindow::InitializeFolderWatcher()
 {
     folderWatcher.reset();
     parentWatcher.reset();
+    folderWatchEnded = false;
 
     if (!GetActiveTab().IsVirtual || GetActiveTab().VirtualFolderPath.empty())
         return;
@@ -1063,10 +1064,10 @@ void CorralWindow::InitializeFolderWatcher()
 
     // By value: the watch thread may outlive this window (see FolderWatcher.h),
     // and a message to a window that is gone fails harmlessly
-    auto notify = [target = hwnd]()
+    auto notify = [target = hwnd](bool ended)
     {
         if (target)
-            PostMessageW(target, WM_FOLDER_CHANGED, 0, 0);
+            PostMessageW(target, WM_FOLDER_CHANGED, ended, 0);
     };
 
     std::wstring folderPath = GetVirtualCurrentPath();

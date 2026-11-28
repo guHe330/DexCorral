@@ -701,6 +701,7 @@ private:
     std::unique_ptr<FolderWatcher> parentWatcher; // Watches parent dir to catch rename/delete of current folder
     bool reuseUnchangedIcons = false;             // Set for a reload after a folder change only
     bool virtualFolderMissing = false;            // Root folder unavailable (deleted/renamed/moved)
+    bool folderWatchEnded = false;                // A folder watcher ended by itself: the next reload restarts them
     bool isDemo = false;                          // Demo Corral of the settings window (see constructor)
     bool virtualFolderConnecting = false;         // Network root: first answer about its share still outstanding
     static const UINT WM_FOLDER_CHANGED = WM_USER + 100;
