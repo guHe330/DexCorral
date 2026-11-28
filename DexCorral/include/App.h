@@ -375,6 +375,9 @@ private:
 
     // Desktop icon push cache (free icons only — corral-owned ones filtered out)
     std::vector<DesktopIconInfo> cachedDesktopIconPositions;
+    // Spots PushDesktopIconsFromCorrals must not use, though they are not
+    // desktop icons to push (filled and cleared around one call)
+    std::vector<DesktopIconInfo> pushObstacles;
     bool desktopIconCacheValid = false;
 
     inline static unsigned accentRgb = 0x0078D4; // Windows blue until it is read

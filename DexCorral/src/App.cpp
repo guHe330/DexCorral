@@ -441,12 +441,30 @@ void App::SetPaused(bool pause)
         // centre: move them out beside it onto free cells, the way icons make
         // room for a new Corral. Un-pause parks them again.
         CacheDesktopIconPositions(); // The free icons, which they must not land on
+        // Active-tab icons scrolled out of view sit just outside their Corral,
+        // where the pushed icons would land: obstacles, but not icons to push
+        // (a virtual tab's files are no desktop icons)
+        HWND hListView = DesktopIcons::GetDesktopListView();
+        for (auto &corral : corrals)
+        {
+            RECT r;
+            if (!hListView || corral->GetActiveTab().IsVirtual || !GetWindowRect(corral->GetHWND(), &r))
+                continue;
+            MapWindowPoints(nullptr, hListView, (POINT *)&r, 2);
+            for (const auto &icon : corral->GetIconScreenPositions())
+            {
+                POINT pt = {icon.pt.x, icon.pt.y};
+                if (!PtInRect(&r, pt))
+                    pushObstacles.push_back({icon.displayName, icon.parsingName, icon.pt});
+            }
+        }
         std::vector<IconPositionRequest> parked;
         for (auto &corral : corrals)
             AppendInactiveTabIcons(*corral, parked);
         for (auto &icon : parked)
             cachedDesktopIconPositions.push_back({icon.displayName, icon.parsingName, icon.pt});
         PushDesktopIconsFromCorrals();
+        pushObstacles.clear();
         InvalidateDesktopIconCache();
 
         for (auto &corral : corrals)
@@ -1610,15 +1628,18 @@ void App::PushDesktopIconsFromCorrals()
             if (RectsOverlap(r, cr))
                 return false;
         }
-        for (const auto &other : cachedDesktopIconPositions)
+        for (const auto *list : {&cachedDesktopIconPositions, &pushObstacles})
         {
-            if (&other == skip)
-                continue;
-            if (other.pt.x < -1000 || other.pt.y < -1000)
-                continue;
-            RECT otherRect = {other.pt.x, other.pt.y, other.pt.x + ICON_W, other.pt.y + ICON_H};
-            if (RectsOverlap(r, otherRect))
-                return false;
+            for (const auto &other : *list)
+            {
+                if (&other == skip)
+                    continue;
+                if (other.pt.x < -1000 || other.pt.y < -1000)
+                    continue;
+                RECT otherRect = {other.pt.x, other.pt.y, other.pt.x + ICON_W, other.pt.y + ICON_H};
+                if (RectsOverlap(r, otherRect))
+                    return false;
+            }
         }
         return true;
     };
