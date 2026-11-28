@@ -53,8 +53,8 @@ For advanced users, or to install without Administrator rights.
 
 1. Download `Portable_DexCorral_${VERSION}.zip`
 2. Extract to any folder
-3. Run `DexCorral.exe --register --scope=user`, or `--scope=machine` from an Administrator prompt
-4. Restart Explorer or log out/in
+3. Run `DexCorral.exe --register --scope=user`, or `--scope=machine` for all users (asks for Administrator rights)
+4. Just for you, DexCorral starts right away; for all users, restart Explorer or sign out and back in
 
 The zip contains:
 - `DexCorral.exe`: registration tool

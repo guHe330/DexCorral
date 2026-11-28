@@ -8,7 +8,7 @@ DexCorral installs either for all users (`C:\Program Files\DexCorral`, registere
 
 The two cannot be installed side by side. They register the same shell extension, and a per-user install would quietly take precedence over a machine-wide one for your account, leaving you on a different version than everyone else with nothing on screen to say so. Setup checks for the other kind before it writes anything: installing just for yourself over an existing all-users install offers to remove that one first, and installing for all users warns you about any per-user installs it can see (only the owner of one can remove it).
 
-The all-users install has one extra load path into Explorer, so it recovers on its own if Explorer crashes mid-session, where a per-user install waits until your next login or your next right-click on the desktop.
+The all-users install has one extra load path into Explorer, so it recovers on its own if Explorer crashes mid-session, where a per-user install waits until your next sign-in, or until you run `DexCorral.exe --startup`.
 
 ## What DexCorral writes outside its own folder
 
@@ -18,12 +18,12 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 
 | Key | Value | Why | Removed by the uninstaller |
 |---|---|---|---|
-| `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer only. | Yes |
+| `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer and by `DexCorral.exe --register`, removed by `--unregister`. | Yes |
 | `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the **Language** choice in the settings window. | Yes |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
-| `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | Yes |
-| `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](USER_MANUAL.md#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | Yes |
-| `HKCU\Software\DexCorral` | `AutoArrange` | Whether **Auto arrange icons** is on for the desktop. DexCorral arranges the free icons itself and keeps Explorer's own setting off, so the choice has to be remembered here. | Yes |
+| `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | When you do not keep your configuration |
+| `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](USER_MANUAL.md#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | When you do not keep your configuration |
+| `HKCU\Software\DexCorral` | `AutoArrange` | Whether **Auto arrange icons** is on for the desktop. DexCorral arranges the free icons itself and keeps Explorer's own setting off, so the choice has to be remembered here. | When you do not keep your configuration |
 | `<root>\Software\Classes\CLSID\{7A3B9E42-…}` | (several) | Standard COM registration for `DexCorralHook.dll`. | Yes |
 | `<root>\Software\Classes\DesktopBackground\ShellEx\ContextMenuHandlers\DexCorral` | (default) | The desktop right-click menu entry. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
@@ -33,7 +33,7 @@ The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register
 
 ## Removing a portable package
 
-Deleting the folder of a portable package leaves its registry entries behind. Run `DexCorral.exe --unregister` first, with the same `--scope` you registered with (as Administrator for `--scope=machine`); to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
+Deleting the folder of a portable package leaves its registry entries behind. Run `DexCorral.exe --unregister` first, with the same `--scope` you registered with (Windows asks for Administrator rights for `--scope=machine`); to also clear the per-user settings, delete `HKCU\Software\DexCorral` and `%APPDATA%\DexCorral`.
 
 ## Leftovers of old versions
 

@@ -77,7 +77,7 @@ Download the latest version from [Releases](https://github.com/guHe330/DexCorral
 
 ### Installer
 
-The installer registers the Explorer shell extension, configures startup, and launches DexCorral without requiring an Explorer restart.
+The installer registers the Explorer shell extension, configures startup, and starts DexCorral in the running Explorer. A first install needs no Explorer restart; an upgrade restarts Explorer once to unload the old version.
 
 Its first page asks how to install:
 

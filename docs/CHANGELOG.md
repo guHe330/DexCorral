@@ -6,6 +6,7 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Fixed
 - Corrals come back where you arranged them for the monitors that are connected. A Corral on a monitor left of or above the main one no longer jumps to the middle of the main monitor at every start, and one from a monitor that is gone no longer opens off the screen. Hover reveal expands the right way on every monitor, sorting the desktop icons keeps them on the main monitor, and the auto-sort notice appears on the monitor of the pointer at its scaling. ([#209](https://github.com/guHe330/DexCorral/issues/209))
+- The portable package registered just for you now starts DexCorral right away and at every sign-in; before, it never started on its own. `--unregister` ends the start at sign-in too, so the Start Menu's **Unregister** really stops DexCorral. An all-users registration asks for Administrator rights instead of failing, which also makes the Start Menu entries of an all-users install work. Setup no longer stops at a question in a silent install (`/VERYSILENT /SUPPRESSMSGBOXES`), the uninstaller asks about keeping your configuration before it stops Explorer, and an uninstall that does not keep it also removes your settings in the registry. Setup refuses Windows on Arm, which the Explorer extension cannot run on. ([#210](https://github.com/guHe330/DexCorral/issues/210))
 
 ## [1.4.0] - 2026-11-26
 
