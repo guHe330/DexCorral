@@ -77,6 +77,7 @@ static const DWORD AUTOSORT_DEBOUNCE_MS = 200;
 static const DWORD POPUP_DISMISS_MS = 5000;
 static const DWORD SORT_FIXUP_DELAY_MS = 300;  // Debounce delay after last Explorer position change
 static HWND g_hAutoSortPopup = nullptr;
+static HFONT g_hAutoSortPopupFont = nullptr;
 static int g_PendingMoveIconIndex = -1;
 static POINT g_PendingMoveDropPos = {};     // Where user wanted the icon
 static bool g_AutoSortTimerActive = false;
@@ -1110,6 +1111,14 @@ static LRESULT CALLBACK AutoSortPopupProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
     case WM_DESTROY:
         g_hAutoSortPopup = nullptr;
         return 0;
+
+    case WM_NCDESTROY:
+        // After the children, which use the font, are gone
+        if (g_hAutoSortPopupFont) {
+            DeleteObject(g_hAutoSortPopupFont);
+            g_hAutoSortPopupFont = nullptr;
+        }
+        break;
     }
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
@@ -1131,19 +1140,13 @@ static void ShowAutoSortPopup() {
     POINT cursorPos;
     GetCursorPos(&cursorPos);
 
-    // Position popup near cursor, clamped to screen
-    RECT workArea;
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
-    int x = cursorPos.x + 16;
-    int y = cursorPos.y + 16;
-    if (x + POPUP_WIDTH > workArea.right) x = workArea.right - POPUP_WIDTH;
-    if (y + POPUP_HEIGHT > workArea.bottom) y = workArea.bottom - POPUP_HEIGHT;
-
+    // Created hidden at the cursor first, so it takes the DPI of the monitor
+    // the cursor is on; sizes and the font follow from that
     g_hAutoSortPopup = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
         POPUP_CLASS_NAME, L"DexCorral",
-        WS_POPUP | WS_BORDER | WS_VISIBLE,
-        x, y, POPUP_WIDTH, POPUP_HEIGHT,
+        WS_POPUP | WS_BORDER,
+        cursorPos.x, cursorPos.y, 1, 1,
         nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 
     if (!g_hAutoSortPopup) {
@@ -1151,27 +1154,48 @@ static void ShowAutoSortPopup() {
         return;
     }
 
+    const int dpi = (int)GetDpiForWindow(g_hAutoSortPopup);
+    auto S = [dpi](int v) { return MulDiv(v, dpi, 96); };
+    const int w = S(POPUP_WIDTH), h = S(POPUP_HEIGHT);
+
+    // Near the cursor, inside the work area of the cursor's monitor
+    MONITORINFO mi = {sizeof(mi)};
+    GetMonitorInfoW(MonitorFromPoint(cursorPos, MONITOR_DEFAULTTONEAREST), &mi);
+    int x = cursorPos.x + S(16);
+    int y = cursorPos.y + S(16);
+    if (x + w > mi.rcWork.right) x = mi.rcWork.right - w;
+    if (y + h > mi.rcWork.bottom) y = mi.rcWork.bottom - h;
+    SetWindowPos(g_hAutoSortPopup, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+
+    NONCLIENTMETRICSW ncm = {sizeof(ncm)};
+    SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0, dpi);
+    g_hAutoSortPopupFont = CreateFontIndirectW(&ncm.lfMessageFont);
+
     // Static label
-    CreateWindowExW(0, L"STATIC", L"Auto-sort moved your icon back.",
+    HWND label = CreateWindowExW(0, L"STATIC", L"Auto-sort moved your icon back.",
         WS_CHILD | WS_VISIBLE | SS_CENTER,
-        8, 8, POPUP_WIDTH - 16, 20,
+        S(8), S(8), w - S(16), S(20),
         g_hAutoSortPopup, nullptr, GetModuleHandleW(nullptr), nullptr);
 
     // Buttons
-    int btnY = 38;
-    int gap = 16;
-    int totalW = POPUP_BTN_W * 2 + gap;
-    int startX = (POPUP_WIDTH - totalW) / 2;
+    int btnY = S(38);
+    int gap = S(16);
+    int totalW = S(POPUP_BTN_W) * 2 + gap;
+    int startX = (w - totalW) / 2;
 
-    CreateWindowExW(0, L"BUTTON", L"Disable",
+    HWND disable = CreateWindowExW(0, L"BUTTON", L"Disable",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        startX, btnY, POPUP_BTN_W, POPUP_BTN_H,
+        startX, btnY, S(POPUP_BTN_W), S(POPUP_BTN_H),
         g_hAutoSortPopup, (HMENU)(INT_PTR)IDC_DISABLE_BTN, GetModuleHandleW(nullptr), nullptr);
 
-    CreateWindowExW(0, L"BUTTON", L"Keep sorting",
+    HWND keep = CreateWindowExW(0, L"BUTTON", L"Keep sorting",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        startX + POPUP_BTN_W + gap, btnY, POPUP_BTN_W, POPUP_BTN_H,
+        startX + S(POPUP_BTN_W) + gap, btnY, S(POPUP_BTN_W), S(POPUP_BTN_H),
         g_hAutoSortPopup, (HMENU)(INT_PTR)IDC_KEEP_BTN, GetModuleHandleW(nullptr), nullptr);
+
+    for (HWND child : {label, disable, keep})
+        SendMessageW(child, WM_SETFONT, (WPARAM)g_hAutoSortPopupFont, FALSE);
+    ShowWindow(g_hAutoSortPopup, SW_SHOWNOACTIVATE);
 
     // Auto-dismiss timer
     SetTimer(g_hAutoSortPopup, POPUP_DISMISS_TIMER_ID, POPUP_DISMISS_MS, nullptr);
