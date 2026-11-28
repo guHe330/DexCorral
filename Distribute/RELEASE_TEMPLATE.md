@@ -21,6 +21,7 @@ SHA-256:
 ```
 DexCorral_${VERSION}_Setup.exe     ${SETUP_SHA256}
 Portable_DexCorral_${VERSION}.zip  ${PORTABLE_SHA256}
+DexCorral_${VERSION}_sbom.cdx.json ${SBOM_SHA256}
 ```
 
 Check a file in PowerShell:
@@ -29,7 +30,7 @@ Check a file in PowerShell:
 Get-FileHash DexCorral_${VERSION}_Setup.exe -Algorithm SHA256
 ```
 
-Both artifacts also carry a GitHub build provenance attestation, which ties them to the exact workflow run and commit that produced them. With the [GitHub CLI](https://cli.github.com/):
+All three files also carry a GitHub build provenance attestation, which ties them to the exact workflow run and commit that produced them. With the [GitHub CLI](https://cli.github.com/):
 
 ```powershell
 gh attestation verify DexCorral_${VERSION}_Setup.exe --repo guHe330/DexCorral

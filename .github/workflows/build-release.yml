@@ -229,6 +229,7 @@ jobs:
         $body = $body -replace '\$\{SBOM_SIZE\}', (Format-Size "DexCorral_${version}_sbom.cdx.json")
         $body = $body -replace '\$\{SETUP_SHA256\}', (Get-Sha "DexCorral_${version}_Setup.exe")
         $body = $body -replace '\$\{PORTABLE_SHA256\}', (Get-Sha "Portable_DexCorral_${version}.zip")
+        $body = $body -replace '\$\{SBOM_SHA256\}', (Get-Sha "DexCorral_${version}_sbom.cdx.json")
         Set-Content "release_notes.md" -Value $body
 
     - name: Attest build provenance
@@ -237,6 +238,7 @@ jobs:
         subject-path: |
           Portable_DexCorral_${{ steps.get_version.outputs.version }}.zip
           DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
+          DexCorral_${{ steps.get_version.outputs.version }}_sbom.cdx.json
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
