@@ -926,6 +926,7 @@ void CorralWindow::UpdateLayeredContent()
                         // Draw to temp DIB, apply tint+opacity, composite onto main buffer
                         memset(iconTempPixels, 0, ICON_TEMP_SIZE * ICON_TEMP_SIZE * 4);
                         DrawIconEx(iconTempDC, 0, 0, hIconToDraw, currentIconSize, currentIconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         for (int py = 0; py < currentIconSize; py++)
                         {
                             int destY = iconDrawTop + py;
@@ -980,6 +981,7 @@ void CorralWindow::UpdateLayeredContent()
                     {
                         DrawIconEx(memDC, icon.iconRect.left, iconDrawTop, hIconToDraw,
                                    currentIconSize, currentIconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         // Fix alpha for old-style icons (no tint/opacity needed in this path)
                         for (int py = iconDrawTop; py < iconDrawTop + currentIconSize && py < h; py++)
                         {
@@ -1146,6 +1148,7 @@ void CorralWindow::UpdateLayeredContent()
                         // Draw to temp DIB, apply tint+opacity, composite onto main buffer
                         memset(iconTempPixels, 0, ICON_TEMP_SIZE * ICON_TEMP_SIZE * 4);
                         DrawIconEx(iconTempDC, 0, 0, icon.hIcon, iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         for (int py = 0; py < iconSize; py++)
                         {
                             int destY = iconDrawTop + py;
@@ -1200,6 +1203,7 @@ void CorralWindow::UpdateLayeredContent()
                     {
                         DrawIconEx(memDC, icon.iconRect.left, iconDrawTop, icon.hIcon,
                                    iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         // Fix alpha for old-style icons (no tint/opacity needed in this path)
                         for (int py = iconDrawTop; py < iconDrawTop + iconSize && py < h; py++)
                         {

@@ -109,7 +109,12 @@ public:
 
     bool IsValid() const { return pixels != nullptr; }
     HDC DC() const { return dc; }
-    DWORD *Pixels() const { return pixels; }
+    /// Flushes GDI first: the DIB bits are only safe to read once batched drawing has landed.
+    DWORD *Pixels() const
+    {
+        GdiFlush();
+        return pixels;
+    }
     int Width() const { return w; }
     int Height() const { return h; }
 

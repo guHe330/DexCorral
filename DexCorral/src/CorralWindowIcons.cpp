@@ -113,6 +113,7 @@ static bool IconHasFullContent(HICON hIcon, int expectedSize)
     HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, hBmp);
     memset(pixels, 0, expectedSize * expectedSize * 4);
     DrawIconEx(memDC, 0, 0, hIcon, expectedSize, expectedSize, 0, nullptr, DI_NORMAL);
+    GdiFlush(); // before reading the DIB bits
 
     // Find bounding box of non-transparent pixels
     int minX = expectedSize, minY = expectedSize, maxX = 0, maxY = 0;
