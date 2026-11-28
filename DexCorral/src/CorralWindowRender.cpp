@@ -537,12 +537,15 @@ void CorralWindow::UpdateLayeredContent()
         static const wchar_t kSortAsc[] = {0x25B2, 0};   // black up triangle
         static const wchar_t kSortDesc[] = {0x25BC, 0};  // black down triangle
 
-        // Nav "up" button (folder-up arrow) — only when navigated below the root
+        // Nav "up" button (folder-up arrow) — only when navigated below the root.
+        // In the header font colour like the titles, but like the reorder grip not
+        // subject to the header text opacity: it is a button, not decoration.
         if (IsNavBackVisible())
         {
             RECT nb = GetNavBackButtonRect();
+            const int at = config.ActiveTabIndex; // made valid by GetActiveTab() above
             drawHeaderText(kUpArrow, 1, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                           nb, RGB(255, 255, 255));
+                           nb, RGB(tabFontR[at], tabFontG[at], tabFontB[at]));
         }
 
         // Details column header band
