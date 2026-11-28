@@ -79,7 +79,8 @@ jobs:
     # builds and publishes releases, so pin every action to a commit SHA.
     - name: Actions pinned to commit SHAs
       run: |
-        if grep -rnE '^\s*uses:' .github/workflows | grep -vE '@[0-9a-f]{40}(\s|$)'; then
+        # (-\s+)? also catches the compact '- uses:' step form.
+        if grep -rnE '^\s*(-\s+)?uses:' .github/workflows | grep -vE '@[0-9a-f]{40}(\s|$)'; then
           echo "::error::Unpinned GitHub Action above. Pin it to a full commit SHA."
           exit 1
         fi
