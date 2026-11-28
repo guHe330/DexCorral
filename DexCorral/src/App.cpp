@@ -51,6 +51,7 @@
 #include "DialogSkin.h"
 #include "ModernMenu.h"
 #include "Conflicts.h"
+#include "ExtensionList.h"
 #include <CommCtrl.h>
 #include <commdlg.h>
 #include <ShlObj.h>
@@ -3183,6 +3184,29 @@ CorralWindow *App::GetCatchAllCorral(int &tabIndex)
     return nullptr;
 }
 
+CorralWindow *App::GetExtensionCorral(const std::wstring &fileName, int &tabIndex)
+{
+    const std::wstring ext = ExtensionList::OfFile(fileName);
+    if (ext.empty())
+        return nullptr;
+    for (auto &corral : corrals)
+    {
+        const auto &tabs = corral->GetConfig().Tabs;
+        for (size_t i = 0; i < tabs.size(); i++)
+        {
+            if (tabs[i].IsVirtual)
+                continue;
+            const auto list = ExtensionList::Parse(CorralWindow::Utf8ToWide(tabs[i].Extensions));
+            if (std::find(list.begin(), list.end(), ext) != list.end())
+            {
+                tabIndex = (int)i;
+                return corral.get();
+            }
+        }
+    }
+    return nullptr;
+}
+
 void App::OnDisplayChange()
 {
     if (!monitorManager)
@@ -3381,7 +3405,7 @@ void App::ProcessPendingAdoptions()
         if (tracked)
             continue;
 
-        // Add to catch-all corral
+        // Add to a corral
         // A file that was replaced (deleted, then written again) goes back
         // to the slot it had, not to the catch-all
         if (RestoreToLeftSlot(fileNameStr))
@@ -3390,12 +3414,17 @@ void App::ProcessPendingAdoptions()
             continue;
         }
 
-        // Into the catch-all tab itself, which need not be the tab in front
-        int catchAllTab = -1;
-        CorralWindow *catchAll = GetCatchAllCorral(catchAllTab);
-        if (catchAll)
+        // Into the tab that lists its extension (never for a folder), else
+        // the catch-all tab; either need not be the tab in front
+        int targetTab = -1;
+        CorralWindow *target = nullptr;
+        if (!(attrs & FILE_ATTRIBUTE_DIRECTORY))
+            target = GetExtensionCorral(fileName, targetTab);
+        if (!target)
+            target = GetCatchAllCorral(targetTab);
+        if (target)
         {
-            catchAll->AddFilesToTab({fileNameStr}, catchAllTab);
+            target->AddFilesToTab({fileNameStr}, targetTab);
             changed = true;
         }
     }
