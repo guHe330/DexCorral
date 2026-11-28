@@ -1318,15 +1318,21 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
         POINT pt;
         GetCursorPos(&pt);
         App *app = App::GetInstance();
+        // A Corral with a dialog open (rename, appearance, a question) is
+        // disabled. Merging would delete it while that dialog's code runs.
+        auto canMergeInto = [this, app](const CorralWindow *c)
+        {
+            for (const auto &other : app->GetCorrals())
+                if (other.get() == c)
+                    return c != this && IsWindowEnabled(c->GetHWND());
+            return false;
+        };
+        CorralWindow *target = nullptr;
         if (app && dragMoved)
         {
             for (const auto &other : app->GetCorrals())
             {
-                if (other.get() == this)
-                    continue;
-                // A Corral with a dialog open (rename, appearance, a question) is
-                // disabled. Merging would delete it while that dialog's code runs.
-                if (!IsWindowEnabled(other->GetHWND()))
+                if (!canMergeInto(other.get()))
                     continue;
 
                 RECT otherRect;
@@ -1335,10 +1341,32 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
                 // If dropped on another window's title bar, merge
                 if (PtInRect(&otherRect, pt) && (pt.y - otherRect.top < other->GetTitleBarHeight()))
                 {
-                    MergeWith(other.get());
-                    return; // The other Corral is gone now; nothing more to do here
+                    target = other.get();
+                    break;
                 }
             }
+        }
+        if (target)
+        {
+            // The drag becomes an undo step that either answer takes back: on No
+            // this Corral returns to where it came from, on Yes the icons it
+            // pushed on the way go back before it joins the target.
+            app->CommitMoveUndo(this, true);
+            const bool merge = MessageBoxBehind(Tr(Str::Confirm_MergeCorralsBody), Tr(Str::Confirm_MergeCorralsTitle),
+                                                MB_YESNO | MB_ICONQUESTION) == IDYES &&
+                               canMergeInto(target); // The box ran a message loop: the target may be gone
+            if (merge)
+                Hide(); // Not seen jumping back first
+            const bool undone = app->UndoLastMove(this);
+            if (merge)
+            {
+                app->InvalidateDesktopIconCache(); // When nothing was undone, Commit left it valid
+                target->MergeWith(this);
+                return; // This Corral is gone now; nothing more to do here
+            }
+            if (undone)
+                return;
+            // No step to take back (another drag came first): it stays where it was dropped
         }
 
         SyncConfigFromWindow(dragMoved);

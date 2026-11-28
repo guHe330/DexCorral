@@ -176,6 +176,8 @@ enum class Str
     Confirm_DeleteCorralBody,    // icons return to the desktop
     Confirm_DeleteVirtualCorralBody, // the folder is not touched
     Confirm_DeleteCorralTitle,   // "Delete Corral"
+    Confirm_MergeCorralsBody,    // a dragged corral dropped on another's title bar
+    Confirm_MergeCorralsTitle,   // "Merge Corrals"
 
     // Rename dialog / file rename (CorralWindowDialogs.cpp)
     Dlg_RenameTab,               // "Rename Tab" (also shown right after creating a corral or tab)

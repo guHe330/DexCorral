@@ -218,7 +218,8 @@ public:
     void BeginMoveUndo(CorralWindow *corral);
     void CommitMoveUndo(CorralWindow *corral, bool moved);
     bool CanUndoMove() const { return !moveUndoStack.empty(); }
-    void UndoLastMove();
+    /// `only`: undo only if the last step is that Corral's. True if a step was undone.
+    bool UndoLastMove(CorralWindow *only = nullptr);
 
     void UpdateHookHiddenIcons();           // Push hidden icon list to shared memory
     void PositionHiddenIconsUnderCorrals(); // Reposition hidden icons to match corral scroll state

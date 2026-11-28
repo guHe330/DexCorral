@@ -622,41 +622,16 @@ void CorralWindow::MergeWith(CorralWindow *other)
     if (!other || other == this)
         return;
 
-    // This (the dragged window) is the survivor, but the user dropped it onto
-    // `other` — the drop target. Adopt the target's position and size so merging
-    // a small corral into a larger one keeps the larger geometry instead of
-    // shrinking the result to the dragged window's size. (Skip if the target is
-    // rolled up, where its rect is only a title bar.)
-    if (!other->GetConfig().IsRolledUp)
-    {
-        RECT otherRect;
-        if (GetWindowRect(other->GetHWND(), &otherRect))
-        {
-            config.Left = otherRect.left;
-            config.Top = otherRect.top;
-            config.Width = otherRect.right - otherRect.left;
-            config.Height = otherRect.bottom - otherRect.top;
-            savedHeight = config.Height; // keep roll-up restore height in sync
-            SetWindowPos(hwnd, nullptr,
-                         (int)config.Left, (int)config.Top,
-                         (int)config.Width, (int)config.Height,
-                         SWP_NOZORDER | SWP_NOACTIVATE);
-            RecalculateLayout();
-
-            // In the target's place for every set of monitors, not only this one
-            config.Layouts = other->GetConfig().Layouts;
-        }
-    }
-    SyncConfigFromWindow(true); // The user dropped it here
-
-    // Copy all tabs from other to this
+    // This is the drop target and survives as it is: its place, size, Lock and
+    // other settings stay. Only the tabs of `other` (the dragged Corral) join it.
+    const int firstMerged = (int)config.Tabs.size();
     for (const auto &tab : other->GetConfig().Tabs)
     {
         config.Tabs.push_back(tab);
     }
 
     // Switch to the first merged tab
-    SetActiveTab((int)config.Tabs.size() - (int)other->GetConfig().Tabs.size());
+    SetActiveTab(firstMerged);
 
     // Remove the other corral
     if (App::GetInstance())
@@ -664,8 +639,7 @@ void CorralWindow::MergeWith(CorralWindow *other)
         App::GetInstance()->RemoveCorral(&other->GetConfig());
     }
 
-    // Repaint at the adopted geometry (SetActiveTab only reloads when the active
-    // index actually changes, so refresh explicitly).
+    // SetActiveTab only reloads when the active index actually changes
     UpdateLayeredContent();
 }
 

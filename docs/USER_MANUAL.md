@@ -85,7 +85,8 @@ A local folder that is not there, for example on a USB drive that is not plugged
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
 - Moved or resized one by accident? Right-click any Corral and choose **Undo Last Move**. The Corral goes back to where it was, and so do the desktop icons it pushed out of the way; an icon you have moved by hand since stays where you put it. Choose it again to go further back, up to ten steps through the last moves and resizes of all Corrals. The steps are forgotten when you sign out, pause DexCorral or change the set of monitors.
-- Drag any **edge or corner** to resize. While moving or resizing, Corrals snap to screen edges and align to other Corrals on the same monitor.
+- Drag any **edge or corner** to resize. While moving or resizing, Corrals snap to screen edges and align to other Corrals on the same monitor. Hold **Shift** while dragging to turn snapping off.
+- Drop a Corral onto another Corral's **title bar** to merge the two. DexCorral asks first. On Yes, the tabs of the Corral you dragged move into the other one, which keeps its place, size, Lock and other settings. On No, the dragged Corral goes back to where it came from. **Detach Tab** splits a tab off into its own Corral again.
 - Corrals are immune to **Win+D / Show Desktop**: they stay visible with your desktop.
 
 ### Lock Position

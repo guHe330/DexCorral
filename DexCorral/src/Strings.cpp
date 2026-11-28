@@ -224,6 +224,8 @@ const wchar_t *const kEnglish[] = {
     /* Confirm_DeleteCorralBody */ L"Delete this corral?\n\nIts icons go back to the desktop. No files are deleted.",
     /* Confirm_DeleteVirtualCorralBody */ L"Delete this corral?\n\nThe folder it shows and the files in it are not touched.",
     /* Confirm_DeleteCorralTitle */L"Delete Corral",
+    /* Confirm_MergeCorralsBody */ L"Merge the two corrals?\n\nThe tabs of the corral you dragged move into the other one, which keeps its place and settings. Detach Tab splits a tab off again.",
+    /* Confirm_MergeCorralsTitle */L"Merge Corrals",
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Rename Tab",
@@ -533,6 +535,8 @@ const wchar_t *const kGerman[] = {
     /* Confirm_DeleteCorralBody */ L"Dieses Corral löschen?\n\nSeine Symbole kehren auf den Desktop zurück. Es werden keine Dateien gelöscht.",
     /* Confirm_DeleteVirtualCorralBody */ L"Dieses Corral löschen?\n\nDer angezeigte Ordner und seine Dateien bleiben unverändert.",
     /* Confirm_DeleteCorralTitle */L"Corral löschen",
+    /* Confirm_MergeCorralsBody */ L"Die beiden Corrals zusammenführen?\n\nDie Tabs des gezogenen Corrals kommen in das andere Corral, das seinen Platz und seine Einstellungen behält. Mit „Tab abtrennen“ lösen Sie einen Tab wieder heraus.",
+    /* Confirm_MergeCorralsTitle */L"Corrals zusammenführen",
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Tab umbenennen",

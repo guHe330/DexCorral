@@ -799,10 +799,10 @@ void App::CommitMoveUndo(CorralWindow *corral, bool moved)
     UndoMove::PushCapped(moveUndoStack, std::move(record), MOVE_UNDO_DEPTH);
 }
 
-void App::UndoLastMove()
+bool App::UndoLastMove(CorralWindow *only)
 {
-    if (moveUndoStack.empty())
-        return;
+    if (moveUndoStack.empty() || (only && moveUndoStack.back().corral != only))
+        return false;
     MoveUndoRecord record = std::move(moveUndoStack.back());
     moveUndoStack.pop_back();
     pendingMoveUndo = {};
@@ -827,6 +827,7 @@ void App::UndoLastMove()
     InvalidateDesktopIconCache();
     PositionHiddenIconsUnderCorrals();
     SaveConfig();
+    return true;
 }
 
 bool App::BeginHoverExpand(CorralWindow *corral)
