@@ -193,7 +193,6 @@ enum class Str
 
     // Appearance dialog (CorralWindowDialogs.cpp)
     Title_Appearance,            // "Appearance: {0}"  ({0} = tab title)
-    Grp_BackgroundColor,         // "Background Color"
     Btn_Change,                  // "Change..."
     Grp_Opacity,                 // "Opacity"
     Grp_Header,                  // "Header"
@@ -202,14 +201,13 @@ enum class Str
     Btn_Choose,                  // "Choose..."
     Lbl_Color,                   // "Color"
     Grp_Icons,                   // "Icons"
-    Lbl_Opacity,                 // "Opacity"
     Lbl_Tint,                    // "Tint"
-    Lbl_Background,              // "Background" (opacity row)
+    Lbl_Background,              // "Background" (first page of the page strip)
     Lbl_Border,                  // "Border" (opacity row)
     Lbl_HeaderLabel,             // "Header Label" (opacity row)
     Lbl_IconLabel,               // "Icon Label" (opacity row)
-    Lbl_Horiz,                   // "Horiz"
-    Lbl_Vert,                    // "Vert"
+    Lbl_Horiz,                   // "Spacing across"
+    Lbl_Vert,                    // "Spacing down"
     Lbl_TintStrength,            // "Tint strength"
     Chk_AccentColor,             // "Windows accent color"
     Chk_UseAsDefault,            // save this style as the default for new corrals

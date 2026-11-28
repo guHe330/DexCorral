@@ -246,7 +246,6 @@ const wchar_t *const kEnglish[] = {
 
     // Appearance dialog
     /* Title_Appearance */         L"Appearance: {0}",
-    /* Grp_BackgroundColor */      L"Background Color",
     /* Btn_Change */               L"Change...",
     /* Grp_Opacity */              L"Opacity",
     /* Grp_Header */               L"Header",
@@ -255,7 +254,6 @@ const wchar_t *const kEnglish[] = {
     /* Btn_Choose */               L"Choose...",
     /* Lbl_Color */                L"Color",
     /* Grp_Icons */                L"Icons",
-    /* Lbl_Opacity */              L"Opacity",
     /* Lbl_Tint */                 L"Tint",
     /* Lbl_Background */           L"Background",
     /* Lbl_Border */               L"Border",
@@ -567,7 +565,6 @@ const wchar_t *const kGerman[] = {
 
     // Appearance dialog
     /* Title_Appearance */         L"Darstellung: {0}",
-    /* Grp_BackgroundColor */      L"Hintergrundfarbe",
     /* Btn_Change */               L"Ändern...",
     /* Grp_Opacity */              L"Deckkraft",
     /* Grp_Header */               L"Kopfzeile",
@@ -576,7 +573,6 @@ const wchar_t *const kGerman[] = {
     /* Btn_Choose */               L"Wählen...",
     /* Lbl_Color */                L"Farbe",
     /* Grp_Icons */                L"Symbole",
-    /* Lbl_Opacity */              L"Deckkraft",
     /* Lbl_Tint */                 L"Tönung",
     /* Lbl_Background */           L"Hintergrund",
     /* Lbl_Border */               L"Rahmen",
