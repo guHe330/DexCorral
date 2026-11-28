@@ -157,8 +157,8 @@ constexpr int MAX_ICON_SIZE = 256;
 // ============================================================================
 
 /// Icon content detection threshold (70%)
-/// Icons with more than 70% non-transparent pixels are considered "full content".
-/// Used to detect padded icons (like shortcuts with badges) vs empty spaces.
+/// The non-transparent content must span at least 70% of the canvas width and height.
+/// Less means a small icon padded onto a larger canvas (an app that ships only 32px icons).
 constexpr double ICON_CONTENT_THRESHOLD = 0.7;
 
 /// OneDrive cloud reparse point tag mask (0x90000000)
