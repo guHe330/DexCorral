@@ -883,10 +883,18 @@ void CorralWindow::CancelPendingRename()
     }
 }
 
+bool CorralWindow::IsOnButton(int x, int y)
+{
+    RECT nb = IsNavBackVisible() ? GetNavBackButtonRect() : RECT{};
+    POINT p = {x, y};
+    return PtInRect(&nb, p) || HitTestScrollbar(x, y) || HitTestDetailsHeader(x, y) >= 0;
+}
+
 void CorralWindow::OnLeftButtonDown(int x, int y)
 {
     // A fresh click cancels any pending (deferred) rename.
     CancelPendingRename();
+    lastDownOnButton = IsOnButton(x, y);
 
     // Check resize area first (but not when rolled up, and not when locked) — except
     // where the top edge would steal a click meant for a tab; see HitTestResizeAllowingTabs.
@@ -1133,9 +1141,8 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
 
     // On a button (nav up, scrollbar, column header) the second of two fast clicks
     // is just another click: going up two folders must not roll the Corral up.
-    RECT nb = IsNavBackVisible() ? GetNavBackButtonRect() : RECT{};
-    POINT p = {x, y};
-    if (PtInRect(&nb, p) || HitTestScrollbar(x, y) || HitTestDetailsHeader(x, y) >= 0)
+    // The first click may have taken the button away (up to the root folder).
+    if (lastDownOnButton || IsOnButton(x, y))
     {
         OnLeftButtonDown(x, y);
         return;
