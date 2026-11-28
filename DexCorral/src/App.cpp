@@ -2611,53 +2611,16 @@ POINT App::FindNearestFreeCorralPosition(POINT desiredTopLeft, int width, int he
 
 void App::CreateVirtualCorralAt(POINT desiredCenter)
 {
-    // Show folder browser dialog
-    IFileDialog *pfd = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
-                                  IID_PPV_ARGS(&pfd));
-    if (FAILED(hr))
-        return;
-
-    DWORD dwOptions;
-    hr = pfd->GetOptions(&dwOptions);
-    if (SUCCEEDED(hr))
-    {
-        hr = pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        pfd->SetTitle(Tr(Str::Dlg_SelectVirtualFolder));
-    }
-
-    hr = pfd->Show(messageWindow);
-    std::wstring folderPath;
-    if (SUCCEEDED(hr))
-    {
-        IShellItem *psi = nullptr;
-        hr = pfd->GetResult(&psi);
-        if (SUCCEEDED(hr))
-        {
-            PWSTR pszPath = nullptr;
-            hr = psi->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
-            if (SUCCEEDED(hr))
-            {
-                folderPath = pszPath;
-                CoTaskMemFree(pszPath);
-            }
-            psi->Release();
-        }
-    }
-    pfd->Release();
-
+    // Same picker and checks as Change Folder, so both say the same thing
+    const std::wstring folderPath =
+        CorralWindow::BrowseForLocalFolder(messageWindow, Tr(Str::Dlg_SelectVirtualFolder), std::wstring());
     if (folderPath.empty())
         return;
 
-    // Validate folder
-    DWORD attrs = GetFileAttributesW(folderPath.c_str());
-    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+    std::wstring errorMsg;
+    if (!CorralWindow::ValidateLocalFolder(folderPath, errorMsg))
     {
-        MessageBoxW(messageWindow, Tr(Str::Err_InvalidFolderSelected), Tr(Str::Title_Error), MB_OK | MB_ICONWARNING);
+        MessageBoxW(messageWindow, errorMsg.c_str(), Tr(Str::Title_InvalidFolder), MB_OK | MB_ICONWARNING);
         return;
     }
 

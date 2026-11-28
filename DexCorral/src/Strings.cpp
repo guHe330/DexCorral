@@ -193,7 +193,6 @@ const wchar_t *const kEnglish[] = {
 
     // Virtual corral folder selection
     /* Dlg_SelectVirtualFolder */  L"Select Folder for Virtual Corral",
-    /* Err_InvalidFolderSelected */L"Invalid folder selected.",
     /* Info_NetworkFolder */       L"This folder is on the network.\n\n"
                                    L"While it cannot be reached, the Corral shows \"Folder unavailable\". Once the share "
                                    L"answers again, it fills by itself: after five minutes at the latest, or right away "
@@ -512,7 +511,6 @@ const wchar_t *const kGerman[] = {
 
     // Virtual corral folder selection
     /* Dlg_SelectVirtualFolder */  L"Ordner für virtuelles Corral auswählen",
-    /* Err_InvalidFolderSelected */L"Ungültiger Ordner ausgewählt.",
     /* Info_NetworkFolder */       L"Dieser Ordner liegt im Netzwerk.\n\n"
                                    L"Solange er nicht erreichbar ist, zeigt das Corral \"Ordner nicht verfügbar\". "
                                    L"Sobald die Freigabe wieder antwortet, füllt es sich von selbst: spätestens nach fünf Minuten, "

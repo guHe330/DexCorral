@@ -143,7 +143,6 @@ enum class Str
 
     // Virtual corral folder selection (App.cpp, CorralWindowCommands.cpp)
     Dlg_SelectVirtualFolder,     // "Select Folder for Virtual Corral"
-    Err_InvalidFolderSelected,   // "Invalid folder selected."
     Info_NetworkFolder,          // notice when a network folder is chosen: what happens while the share is away
     Err_FolderNotExist,          // "The specified folder does not exist."
     Err_PathNotFolder,           // "The specified path is not a folder."

@@ -201,6 +201,12 @@ public:
     /// True for a UNC path or a path on a mapped network drive. Does not touch the network.
     static bool IsNetworkFolder(const std::wstring &path);
 
+    /// Folder picker for a virtual Corral; empty if cancelled. An empty startFolder leaves the dialog's own choice.
+    static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title, const std::wstring &startFolder);
+
+    /// False, with the message to show, when path is not an existing folder
+    static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg);
+
     /// Helper to extract CLSID from special icon entry
     static std::wstring GetSpecialIconClsid(const std::string &fileName);
 
