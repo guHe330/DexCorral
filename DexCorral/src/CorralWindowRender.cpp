@@ -1220,7 +1220,8 @@ void CorralWindow::UpdateLayeredContent()
                     }
                 }
 
-                // Label with glow shadow (matches Windows desktop style)
+                // Label with glow shadow (matches Windows desktop style). DT_EDITCONTROL
+                // drops a part-visible last line and ends the last whole one in an ellipsis.
                 int labelTop = iconDrawTop + iconSize + Dpi(2);
                 RECT labelRect = {
                     icon.rect.left,
@@ -1234,7 +1235,7 @@ void CorralWindow::UpdateLayeredContent()
                 if (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop)
                 {
                     drawShadowedText(icon.displayName.c_str(), (int)icon.displayName.length(),
-                                     DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+                                     DT_CENTER | DT_TOP | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX,
                                      labelRect, RGB(255, 255, 255));
                 }
             }
