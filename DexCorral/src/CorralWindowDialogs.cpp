@@ -179,8 +179,9 @@ void CorralWindow::EndIconRename(bool save)
                 size_t lastSlash = oldPath.find_last_of(L"\\");
                 std::wstring newPath;
                 // A name with a path separator would move the file to another
-                // folder: such a name is refused like any failed rename.
-                if (lastSlash != std::wstring::npos && IconUtils::IsValidNewFileName(newName))
+                // folder: such a name is refused with the other invalid ones.
+                const bool validName = IconUtils::IsValidNewFileName(newName);
+                if (lastSlash != std::wstring::npos && validName)
                 {
                     // The editable name is the shell display name, which may
                     // omit the extension (.lnk, or any extension when "hide
@@ -229,9 +230,30 @@ void CorralWindow::EndIconRename(bool save)
                 }
                 else
                 {
-                    // Rename failed - could show error message
-                    MessageBoxBehind(Tr(Str::Err_RenameFailedBody), Tr(Str::Err_RenameFailedTitle),
-                                     MB_OK | MB_ICONERROR);
+                    const DWORD error = GetLastError();
+                    const bool taken = !newPath.empty() && (error == ERROR_ALREADY_EXISTS || error == ERROR_FILE_EXISTS);
+                    if (!validName)
+                        MessageBoxBehind(Tr(Str::Err_RenameInvalidName), Tr(Str::Err_RenameFailedTitle),
+                                         MB_OK | MB_ICONWARNING);
+                    else if (taken)
+                        MessageBoxBehind(TrFmt(Str::Err_RenameNameTaken, newName).c_str(),
+                                         Tr(Str::Err_RenameFailedTitle), MB_OK | MB_ICONWARNING);
+                    else
+                        MessageBoxBehind(Tr(Str::Err_RenameFailedBody), Tr(Str::Err_RenameFailedTitle),
+                                         MB_OK | MB_ICONERROR);
+
+                    // A name the user can fix: keep the edit open with what was
+                    // typed, as Explorer does. Escape still cancels.
+                    if ((!validName || taken) && IsWindow(hEditControl))
+                    {
+                        isRenamingIcon = true;
+                        blockRaise++;
+                        SetForegroundWindow(hEditControl);
+                        SetFocus(hEditControl);
+                        blockRaise--;
+                        SendMessageW(hEditControl, EM_SETSEL, 0, -1);
+                        return;
+                    }
                 }
             }
         }

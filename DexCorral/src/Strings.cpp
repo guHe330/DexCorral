@@ -239,6 +239,8 @@ const wchar_t *const kEnglish[] = {
     /* Dlg_RenameTab */            L"Rename Tab",
     /* Err_RenameFailedBody */     L"Failed to rename file. The file may be in use or you may not have permission.",
     /* Err_RenameFailedTitle */    L"Rename Error",
+    /* Err_RenameInvalidName */    L"A file name cannot contain any of these characters:\n\\ / : * ? \" < > |\n\nIt also cannot end with a dot or a space.",
+    /* Err_RenameNameTaken */      L"There is already a file named \"{0}\" in this folder. Please choose a different name.",
 
     // Appearance dialog
     /* Title_Appearance */         L"Appearance: {0}",
@@ -559,6 +561,8 @@ const wchar_t *const kGerman[] = {
     /* Dlg_RenameTab */            L"Tab umbenennen",
     /* Err_RenameFailedBody */     L"Die Datei konnte nicht umbenannt werden. Sie wird möglicherweise verwendet, oder Ihnen fehlt die Berechtigung.",
     /* Err_RenameFailedTitle */    L"Fehler beim Umbenennen",
+    /* Err_RenameInvalidName */    L"Ein Dateiname darf keines dieser Zeichen enthalten:\n\\ / : * ? \" < > |\n\nEr darf auch nicht mit einem Punkt oder einem Leerzeichen enden.",
+    /* Err_RenameNameTaken */      L"In diesem Ordner gibt es schon eine Datei namens „{0}“. Bitte wählen Sie einen anderen Namen.",
 
     // Appearance dialog
     /* Title_Appearance */         L"Darstellung: {0}",

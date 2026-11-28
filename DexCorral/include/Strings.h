@@ -188,6 +188,8 @@ enum class Str
     Dlg_RenameTab,               // "Rename Tab" (also shown right after creating a corral or tab)
     Err_RenameFailedBody,        // file rename failure text
     Err_RenameFailedTitle,       // "Rename Error"
+    Err_RenameInvalidName,       // inline file rename: forbidden characters or a trailing dot
+    Err_RenameNameTaken,         // inline file rename: {0} = the name, which another file has
 
     // Appearance dialog (CorralWindowDialogs.cpp)
     Title_Appearance,            // "Appearance: {0}"  ({0} = tab title)
