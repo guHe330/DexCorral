@@ -28,6 +28,7 @@
 #include "ChromeAlpha.h"
 #include "LayoutMath.h"
 #include "IconUtils.h"
+#include "ExtensionList.h"
 
 using IconUtils::Utf8ToWide;
 
@@ -156,6 +157,22 @@ void Config::Normalize(AppConfig &config)
         {
             tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity);
             tab.HeaderFontSize = std::clamp(tab.HeaderFontSize, 1, 1638);
+        }
+    }
+
+    // New-file extensions: valid ones only, each with the first tab that lists
+    // it, none on a virtual tab (its content is a folder, not desktop files)
+    std::vector<std::wstring> claimed;
+    for (auto &corral : config.Corrals)
+    {
+        for (auto &tab : corral.Tabs)
+        {
+            std::vector<std::wstring> list;
+            if (!tab.IsVirtual)
+                list = ExtensionList::Parse(Utf8ToWide(tab.Extensions));
+            ExtensionList::Remove(list, claimed);
+            claimed.insert(claimed.end(), list.begin(), list.end());
+            tab.Extensions = IconUtils::WideToUtf8(ExtensionList::Join(list));
         }
     }
 

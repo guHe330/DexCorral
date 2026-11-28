@@ -66,6 +66,7 @@ struct CorralTabConfig
     std::vector<std::string> Files;          /// List of file names or "shell:{CLSID}" for special icons
     int ViewModeInt = 0;                     /// View mode (0=Small, 1=Medium, 2=Large, 3=Details)
     bool IsCatchAll = false;                 /// True if this is the automatic catch-all folder tab
+    std::string Extensions;                  /// New desktop files with these extensions come here: "pdf; docx" (see ExtensionList.h)
     bool IsVirtual = false;                  /// True if this tab mirrors a local folder
     std::string VirtualFolderPath;           /// UTF-8 path to folder (empty if not virtual)
     std::string CurrentSubPath;              /// UTF-8 sub-path relative to VirtualFolderPath (empty = at root)
@@ -86,7 +87,7 @@ struct CorralTabConfig
     /// Sets the view mode from enum
     void SetViewMode(ViewMode mode) { ViewModeInt = static_cast<int>(mode); }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity, UseAccentColor)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CorralTabConfig, Title, ColorHex, Files, ViewModeInt, IsCatchAll, Extensions, IsVirtual, VirtualFolderPath, CurrentSubPath, DetailsColumnWidths, DetailsSortColumn, DetailsSortAscending, HeaderFontName, HeaderFontSize, HeaderFontColor, HeaderFontOpacity, UseAccentColor)
 };
 
 /// Configuration for a single corral window
