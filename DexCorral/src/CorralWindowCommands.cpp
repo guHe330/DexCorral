@@ -178,6 +178,8 @@ void CorralWindow::ShowContextMenu(int x, int y)
     {
         UINT catchAllFlags = MF_STRING | (GetActiveTab().IsCatchAll ? MF_CHECKED : MF_UNCHECKED);
         AppendMenuW(menu, catchAllFlags, 3, Tr(Str::Menu_CatchAll));
+        UINT extensionFlags = MF_STRING | (GetActiveTab().Extensions.empty() ? MF_UNCHECKED : MF_CHECKED);
+        AppendMenuW(menu, extensionFlags, 19, Tr(Str::Menu_NewFilesByExtension));
     }
 
     // Add Special Icons submenu - only for non-virtual tabs
@@ -263,6 +265,9 @@ void CorralWindow::ShowContextMenu(int x, int y)
         break;
     case 3:
         ToggleCatchAll();
+        break;
+    case 19:
+        ShowExtensionsDialog();
         break;
     case 4:
         DeleteCorral();

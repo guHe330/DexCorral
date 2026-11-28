@@ -317,6 +317,8 @@ private:
     void EnsureCatchAllCorral();
     /// The corral holding the catch-all tab and that tab's index, or nullptr when catch-all is off
     CorralWindow *GetCatchAllCorral(int &tabIndex);
+    /// The corral holding the tab that lists this new file's extension and that tab's index, or nullptr
+    CorralWindow *GetExtensionCorral(const std::wstring &fileName, int &tabIndex);
     void OnDesktopFileAdded(const std::wstring &fileName);
     void OnDesktopFileRenamed(const std::wstring &oldName, const std::wstring &newName);
     void OnDesktopFileDeleted(const std::wstring &fileName);

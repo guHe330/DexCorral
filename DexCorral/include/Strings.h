@@ -166,6 +166,7 @@ enum class Str
     Menu_SortAscending,          // "Ascending"
     Menu_SortDescending,         // "Descending"
     Menu_CatchAll,               // "Catch-All (receives new files)"
+    Menu_NewFilesByExtension,    // "New Files by Extension..." (below Catch-All)
     Menu_AddSpecialIcon,         // "Add Special Icon"
     Menu_ExcludeFromQuickHide,   // "Exclude from Quick-Hide"
     Menu_LockPosition,           // "Lock Position"
@@ -196,6 +197,9 @@ enum class Str
 
     // Rename dialog / file rename (CorralWindowDialogs.cpp)
     Dlg_RenameTab,               // "Rename Tab" (also shown right after creating a corral or tab)
+    Dlg_NewFilesByExtension,     // title of the extension prompt and of its question
+    Hint_Extensions,             // grey hint in the empty extension field, e.g. "pdf; docx; xlsx"
+    Confirm_ExtensionsTakenBody, // {0} = lines "extension: tab title" another tab has
     Err_RenameFailedBody,        // file rename failure text
     Err_RenameFailedTitle,       // "Rename Error"
     Err_RenameInvalidName,       // inline file rename: forbidden characters or a trailing dot

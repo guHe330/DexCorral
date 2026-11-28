@@ -1003,3 +1003,37 @@ TEST(ConfigFirstCorral, SeededSurvivesARoundTripWithNoCorrals) {
     EXPECT_TRUE(back.FirstCorralSeeded);
     EXPECT_TRUE(back.Corrals.empty());
 }
+
+TEST(ConfigExtensions, RoundTripsAndDefaultsToNone) {
+    EXPECT_TRUE(CorralTabConfig{}.Extensions.empty());
+
+    CorralTabConfig tab;
+    tab.Extensions = "pdf; docx";
+    nlohmann::json j = tab;
+    EXPECT_EQ(j.get<CorralTabConfig>().Extensions, "pdf; docx");
+
+    // A config written before the setting existed
+    j.erase("Extensions");
+    EXPECT_TRUE(j.get<CorralTabConfig>().Extensions.empty());
+}
+
+TEST(ConfigExtensions, NormalizeKeepsValidOnesAndGivesEachToTheFirstTab) {
+    AppConfig c;
+    CorralWindowConfig first, second;
+    CorralTabConfig a, b, v, d;
+    a.Extensions = "*.PDF, .docx; Invoice*.pdf; lnk";  // Hand-edited: cleaned to the stored form
+    b.Extensions = "docx; xlsx";                       // docx belongs to the first tab
+    v.IsVirtual = true;
+    v.Extensions = "txt";                              // Virtual tabs take none
+    d.Extensions = "PDF; txt";                         // pdf taken; txt is free, the virtual tab had none
+    first.Tabs = {a, b};
+    second.Tabs = {v, d};
+    c.Corrals = {first, second};
+
+    Config::Normalize(c);
+
+    EXPECT_EQ(c.Corrals[0].Tabs[0].Extensions, "pdf; docx");
+    EXPECT_EQ(c.Corrals[0].Tabs[1].Extensions, "xlsx");
+    EXPECT_EQ(c.Corrals[1].Tabs[0].Extensions, "");
+    EXPECT_EQ(c.Corrals[1].Tabs[1].Extensions, "txt");
+}

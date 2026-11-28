@@ -62,6 +62,15 @@ Each Corral can hold multiple **tabs**, each with its own title, icon list, back
 ### Catch-All
 One tab can be the **Catch-All**: new files and shortcuts landing on the desktop are captured into it automatically. No tab is the Catch-All until you pick one: open the tab, right-click the Corral and choose **Catch-All (receives new files)**. Until then new files stay on the desktop.
 
+### New Files by Extension
+A tab can also receive new desktop files by their extension, for example every new PDF. Right-click the tab and choose **New Files by Extension...**, then type the extensions, for example `pdf; docx; xlsx`. `*.pdf`, `.pdf` and `PDF` all mean the same, and a semicolon, comma or blank separates them. An empty field switches it off. The menu entry has a check mark while the tab has extensions.
+
+- A new file whose extension a tab lists goes to that tab; every other new file goes to the Catch-All, or stays on the desktop if there is none.
+- An extension belongs to one tab. If you type one that another tab has, DexCorral asks whether to move it to this tab; **No** leaves it where it is.
+- Only files that arrive on the desktop from now on are sent. Icons already on the desktop or in a Corral are not sorted.
+- Folders and shortcuts (`.lnk`) are never sent by extension, also not by the file a shortcut points to; they go to the Catch-All as before. Patterns such as `Invoice*.pdf` are not accepted.
+- Virtual tabs do not offer the entry: their content is a folder.
+
 ### Virtual Corrals
 A virtual tab mirrors any folder on your PC. Point it at `Downloads` or a project directory and its files appear inside the Corral, kept in sync as the folder changes.
 
@@ -121,6 +130,7 @@ Right-click a Corral's title bar or background:
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
 - **Sort By**: on a normal tab, sorts the icons once by **Name** or **Type**; you can still drag them into any order afterwards, and new icons are added at the end. On a virtual tab it sets the standing sort column and direction, in every view.
 - **Catch-All (receives new files)**: make this tab the catch-all for new desktop items (normal tabs only).
+- **New Files by Extension...**: list the extensions of new desktop files this tab receives (normal tabs only, see [New Files by Extension](#new-files-by-extension)).
 - **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral (normal tabs only).
 - **Show Desktop Icons**: toggle visibility of all native desktop icons.
 - **Exclude from Quick-Hide**: keep this Corral visible while [Quick-Hide](#quick-hide) hides everything else.
@@ -177,7 +187,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 - Drag any icon from the desktop and drop it onto a Corral.
 - Drag a file or folder from an Explorer window onto a Corral: DexCorral puts a shortcut to it on the desktop and adds that shortcut to the Corral. The original stays where it is.
 - If the cursor shows the no-drop sign, the Corral cannot take what you are dragging.
-- New desktop items land automatically in the Catch-All tab, if one is set.
+- New desktop items land automatically in the tab that lists their extension, otherwise in the Catch-All tab, if one is set.
 
 ### Using
 - **Double-click** an icon to open it.

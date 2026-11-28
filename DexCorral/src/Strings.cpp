@@ -221,6 +221,7 @@ const wchar_t *const kEnglish[] = {
     /* Menu_SortAscending */       L"Ascending",
     /* Menu_SortDescending */      L"Descending",
     /* Menu_CatchAll */            L"Catch-All (receives new files)",
+    /* Menu_NewFilesByExtension */ L"New Files by Extension...",
     /* Menu_AddSpecialIcon */      L"Add Special Icon",
     /* Menu_ExcludeFromQuickHide */L"Exclude from Quick-Hide",
     /* Menu_LockPosition */        L"Lock Position",
@@ -250,6 +251,9 @@ const wchar_t *const kEnglish[] = {
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Rename Tab",
+    /* Dlg_NewFilesByExtension */  L"New Files by Extension",
+    /* Hint_Extensions */          L"e.g. pdf; docx; xlsx",
+    /* Confirm_ExtensionsTakenBody */ L"New files with these extensions go to another tab now:\n\n{0}\n\nSend them to this tab instead?",
     /* Err_RenameFailedBody */     L"Failed to rename file. The file may be in use or you may not have permission.",
     /* Err_RenameFailedTitle */    L"Rename Error",
     /* Err_RenameInvalidName */    L"A file name cannot contain any of these characters:\n\\ / : * ? \" < > |\n\nIt also cannot end with a dot or a space.",
@@ -553,6 +557,7 @@ const wchar_t *const kGerman[] = {
     /* Menu_SortAscending */       L"Aufsteigend",
     /* Menu_SortDescending */      L"Absteigend",
     /* Menu_CatchAll */            L"Auffang-Corral (empfängt neue Dateien)",
+    /* Menu_NewFilesByExtension */ L"Neue Dateien nach Dateiendung...",
     /* Menu_AddSpecialIcon */      L"Spezialsymbol hinzufügen",
     /* Menu_ExcludeFromQuickHide */L"Vom Schnell-Ausblenden ausnehmen",
     /* Menu_LockPosition */        L"Position sperren",
@@ -582,6 +587,9 @@ const wchar_t *const kGerman[] = {
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Tab umbenennen",
+    /* Dlg_NewFilesByExtension */  L"Neue Dateien nach Dateiendung",
+    /* Hint_Extensions */          L"z. B. pdf; docx; xlsx",
+    /* Confirm_ExtensionsTakenBody */ L"Neue Dateien mit diesen Endungen kommen bisher in einen anderen Tab:\n\n{0}\n\nSollen sie stattdessen in diesen Tab kommen?",
     /* Err_RenameFailedBody */     L"Die Datei konnte nicht umbenannt werden. Sie wird möglicherweise verwendet, oder Ihnen fehlt die Berechtigung.",
     /* Err_RenameFailedTitle */    L"Fehler beim Umbenennen",
     /* Err_RenameInvalidName */    L"Ein Dateiname darf keines dieser Zeichen enthalten:\n\\ / : * ? \" < > |\n\nEr darf auch nicht mit einem Punkt oder einem Leerzeichen enden.",
