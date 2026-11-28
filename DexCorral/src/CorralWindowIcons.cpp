@@ -433,11 +433,12 @@ void CorralWindow::LoadIconImages()
         std::wstring userPath = desktopPath + L"\\" + ci.wFileName;
         std::wstring pubPath = publicDesktopPath + L"\\" + ci.wFileName;
 
-        if (GetFileAttributesW(userPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        DWORD attrs = GetFileAttributesW(userPath.c_str());
+        if (attrs != INVALID_FILE_ATTRIBUTES)
         {
             ci.fullPath = userPath;
         }
-        else if (GetFileAttributesW(pubPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        else if ((attrs = GetFileAttributesW(pubPath.c_str())) != INVALID_FILE_ATTRIBUTES)
         {
             ci.fullPath = pubPath;
         }
@@ -449,6 +450,7 @@ void CorralWindow::LoadIconImages()
                 staleFiles.push_back(fileName);
             continue;
         }
+        ci.isFolder = (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
         // for known file types" and strips .lnk

@@ -1025,7 +1025,11 @@ void CorralWindow::UpdateLayeredContent()
 
                     // Draw size
                     std::wstring sizeStr;
-                    if (icon.fileSize < 1024)
+                    if (icon.isFolder || icon.isSpecialIcon)
+                    {
+                        // No size, as in Explorer
+                    }
+                    else if (icon.fileSize < 1024)
                     {
                         sizeStr = std::to_wstring(icon.fileSize) + Tr(Str::Unit_Bytes);
                     }
@@ -1046,16 +1050,29 @@ void CorralWindow::UpdateLayeredContent()
                                      DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                                      sizeRect, RGB(255, 255, 255));
 
-                    // Draw date
-                    FILETIME localTime;
-                    SYSTEMTIME sysTime;
-                    FileTimeToLocalFileTime(&icon.modifiedTime, &localTime);
-                    FileTimeToSystemTime(&localTime, &sysTime);
-                    wchar_t dateStr[32];
-                    swprintf_s(dateStr, L"%02d/%02d/%04d", sysTime.wMonth, sysTime.wDay, sysTime.wYear);
+                    // Draw date in the user's short date and time format, as Explorer does;
+                    // blank when there is none (special icons, unreadable files)
+                    SYSTEMTIME utcTime, sysTime;
+                    wchar_t dateStr[64] = L"";
+                    if ((icon.modifiedTime.dwLowDateTime || icon.modifiedTime.dwHighDateTime) &&
+                        FileTimeToSystemTime(&icon.modifiedTime, &utcTime) &&
+                        SystemTimeToTzSpecificLocalTime(nullptr, &utcTime, &sysTime))
+                    {
+                        int len = GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, DATE_SHORTDATE, &sysTime, nullptr,
+                                                  dateStr, ARRAYSIZE(dateStr), nullptr);
+                        if (len > 0 && len < ARRAYSIZE(dateStr))
+                        {
+                            dateStr[len - 1] = L' ';
+                            if (!GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &sysTime, nullptr,
+                                                 dateStr + len, ARRAYSIZE(dateStr) - len))
+                                dateStr[len - 1] = 0;
+                        }
+                        else
+                            dateStr[0] = 0;
+                    }
                     RECT dateRect = {dateCol, drawTop, syncCol - Dpi(4), drawBottom};
                     drawShadowedText(dateStr, -1,
-                                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
                                      dateRect, RGB(255, 255, 255));
 
                     // Draw sync status indicator

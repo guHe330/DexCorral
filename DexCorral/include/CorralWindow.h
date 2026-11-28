@@ -123,7 +123,7 @@ struct CorralIcon
     bool isSpecialIcon = false; /// True if this is a virtual shell item
     std::wstring clsid;         /// CLSID string for special icons
 
-    bool isFolder = false;      /// True if this entry is a directory (virtual corral navigation)
+    bool isFolder = false;      /// True if this entry is a directory (virtual corral navigation, blank Size)
 
     /// Details view information
     std::wstring fileType;                    /// File type description (e.g., "Text Document")
