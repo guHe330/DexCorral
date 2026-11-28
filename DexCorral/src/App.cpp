@@ -1017,12 +1017,9 @@ void App::ApplyAppearanceToAllCorrals(const AppearanceSettings &settings,
         }
         if (apply.Font || apply.FontColor || apply.FontOpacity)
         {
-            // Font settings are per-tab; the dialog edits the active tab, so
-            // that is where they land here too.
-            int activeIdx = cfg.ActiveTabIndex;
-            if (activeIdx >= 0 && activeIdx < (int)cfg.Tabs.size())
+            // Font settings are per tab; like the colour, they go to every tab
+            for (auto &tab : cfg.Tabs)
             {
-                auto &tab = cfg.Tabs[activeIdx];
                 if (apply.Font)
                 {
                     tab.HeaderFontName = settings.HeaderFontName;
