@@ -73,6 +73,8 @@ It is a live view of that folder, and its icons are the real files, so dragging 
 
 The folder can be on the network: a share (`\\nas\photos`) or a mapped network drive. DexCorral asks in the background whether the share answers, without making the other Corrals wait for it. Until the first answer is in, the Corral shows **Connecting...**. While the share does not answer, for example at sign-in before the NAS is up, the Corral shows **Folder unavailable** and asks again: after ten seconds, then after twice as long each time, up to five minutes. It also asks at once when you move the pointer over the Corral. A share that answers is left alone, so a NAS can go to sleep: DexCorral asks it only when you do something in the Corral or the folder reports a change. Because many network devices do not report changes reliably, a network folder is also read again when you move the pointer over its Corral and the last reading is more than a minute old. Reading a large folder over a slow connection can make all Corrals pause for that moment.
 
+A local folder that is not there, for example on a USB drive that is not plugged in, also shows **Folder unavailable**. DexCorral looks for it again after five seconds, then after twice as long each time, up to once a minute, and fills the Corral when it finds it. If the folder is gone for good, right-click the Corral and choose **Change Folder...**.
+
 ## Managing Corrals
 
 ### Creating

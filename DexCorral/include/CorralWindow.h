@@ -750,6 +750,7 @@ private:
     static const UINT_PTR NET_PROBE_TIMER_ID = 11;
     // The desktop folder did not answer when a normal tab was loaded: its icons
     // could not be shown. Tried again after a pause that doubles up to a minute.
+    // Also used for the local folder of a virtual tab that is not there.
     static const UINT_PTR DESKTOP_RETRY_TIMER_ID = 12;
     UINT desktopRetryMs = 0;
     static const UINT NET_PROBE_MS = 10000;

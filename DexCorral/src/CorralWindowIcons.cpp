@@ -651,6 +651,7 @@ void CorralWindow::LoadVirtualFolderIcons()
     }
 
     ClearIcons();
+    const bool wasMissing = virtualFolderMissing;
     virtualFolderMissing = false;
     virtualFolderConnecting = false;
 
@@ -661,7 +662,8 @@ void CorralWindow::LoadVirtualFolderIcons()
     // A network folder is only touched while its share is known to answer
     // (see netState). Until then: "connecting", and "unavailable" once the answer is no.
     const std::wstring root = Utf8ToWide(tab.VirtualFolderPath);
-    if (IsNetworkFolder(root))
+    const bool isNetwork = IsNetworkFolder(root);
+    if (isNetwork)
     {
         if (netProbeRoot != root)
         {
@@ -685,7 +687,20 @@ void CorralWindow::LoadVirtualFolderIcons()
     if (!IsExistingDirectory(root))
     {
         virtualFolderMissing = true;
+        // Nothing reports a drive plugged in or a folder made again: look later
+        // (a share has its own probe)
+        if (hwnd && !isNetwork)
+        {
+            desktopRetryMs = desktopRetryMs ? (std::min)(desktopRetryMs * 2, 60000u) : 5000u;
+            SetTimer(hwnd, DESKTOP_RETRY_TIMER_ID, desktopRetryMs, nullptr);
+        }
         return;
+    }
+    if (!isNetwork)
+    {
+        desktopRetryMs = 0;
+        if (wasMissing)
+            InitializeFolderWatcher(); // The watchers on the folder that was gone have ended
     }
 
     // Current sub-folder gone: auto-navigate up to the nearest existing ancestor.
