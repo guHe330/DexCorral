@@ -504,6 +504,87 @@ TEST(Normalize, ClampsHandEditedHeaderOpacity) {
     EXPECT_EQ(cfg.DefaultBorderOpacity, 0);
 }
 
+TEST(Normalize, ClampsHandEditedSizesToTheDialogRanges) {
+    // A 0 header cannot be dragged, IconOpacity 256 wraps to 0 as a BYTE, and
+    // tint 300 makes the colour maths go negative.
+    AppConfig cfg;
+    CorralWindowConfig corral;
+    CorralTabConfig tab;
+    tab.HeaderFontSize = 0;
+    corral.Tabs.push_back(tab);
+    tab.HeaderFontSize = 100000;
+    corral.Tabs.push_back(tab);
+    corral.TitleBarHeight = 0;
+    corral.IconOpacity = 256;
+    corral.IconTintStrength = 300;
+    corral.IconSpacingXPercent = 10;
+    corral.IconSpacingYPercent = 900;
+    cfg.Corrals.push_back(corral);
+    cfg.DefaultTitleBarHeight = 900;
+    cfg.DefaultIconOpacity = 0;
+    cfg.DefaultIconTintStrength = -1;
+    cfg.DefaultIconSpacingXPercent = 900;
+    cfg.DefaultIconSpacingYPercent = -10;
+    cfg.DefaultHeaderFontSize = -10;
+
+    Config::Normalize(cfg);
+
+    const CorralWindowConfig &c = cfg.Corrals[0];
+    EXPECT_EQ(c.TitleBarHeight, 20);
+    EXPECT_EQ(c.IconOpacity, 255);
+    EXPECT_EQ(c.IconTintStrength, 255);
+    EXPECT_EQ(c.IconSpacingXPercent, 50);
+    EXPECT_EQ(c.IconSpacingYPercent, 200);
+    EXPECT_EQ(c.Tabs[0].HeaderFontSize, 1);
+    EXPECT_EQ(c.Tabs[1].HeaderFontSize, 1638);
+    EXPECT_EQ(cfg.DefaultTitleBarHeight, 64);
+    EXPECT_EQ(cfg.DefaultIconOpacity, 5);
+    EXPECT_EQ(cfg.DefaultIconTintStrength, 0);
+    EXPECT_EQ(cfg.DefaultIconSpacingXPercent, 200);
+    EXPECT_EQ(cfg.DefaultIconSpacingYPercent, 50);
+    EXPECT_EQ(cfg.DefaultHeaderFontSize, 1);
+}
+
+TEST(Normalize, KeepsEverySizeTheDialogsCanSet) {
+    // The ends of each slider range, and an odd font size the font picker takes
+    AppConfig cfg;
+    CorralWindowConfig low, high;
+    CorralTabConfig tab;
+    tab.HeaderFontSize = 5;
+    low.Tabs.push_back(tab);
+    low.TitleBarHeight = 20;
+    low.IconOpacity = 5;
+    low.IconTintStrength = 0;
+    low.IconSpacingXPercent = 50;
+    low.IconSpacingYPercent = 50;
+    tab.HeaderFontSize = 96;
+    high.Tabs.push_back(tab);
+    high.TitleBarHeight = 64;
+    high.IconOpacity = 255;
+    high.IconTintStrength = 255;
+    high.IconSpacingXPercent = 200;
+    high.IconSpacingYPercent = 200;
+    cfg.Corrals = {low, high};
+    const AppConfig before = cfg;
+
+    Config::Normalize(cfg);
+
+    for (size_t i = 0; i < 2; i++) {
+        const CorralWindowConfig &was = before.Corrals[i], &now = cfg.Corrals[i];
+        EXPECT_EQ(now.TitleBarHeight, was.TitleBarHeight);
+        EXPECT_EQ(now.IconOpacity, was.IconOpacity);
+        EXPECT_EQ(now.IconTintStrength, was.IconTintStrength);
+        EXPECT_EQ(now.IconSpacingXPercent, was.IconSpacingXPercent);
+        EXPECT_EQ(now.IconSpacingYPercent, was.IconSpacingYPercent);
+        EXPECT_EQ(now.Tabs[0].HeaderFontSize, was.Tabs[0].HeaderFontSize);
+    }
+    // The stock defaults pass untouched as well
+    EXPECT_EQ(cfg.DefaultTitleBarHeight, AppConfig().DefaultTitleBarHeight);
+    EXPECT_EQ(cfg.DefaultIconOpacity, AppConfig().DefaultIconOpacity);
+    EXPECT_EQ(cfg.DefaultIconTintStrength, AppConfig().DefaultIconTintStrength);
+    EXPECT_EQ(cfg.DefaultHeaderFontSize, AppConfig().DefaultHeaderFontSize);
+}
+
 TEST(Normalize, ReplacesMalformedColors) {
     // The renderers sscanf these into uninitialised locals; a colour that does
     // not parse must never reach them.

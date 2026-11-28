@@ -132,15 +132,30 @@ void Config::Normalize(AppConfig &config)
     config.DefaultHeaderFontOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultHeaderFontOpacity);
     config.DefaultIconLabelOpacity = ChromeAlpha::ClampTextOpacity(config.DefaultIconLabelOpacity);
 
+    // The rest to the ranges of the Appearance dialog's sliders, and the font
+    // size to what the font picker accepts, so nothing the UI can set changes
+    config.DefaultTitleBarHeight = std::clamp(config.DefaultTitleBarHeight, 20, 64);
+    config.DefaultIconOpacity = std::clamp(config.DefaultIconOpacity, 5, 255);
+    config.DefaultIconTintStrength = std::clamp(config.DefaultIconTintStrength, 0, 255);
+    config.DefaultIconSpacingXPercent = std::clamp(config.DefaultIconSpacingXPercent, 50, 200);
+    config.DefaultIconSpacingYPercent = std::clamp(config.DefaultIconSpacingYPercent, 50, 200);
+    config.DefaultHeaderFontSize = std::clamp(config.DefaultHeaderFontSize, 1, 1638);
+
     for (auto &corral : config.Corrals)
     {
         corral.HeaderOpacity = ChromeAlpha::ClampHeaderOpacity(corral.HeaderOpacity);
         corral.BorderOpacity = ChromeAlpha::ClampBorderOpacity(corral.BorderOpacity);
         corral.IconLabelOpacity = ChromeAlpha::ClampTextOpacity(corral.IconLabelOpacity);
+        corral.TitleBarHeight = std::clamp(corral.TitleBarHeight, 20, 64);
+        corral.IconOpacity = std::clamp(corral.IconOpacity, 5, 255);
+        corral.IconTintStrength = std::clamp(corral.IconTintStrength, 0, 255);
+        corral.IconSpacingXPercent = std::clamp(corral.IconSpacingXPercent, 50, 200);
+        corral.IconSpacingYPercent = std::clamp(corral.IconSpacingYPercent, 50, 200);
 
         for (auto &tab : corral.Tabs)
         {
             tab.HeaderFontOpacity = ChromeAlpha::ClampTextOpacity(tab.HeaderFontOpacity);
+            tab.HeaderFontSize = std::clamp(tab.HeaderFontSize, 1, 1638);
         }
     }
 
