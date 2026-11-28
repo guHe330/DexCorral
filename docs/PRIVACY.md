@@ -33,8 +33,15 @@ GET https://api.github.com/repos/guHe330/DexCorral/releases/latest
 ```
 
 - It **sends nothing about you or your machine**: no version, no identifier, no
-  configuration. The request carries `DexCorral-UpdateCheck` as its user agent and
-  nothing else.
+  configuration, no cookies. Besides what Windows puts into every HTTPS request, such
+  as the host name `api.github.com`, it carries three fixed headers, the same on every
+  PC. The last two ask GitHub for its documented API format:
+
+  ```
+  User-Agent: DexCorral-UpdateCheck
+  Accept: application/vnd.github+json
+  X-GitHub-Api-Version: 2022-11-28
+  ```
 - GitHub necessarily sees your IP address and the time, exactly as if you had opened the
   releases page in a browser. That is GitHub's to handle, under [their privacy
   statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
