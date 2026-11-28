@@ -303,19 +303,18 @@ static void GuardLog(const wchar_t* format, ...) {
     wchar_t* appData = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)) || !appData)
         return;
-    wchar_t dir[MAX_PATH];
-    wchar_t path[MAX_PATH];
-    swprintf_s(dir, L"%s\\DexCorral", appData);
-    swprintf_s(path, L"%s\\guard.log", dir);
+    // Not swprintf_s into a MAX_PATH buffer: it ends Explorer when the path does not fit
+    const std::wstring dir = std::wstring(appData) + L"\\DexCorral";
+    const std::wstring path = dir + L"\\guard.log";
     CoTaskMemFree(appData);
-    CreateDirectoryW(dir, nullptr);
+    CreateDirectoryW(dir.c_str(), nullptr);
 
     // Keep it small: start over once it passes 64 KB
     WIN32_FILE_ATTRIBUTE_DATA info = {};
-    bool startOver = GetFileAttributesExW(path, GetFileExInfoStandard, &info) &&
+    bool startOver = GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info) &&
                      (info.nFileSizeHigh != 0 || info.nFileSizeLow > 64 * 1024);
 
-    HANDLE hFile = CreateFileW(path, startOver ? GENERIC_WRITE : FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+    HANDLE hFile = CreateFileW(path.c_str(), startOver ? GENERIC_WRITE : FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
                                startOver ? CREATE_ALWAYS : OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
         return;
