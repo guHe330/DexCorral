@@ -67,6 +67,8 @@ const wchar_t *const kEnglish[] = {
     /* Settings_Hotkey */          L"Quick-Hide hotkey",
     /* Settings_HotkeyHint */      L"Click the field and press the keys, for example Ctrl+Alt+H. "
                                    L"Backspace removes the hotkey.",
+    /* Settings_HotkeyWinHint */   L"config.json sets {0}, which this field cannot show. "
+                                   L"Press other keys in the field to replace it.",
     /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
     /* Settings_DebugLogging */    L"Write debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
@@ -364,6 +366,8 @@ const wchar_t *const kGerman[] = {
     /* Settings_Hotkey */          L"Tastenkürzel für Schnell-Ausblenden",
     /* Settings_HotkeyHint */      L"In das Feld klicken und die Tasten drücken, zum Beispiel Strg+Alt+H. "
                                    L"Die Rücktaste entfernt das Tastenkürzel.",
+    /* Settings_HotkeyWinHint */   L"In config.json ist {0} festgelegt, das dieses Feld nicht anzeigen kann. "
+                                   L"Andere Tasten im Feld ersetzen es.",
     /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg, Alt oder Umschalt und dazu einen Buchstaben, "
                                    L"eine Ziffer oder eine Funktionstaste.",
     /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",

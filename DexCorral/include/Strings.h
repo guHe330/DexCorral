@@ -61,6 +61,7 @@ enum class Str
     Title_Settings,              // window title
     Settings_Hotkey,             // label of the Quick-Hide hotkey field
     Settings_HotkeyHint,         // how to use the field
+    Settings_HotkeyWinHint,      // the hint instead, when config.json sets a Win hotkey the field cannot show; {0} = it
     Settings_HotkeyUnsupported,  // message: the key pressed cannot be a hotkey
     Settings_DebugLogging,       // checkbox
     Settings_DebugHint,          // what the logs are for and where they go

@@ -1918,7 +1918,8 @@ struct SettingsDialogData
     unsigned hotkeyWord = 0;     /// Hot key control word (see Hotkey.h)
     unsigned hotkeyBaseline = 0; /// The word the control reported before the user touched it
     bool hotkeyChanged = false;
-    int theme = 0;                      /// 0 = like Windows, 1 = light, 2 = dark
+    std::wstring winHotkey;      /// A Win hotkey from config.json, which the field cannot show; else empty
+    int theme = 0;                     /// 0 = like Windows, 1 = light, 2 = dark
     int look = 0;                       /// 0 = keep the current look, else an entry of the Look list (SettingsLookAt)
     std::vector<LookPreset> *own = nullptr; /// The user's presets; import changes them at once
     std::vector<LookPreset> listed;     /// The own presets as the Look list shows them: another dialog may change `own` meanwhile
@@ -2149,6 +2150,8 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPAR
 
         DialogSkin::Attach(hDlg, SETTINGS_FOOTER_TOP);
         DialogSkin::MakeHint(hDlg, IDC_SET_LOOK_HINT);
+        if (!data->winHotkey.empty())
+            SetDlgItemTextW(hDlg, IDC_SET_HOTKEY_HINT, TrFmt(Str::Settings_HotkeyWinHint, data->winHotkey).c_str());
         DialogSkin::MakeHint(hDlg, IDC_SET_HOTKEY_HINT);
         DialogSkin::MakeHint(hDlg, IDC_SET_DEBUG_HINT);
 
@@ -2242,7 +2245,10 @@ void App::ShowSettings()
     data.debugLogging = config.DebugLogging;
     HotkeySpec current; // Stays empty when none is set or the text is not valid
     ParseHotkey(config.QuickHideHotkey, current);
-    data.hotkeyWord = HotkeyToControlWord(current);
+    if (current.modifiers & MOD_WIN) // The field would show it without the Win key: leave it empty, name it in the hint
+        data.winHotkey = FormatHotkey(current, Tr(Str::Key_Ctrl), Tr(Str::Key_Shift));
+    else
+        data.hotkeyWord = HotkeyToControlWord(current);
     data.demoAllowed = desktopActive;
     data.theme = DialogSkin::ThemeOverride(config.Theme) + 1;
     data.own = &config.Presets;
