@@ -4,6 +4,9 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ## [Unreleased]
 
+### Added
+- **New Files by Extension...** in the tab menu: a tab can list extensions such as `pdf; docx`, and new desktop files with one of them go straight to that tab instead of the Catch-All. Folders and shortcuts are not sent by extension. ([#179](https://github.com/guHe330/DexCorral/issues/179))
+
 ### Changed
 - Dropping one Corral on another Corral's title bar asks before it merges them. The Corral you drop onto keeps its place, size, Lock and other settings and takes the tabs of the other one; the desktop icons pushed aside during the drag go back. If you answer No, the dragged Corral returns to where it came from. ([#215](https://github.com/guHe330/DexCorral/issues/215))
 - The first Corral after installing is no longer the Catch-All, so new files saved to the desktop stay on the desktop until you choose a Catch-All tab. Existing configurations keep theirs. A new Corral moves the desktop icons beneath it aside instead of covering them. ([#215](https://github.com/guHe330/DexCorral/issues/215))
