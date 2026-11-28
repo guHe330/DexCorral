@@ -142,8 +142,9 @@ if ($exitCode -eq 0) {
     Write-Host "Registration:    $buildDir\DexCorral.exe" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "To install:   DexCorral.exe --register  (run as Admin)" -ForegroundColor Cyan
-    Write-Host "To uninstall: DexCorral.exe --unregister" -ForegroundColor Cyan
+    Write-Host "To install:   DexCorral.exe --register --scope=user  (no admin needed)" -ForegroundColor Cyan
+    Write-Host "To uninstall: DexCorral.exe --unregister --scope=user" -ForegroundColor Cyan
+    Write-Host "(--scope=machine, from an elevated prompt, only to test the all-users load path)" -ForegroundColor DarkGray
 
     # Run unit tests
     $testsExe = Join-Path $buildDir "DexCorralTests.exe"
