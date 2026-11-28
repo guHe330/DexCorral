@@ -851,19 +851,20 @@ void App::EndHoverExpand(CorralWindow *corral)
         hoverExpandedCorral = nullptr;
 }
 
-void App::RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab)
+void App::RemoveFilesFromOtherCorrals(const std::vector<std::string> &fileNames, CorralTabConfig *exceptTab)
 {
-    std::string fileNameStr = CorralWindow::WideToUtf8(fileName);
-
+    // All names in one pass: one save and one reload, not one per dropped item
     bool changed = false;
     for (auto &corral : corrals)
     {
         auto &corralConfig = corral->GetConfig();
         for (auto &tab : corralConfig.Tabs)
         {
-            if (&tab != exceptTab)
+            if (&tab == exceptTab)
+                continue;
+            for (const std::string &fileName : fileNames)
             {
-                auto it = std::find(tab.Files.begin(), tab.Files.end(), fileNameStr);
+                auto it = std::find(tab.Files.begin(), tab.Files.end(), fileName);
                 if (it != tab.Files.end())
                 {
                     tab.Files.erase(it);

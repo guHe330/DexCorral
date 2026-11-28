@@ -67,8 +67,8 @@ public:
     /// Removes a corral and all its tabs
     void RemoveCorral(CorralWindowConfig *config);
 
-    /// Removes a file from all corrals except the specified tab
-    void RemoveFileFromOtherCorrals(const std::wstring &fileName, CorralTabConfig *exceptTab);
+    /// Removes files (config entry names) from all corrals except the specified tab
+    void RemoveFilesFromOtherCorrals(const std::vector<std::string> &fileNames, CorralTabConfig *exceptTab);
 
     /// Refreshes all corrals' content (folder contents, icons, etc.)
     void RefreshAllCorrals();

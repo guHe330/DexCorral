@@ -2169,7 +2169,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
     if (GetActiveTab().IsVirtual)
         return;
 
-    bool changed = false;
+    std::vector<std::string> added;
     std::wstring desktopPath = GetDesktopPath();
     std::wstring publicDesktopPath = GetPublicDesktopPath();
 
@@ -2181,9 +2181,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         if (std::find(files.begin(), files.end(), entryUtf8) != files.end())
             return;
         files.push_back(entryUtf8);
-        changed = true;
-        if (App::GetInstance())
-            App::GetInstance()->RemoveFileFromOtherCorrals(Utf8ToWide(entryUtf8), &GetActiveTab());
+        added.push_back(entryUtf8);
     };
 
     FORMATETC fmtShellIdList = {ShellIdListFormat(), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
@@ -2296,8 +2294,10 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         ReleaseStgMedium(&stgShellIdList);
     }
 
-    if (changed)
+    if (!added.empty())
     {
+        if (App::GetInstance())
+            App::GetInstance()->RemoveFilesFromOtherCorrals(added, &GetActiveTab());
         LoadFiles();
         if (App::GetInstance())
         {
