@@ -309,6 +309,24 @@ LRESULT CALLBACK CorralWindow::EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wPa
 // Where the footer band of the rename dialog begins (dialog units)
 static const int RENAME_FOOTER_TOP = 32;
 
+struct NamePrompt
+{
+    wchar_t *name; // 256 characters: the text to start with and, on OK, the trimmed result
+    int maxLength; // Characters the edit accepts
+};
+
+/// What the name edit holds, without blanks around it
+static std::wstring NamePromptText(HWND hDlg)
+{
+    wchar_t buffer[256] = {};
+    GetDlgItemTextW(hDlg, 101, buffer, 256);
+    const std::wstring text = buffer;
+    const size_t first = text.find_first_not_of(L" \t");
+    if (first == std::wstring::npos)
+        return L"";
+    return text.substr(first, text.find_last_not_of(L" \t") - first + 1);
+}
+
 static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -316,10 +334,12 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
     case WM_INITDIALOG:
     {
         SetWindowLongPtrW(hDlg, GWLP_USERDATA, lParam);
-        wchar_t *initialText = (wchar_t *)lParam;
-        SetDlgItemTextW(hDlg, 101, initialText);
-
+        const NamePrompt *prompt = (const NamePrompt *)lParam;
         HWND hEdit = GetDlgItem(hDlg, 101);
+        SendMessageW(hEdit, EM_LIMITTEXT, prompt->maxLength, 0);
+        SetDlgItemTextW(hDlg, 101, prompt->name);
+        EnableWindow(GetDlgItem(hDlg, IDOK), !NamePromptText(hDlg).empty()); // A blank name is not a name
+
         SendMessageW(hEdit, EM_SETSEL, 0, -1);
         SetFocus(hEdit);
         DialogSkin::Attach(hDlg, RENAME_FOOTER_TOP);
@@ -357,12 +377,15 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         return FALSE;
     }
     case WM_COMMAND:
+        if (LOWORD(wParam) == 101 && HIWORD(wParam) == EN_CHANGE)
+            EnableWindow(GetDlgItem(hDlg, IDOK), !NamePromptText(hDlg).empty());
         if (LOWORD(wParam) == IDOK)
         {
-            wchar_t buffer[256];
-            GetDlgItemTextW(hDlg, 101, buffer, 256);
-            wchar_t *result = (wchar_t *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
-            wcscpy_s(result, 256, buffer);
+            const std::wstring text = NamePromptText(hDlg);
+            if (text.empty())
+                return TRUE; // OK is disabled then; this covers Enter
+            NamePrompt *prompt = (NamePrompt *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
+            wcscpy_s(prompt->name, 256, text.c_str());
             EndDialog(hDlg, IDOK);
             return TRUE;
         }
@@ -388,9 +411,11 @@ void CorralWindow::PromptRename()
 }
 
 /// Asks for a name in the small edit dialog. `name` (256 characters) holds
-/// the text to start with and, on true, what the user entered.
-static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name)
+/// the text to start with and, on true, what the user entered without blanks
+/// around it, never empty. The edit takes at most `maxLength` characters.
+static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name, int maxLength = 255)
 {
+    NamePrompt prompt = {name, maxLength};
     WORD dlgTemplate[512] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
@@ -402,7 +427,7 @@ static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 118, RENAME_FOOTER_TOP + 7, 50, 14, IDCANCEL,
                    0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_Cancel));
     return DialogBoxIndirectParamW(GetModuleHandleW(nullptr), (DLGTEMPLATE *)dlgTemplate, owner, RenameDlgProc,
-                                   (LPARAM)name) == IDOK;
+                                   (LPARAM)&prompt) == IDOK;
 }
 
 void CorralWindow::ShowRenameDialog()
@@ -416,7 +441,7 @@ void CorralWindow::ShowRenameDialog()
     blockRaise--;
     PinToBandTop();
 
-    if (result == IDOK && wcslen(nameBuffer) > 0)
+    if (result == IDOK)
     {
         int sz = WideCharToMultiByte(CP_UTF8, 0, nameBuffer, -1, nullptr, 0, nullptr, nullptr);
         std::string newTitle(sz - 1, 0);
@@ -1054,7 +1079,7 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             wchar_t name[256] = {};
             const std::string selected = AppearanceOwnPresetName(hDlg);
             wcsncpy_s(name, CorralWindow::Utf8ToWide(selected).c_str(), _TRUNCATE);
-            if (!PromptForName(hDlg, Tr(Str::Title_SavePreset), name))
+            if (!PromptForName(hDlg, Tr(Str::Title_SavePreset), name, (int)Presets::MAX_NAME))
                 return TRUE;
 
             const std::string clean = Presets::CleanName(CorralWindow::WideToUtf8(name));
