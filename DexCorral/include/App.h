@@ -109,6 +109,8 @@ public:
 
     /// Returns true while quick-hide is active (everything hidden)
     bool IsQuickHideActive() const { return quickHideActive; }
+    // The check mark of Show Desktop Icons: during quick-hide, the state it puts back
+    bool DesktopIconsShownSetting() const;
 
 
     /// Sets the default corral background color (hex format, e.g., "FF0000" for red)

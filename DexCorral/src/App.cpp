@@ -1107,8 +1107,17 @@ void App::ApplyLookToAllCorrals(const AppearanceSettings &look)
     SetDefaultAppearance(look);
 }
 
+bool App::DesktopIconsShownSetting() const
+{
+    return quickHideActive ? desktopIconsVisibleBeforeQuickHide : DesktopIcons::AreIconsVisible();
+}
+
 void App::ToggleDesktopIcons()
 {
+    // Quick-hide hid the icons and puts back the earlier state when it ends,
+    // which would undo a toggle now (the menu entries are greyed then)
+    if (quickHideActive)
+        return;
     bool currentlyVisible = DesktopIcons::AreIconsVisible();
     DesktopIcons::SetIconsVisible(!currentlyVisible);
     SaveConfig();
@@ -1805,8 +1814,7 @@ void App::ShowTrayMenu()
 
     // Icon visibility toggle. Not during quick-hide: it hid the icons and puts
     // back the state shown here when it ends, which a toggle now would undo.
-    UINT flags = (quickHideActive ? desktopIconsVisibleBeforeQuickHide : DesktopIcons::AreIconsVisible())
-                     ? MF_CHECKED : MF_UNCHECKED;
+    UINT flags = DesktopIconsShownSetting() ? MF_CHECKED : MF_UNCHECKED;
     if (quickHideActive)
         flags |= MF_GRAYED;
     AppendMenuW(menu, MF_STRING | flags, 2, Tr(Str::Menu_ShowDesktopIcons));
