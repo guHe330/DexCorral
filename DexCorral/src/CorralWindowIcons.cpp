@@ -758,6 +758,9 @@ void CorralWindow::LoadVirtualFolderIcons()
             continue;
         }
         ci.stamp = stamp;
+        // Sort By Size and Date need these in every view, not only in Details
+        ci.fileSize = stamp.size;
+        ci.modifiedTime = stamp.writeTime;
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
         // for known file types" and strips .lnk
@@ -830,6 +833,17 @@ void CorralWindow::SortVirtualIcons()
     const CorralTabConfig &tab = GetActiveTab();
     int col = tab.DetailsSortColumn;
     bool asc = tab.DetailsSortAscending;
+
+    // Only Details loads the type names: fetch them when another view sorts by type
+    if (col == 1)
+    {
+        for (auto &icon : icons)
+        {
+            SHFILEINFOW sfi = {};
+            if (icon.fileType.empty() && SHGetFileInfoW(icon.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_TYPENAME))
+                icon.fileType = sfi.szTypeName;
+        }
+    }
 
     // The selection is held as indices: it moves with its files
     const SelectionByFile selected = SaveSelectionByFile();
