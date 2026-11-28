@@ -652,10 +652,19 @@ void App::RestoreCorrals()
             corralConfig.Width = 300;
             corralConfig.Height = 200;
         }
-        if (corralConfig.Left < -1000 || corralConfig.Top < -1000)
+        // Off every connected monitor (its monitor is gone, or a corrupt value
+        // like a minimized window's -32000): the middle of the primary work
+        // area. Negative coordinates alone are fine, a monitor can sit left of
+        // or above the primary. A stored layout below still wins.
+        RECT rc = {(LONG)corralConfig.Left, (LONG)corralConfig.Top,
+                   (LONG)(corralConfig.Left + corralConfig.Width), (LONG)(corralConfig.Top + corralConfig.Height)};
+        if (!MonitorFromRect(&rc, MONITOR_DEFAULTTONULL))
         {
-            corralConfig.Left = GetSystemMetrics(SM_CXSCREEN) / 2 - 150;
-            corralConfig.Top = GetSystemMetrics(SM_CYSCREEN) / 2 - 100;
+            RECT work = {0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
+            if (const MonitorInfo *primary = monitorManager ? monitorManager->GetPrimaryMonitor() : nullptr)
+                work = primary->workArea;
+            corralConfig.Left = (work.left + work.right - corralConfig.Width) / 2;
+            corralConfig.Top = (work.top + work.bottom - corralConfig.Height) / 2;
         }
 
         // A config from 1.1.x: per-monitor positions become layouts. They
@@ -671,10 +680,14 @@ void App::RestoreCorrals()
             }
         }
 
-        auto corral = std::make_unique<CorralWindow>(corralConfig);
-        corral->Show();
-        corrals.push_back(std::move(corral));
+        corrals.push_back(std::make_unique<CorralWindow>(corralConfig));
     }
+
+    // The arrangement saved for the monitors connected now, as after a display
+    // change, before any Corral is seen at its last pixel position
+    UpdateCorralPositions();
+    for (auto &corral : corrals)
+        corral->Show();
     restoringCorrals = false;
     if (saveAfterRestore)
     {
