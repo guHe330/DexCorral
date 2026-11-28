@@ -901,7 +901,10 @@ void CorralWindow::SortVirtualIcons()
         for (auto &icon : icons)
         {
             SHFILEINFOW sfi = {};
-            if (icon.fileType.empty() && SHGetFileInfoW(icon.fullPath.c_str(), 0, &sfi, sizeof(sfi), SHGFI_TYPENAME))
+            // From the listing's attributes, never the file: the share may have gone
+            if (icon.fileType.empty() &&
+                SHGetFileInfoW(icon.fullPath.c_str(), icon.stamp.attributes, &sfi, sizeof(sfi),
+                               SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES))
                 icon.fileType = sfi.szTypeName;
         }
     }
