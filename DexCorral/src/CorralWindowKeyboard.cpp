@@ -635,8 +635,10 @@ void CorralWindow::InvokeVerbOnSelection(const char *verb)
     PinToBandTop();
 
     // Deleted entries are pruned by the reload. The folder watcher / DesktopMonitor
-    // would get here eventually; this just makes it immediate.
-    LoadFiles();
+    // would get here eventually; this just makes it immediate. Copy, cut and
+    // properties change nothing in the folder.
+    if (strcmp(verb, "delete") == 0)
+        LoadFiles();
 }
 
 void CorralWindow::InvokeVerbOnFolder(const char *verb)
