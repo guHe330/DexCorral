@@ -180,8 +180,8 @@ const wchar_t *const kEnglish[] = {
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
                                    L"Free software under the GNU General Public License, version 3 or later. "
                                    L"It comes with no warranty.",
-    /* Btn_Website */              L"Website",
-    /* Btn_License */              L"License",
+    /* Btn_Website */              L"&Website",
+    /* Btn_License */              L"&License",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral update available",
@@ -505,8 +505,8 @@ const wchar_t *const kGerman[] = {
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
                                    L"Freie Software unter der GNU General Public License, Version 3 oder später. "
                                    L"Es besteht keinerlei Garantie.",
-    /* Btn_Website */              L"Website",
-    /* Btn_License */              L"Lizenz",
+    /* Btn_Website */              L"&Website",
+    /* Btn_License */              L"&Lizenz",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral-Update verfügbar",
