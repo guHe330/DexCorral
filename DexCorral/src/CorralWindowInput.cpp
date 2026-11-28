@@ -1375,13 +1375,15 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
             // The drag becomes an undo step that either answer takes back: on No
             // this Corral returns to where it came from, on Yes the icons it
             // pushed on the way go back before it joins the target.
-            app->CommitMoveUndo(this, true);
+            const unsigned step = app->CommitMoveUndo(this, true);
             const bool merge = MessageBoxBehind(Tr(Str::Confirm_MergeCorralsBody), Tr(Str::Confirm_MergeCorralsTitle),
                                                 MB_YESNO | MB_ICONQUESTION) == IDYES &&
                                canMergeInto(target); // The box ran a message loop: the target may be gone
             if (merge)
                 Hide(); // Not seen jumping back first
-            const bool undone = app->UndoLastMove(this);
+            // Only this drag's step: the box ran a message loop, and Undo Last
+            // Move from a menu may have taken it already
+            const bool undone = step && app->UndoLastMove(this, step);
             if (merge)
             {
                 app->InvalidateDesktopIconCache(); // When nothing was undone, Commit left it valid

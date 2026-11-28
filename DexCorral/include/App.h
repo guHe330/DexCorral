@@ -218,10 +218,12 @@ public:
     /// Begin: a drag or resize may start (the icon cache must be fresh).
     /// Commit: it ended, after the final push; `moved` = past the drag threshold.
     void BeginMoveUndo(CorralWindow *corral);
-    void CommitMoveUndo(CorralWindow *corral, bool moved);
+    // Returns the step's serial, or 0 when no step was recorded
+    unsigned CommitMoveUndo(CorralWindow *corral, bool moved);
     bool CanUndoMove() const { return !moveUndoStack.empty(); }
     /// `only`: undo only if the last step is that Corral's. True if a step was undone.
-    bool UndoLastMove(CorralWindow *only = nullptr);
+    // only / serial: undo nothing unless the newest step is that Corral's / that one
+    bool UndoLastMove(CorralWindow *only = nullptr, unsigned serial = 0);
 
     void UpdateHookHiddenIcons();           // Push hidden icon list to shared memory
     void PositionHiddenIconsUnderCorrals(); // Reposition hidden icons to match corral scroll state
@@ -384,7 +386,9 @@ private:
         CorralWindow *corral = nullptr;
         int left = 0, top = 0, width = 0, height = 0; // height unrolled
         std::vector<DesktopIconInfo> iconsBefore, iconsAfter;
+        unsigned serial = 0;
     };
+    unsigned moveUndoSerial = 0;
     MoveUndoRecord pendingMoveUndo;            // corral == nullptr: none
     std::vector<MoveUndoRecord> moveUndoStack; // newest last
     void ClearMoveUndo();

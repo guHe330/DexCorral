@@ -883,25 +883,28 @@ void App::BeginMoveUndo(CorralWindow *corral)
     pendingMoveUndo = {corral, place.left, place.top, place.width, place.height, cachedDesktopIconPositions, {}};
 }
 
-void App::CommitMoveUndo(CorralWindow *corral, bool moved)
+unsigned App::CommitMoveUndo(CorralWindow *corral, bool moved)
 {
     MoveUndoRecord record = std::move(pendingMoveUndo);
     pendingMoveUndo = {};
 
     // A click that never became a move leaves the earlier steps as they are
     if (!moved || !corral || record.corral != corral)
-        return;
+        return 0;
 
     // Read the positions back instead of trusting the ones the push asked
     // for: Explorer may have snapped an icon to its own grid
     CacheDesktopIconPositions();
     record.iconsAfter = cachedDesktopIconPositions;
+    const unsigned serial = record.serial = ++moveUndoSerial; // From 1: 0 means no step
     UndoMove::PushCapped(moveUndoStack, std::move(record), MOVE_UNDO_DEPTH);
+    return serial;
 }
 
-bool App::UndoLastMove(CorralWindow *only)
+bool App::UndoLastMove(CorralWindow *only, unsigned serial)
 {
-    if (moveUndoStack.empty() || (only && moveUndoStack.back().corral != only))
+    if (moveUndoStack.empty() || (only && moveUndoStack.back().corral != only) ||
+        (serial && moveUndoStack.back().serial != serial))
         return false;
     MoveUndoRecord record = std::move(moveUndoStack.back());
     moveUndoStack.pop_back();
