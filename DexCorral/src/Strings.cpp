@@ -121,8 +121,9 @@ const wchar_t *const kEnglish[] = {
                                    L"and their settings are saved.\n\n"
                                    L"DexCorral stays paused, also after a restart, until you right-click its "
                                    L"tray icon and choose \"Resume DexCorral\".\n\n"
-                                   L"If it happens again, please report it. \"Open Config Folder\" in the same "
-                                   L"menu shows guard.log and config.json, which are what a report needs.",
+                                   L"If it happens again, please report it. \"Settings...\" in the same menu has "
+                                   L"an \"Open Config Folder\" button that shows guard.log and config.json, which "
+                                   L"are what a report needs.",
     /* Resume_FailedTitle */       L"DexCorral could not resume",
     /* Resume_FailedBody */        L"The desktop was not ready. Sign out and back in, and DexCorral will start "
                                    L"normally.",
@@ -438,9 +439,9 @@ const wchar_t *const kGerman[] = {
                                    L"DexCorral bleibt pausiert, auch nach einem Neustart, bis Sie mit der rechten "
                                    L"Maustaste auf das Symbol im Infobereich klicken und \"DexCorral fortsetzen\" "
                                    L"wählen.\n\n"
-                                   L"Sollte es erneut passieren, melden Sie es bitte. \"Konfigurationsordner "
-                                   L"öffnen\" im selben Menü zeigt guard.log und config.json, die für eine Meldung "
-                                   L"gebraucht werden.",
+                                   L"Sollte es erneut passieren, melden Sie es bitte. \"Einstellungen...\" im "
+                                   L"selben Menü hat eine Schaltfläche \"Konfigurationsordner öffnen\", die "
+                                   L"guard.log und config.json zeigt, die für eine Meldung gebraucht werden.",
     /* Resume_FailedTitle */       L"DexCorral konnte nicht fortgesetzt werden",
     /* Resume_FailedBody */        L"Der Desktop war nicht bereit. Nach dem Ab- und Anmelden startet DexCorral "
                                    L"normal.",
