@@ -43,10 +43,8 @@ TrayIcon::~TrayIcon()
 
 bool TrayIcon::Show()
 {
-    if (m_visible) {
-        Shell_NotifyIconW(NIM_MODIFY, &nid);
-        return true;
-    }
+    if (m_visible)
+        return Shell_NotifyIconW(NIM_MODIFY, &nid) != FALSE;
     if (Shell_NotifyIconW(NIM_ADD, &nid)) {
         m_visible = true;
         return true;

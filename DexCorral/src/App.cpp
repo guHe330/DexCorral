@@ -2915,7 +2915,11 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         DllLog(L"App: WM_TASKBARCREATED — Explorer restarted, retrying tray icon");
         if (app->trayIcon)
         {
-            app->trayIcon->Show();
+            // The new taskbar knows no icon of ours, even when the old one did:
+            // forget it and add it again (NIM_MODIFY alone would fail quietly)
+            app->trayIcon->Hide();
+            if (!app->trayIcon->Show())
+                SetTimer(hwnd, TRAY_RETRY_TIMER, 500, nullptr);
             ShowSafeModeNoticeIfPending(app->trayIcon.get());
             ShowConfigNoticeIfPending(app->trayIcon.get());
         }
