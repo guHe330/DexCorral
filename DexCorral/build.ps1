@@ -33,6 +33,9 @@ if (Test-Path $hookDll) {
         # kills every other signed-in user's desktop.
         $session = (Get-Process -Id $PID).SessionId
         $explorers = Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session
+        # Our own restart, not a crash: clear the crash guard's "hook just installed"
+        # flag first, as the installer's RestartExplorer does (CrashGuard.h).
+        Remove-ItemProperty -Path "HKCU:\Software\DexCorral" -Name "HookStartPending" -ErrorAction SilentlyContinue
         $explorers | Stop-Process -Force -ErrorAction SilentlyContinue
         $explorers | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
         # Winlogon usually restarts the shell by itself. Start it only if it stays
