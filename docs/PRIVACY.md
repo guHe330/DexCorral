@@ -9,8 +9,8 @@ Everything stays on your PC.
 | What | Where |
 |---|---|
 | Your configuration | `%AppData%\DexCorral\config.json` |
-| Install location, language, autostart, shell-extension registration | Registry; full table under [Configuration](USER_MANUAL.md#configuration) in the User Manual |
-| Debug logs, written only while **Debug Logging** is on | `%AppData%\DexCorral\*.log` |
+| Install location, language, autostart, shell-extension registration | Registry; full table under [What DexCorral writes outside its own folder](TECHNICAL_NOTES.md#what-dexcorral-writes-outside-its-own-folder) in the Technical Notes |
+| Debug logs, written only while **Write debug logs** is on in the settings window | `%AppData%\DexCorral\*.log` |
 
 Alongside your corral names, positions and tab settings, `config.json` **holds the full path of every file you have organized into a corral**. That is how corrals survive a restart. It never leaves your PC on its own, but it is also the file [CONTRIBUTING.md](CONTRIBUTING.md) asks for in bug reports, so read it over and redact before attaching it to a public issue.
 
@@ -68,5 +68,5 @@ Every release also ships a build provenance attestation, confirming the binary y
 downloaded was built by this repository's release workflow from the tagged source:
 
 ```powershell
-gh attestation verify DexCorral_1.0.28_Setup.exe --repo guHe330/DexCorral
+gh attestation verify DexCorral_<version>_Setup.exe --repo guHe330/DexCorral
 ```
