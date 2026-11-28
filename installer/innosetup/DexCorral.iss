@@ -261,7 +261,7 @@ begin
   if ActiveLanguage = 'german' then
     Msg := 'DexCorral ist bereits für alle Benutzer dieses PCs installiert:' + #13#10 +
            '  ' + Dir + '  (Version ' + Version + ')' + #13#10 + #13#10 +
-           'Eine Installation nur für dich würde diese Version für dein Konto verdecken. ' +
+           'Eine Installation nur für Sie würde diese Version für Ihr Konto verdecken. ' +
            'Beide Varianten teilen sich dieselbe Registrierung und dürfen nicht nebeneinander bestehen.' + #13#10 + #13#10 +
            'Die vorhandene Installation jetzt entfernen und fortfahren? ' +
            '(Dafür sind Administratorrechte erforderlich.)'
@@ -284,10 +284,10 @@ begin
   if not RunOtherUninstaller(HKLM64) then begin
     if ActiveLanguage = 'german' then
       Result := 'Die vorhandene systemweite Installation konnte nicht entfernt werden. ' +
-                'Bitte deinstalliere DexCorral über "Apps & Features" und starte Setup erneut.'
+                'Bitte deinstallieren Sie DexCorral unter "Installierte Apps" und starten Sie Setup erneut.'
     else
       Result := 'The existing all-users installation could not be removed. ' +
-                'Please uninstall DexCorral from "Apps & Features" and run Setup again.';
+                'Please uninstall DexCorral from "Installed apps" and run Setup again.';
     Exit;
   end;
 
@@ -330,13 +330,13 @@ begin
     Msg := 'Auf diesem PC ist DexCorral bereits für einzelne Benutzer installiert:' + #13#10 + #13#10 +
            Found + #13#10 +
            'Diese Installationen verdecken die systemweite Version für die betreffenden Konten. ' +
-           'Nur der jeweilige Benutzer kann sie entfernen (über "Apps & Features").' + #13#10 + #13#10 +
+           'Nur der jeweilige Benutzer kann sie entfernen (unter "Installierte Apps").' + #13#10 + #13#10 +
            'Trotzdem für alle Benutzer installieren?'
   else
     Msg := 'DexCorral is already installed for individual users on this PC:' + #13#10 + #13#10 +
            Found + #13#10 +
            'Those installations will shadow this all-users version for the accounts that own ' +
-           'them. Only the user in question can remove one, from "Apps & Features".' + #13#10 + #13#10 +
+           'them. Only the user in question can remove one, from "Installed apps".' + #13#10 + #13#10 +
            'Install for all users anyway?';
 
   // Only a warning: a silent deployment goes ahead
@@ -515,7 +515,7 @@ begin
     Msg := 'DexCorral kann nicht installiert werden, solange Stardock Fences auf diesem PC installiert ist.' + #13#10 + #13#10 +
            'Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, werden die von ' +
            'DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt gezeichnet.' + #13#10 + #13#10 +
-           'Welches der beiden du nutzt, entscheidest du: Stardock Fences deinstallieren und Setup erneut ' +
+           'Welches der beiden Sie nutzen, entscheiden Sie: Stardock Fences deinstallieren und Setup erneut ' +
            'starten, oder Fences behalten und auf DexCorral verzichten.' + #13#10 + #13#10 +
            'Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner Verbindung zu Stardock.'
   else
