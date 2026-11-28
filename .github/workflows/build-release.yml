@@ -117,6 +117,14 @@ jobs:
     - name: Build Release
       run: cmake --build DexCorral/build --config Release
 
+    # Same step as ci.yml. A tag can sit on a commit CI never passed, so the
+    # tests run here too before anything is packaged.
+    - name: Run tests
+      shell: pwsh
+      run: |
+        & "DexCorral/build/Release/DexCorralTests.exe"
+        if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+
     - name: Prepare portable readme
       shell: pwsh
       run: |
