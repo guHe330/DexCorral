@@ -29,9 +29,20 @@ if (Test-Path $hookDll) {
     } catch {
         Write-Host "  DexCorralHook.dll is locked (loaded by Explorer as shell extension)" -ForegroundColor Yellow
         Write-Host "  Restarting Explorer to unlock DLL..." -ForegroundColor Yellow
-        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 3
-        Start-Process explorer.exe
+        # Only this session's Explorer: from an elevated prompt -Name alone also
+        # kills every other signed-in user's desktop.
+        $session = (Get-Process -Id $PID).SessionId
+        $explorers = Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session
+        $explorers | Stop-Process -Force -ErrorAction SilentlyContinue
+        $explorers | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+        # Winlogon usually restarts the shell by itself. Start it only if it stays
+        # down: a second explorer.exe next to a running shell opens a folder window.
+        for ($i = 0; $i -lt 20 -and -not (Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session); $i++) {
+            Start-Sleep -Milliseconds 500
+        }
+        if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session)) {
+            Start-Process explorer.exe
+        }
         Start-Sleep -Seconds 3
     }
 }
