@@ -975,7 +975,8 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                                          x >= scrollbarRegionLeft &&
                                          y >= window->GetIconAreaTop();
 
-            window->isScrollbarHovered = isOverScrollbarRegion;
+            // Mid-drag the bar stays wide: collapsing it changes the thumb's scale
+            window->isScrollbarHovered = isOverScrollbarRegion || window->isDraggingScrollbar;
 
             // Redraw if hover state changed
             if (wasHovered != window->isScrollbarHovered)
