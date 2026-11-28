@@ -1124,6 +1124,16 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
     // A double-click cancels any pending (deferred) rename — the user wants to open.
     CancelPendingRename();
 
+    // On a button (nav up, scrollbar, column header) the second of two fast clicks
+    // is just another click: going up two folders must not roll the Corral up.
+    RECT nb = IsNavBackVisible() ? GetNavBackButtonRect() : RECT{};
+    POINT p = {x, y};
+    if (PtInRect(&nb, p) || HitTestScrollbar(x, y) || HitTestDetailsHeader(x, y) >= 0)
+    {
+        OnLeftButtonDown(x, y);
+        return;
+    }
+
     // Double-click on title bar toggles roll-up
     if (y < GetTitleBarHeight())
     {
