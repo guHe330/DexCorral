@@ -238,7 +238,8 @@ if ($exitCode -eq 0) {
                     Write-Host "Installer:   $($setupExe.FullName)" -ForegroundColor Green
                 }
             } else {
-                Write-Host "Installer build failed (exit code $LASTEXITCODE)" -ForegroundColor Yellow
+                $exitCode = $LASTEXITCODE
+                Write-Host "Installer build failed (exit code $exitCode)" -ForegroundColor Red
             }
         }
     } else {
