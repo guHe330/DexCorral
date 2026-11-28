@@ -332,22 +332,23 @@ void CorralWindow::DoResize(int screenX, int screenY)
         newHeight += dy;
     }
 
-    // Minimum size constraints
-    if (newWidth < 100)
+    // Minimum size constraints (logical, so the header still fits at high DPI)
+    const int minWidth = Dpi(100), minHeight = Dpi(80);
+    if (newWidth < minWidth)
     {
         if (resizeMode == HTLEFT || resizeMode == HTTOPLEFT || resizeMode == HTBOTTOMLEFT)
         {
-            newLeft = resizeStartRect.right - 100;
+            newLeft = resizeStartRect.right - minWidth;
         }
-        newWidth = 100;
+        newWidth = minWidth;
     }
-    if (newHeight < 80)
+    if (newHeight < minHeight)
     {
         if (resizeMode == HTTOP || resizeMode == HTTOPLEFT || resizeMode == HTTOPRIGHT)
         {
-            newTop = resizeStartRect.bottom - 80;
+            newTop = resizeStartRect.bottom - minHeight;
         }
-        newHeight = 80;
+        newHeight = minHeight;
     }
 
     // Apply snap to resize unless Shift is held
@@ -846,21 +847,22 @@ void CorralWindow::ApplyResizeSnap(int &newLeft, int &newTop, int &newWidth, int
     }
 
     // Enforce minimum size (adjusting position for left/top edge resizing)
-    if (newWidth < 100)
+    const int minWidth = Dpi(100), minHeight = Dpi(80);
+    if (newWidth < minWidth)
     {
         if (resizingLeft)
         {
-            newLeft -= (100 - newWidth);
+            newLeft -= (minWidth - newWidth);
         }
-        newWidth = 100;
+        newWidth = minWidth;
     }
-    if (newHeight < 80)
+    if (newHeight < minHeight)
     {
         if (resizingTop)
         {
-            newTop -= (80 - newHeight);
+            newTop -= (minHeight - newHeight);
         }
-        newHeight = 80;
+        newHeight = minHeight;
     }
 }
 
