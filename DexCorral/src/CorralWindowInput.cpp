@@ -1757,7 +1757,14 @@ namespace
                IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
     }
 
-    /// True if at least one CF_HDROP file is, by name, a file on the desktop.
+    /// True if a CF_HDROP path names an existing item on the user or public desktop.
+    /// Its folder counts, not just its name: a file elsewhere may share a desktop file's name.
+    bool IsHdropDesktopFile(const wchar_t *filePath)
+    {
+        return IsDesktopItem(filePath) && GetFileAttributesW(filePath) != INVALID_FILE_ATTRIBUTES;
+    }
+
+    /// True if at least one CF_HDROP file is a file on the desktop.
     bool HdropHasDesktopFile(IDataObject *data)
     {
         FORMATETC fmt = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
@@ -1768,17 +1775,13 @@ namespace
         bool found = false;
         if (HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal))
         {
-            std::wstring desktop = CorralWindow::GetDesktopPath();
-            std::wstring publicDesktop = CorralWindow::GetPublicDesktopPath();
             UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
             for (UINT i = 0; i < count && !found; i++)
             {
                 wchar_t filePath[MAX_PATH];
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
-                std::wstring name = NameOf(filePath);
-                found = GetFileAttributesW((desktop + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES ||
-                        GetFileAttributesW((publicDesktop + L"\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES;
+                found = IsHdropDesktopFile(filePath);
             }
             GlobalUnlock(stg.hGlobal);
         }
@@ -2170,8 +2173,6 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         return;
 
     std::vector<std::string> added;
-    std::wstring desktopPath = GetDesktopPath();
-    std::wstring publicDesktopPath = GetPublicDesktopPath();
 
     auto addEntry = [&](const std::string &entryUtf8)
     {
@@ -2189,7 +2190,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
 
     // CF_HDROP: only for a source that offers no shell ID list. It carries bare
     // paths, and the desktop shell resolves .lnk shortcuts in it (it gives the
-    // target path), so all it can do is match names against the desktop.
+    // target path), so all it can do is take the files that lie on the desktop.
     FORMATETC fmtHdrop = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
     STGMEDIUM stgHdrop = {};
 
@@ -2205,16 +2206,8 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
 
-                std::wstring fileName = NameOf(filePath);
-                std::wstring userPath = desktopPath + L"\\" + fileName;
-                std::wstring pubPath = publicDesktopPath + L"\\" + fileName;
-                if (GetFileAttributesW(userPath.c_str()) == INVALID_FILE_ATTRIBUTES &&
-                    GetFileAttributesW(pubPath.c_str()) == INVALID_FILE_ATTRIBUTES)
-                {
-                    continue;
-                }
-
-                addEntry(WideToUtf8(fileName));
+                if (IsHdropDesktopFile(filePath))
+                    addEntry(WideToUtf8(NameOf(filePath)));
             }
             GlobalUnlock(stgHdrop.hGlobal);
         }
