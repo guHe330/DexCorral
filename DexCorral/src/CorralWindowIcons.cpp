@@ -1020,10 +1020,13 @@ void CorralWindow::InitializeFolderWatcher()
     // Watch the parent folder too: a rename/delete of the current folder itself is
     // reported to its parent, not to the folder we are viewing.
     size_t slash = folderPath.find_last_of(L"\\/");
-    if (slash != std::wstring::npos && slash > 0)
+    // A drive root itself ("D:\") has no parent to watch.
+    if (slash != std::wstring::npos && slash > 0 && slash + 1 < folderPath.size())
     {
         std::wstring parentPath = folderPath.substr(0, slash);
-        // Skip degenerate parents like "C:" (drive root has no separate parent dir to watch).
+        // A folder right on a drive: its parent is the root "D:\", not "D:"
+        if (parentPath.size() == 2 && parentPath[1] == L':')
+            parentPath += L'\\';
         if (parentPath.size() > 2)
         {
             parentWatcher = std::make_unique<FolderWatcher>();
