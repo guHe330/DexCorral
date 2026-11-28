@@ -312,7 +312,9 @@ bool Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
         if (!MoveFileExW(wTmp.c_str(), wPath.c_str(),
                          MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
         {
+            const DWORD error = GetLastError(); // The caller logs the move's error, not the cleanup's
             DeleteFileW(wTmp.c_str()); // leave the existing config intact
+            SetLastError(error);
             return false;
         }
         return true;

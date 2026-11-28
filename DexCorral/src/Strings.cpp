@@ -157,6 +157,10 @@ const wchar_t *const kEnglish[] = {
     /* Config_ResetBody */         L"config.json could not be read and no backup was usable, so DexCorral started "
                                    L"with a fresh layout. The unreadable file was kept as config.corrupt.json in "
                                    L"%APPDATA%\\DexCorral.",
+    /* Save_FailedTitle */         L"DexCorral could not save your changes",
+    /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral could not be written. Your changes last "
+                                   L"until you sign out, but they are not saved. Check that the file is not "
+                                   L"read-only.",
 
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Hotkey not available",
@@ -467,6 +471,10 @@ const wchar_t *const kGerman[] = {
     /* Config_ResetBody */         L"config.json konnte nicht gelesen werden und es gab keine brauchbare Sicherung, "
                                    L"daher startet DexCorral mit einem neuen Layout. Die unlesbare Datei liegt als "
                                    L"config.corrupt.json in %APPDATA%\\DexCorral.",
+    /* Save_FailedTitle */         L"DexCorral konnte Ihre Änderungen nicht speichern",
+    /* Save_FailedBody */          L"config.json in %APPDATA%\\DexCorral konnte nicht geschrieben werden. Ihre "
+                                   L"Änderungen bleiben bis zur Abmeldung erhalten, werden aber nicht gespeichert. "
+                                   L"Prüfen Sie, ob die Datei schreibgeschützt ist.",
 
     // Quick-hide hotkey could not be registered
     /* Hotkey_FailedTitle */       L"Tastenkürzel nicht verfügbar",

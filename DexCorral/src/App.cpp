@@ -686,7 +686,17 @@ void App::FlushConfigWrite()
     if (messageWindow)
         KillTimer(messageWindow, CONFIG_WRITE_TIMER);
     if (!Config::Save(config))
+    {
         DllLog(L"App: config.json could not be written (error %lu); the change is not saved", GetLastError());
+        // Once a session: every later change fails the same way
+        static bool told = false;
+        if (!told)
+        {
+            told = true;
+            s_Notices.emplace_back(Str::Save_FailedTitle, Tr(Str::Save_FailedBody));
+            ShowNextNotice(trayIcon.get(), messageWindow);
+        }
+    }
 }
 
 void App::RestoreCorrals()

@@ -727,6 +727,17 @@ TEST_F(ConfigFiles, SaveReportsFailure_AndLeavesTheFileAlone) {
     EXPECT_FALSE(Exists(path));
 }
 
+TEST_F(ConfigFiles, SaveOverReadOnlyFile_FailsWithTheMovesError) {
+    WriteText(path, "{}");
+    SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_READONLY);
+    EXPECT_FALSE(Config::SaveTo(path, OneCorral(1)));
+    const DWORD error = GetLastError(); // Not the temp file cleanup's
+    SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+    EXPECT_EQ(error, (DWORD)ERROR_ACCESS_DENIED);
+    EXPECT_EQ(ReadText(path), "{}");
+    EXPECT_FALSE(Exists(path + L".tmp"));
+}
+
 TEST_F(ConfigFiles, SaveThenLoad_RoundTripsAndKeepsBackup) {
     EXPECT_TRUE(Config::SaveTo(path, OneCorral(444)));
 
