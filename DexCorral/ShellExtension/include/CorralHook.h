@@ -23,7 +23,8 @@ bool InitializeCorralHook();
 void CleanupCorralHook();
 
 // Explorer is exiting normally: clear the crash guard's sentinel and nothing
-// else. Safe from DllMain during process termination, unlike CleanupCorralHook.
+// else. Registry writes only, no logging, so it is safe from DllMain during
+// process termination, unlike CleanupCorralHook.
 void MarkCorralHookCleanExit();
 
 /**

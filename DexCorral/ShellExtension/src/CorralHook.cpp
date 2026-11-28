@@ -2324,7 +2324,11 @@ void CleanupCorralHook() {
 }
 
 void MarkCorralHookCleanExit() {
-    MarkHookSessionStable(L"clean shutdown");
+    // MarkHookSessionStable without its logging: that asks the shell for a
+    // folder and opens files, which must not happen under the loader lock
+    if (!g_CrashSentinelArmed) return;
+    g_CrashSentinelArmed = false;
+    WriteGuardState(CrashGuardAfterStableSession(ReadGuardState()));
 }
 
 bool IsCorralHookActive() { return g_HookActive; }
