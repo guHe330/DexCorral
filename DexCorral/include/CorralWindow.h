@@ -377,6 +377,7 @@ private:
     void DeleteCorral();
     void ToggleRollUp();
     void ToggleCatchAll();
+    void ShowExtensionsDialog(); // New Files by Extension...
     void SetViewMode(ViewMode mode);
 
     // Hover-expand for rolled-up corrals

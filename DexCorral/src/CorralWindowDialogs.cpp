@@ -33,6 +33,7 @@
 #include "DialogSkin.h"
 #include "Presets.h"
 #include "IconUtils.h"
+#include "ExtensionList.h"
 #include <vector>
 #include "App.h"
 #include "Constants.h"
@@ -335,6 +336,7 @@ struct NamePrompt
 {
     wchar_t *name; // 256 characters: the text to start with and, on OK, the trimmed result
     int maxLength; // Characters the edit accepts
+    const wchar_t *cue; // Grey hint while the edit is empty; with one, empty is an answer too
 };
 
 /// What the name edit holds, without blanks around it
@@ -360,7 +362,9 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         HWND hEdit = GetDlgItem(hDlg, 101);
         SendMessageW(hEdit, EM_LIMITTEXT, prompt->maxLength, 0);
         SetDlgItemTextW(hDlg, 101, prompt->name);
-        EnableWindow(GetDlgItem(hDlg, IDOK), !NamePromptText(hDlg).empty()); // A blank name is not a name
+        if (prompt->cue)
+            SendMessageW(hEdit, EM_SETCUEBANNER, TRUE, (LPARAM)prompt->cue);
+        EnableWindow(GetDlgItem(hDlg, IDOK), prompt->cue || !NamePromptText(hDlg).empty()); // A blank name is not a name
 
         SendMessageW(hEdit, EM_SETSEL, 0, -1);
         SetFocus(hEdit);
@@ -400,13 +404,16 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
     }
     case WM_COMMAND:
         if (LOWORD(wParam) == 101 && HIWORD(wParam) == EN_CHANGE)
-            EnableWindow(GetDlgItem(hDlg, IDOK), !NamePromptText(hDlg).empty());
+        {
+            const NamePrompt *prompt = (const NamePrompt *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
+            EnableWindow(GetDlgItem(hDlg, IDOK), (prompt && prompt->cue) || !NamePromptText(hDlg).empty());
+        }
         if (LOWORD(wParam) == IDOK)
         {
             const std::wstring text = NamePromptText(hDlg);
-            if (text.empty())
-                return TRUE; // OK is disabled then; this covers Enter
             NamePrompt *prompt = (NamePrompt *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
+            if (!prompt || (text.empty() && !prompt->cue))
+                return TRUE; // OK is disabled then; this covers Enter
             wcscpy_s(prompt->name, 256, text.c_str());
             EndDialog(hDlg, IDOK);
             return TRUE;
@@ -435,9 +442,11 @@ void CorralWindow::PromptRename()
 /// Asks for a name in the small edit dialog. `name` (256 characters) holds
 /// the text to start with and, on true, what the user entered without blanks
 /// around it, never empty. The edit takes at most `maxLength` characters.
-static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name, int maxLength = 255)
+/// With a `cue` (a grey hint for the empty edit), empty is a valid answer.
+static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name, int maxLength = 255,
+                          const wchar_t *cue = nullptr)
 {
-    NamePrompt prompt = {name, maxLength};
+    NamePrompt prompt = {name, maxLength, cue};
     WORD dlgTemplate[512] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
@@ -478,6 +487,60 @@ void CorralWindow::ShowRenameDialog()
             App::GetInstance()->SaveConfig();
         }
     }
+}
+
+void CorralWindow::ShowExtensionsDialog()
+{
+    App *app = App::GetInstance();
+    if (!app || GetActiveTab().IsVirtual)
+        return;
+
+    wchar_t buffer[256] = {};
+    wcsncpy_s(buffer, Utf8ToWide(GetActiveTab().Extensions).c_str(), _TRUNCATE);
+    blockRaise++; // The prompt is owned by this corral: see MessageBoxBehind
+    const bool ok = PromptForName(hwnd, Tr(Str::Dlg_NewFilesByExtension), buffer, 255, Tr(Str::Hint_Extensions));
+    blockRaise--;
+    PinToBandTop();
+    if (!ok)
+        return;
+
+    // An extension belongs to one tab: ask before taking one from another tab
+    std::vector<std::wstring> wanted = ExtensionList::Parse(buffer);
+    std::wstring taken;
+    for (const auto &corral : app->GetCorrals())
+    {
+        for (const auto &tab : corral->GetConfig().Tabs)
+        {
+            if (&tab == &GetActiveTab())
+                continue;
+            for (const auto &ext : ExtensionList::Parse(Utf8ToWide(tab.Extensions)))
+            {
+                if (std::find(wanted.begin(), wanted.end(), ext) != wanted.end())
+                    taken += (taken.empty() ? L"" : L"\n") + ext + L": " + Utf8ToWide(tab.Title);
+            }
+        }
+    }
+    const bool takeOver = taken.empty() ||
+                          MessageBoxBehind(TrFmt(Str::Confirm_ExtensionsTakenBody, taken).c_str(),
+                                           Tr(Str::Dlg_NewFilesByExtension), MB_YESNO | MB_ICONQUESTION) == IDYES;
+    for (const auto &corral : app->GetCorrals())
+    {
+        for (auto &tab : corral->GetConfig().Tabs)
+        {
+            if (&tab == &GetActiveTab())
+                continue;
+            std::vector<std::wstring> theirs = ExtensionList::Parse(Utf8ToWide(tab.Extensions));
+            if (takeOver)
+            {
+                ExtensionList::Remove(theirs, wanted);
+                tab.Extensions = WideToUtf8(ExtensionList::Join(theirs));
+            }
+            else
+                ExtensionList::Remove(wanted, theirs); // No: they stay where they are
+        }
+    }
+    GetActiveTab().Extensions = WideToUtf8(ExtensionList::Join(wanted));
+    app->SaveConfig();
 }
 
 // ============================================================================
