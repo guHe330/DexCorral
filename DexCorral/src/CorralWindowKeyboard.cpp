@@ -56,6 +56,50 @@ std::vector<int> CorralWindow::GetSelectedIndices() const
     return result;
 }
 
+// Special shell icons have no path; their fileName ("shell:{CLSID}") is unique
+static std::wstring IconKey(const CorralIcon &icon)
+{
+    return icon.fullPath.empty() ? CorralWindow::Utf8ToWide(icon.fileName) : icon.fullPath;
+}
+
+CorralWindow::SelectionByFile CorralWindow::SaveSelectionByFile() const
+{
+    SelectionByFile saved;
+    auto key = [this](int i) { return i >= 0 && i < (int)icons.size() ? IconKey(icons[i]) : std::wstring(); };
+    for (int i : selection)
+        if (i >= 0 && i < (int)icons.size())
+            saved.selected.insert(IconKey(icons[i]));
+    saved.focus = key(selectedIcon);
+    saved.anchor = key(selectionAnchor);
+    saved.rename = key(pendingRenameIcon);
+    return saved;
+}
+
+void CorralWindow::RestoreSelectionByFile(const SelectionByFile &saved)
+{
+    selection.clear();
+    selectedIcon = selectionAnchor = -1;
+    int rename = -1;
+    for (int i = 0; i < (int)icons.size(); i++)
+    {
+        const std::wstring k = IconKey(icons[i]);
+        if (k.empty())
+            continue; // Would match "none" below
+        if (saved.selected.count(k))
+            selection.insert(i);
+        if (k == saved.focus)
+            selectedIcon = i;
+        if (k == saved.anchor)
+            selectionAnchor = i;
+        if (k == saved.rename)
+            rename = i;
+    }
+    if (pendingRenameIcon >= 0 && rename < 0)
+        CancelPendingRename(); // Its file is gone
+    else
+        pendingRenameIcon = rename;
+}
+
 void CorralWindow::ClearSelection()
 {
     selection.clear();

@@ -537,6 +537,15 @@ private:
     int selectionAnchor = -1;
     int hoveredIcon = -1;
 
+    // The indices above, by file, across a sort or reload that reorders `icons`
+    struct SelectionByFile
+    {
+        std::set<std::wstring> selected;
+        std::wstring focus, anchor, rename;
+    };
+    SelectionByFile SaveSelectionByFile() const;
+    void RestoreSelectionByFile(const SelectionByFile &saved);
+
     // Rubber-band selection (drag on empty corral space)
     bool isRubberBanding = false;
     POINT rubberBandStart = {};   // Content coords (scroll applied)

@@ -831,6 +831,9 @@ void CorralWindow::SortVirtualIcons()
     int col = tab.DetailsSortColumn;
     bool asc = tab.DetailsSortAscending;
 
+    // The selection is held as indices: it moves with its files
+    const SelectionByFile selected = SaveSelectionByFile();
+
     std::stable_sort(icons.begin(), icons.end(),
                      [col, asc](const CorralIcon &a, const CorralIcon &b)
                      {
@@ -863,6 +866,8 @@ void CorralWindow::SortVirtualIcons()
 
                          return asc ? (cmp < 0) : (cmp > 0);
                      });
+
+    RestoreSelectionByFile(selected);
 }
 
 // ============================================================================
