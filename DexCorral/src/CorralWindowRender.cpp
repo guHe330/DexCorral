@@ -1014,8 +1014,9 @@ void CorralWindow::UpdateLayeredContent()
                 int dateCol = detailCols[3].left;
                 int syncCol = detailCols[3].right;
 
-                // Draw detail columns (DrawThemeTextEx ignores clip regions, so guard visibility)
-                if (drawTop >= visibleTop && drawBottom <= visibleBottom)
+                // Draw detail columns. DrawThemeTextEx ignores clip regions: the label
+                // layer's bounds clip a part-visible row, the back buffer needs a guard.
+                if (useLabelLayer || (drawTop >= visibleTop && drawBottom <= visibleBottom))
                 {
                     // Draw name (bright white)
                     RECT nameRect = {nameCol, drawTop, typeCol - Dpi(4), drawBottom};
@@ -1236,11 +1237,11 @@ void CorralWindow::UpdateLayeredContent()
                     labelTop,
                     icon.rect.right,
                     drawBottom};
-                // Only draw if label area is fully within visible region.
-                // DrawThemeTextEx with DTT_COMPOSITED ignores GDI clip regions,
-                // so we skip the label entirely when it would overflow into the title bar
-                // (clamping the rect causes the label to visually "stick" at the border).
-                if (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop)
+                // DrawThemeTextEx with DTT_COMPOSITED ignores GDI clip regions. The label
+                // layer's bounds clip a label that scrolls under the header; drawn straight
+                // into the back buffer it is skipped instead, as it would overflow into the
+                // title bar (clamping the rect makes the label "stick" at the border).
+                if (useLabelLayer || (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop))
                 {
                     drawShadowedText(icon.displayName.c_str(), (int)icon.displayName.length(),
                                      DT_CENTER | DT_TOP | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX,
