@@ -30,6 +30,7 @@
 
 #include "CorralWindow.h"
 #include "App.h"
+#include "ChromeAlpha.h"
 #include "Constants.h"
 #include "FolderWatcher.h"
 #include "IconUtils.h"
@@ -148,6 +149,54 @@ static bool IconHasFullContent(HICON hIcon, int expectedSize)
     int contentH = maxY - minY + 1;
     // Content should fill at least 70% of the canvas
     return (contentW >= (int)(expectedSize * ICON_CONTENT_THRESHOLD) && contentH >= (int)(expectedSize * ICON_CONTENT_THRESHOLD));
+}
+
+// A legacy icon (colour bitmap without alpha, plus an AND mask) comes back as a
+// 32-bit icon whose alpha is built from the mask, so its black pixels stay opaque
+// in every render path. Any other icon, or any failure, returns `hIcon` unchanged.
+static HICON WithAlphaFromMask(HICON hIcon)
+{
+    ICONINFO ii = {};
+    if (!hIcon || !GetIconInfo(hIcon, &ii))
+        return hIcon;
+    HICON result = hIcon;
+    BITMAP bm = {};
+    // No hbmColor: a monochrome icon, left to DrawIconEx as before
+    if (ii.hbmColor && GetObject(ii.hbmColor, sizeof(bm), &bm) && bm.bmWidth > 0 && bm.bmHeight > 0)
+    {
+        BITMAPINFO bmi = {};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = bm.bmWidth;
+        bmi.bmiHeader.biHeight = -bm.bmHeight;
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+        const size_t count = (size_t)bm.bmWidth * bm.bmHeight;
+        std::vector<DWORD> mask(count);
+        DWORD *bits = nullptr;
+        HDC screenDC = GetDC(nullptr);
+        BITMAPINFO maskBmi = bmi; // GetDIBits may write to the header it is given
+        HBITMAP hColor = CreateDIBSection(screenDC, &bmi, DIB_RGB_COLORS, (void **)&bits, nullptr, 0);
+        if (hColor && GetDIBits(screenDC, ii.hbmColor, 0, bm.bmHeight, bits, &bmi, DIB_RGB_COLORS) == bm.bmHeight &&
+            GetDIBits(screenDC, ii.hbmMask, 0, bm.bmHeight, mask.data(), &maskBmi, DIB_RGB_COLORS) == bm.bmHeight &&
+            ChromeAlpha::AlphaFromMask(bits, mask.data(), count))
+        {
+            ICONINFO out = {TRUE, 0, 0, ii.hbmMask, hColor};
+            if (HICON converted = CreateIconIndirect(&out))
+            {
+                DestroyIcon(hIcon);
+                result = converted;
+            }
+        }
+        ReleaseDC(nullptr, screenDC);
+        if (hColor)
+            DeleteObject(hColor);
+    }
+    if (ii.hbmColor)
+        DeleteObject(ii.hbmColor);
+    if (ii.hbmMask)
+        DeleteObject(ii.hbmMask);
+    return result;
 }
 
 // Extract icon from system image list at a given index and size.
@@ -372,6 +421,8 @@ bool CorralWindow::LoadSpecialIcon(CorralIcon &ci, const std::string &fileName, 
         DestroyIcon(ci.hIconSmall);
         ci.hIconSmall = nullptr;
     }
+    ci.hIcon = WithAlphaFromMask(ci.hIcon);
+    ci.hIconSmall = WithAlphaFromMask(ci.hIconSmall);
     return ci.hIcon != nullptr;
 }
 
@@ -519,6 +570,8 @@ void CorralWindow::LoadIconImages()
             LoadFileDetails(ci);
         }
 
+        ci.hIcon = WithAlphaFromMask(ci.hIcon);
+        ci.hIconSmall = WithAlphaFromMask(ci.hIconSmall);
         icons.push_back(std::move(ci));
     }
 
@@ -821,6 +874,8 @@ void CorralWindow::LoadVirtualFolderIcons()
             LoadFileDetails(ci);
         }
 
+        ci.hIcon = WithAlphaFromMask(ci.hIcon);
+        ci.hIconSmall = WithAlphaFromMask(ci.hIconSmall);
         icons.push_back(std::move(ci));
     } while (FindNextFileW(hFind, &findData));
 

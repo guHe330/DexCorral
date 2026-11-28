@@ -237,4 +237,22 @@ namespace ChromeAlpha
                (DWORD)(b > 255 ? 255 : b);
     }
 
+    /**
+     * Gives a legacy (mask-based) icon's colour pixels the alpha its AND mask means.
+     *
+     * Such an icon's colour bitmap has alpha 0 everywhere, so the renderer could only
+     * guess "black = transparent". Where the mask is set (non-zero) the pixel becomes
+     * fully transparent, elsewhere fully opaque, black included. Does nothing and
+     * returns false if any pixel already has alpha: that icon carries its own.
+     */
+    inline bool AlphaFromMask(DWORD *color, const DWORD *mask, size_t count)
+    {
+        for (size_t i = 0; i < count; i++)
+            if (color[i] >> 24)
+                return false;
+        for (size_t i = 0; i < count; i++)
+            color[i] = (mask[i] & 0xFFFFFF) ? 0 : (color[i] | 0xFF000000);
+        return true;
+    }
+
 } // namespace ChromeAlpha
