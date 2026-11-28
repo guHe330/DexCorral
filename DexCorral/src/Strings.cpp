@@ -69,7 +69,8 @@ const wchar_t *const kEnglish[] = {
                                    L"Backspace removes the hotkey.",
     /* Settings_HotkeyWinHint */   L"config.json sets {0}, which this field cannot show. "
                                    L"Press other keys in the field to replace it.",
-    /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
+    /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl or Alt (Shift can be added) plus a letter, a digit or a "
+                                   L"function key.",
     /* Settings_DebugLogging */    L"Write debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
     /* Settings_Theme */           L"Windows and menus",
@@ -383,8 +384,8 @@ const wchar_t *const kGerman[] = {
                                    L"Die Rücktaste entfernt das Tastenkürzel.",
     /* Settings_HotkeyWinHint */   L"In config.json ist {0} festgelegt, das dieses Feld nicht anzeigen kann. "
                                    L"Andere Tasten im Feld ersetzen es.",
-    /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg, Alt oder Umschalt und dazu einen Buchstaben, "
-                                   L"eine Ziffer oder eine Funktionstaste.",
+    /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg oder Alt (Umschalt kann dazukommen) und dazu "
+                                   L"einen Buchstaben, eine Ziffer oder eine Funktionstaste.",
     /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
     /* Settings_DebugHint */       L"Für Fehlerberichte. Die Protokolle liegen im Konfigurationsordner.",
     /* Settings_Theme */           L"Fenster und Menüs",
