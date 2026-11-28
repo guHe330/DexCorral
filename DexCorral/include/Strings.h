@@ -198,7 +198,8 @@ enum class Str
     Err_RenameInvalidName,       // inline file rename: forbidden characters or a trailing dot
     Err_RenameNameTaken,         // inline file rename: {0} = the name, which another file has
 
-    // Appearance dialog (CorralWindowDialogs.cpp)
+    // Appearance dialog (CorralWindowDialogs.cpp). A '&' marks the access key: unique among the
+    // controls always shown plus each page, per language (a test checks it)
     Title_Appearance,            // "Appearance: {0}"  ({0} = tab title)
     Btn_Change,                  // "Change..."
     Grp_Opacity,                 // "Opacity"

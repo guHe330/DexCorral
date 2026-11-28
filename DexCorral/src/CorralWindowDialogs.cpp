@@ -1389,8 +1389,9 @@ void CorralWindow::ShowAppearanceDialog()
                                0, APPEARANCE_DLG_W, APPEARANCE_FOOTER_TOP + 28, dlgTitleStr.c_str());
     WORD itemCount = 0;
 
-    // WS_GROUP on every label: the arrow keys stay within the page strip and within each row
-    const DWORD labelStyle = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX | WS_GROUP;
+    // WS_GROUP on every label: the arrow keys stay within the page strip and within each row.
+    // No SS_NOPREFIX: a label's access key moves to the control after it.
+    const DWORD labelStyle = WS_CHILD | WS_VISIBLE | SS_LEFT | WS_GROUP;
     const DWORD buttonStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
     const DWORD checkStyle = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
     const DWORD swatchStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY;
@@ -1446,7 +1447,7 @@ void CorralWindow::ShowAppearanceDialog()
     slider(0, 153, Tr(Str::Lbl_Height), 110, 111);
     slider(1, 154, Tr(Str::Grp_Opacity), 124, 125);
     text(LABEL_X, rowY(2), LABEL_W, 155, Tr(Str::Lbl_Font), labelStyle);
-    text(FIELD_X, rowY(2), 84, 112, L"", labelStyle | SS_ENDELLIPSIS);
+    text(FIELD_X, rowY(2), 84, 112, L"", labelStyle | SS_ENDELLIPSIS | SS_NOPREFIX); // A font name, not a label
     button(FIELD_X + 88, (short)(rowY(2) - 2), 58, 113, Tr(Str::Btn_Choose), buttonStyle);
     text(LABEL_X, rowY(3), LABEL_W, 156, Tr(Str::Lbl_Color), labelStyle);
     swatch(3, 114);

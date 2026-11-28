@@ -169,6 +169,12 @@ bool ShowsFocus(HWND control)
     return !(SendMessageW(control, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS);
 }
 
+/// Underline the &-marked access key only once the user has pressed Alt, as Windows does
+UINT AccelFlag(HWND control)
+{
+    return (SendMessageW(control, WM_QUERYUISTATE, 0, 0) & UISF_HIDEACCEL) ? DT_HIDEPREFIX : 0;
+}
+
 void FocusRing(HDC dc, RECT r, int inset, int radius, const State *s, COLORREF behind)
 {
     InflateRect(&r, -inset, -inset);
@@ -249,12 +255,12 @@ void DrawButton(HWND hDlg, const DRAWITEMSTRUCT *item, const State *s)
         SetTextColor(dc, selected ? c.text : c.textMuted);
         RECT textRect = r;
         textRect.bottom -= Scale(button, 4);
-        DrawTextW(dc, text.c_str(), -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW(dc, text.c_str(), -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | AccelFlag(button));
         if (selected)
         {
-            SIZE size = {};
-            GetTextExtentPoint32W(dc, text.c_str(), (int)text.size(), &size);
-            const int width = std::min((int)size.cx, (int)(r.right - r.left) - Scale(button, 8));
+            RECT size = {};
+            DrawTextW(dc, text.c_str(), -1, &size, DT_SINGLELINE | DT_CALCRECT); // Width without the '&'
+            const int width = std::min((int)size.right, (int)(r.right - r.left) - Scale(button, 8));
             const int mid = (r.left + r.right) / 2;
             RECT line = {mid - width / 2, r.bottom - Scale(button, 3), mid + width / 2, r.bottom};
             FillRoundRect(dc, line, Scale(button, 2), c.accent, c.accent, behind);
@@ -287,7 +293,7 @@ void DrawButton(HWND hDlg, const DRAWITEMSTRUCT *item, const State *s)
 
     HGDIOBJ oldFont = SelectObject(dc, font);
     SetTextColor(dc, textColor);
-    DrawTextW(dc, text.c_str(), -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(dc, text.c_str(), -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | AccelFlag(button));
     SelectObject(dc, oldFont);
     if (focus)
         FocusRing(dc, r, Scale(button, 2), Scale(button, 3), s, behind);
@@ -343,7 +349,7 @@ LRESULT DrawCheckBox(HWND hDlg, const NMCUSTOMDRAW *draw, const State *s)
     SetTextColor(dc, disabled ? c.textDisabled : c.text);
     RECT textRect = {square.right + Scale(box, 7), r.top, r.right, r.bottom};
     const std::wstring text = TextOf(box);
-    DrawTextW(dc, text.c_str(), -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(dc, text.c_str(), -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | AccelFlag(box));
     if ((draw->uItemState & CDIS_FOCUS) && ShowsFocus(box))
     {
         RECT measure = textRect;
