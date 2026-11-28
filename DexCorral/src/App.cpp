@@ -323,8 +323,12 @@ void App::Initialize()
 
     // Create tray icon. HookBridge::GetDllModule() is this DLL's own module handle —
     // GetModuleHandleW(nullptr) would resolve to explorer.exe here since this code runs
-    // injected into Explorer's process.
-    HICON icon = LoadIconW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON));
+    // injected into Explorer's process. Loaded at the small-icon size the tray
+    // shows: LoadIconW gives the 32 px one, which the shell scales down blurry.
+    // Not LR_SHARED, whose cache hands back whichever size was loaded first;
+    // the icon lives as long as the tray icon, for the whole session.
+    HICON icon = (HICON)LoadImageW(HookBridge::GetDllModule(), MAKEINTRESOURCE(IDI_APPICON), IMAGE_ICON,
+                                   GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);
     if (!icon)
         icon = LoadIconW(nullptr, IDI_APPLICATION);
     // Standby was decided by the hook before this thread started
