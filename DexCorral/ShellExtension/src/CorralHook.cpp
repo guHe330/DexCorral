@@ -426,6 +426,8 @@ static bool EvaluateSafeMode() {
 // pre-update item can be stale. Re-check once the shell has settled: drop the
 // memo, repaint, and have the app re-park hidden icons with fresh identities.
 static int g_RevalidatePass = 0;
+// keepFocus: take back only the selection, so the arrow keys still move past
+static void DeselectHiddenIcons(HWND hwnd, bool keepFocus = false);
 
 static void CALLBACK RevalidateTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
     KillTimer(hwnd, REVALIDATE_TIMER_ID);
@@ -435,6 +437,9 @@ static void CALLBACK RevalidateTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent,
     __try {
         InvalidateHiddenIndexCache();
         RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+        // An icon selected before it went into a Corral sends no selection
+        // change, so it would stay selected for Delete and Enter
+        DeselectHiddenIcons(hwnd, true);
 
         HWND appWnd = HookBridge::GetAppMessageWindow();
         if (appWnd) {
@@ -780,20 +785,21 @@ static bool IsClickOnHiddenIcon(HWND hwnd, LPARAM lParam) {
 // Helper: deselect any hidden icons (after rubber-band selection, etc.)
 // ============================================================================
 
-static void DeselectHiddenIcons(HWND hwnd) {
+static void DeselectHiddenIcons(HWND hwnd, bool keepFocus) {
     if (g_HiddenIcons.empty()) return;
 
+    const UINT mask = keepFocus ? LVIS_SELECTED : (LVIS_SELECTED | LVIS_FOCUSED);
     int count = (int)CallWindowProcW(g_OriginalListViewProc, hwnd, LVM_GETITEMCOUNT, 0, 0);
     for (int i = 0; i < count; i++) {
         DWORD state = (DWORD)CallWindowProcW(g_OriginalListViewProc, hwnd,
-            LVM_GETITEMSTATE, i, LVIS_SELECTED | LVIS_FOCUSED);
-        if (!(state & (LVIS_SELECTED | LVIS_FOCUSED))) continue;
+            LVM_GETITEMSTATE, i, mask);
+        if (!(state & mask)) continue;
 
         if (!ShouldHideIconByIndex(i)) continue;
 
-        // Deselect and unfocus this hidden icon
+        // Deselect (and unless keepFocus, unfocus) this hidden icon
         LVITEMW lvi = {};
-        lvi.stateMask = LVIS_SELECTED | LVIS_FOCUSED;
+        lvi.stateMask = mask;
         lvi.state = 0;
         CallWindowProcW(g_OriginalListViewProc, hwnd, LVM_SETITEMSTATE, i, (LPARAM)&lvi);
     }
@@ -1683,9 +1689,9 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
             if ((nmlv->uChanged & LVIF_STATE) && (nmlv->uNewState & LVIS_SELECTED) &&
                 !(nmlv->uOldState & LVIS_SELECTED)) {
                 LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+                RefreshHiddenIconCache(); // The list may have changed since the last paint
                 if (nmlv->iItem == -1) {
                     // "Select all" as one notification for every item
-                    RefreshHiddenIconCache();
                     DeselectHiddenIcons(g_hDesktopListView);
                 } else if (ShouldHideIconByIndex(nmlv->iItem)) {
                     LVITEMW lvi = {};
@@ -1693,6 +1699,18 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
                     CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
                         LVM_SETITEMSTATE, nmlv->iItem, (LPARAM)&lvi);
                 }
+                return result;
+            }
+        }
+        // The desktop ListView is owner-data: a range selection (Shift+End,
+        // Shift+click, Shift+arrows) comes as one LVN_ODSTATECHANGED, not as
+        // LVN_ITEMCHANGED per item
+        if (nmhdr->code == LVN_ODSTATECHANGED && nmhdr->hwndFrom == g_hDesktopListView) {
+            NMLVODSTATECHANGE* od = (NMLVODSTATECHANGE*)lParam;
+            if ((od->uNewState & LVIS_SELECTED) && !(od->uOldState & LVIS_SELECTED)) {
+                LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+                RefreshHiddenIconCache();
+                DeselectHiddenIcons(g_hDesktopListView, true);
                 return result;
             }
         }
