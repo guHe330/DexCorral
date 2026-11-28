@@ -30,6 +30,7 @@ jobs:
         minor=$(grep -oP '#define NLOHMANN_JSON_VERSION_MINOR \K[0-9]+' "$header")
         patch=$(grep -oP '#define NLOHMANN_JSON_VERSION_PATCH \K[0-9]+' "$header")
         vendored="$major.$minor.$patch"
+        echo "vendored=$vendored" >> "$GITHUB_ENV"
         latest=$(gh api repos/nlohmann/json/releases/latest --jq .tag_name | sed 's/^v//')
         echo "vendored=$vendored latest=$latest"
 
@@ -62,15 +63,22 @@ jobs:
         EOF
         )"
 
-    - name: Scan the SBOM against the OSV database
+    - name: Check the vendored nlohmann/json against the OSV database
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        # Pinned by version and content hash. Note that OSV's coverage of C/C++
-        # libraries is thin - most C/C++ CVEs are only in NVD, keyed by CPE - so
-        # a clean result here is weak evidence. The release watch above is the
-        # real safety net; this catches the cases OSV does know about.
-        curl -sSL -o osv-scanner \
-          https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
-        echo "f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be  osv-scanner" \
-          | sha256sum -c -
-        chmod +x osv-scanner
-        ./osv-scanner scan source --sbom=sbom/dexcorral.cdx.json
+        # OSV has no ecosystem for the SBOM's pkg:github purls, so scanning the
+        # SBOM matched nothing. Its GIT ecosystem is keyed by commit, so ask
+        # about the commit the vendored release tag points to. OSV's coverage of
+        # C/C++ libraries is still thin - most C/C++ CVEs are only in NVD, keyed
+        # by CPE - so a clean result is weak evidence. The release watch above is
+        # the real safety net; this catches the cases OSV does know about.
+        commit=$(gh api "repos/nlohmann/json/commits/v$vendored" --jq .sha)
+        # Two steps, not a pipe: without pipefail a failed curl would read as clean.
+        result=$(curl -sSf -X POST https://api.osv.dev/v1/query -d "{\"commit\":\"$commit\"}")
+        vulns=$(echo "$result" | jq -r '.vulns[]?.id')
+        if [ -n "$vulns" ]; then
+          echo "::error::OSV lists vulnerabilities for nlohmann/json $vendored ($commit):" $vulns
+          exit 1
+        fi
+        echo "OSV lists no vulnerability for nlohmann/json $vendored ($commit)."
