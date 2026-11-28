@@ -1658,6 +1658,30 @@ static LRESULT CALLBACK ShellDefViewSubclassProcImpl(HWND hwnd, UINT uMsg, WPARA
             }
         }
 
+        // An icon inside a Corral never stays selected, whatever selected it:
+        // Ctrl+A, Home/End, type-to-select, a rubber band. Otherwise Delete or
+        // Enter act on files the user cannot see. Only the selection is taken
+        // back, not the focus: refusing LVN_ITEMCHANGING would also stop the
+        // arrow keys from moving past a hidden icon.
+        if (nmhdr->code == LVN_ITEMCHANGED && nmhdr->hwndFrom == g_hDesktopListView) {
+            NMLISTVIEW* nmlv = (NMLISTVIEW*)lParam;
+            if ((nmlv->uChanged & LVIF_STATE) && (nmlv->uNewState & LVIS_SELECTED) &&
+                !(nmlv->uOldState & LVIS_SELECTED)) {
+                LRESULT result = ForwardToOriginal(g_OriginalShellDefViewProc, hwnd, uMsg, wParam, lParam);
+                if (nmlv->iItem == -1) {
+                    // "Select all" as one notification for every item
+                    RefreshHiddenIconCache();
+                    DeselectHiddenIcons(g_hDesktopListView);
+                } else if (ShouldHideIconByIndex(nmlv->iItem)) {
+                    LVITEMW lvi = {};
+                    lvi.stateMask = LVIS_SELECTED;
+                    CallWindowProcW(g_OriginalListViewProc, g_hDesktopListView,
+                        LVM_SETITEMSTATE, nmlv->iItem, (LPARAM)&lvi);
+                }
+                return result;
+            }
+        }
+
         if (nmhdr->code == NM_CUSTOMDRAW && nmhdr->hwndFrom == g_hDesktopListView) {
             NMLVCUSTOMDRAW* cd = (NMLVCUSTOMDRAW*)lParam;
 
