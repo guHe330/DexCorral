@@ -62,6 +62,17 @@ TEST(UpdateLogic, TrustsOnlyTheProjectsOwnReleaseUrls)
     EXPECT_FALSE(IsTrustedReleaseUrl("\\\\server\\share\\x.exe"));
 }
 
+TEST(UpdateLogic, AutoCheckIsDueOncePerDayAndAfterAClockFix)
+{
+    const long long day = 24LL * 60 * 60, now = 1800000000;
+    EXPECT_TRUE(IsAutoCheckDue(now, 0));               // never checked
+    EXPECT_FALSE(IsAutoCheckDue(now, now));
+    EXPECT_FALSE(IsAutoCheckDue(now, now - day + 1));
+    EXPECT_TRUE(IsAutoCheckDue(now, now - day));
+    EXPECT_TRUE(IsAutoCheckDue(now, now + 1));         // stamp from a clock set ahead
+    EXPECT_TRUE(IsAutoCheckDue(now, now + 365 * day));
+}
+
 TEST(UpdateLogic, RejectsTraversalAndOddCharacters)
 {
     EXPECT_FALSE(IsTrustedReleaseUrl("https://github.com/guHe330/DexCorral/../../evil/repo"));

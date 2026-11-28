@@ -39,6 +39,7 @@
 #include "Version.h"
 #include "../resources/resource.h"
 #include "UpdateChecker.h"
+#include "UpdateLogic.h"
 #include "Strings.h"
 #include "LayoutMath.h"
 #include "Presets.h"
@@ -98,6 +99,10 @@ static const UINT NOTICE_FALLBACK_MS = 30000;
 // One retry of a failed automatic update check
 static const UINT_PTR UPDATE_RETRY_TIMER = 5;
 static const UINT UPDATE_RETRY_MS = 5 * 60 * 1000;
+// Hourly look at whether the automatic update check is due again (once a day):
+// Explorer, and with it DexCorral, can run for weeks across sleep and resume
+static const UINT_PTR UPDATE_DAILY_TIMER = 10;
+static const UINT UPDATE_DAILY_POLL_MS = 60 * 60 * 1000;
 static const UINT CONFLICT_POLL_MS = 15000;
 static const UINT ADOPTION_POLL_MS = 800;
 
@@ -369,6 +374,7 @@ void App::Initialize()
     // leaving the user to wonder where their corrals went
     ShowNextNotice(trayIcon.get(), messageWindow);
 
+    SetTimer(messageWindow, UPDATE_DAILY_TIMER, UPDATE_DAILY_POLL_MS, nullptr);
     if (standbyReason != HookStandbyReason::None)
     {
         // Nothing that shows a corral, hides an icon or touches the desktop
@@ -2427,11 +2433,8 @@ void App::StartUpdateCheck(bool userInitiated)
     if (!userInitiated)
     {
         // Automatic check: only when opted in, and at most once per 24h.
-        if (!config.CheckForUpdates)
-            return;
-        long long now = (long long)time(nullptr);
-        const long long kDaySeconds = 24LL * 60 * 60;
-        if (config.LastUpdateCheckEpoch != 0 && now - config.LastUpdateCheckEpoch < kDaySeconds)
+        if (!config.CheckForUpdates ||
+            !UpdateLogic::IsAutoCheckDue((long long)time(nullptr), config.LastUpdateCheckEpoch))
             return;
         // The 24h stamp is written when the answer arrives (WM_UPDATE_CHECK_DONE),
         // so a check that failed does not count as the day's check.
@@ -2840,20 +2843,19 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     if (app && uMsg == WM_UPDATE_CHECK_DONE)
     {
         std::unique_ptr<UpdateCheckResult> result((UpdateCheckResult *)lParam);
-        if (result && !result->UserInitiated)
+        // A manual check that got an answer counts too: the hourly look would
+        // otherwise ask again within the hour after the check is switched on
+        if (result && result->Success)
         {
-            if (result->Success)
-            {
-                app->config.LastUpdateCheckEpoch = (long long)time(nullptr);
-                app->SaveConfig();
-            }
-            else if (!app->updateRetryUsed)
-            {
-                // The automatic check runs at sign-in, often before the network
-                // is up. Try once more a little later instead of waiting a day.
-                app->updateRetryUsed = true;
-                SetTimer(hwnd, UPDATE_RETRY_TIMER, UPDATE_RETRY_MS, nullptr);
-            }
+            app->config.LastUpdateCheckEpoch = (long long)time(nullptr);
+            app->SaveConfig();
+        }
+        else if (result && !result->UserInitiated && !app->updateRetryUsed)
+        {
+            // The automatic check runs at sign-in, often before the network
+            // is up. Try once more a little later instead of waiting an hour.
+            app->updateRetryUsed = true;
+            SetTimer(hwnd, UPDATE_RETRY_TIMER, UPDATE_RETRY_MS, nullptr);
         }
         if (result && app->trayIcon)
         {
@@ -2986,6 +2988,12 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     {
         KillTimer(hwnd, UPDATE_RETRY_TIMER);
         app->StartUpdateCheck(false);
+        return 0;
+    }
+
+    if (app && uMsg == WM_TIMER && wParam == UPDATE_DAILY_TIMER)
+    {
+        app->StartUpdateCheck(false); // Does nothing unless switched on and due
         return 0;
     }
 

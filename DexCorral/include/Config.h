@@ -218,7 +218,7 @@ struct AppConfig
     // Update check (opt-in, off by default). Checks the GitHub Releases API at
     // most once per 24h on startup and notifies via a tray balloon — no auto-download.
     bool CheckForUpdates = false;
-    long long LastUpdateCheckEpoch = 0;    // Unix time of the last automatic check (throttle)
+    long long LastUpdateCheckEpoch = 0;    // Unix time of the last check that got an answer (throttle)
 
     // UI language code ("en", "de"), set in the settings window.
     // Empty = use the installer's choice (HKCU\Software\DexCorral\Language),

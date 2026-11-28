@@ -19,9 +19,14 @@ Alongside your corral names, positions and tab settings, `config.json` **holds t
 **Off by default.** Enable it with **Check for Updates Automatically** in the settings window (tray menu, **Settings...**); 
 **Check for Updates Now** runs a single check without turning anything on.
 
-While enabled, at startup and at most once every 24 hours, DexCorral makes one HTTPS
-request. If that request fails, for example because the network is not up yet, it is
-repeated once five minutes later:
+While enabled, DexCorral makes one HTTPS request when it starts, if the last check that
+got an answer (automatic or **Check for Updates Now**) is 24 hours old or older, and
+again each time it becomes 24 hours old while DexCorral runs; DexCorral looks once an
+hour whether that time has come. A last check dated in the future, which a wrong clock
+can leave behind, does not hold the next one back. Switching the setting on runs one
+check right away. If an automatic request fails, for example because the network is not
+up yet, the first failure since DexCorral started is retried five minutes later; after
+that DexCorral tries once an hour until a request succeeds:
 
 ```
 GET https://api.github.com/repos/guHe330/DexCorral/releases/latest
