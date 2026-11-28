@@ -147,9 +147,9 @@ Saving and deleting a preset take effect at once and are not undone by **Cancel*
 
 Three checkboxes at the bottom decide where the style goes when you press OK:
 
-- **Save this style as the default for new corrals**: Corrals you create from now on start with this look.
-- **Apply only what I changed to all corrals**: the settings you touched in this session, and only those, are copied to every Corral. Change just the border opacity and every Corral gets that border, keeping its own colours and fonts.
-- **Make all corrals look like this one**: every setting in the dialog is copied to every Corral.
+- **Save this style as the default for new Corrals**: Corrals you create from now on start with this look.
+- **Apply only what I changed to all Corrals**: the settings you touched in this session, and only those, are copied to every Corral. Change just the border opacity and every Corral gets that border, keeping its own colours and fonts.
+- **Make all Corrals look like this one**: every setting in the dialog is copied to every Corral.
 
 **Reset to Defaults** sets every control back to the look a new Corral would get. It previews live like any other change; OK then gives it to every tab of this Corral, and Cancel undoes it.
 

@@ -231,10 +231,10 @@ const wchar_t *const kEnglish[] = {
     /* Confirm_CloseTabBody */     L"Close the tab \"{0}\"?\n\nIts icons go back to the desktop. No files are deleted.",
     /* Confirm_CloseVirtualTabBody */ L"Close the tab \"{0}\"?\n\nThe folder it shows and the files in it are not touched.",
     /* Confirm_CloseTabTitle */    L"Close Tab",
-    /* Confirm_DeleteCorralBody */ L"Delete this corral?\n\nIts icons go back to the desktop. No files are deleted.",
-    /* Confirm_DeleteVirtualCorralBody */ L"Delete this corral?\n\nThe folder it shows and the files in it are not touched.",
+    /* Confirm_DeleteCorralBody */ L"Delete this Corral?\n\nIts icons go back to the desktop. No files are deleted.",
+    /* Confirm_DeleteVirtualCorralBody */ L"Delete this Corral?\n\nThe folder it shows and the files in it are not touched.",
     /* Confirm_DeleteCorralTitle */L"Delete Corral",
-    /* Confirm_MergeCorralsBody */ L"Merge the two corrals?\n\nThe tabs of the corral you dragged move into the other one, which keeps its place and settings. Detach Tab splits a tab off again.",
+    /* Confirm_MergeCorralsBody */ L"Merge the two Corrals?\n\nThe tabs of the Corral you dragged move into the other one, which keeps its place and settings. Detach Tab splits a tab off again.",
     /* Confirm_MergeCorralsTitle */L"Merge Corrals",
 
     // Rename dialog / file rename
@@ -266,9 +266,9 @@ const wchar_t *const kEnglish[] = {
     /* Lbl_Vert */                 L"Spacing down",
     /* Lbl_TintStrength */         L"Tint strength",
     /* Chk_AccentColor */          L"Windows accent color",
-    /* Chk_UseAsDefault */         L"Save this style as the default for new corrals",
-    /* Chk_ApplyToAll */           L"Apply only what I changed to all corrals",
-    /* Chk_CopyStyleToAll */       L"Make all corrals look like this one",
+    /* Chk_UseAsDefault */         L"Save this style as the default for new Corrals",
+    /* Chk_ApplyToAll */           L"Apply only what I changed to all Corrals",
+    /* Chk_CopyStyleToAll */       L"Make all Corrals look like this one",
     /* Btn_ResetToDefaults */      L"Reset to Defaults",
 
     // Details view column headers / sort menu
