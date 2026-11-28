@@ -740,11 +740,12 @@ void CorralWindow::LoadVirtualFolderIcons()
         return;
     }
     if (!isNetwork)
-    {
         desktopRetryMs = 0;
-        if (wasMissing || folderWatchEnded)
-            InitializeFolderWatcher(); // The watchers on the folder that was gone have ended
-    }
+    // The watchers on a folder that was gone have ended. A share gets here only
+    // while it is known to answer, so starting them is safe there too; its
+    // probe restarts them itself when the share comes back.
+    if (folderWatchEnded || (wasMissing && !isNetwork))
+        InitializeFolderWatcher();
 
     // Current sub-folder gone: auto-navigate up to the nearest existing ancestor.
     std::string origSub = tab.CurrentSubPath;
