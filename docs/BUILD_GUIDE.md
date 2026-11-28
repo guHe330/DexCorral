@@ -68,21 +68,23 @@ Win32-dependent behaviour (Explorer hook, drag-drop, DPI scaling, multi-monitor,
 | File | Description |
 |------|-------------|
 | `build/DexCorralHook.dll` | The shell extension. Holds all app logic and the Explorer hook. |
-| `build/DexCorral.exe` | Registration tool (run once as admin to install the shell extension). |
+| `build/DexCorral.exe` | Registration tool (run once to register the shell extension). |
 | `build/DexCorralTests.exe` | Unit test runner. |
 | `build/DexCorral_<version>.zip` | Release archive containing the two distributable binaries, named after the version in `Version.h`. |
 
 ## Run your build
 
-From `DexCorral/build/`, as Administrator:
+From `DexCorral/build/`, without Administrator rights:
 
 ```powershell
-.\DexCorral.exe --register   # one-time shell extension registration
-.\DexCorral.exe --startup    # inject into the running Explorer (no restart needed)
-.\DexCorral.exe --register --force   # register on an unsupported Windows version (Windows 11 is required otherwise)
+.\DexCorral.exe --register --scope=user   # one-time registration for your account; also starts it and adds the start at sign-in
+.\DexCorral.exe --startup    # inject into the running Explorer again, e.g. after an Explorer restart
+.\DexCorral.exe --register --scope=user --force   # register on an unsupported Windows version (Windows 11 is required otherwise)
 ```
 
-After the first registration, rebuilding the DLL only requires Explorer to reload it; the build script handles unlocking automatically. To remove the registration: `DexCorral.exe --unregister`.
+Outside Program Files `--register` uses `--scope=user` anyway: it writes to `HKCU` only, for the account that runs it, even when run as Administrator. For that account it takes precedence over an all-users install and replaces a per-user one, so while it exists you run your build instead. `--scope=machine` (elevated) is only needed to test the `HKLM` load paths.
+
+After the first registration, rebuilding the DLL only requires Explorer to reload it; the build script handles unlocking automatically. To remove the registration: `DexCorral.exe --unregister --scope=user`. With DexCorral also installed for you only, that removes its registration as well; run its Setup again afterwards.
 
 ## Unlock the DLL manually
 
