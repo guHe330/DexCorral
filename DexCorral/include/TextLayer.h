@@ -51,8 +51,8 @@ public:
      * @param width       Layer width in pixels.
      * @param height      Layer height in pixels.
      * @param fillPixel   Value every pixel starts at. Transparent black (0) for
-     *                    a layer with real alpha; opaque white for a coverage
-     *                    layer that GDI text will be drawn into in black.
+     *                    a layer with real alpha; white with alpha 0 for a
+     *                    coverage layer that GDI text will be drawn into in black.
      */
     TextLayer(HDC referenceDC, int width, int height, DWORD fillPixel)
         : dc(nullptr), bmp(nullptr), oldBmp(nullptr), pixels(nullptr), w(width), h(height)

@@ -314,8 +314,9 @@ void CorralWindow::UpdateLayeredContent()
      * The font is created with ANTIALIASED_QUALITY rather than ClearType:
      * subpixel antialiasing encodes coverage per colour channel, which a single
      * alpha channel cannot carry, and it was never meaningful on a layered
-     * window composited over an unknown wallpaper anyway. This matches how the
-     * icon labels have always been drawn.
+     * window composited over an unknown wallpaper anyway. The icon label font
+     * asks for ClearType, but DrawThemeTextEx with DTT_COMPOSITED draws it in
+     * greyscale all the same.
      */
     // Reserved before the titles are laid out: the padlock sits over the last tab,
     // so that tab has to give up the width or a long title runs under it.
@@ -379,7 +380,7 @@ void CorralWindow::UpdateLayeredContent()
                 }
                 else if (tab.IsCatchAll)
                 {
-                    wtitle = L"\u2B07 " + wtitle; // Down arrow (escaped: this source is not compiled as UTF-8)
+                    wtitle = L"\u2B07 " + wtitle; // Down arrow (escaped by choice; the source is compiled as UTF-8)
                 }
 
                 RECT tabRect = GetTabRect(i);
@@ -535,7 +536,7 @@ void CorralWindow::UpdateLayeredContent()
             DrawThemeTextEx(hHdrTheme, memDC, 0, 0, text, len, flags, &r, &o);
         };
 
-        // Glyphs (declared via codepoints; the source is not compiled as UTF-8)
+        // Glyphs (declared via codepoints by choice; the source is compiled as UTF-8)
         static const wchar_t kUpArrow[] = {0x2191, 0};   // up arrow (nav up)
         static const wchar_t kSortAsc[] = {0x25B2, 0};   // black up triangle
         static const wchar_t kSortDesc[] = {0x25BC, 0};  // black down triangle
