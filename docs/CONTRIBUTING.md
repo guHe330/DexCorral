@@ -7,7 +7,7 @@ Thanks for your interest in DexCorral. Bug reports, feature suggestions, and pul
 Open an [issue](https://github.com/guHe330/DexCorral/issues/new/choose) and pick a template. The forms ask for what is actually needed to reproduce a problem:
 
 - Your Windows version (e.g. Windows 11 Pro 24H2)
-- The DexCorral version (visible in the tray menu)
+- The DexCorral version (tray menu > **About**)
 - What you did, what you expected, and what happened instead
 - A screenshot, if the problem is visual
 - Your display setup, if more than one monitor is involved
@@ -16,7 +16,7 @@ A partial report beats no report. If a field does not apply, leave it empty and 
 
 **Windows 11 only.** Bugs reported from Windows 10 are closed as out of scope, including ones hit after bypassing the version check with `--force`. The override exists so you can experiment, not so you can file reports from there.
 
-For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest route to a fix. It lists your corral names, positions and the paths of the files you have organized, so look it over and redact anything you would rather not publish.
+For layout, tab and persistence bugs, attaching `%AppData%\DexCorral\config.json` is the fastest route to a fix. It lists your corral names and positions, the names of the files you have organized and the full paths of the folders your virtual tabs show, so look it over and redact anything you would rather not publish.
 
 ## Testing is a contribution
 

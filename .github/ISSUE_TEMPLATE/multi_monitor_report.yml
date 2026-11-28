@@ -17,8 +17,8 @@ body:
     id: version
     attributes:
       label: DexCorral version
-      description: Shown at the top of the tray menu.
-      placeholder: "1.0.22"
+      description: In the tray menu, choose About.
+      placeholder: "1.4.0"
     validations:
       required: true
 

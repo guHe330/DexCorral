@@ -90,6 +90,11 @@ constexpr int INACTIVE_TAB_ALPHA_MIN = 10;
 constexpr int INACTIVE_TAB_RGB_SCALE_MAX_PERCENT = 50;
 constexpr int INACTIVE_TAB_RGB_SCALE_MIN_PERCENT = 25;
 
+/// Minimum opacity of the Lock Position padlock (128/255, ~50%)
+/// The padlock follows the header text opacity, but it is the only sign that
+/// a corral cannot be moved or resized, so it stays visible with titles at 0.
+constexpr int LOCK_GLYPH_ALPHA_MIN = 128;
+
 /// Default border opacity (255, fully opaque) — the previous hard-coded value
 constexpr int BORDER_OPACITY_DEFAULT = 255;
 
@@ -139,8 +144,8 @@ constexpr BYTE HOVER_B = 200;
 // Icon Rendering
 // ============================================================================
 
-/// Temporary icon rendering size threshold (64px)
-/// Icons larger than this are rendered at native size for performance
+/// Minimum side of the scratch DIB used to tint and fade icons (64px)
+/// Larger icons get a DIB of their own size
 constexpr int ICON_TEMP_SIZE_THRESHOLD = 64;
 
 /// Maximum icon size in pixels (256)
@@ -152,8 +157,8 @@ constexpr int MAX_ICON_SIZE = 256;
 // ============================================================================
 
 /// Icon content detection threshold (70%)
-/// Icons with more than 70% non-transparent pixels are considered "full content".
-/// Used to detect padded icons (like shortcuts with badges) vs empty spaces.
+/// The non-transparent content must span at least 70% of the canvas width and height.
+/// Less means a small icon padded onto a larger canvas (an app that ships only 32px icons).
 constexpr double ICON_CONTENT_THRESHOLD = 0.7;
 
 /// OneDrive cloud reparse point tag mask (0x90000000)

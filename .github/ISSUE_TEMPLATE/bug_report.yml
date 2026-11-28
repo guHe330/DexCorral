@@ -13,8 +13,8 @@ body:
     id: version
     attributes:
       label: DexCorral version
-      description: Shown at the top of the tray menu.
-      placeholder: "1.0.22"
+      description: In the tray menu, choose About.
+      placeholder: "1.4.0"
     validations:
       required: true
 
@@ -32,7 +32,8 @@ body:
     attributes:
       label: How did you install it?
       options:
-        - Installer
+        - Installer, for all users
+        - Installer, for me only
         - Portable ZIP
         - Built from source
     validations:
@@ -92,3 +93,11 @@ body:
         Attach `%AppData%\DexCorral\config.json` (rename to `.txt` if GitHub refuses the upload).
         It lists your corral names, positions, and the paths of the files you have organized —
         please look it over and redact anything you would rather not publish.
+
+  - type: textarea
+    id: guard-log
+    attributes:
+      label: guard.log
+      description: >
+        Only if DexCorral paused itself. Attach `%AppData%\DexCorral\guard.log`
+        (rename to `.txt` if GitHub refuses the upload). It records why DexCorral paused.

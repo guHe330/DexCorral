@@ -78,9 +78,9 @@ A local folder that is not there, for example on a USB drive that is not plugged
 ## Managing Corrals
 
 ### Creating
-- Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab**.
-- Choose **New Virtual Corral** instead to pick a folder and create a Corral mirroring it.
-- The classic right-click menu of the desktop background offers **New DexCorral** and **New Virtual DexCorral** as well, and creates the Corral where you clicked. Hold **Shift** while you right-click the desktop to get that menu; see [Known Limitations](#known-limitations) for why.
+- Right-click the DexCorral **tray icon** (or the background of any Corral) and choose **Create New Corral**. DexCorral asks for its name straight away; press Esc to keep "New Corral" and name it later with **Rename Tab...**.
+- Choose **New Virtual Corral...** instead to pick a folder and create a Corral mirroring it.
+- The classic right-click menu of the desktop background offers **Create New Corral** and **New Virtual Corral...** as well, and creates the Corral where you clicked. Hold **Shift** while you right-click the desktop to get that menu; see [Known Limitations](#known-limitations) for why.
 
 ### Moving and Resizing
 - Drag the **title bar** to move a Corral.
@@ -115,17 +115,19 @@ Right-click a Corral's title bar or background:
 
 - **Add Tab**: add a new tab to this Corral and name it.
 - **Detach Tab**: move the current tab out into its own Corral window (shown when the Corral has more than one tab).
-- **Rename Tab**: change the current tab's title.
+- **Rename Tab...**: change the current tab's title.
 - **Appearance...**: open the appearance dialog (see below).
 - **Change Folder...**: for virtual tabs, point the tab at a different folder. A tab named after its folder takes the name of the new one; a name you gave the tab yourself stays.
 - **View**: switch between **Small / Medium / Large Icons** and **Details** (a list with name, type, size, modified date, and cloud sync status for OneDrive files).
 - **Sort By**: on a normal tab, sorts the icons once by **Name** or **Type**; you can still drag them into any order afterwards, and new icons are added at the end. On a virtual tab it sets the standing sort column and direction, in every view.
-- **Catch-All (receives new files)**: make this tab the catch-all for new desktop items.
-- **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral.
+- **Catch-All (receives new files)**: make this tab the catch-all for new desktop items (normal tabs only).
+- **Add Special Icon**: add special shell items such as the Recycle Bin to the Corral (normal tabs only).
 - **Show Desktop Icons**: toggle visibility of all native desktop icons.
+- **Exclude from Quick-Hide**: keep this Corral visible while [Quick-Hide](#quick-hide) hides everything else.
 - **Lock Position**: freeze this Corral so it cannot be moved or resized by mouse (see above).
+- **Undo Last Move**: put the last moved or resized Corral back (see [Moving and Resizing](#moving-and-resizing)).
 - **Expand on Hover**: whether this Corral, when rolled up, opens under a resting mouse (see [Roll-Up](#roll-up)).
-- **Create New Corral / New Virtual Corral**: same as the tray menu.
+- **Create New Corral / New Virtual Corral...**: same as the tray menu.
 - **Close Tab / Delete Corral**: remove the current tab, or the whole Corral if it's the last tab. Contained icons return to the desktop.
 
 ### Appearance Dialog
@@ -147,11 +149,11 @@ Saving and deleting a preset take effect at once and are not undone by **Cancel*
 
 Three checkboxes at the bottom decide where the style goes when you press OK:
 
-- **Save this style as the default for new corrals**: Corrals you create from now on start with this look.
-- **Apply only what I changed to all corrals**: the settings you touched in this session, and only those, are copied to every Corral. Change just the border opacity and every Corral gets that border, keeping its own colours and fonts.
-- **Make all corrals look like this one**: every setting in the dialog is copied to every Corral.
+- **Save this style as the default for new Corrals**: Corrals you create from now on start with this look.
+- **Apply only what I changed to all Corrals**: the settings you touched in this session, and only those, are copied to every Corral. Change just the border opacity and every Corral gets that border, keeping its own colours and fonts.
+- **Make all Corrals look like this one**: every setting in the dialog is copied to every Corral.
 
-**Reset to Defaults** sets every control back to the look a new Corral would get. It previews live like any other change, and Cancel undoes it.
+**Reset to Defaults** sets every control back to the look a new Corral would get. It previews live like any other change; OK then gives it to every tab of this Corral, and Cancel undoes it.
 
 #### Header opacity and tabs
 Header opacity fades the title bar and tab strip independently of the Corral fill.
@@ -164,7 +166,7 @@ Header opacity fades the title bar and tab strip independently of the Corral fil
 #### Text opacity
 The tab title and the icon labels fade on their own sliders, so text can be dialled back without touching what is behind it, or turned off entirely for a Corral that is just icons.
 
-- **Header label** fades the active tab's title. It is a per-tab setting, like the font face and color, even though the slider sits with the per-Corral ones.
+- **Header label**, on the Header page, fades the active tab's title. It is a per-tab setting, like the font face and color just above it.
 - **Icon label** fades every icon caption in the Corral.
 - Both go all the way to invisible. Nothing is lost: the header still drags, rolls up and right-clicks with no title on it, and icons stay visible and clickable with no captions.
 - Both fade in on hover along with the icons, border and header, on the same timing. Text set to 0% is therefore not gone: it appears when you move the mouse over the Corral and fades back out when you leave.
@@ -180,7 +182,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 ### Using
 - **Double-click** an icon to open it.
 - **Drop a file onto an icon** inside a Corral to invoke its target, e.g. drop a document onto an application's icon to open it with that app.
-- **Click the label of a selected icon** once more (or press F2) to rename it in place.
+- **Click the label of a selected icon** once more (or press F2) to rename it in place. If the name contains a character Windows does not allow, or another file already has it, DexCorral says so and leaves the name open for editing; Esc gives up.
 - **Select several icons** with Ctrl+click, Shift+click, Ctrl+A or by dragging a rectangle over them. Dragging one of the selected icons carries all of them: to another Corral, back out to the desktop, or to a new place in the same Corral.
 - **Drag an icon into another application or an Explorer window** and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it. Moving it into another folder takes the file off the desktop, and so out of the Corral.
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
@@ -225,8 +227,8 @@ Double-clicking the tray icon toggles Quick-Hide. Its right-click menu offers:
 
 - **About**: the version, the license in one sentence, and buttons that open the website, the GitHub project and the full license text.
 - **User Manual**: opens this manual on GitHub in your browser.
-- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "New DexCorral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
-- **Create New Corral** / **New Virtual Corral**.
+- **Pause DexCorral**: hides every Corral and shows all your icons as ordinary desktop icons, without restarting Explorer. Icons that live in a Corral appear where their Corral was; those of the tabs that were not showing sit on one spot in the middle of their Corral, one on top of another. Choose it again to bring everything back as it was. While paused the menu is reduced to the entries that still apply, the desktop right-click menu does not offer "Create New Corral", and Quick-Hide does nothing. The pause is kept when you sign out or restart.
+- **Create New Corral** / **New Virtual Corral...**.
 - **Show Desktop Icons**: toggle all native desktop icons. Not available while Quick-Hide is on; the check mark then shows what Quick-Hide gives back when it ends.
 - **Quick-Hide Everything**: hide/show icons and corrals at once (same as double-clicking the desktop). If you have set a hotkey for it (see [Quick-Hide](#quick-hide)), the keys are shown on this line.
 - **Settings...**: opens the settings window, see below.
@@ -256,7 +258,7 @@ Standby is also what DexCorral does when [Stardock Fences](#stardock-fences) is 
 - All your icons are ordinary desktop icons again. No Corrals are shown.
 - Your layout is safe. `config.json` is not changed, and everything comes back as it was.
 - The tray icon stays, with the tooltip "DexCorral is paused". Its menu shows why, and keeps About, User Manual, Settings and the update check.
-- The desktop right-click menu does not offer "New DexCorral".
+- The desktop right-click menu does not offer "Create New Corral".
 - It stays that way across restarts. DexCorral does not quietly try again at the next login.
 
 To leave a crash-guard standby, right-click the tray icon and choose **Resume DexCorral**. The Corrals come back at once, without signing out. Installing a different DexCorral version also ends it, since a new build deserves a fresh attempt.
@@ -279,7 +281,13 @@ All settings (corral layouts, tabs, colors, fonts, assigned files) are stored in
 %APPDATA%\DexCorral\config.json
 ```
 
-The format is forward- and backward-compatible: fields missing from an older config simply get default values. The file is written automatically; if you edit it by hand, do so while DexCorral is not running.
+The format is forward- and backward-compatible: fields missing from an older config simply get default values.
+
+The file is written automatically. DexCorral reads it only when it starts and writes its own settings back after every change, also while paused, so a hand edit made while it runs is lost at the next save. DexCorral runs inside Explorer and has no Exit, so to edit the file by hand:
+
+1. Edit and save `config.json` without touching any Corral in between.
+2. Right away, end Explorer, which ends DexCorral before it can save again: in PowerShell, `Stop-Process -Name explorer -Force`.
+3. Windows usually starts Explorer again within a few seconds; if not, run `Start-Process explorer.exe`. DexCorral reads your edit when it starts. An install for all users comes back with Explorer. One for you only does not: run `DexCorral.exe --startup` from its folder, or sign out and back in.
 
 Two more files can appear next to it:
 
@@ -310,7 +318,7 @@ Which of the two you use is your choice. To use DexCorral, uninstall Stardock Fe
 
 - **Identical filenames on the user and Public desktop**: corral membership is stored as a bare filename, so DexCorral assumes the one on the user desktop. The same *display* name with different filenames (a folder `test` next to `test.txt`) is handled correctly.
 - **Network folders**: whether a share answers is checked in the background before DexCorral touches it, but the folder itself is read on the thread all Corrals share. If a share stops answering in the two seconds after such a check, or while the folder is being read, Corrals can stall once until Windows gives up on it. A new network Corral is empty until the first check has answered.
-- **"New DexCorral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Since the customizable context menu that Microsoft introduced with [KB5127936](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/10/kb5127936-windows-11-25h2-26h2-update) (October 2026, rolled out in phases; seen here after [KB5132061](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/11/kb5132061-windows-11-24h2-25h2-26h2-security-update), build 26200.9974), a plain right-click on the desktop shows the new menu, which does not list DexCorral. The registry setting that used to make the classic menu the default no longer has an effect there.
+- **"Create New Corral" missing from the desktop menu**: DexCorral adds its entries to the classic desktop menu. Since the customizable context menu that Microsoft introduced with [KB5127936](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/10/kb5127936-windows-11-25h2-26h2-update) (October 2026, rolled out in phases; seen here after [KB5132061](https://support.microsoft.com/en-us/servicing/os/windows-11/2026/11/kb5132061-windows-11-24h2-25h2-26h2-security-update), build 26200.9974), a plain right-click on the desktop shows the new menu, which does not list DexCorral. The registry setting that used to make the classic menu the default no longer has an effect there.
   - **Hold Shift and right-click the desktop**: this opens the classic menu with both entries. Microsoft describes it on the KB5127936 page: "To see more options, hold down Shift and right-click on your desktop."
   - Or create Corrals from the tray menu or from the right-click menu of any Corral.
 

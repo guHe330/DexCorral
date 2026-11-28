@@ -43,6 +43,8 @@ struct HotkeySpec
  * Case and spaces are ignored. A valid hotkey has at least one modifier
  * (Ctrl, Alt, Shift, Win) and exactly one key (A-Z, 0-9, F1-F24). A bare key
  * is refused: registered globally it would swallow that key in every program.
+ * Shift alone counts only with a function key, for the same reason. The
+ * settings field is stricter still and always wants Ctrl or Alt.
  * Returns false, leaving `out` untouched, for anything else.
  */
 bool ParseHotkey(const std::string &text, HotkeySpec &out);

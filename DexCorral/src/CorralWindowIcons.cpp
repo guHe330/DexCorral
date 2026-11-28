@@ -113,6 +113,7 @@ static bool IconHasFullContent(HICON hIcon, int expectedSize)
     HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, hBmp);
     memset(pixels, 0, expectedSize * expectedSize * 4);
     DrawIconEx(memDC, 0, 0, hIcon, expectedSize, expectedSize, 0, nullptr, DI_NORMAL);
+    GdiFlush(); // before reading the DIB bits
 
     // Find bounding box of non-transparent pixels
     int minX = expectedSize, minY = expectedSize, maxX = 0, maxY = 0;
@@ -150,42 +151,29 @@ static bool IconHasFullContent(HICON hIcon, int expectedSize)
 }
 
 // Extract icon from system image list at a given index and size.
-// If the icon has too much padding (app lacks high-res icon), falls back to
-// SHIL_LARGE (32x32) which DrawIconEx will scale up.
+// If the icon has too much padding (app lacks that size), steps down from
+// SHIL_JUMBO (256) to SHIL_EXTRALARGE (48) to SHIL_LARGE (32), whichever is the
+// first with real content; DrawIconEx scales it up.
 static HICON ExtractFromImageList(int iconIndex, int iconSize)
 {
-    int imageListType = GetImageListType(iconSize);
-
-    IImageList *pImageList = nullptr;
-    if (FAILED(SHGetImageList(imageListType, IID_PPV_ARGS(&pImageList))))
+    for (int imageListType = GetImageListType(iconSize);;
+         imageListType = (imageListType == SHIL_JUMBO) ? SHIL_EXTRALARGE : SHIL_LARGE)
     {
-        return nullptr;
-    }
+        IImageList *pImageList = nullptr;
+        if (FAILED(SHGetImageList(imageListType, IID_PPV_ARGS(&pImageList))))
+            return nullptr;
 
-    HICON hIcon = nullptr;
-    pImageList->GetIcon(iconIndex, ILD_TRANSPARENT, &hIcon);
-    pImageList->Release();
+        HICON hIcon = nullptr;
+        pImageList->GetIcon(iconIndex, ILD_TRANSPARENT, &hIcon);
+        pImageList->Release();
 
-    // Check if the high-res icon actually has content or is just a small icon
-    // centered in a larger canvas with transparent padding
-    if (hIcon && imageListType > SHIL_LARGE && !IconHasFullContent(hIcon, iconSize))
-    {
+        // Check if the high-res icon actually has content or is just a small icon
+        // centered in a larger canvas with transparent padding
+        if (!hIcon || (imageListType != SHIL_JUMBO && imageListType != SHIL_EXTRALARGE) ||
+            IconHasFullContent(hIcon, iconSize))
+            return hIcon;
         DestroyIcon(hIcon);
-        // Fall back to 32x32 — DrawIconEx will scale it up
-        pImageList = nullptr;
-        if (SUCCEEDED(SHGetImageList(SHIL_LARGE, IID_PPV_ARGS(&pImageList))))
-        {
-            hIcon = nullptr;
-            pImageList->GetIcon(iconIndex, ILD_TRANSPARENT, &hIcon);
-            pImageList->Release();
-        }
-        else
-        {
-            hIcon = nullptr;
-        }
     }
-
-    return hIcon;
 }
 
 // Extract a high-resolution icon from the system image list using a file path.
@@ -446,11 +434,12 @@ void CorralWindow::LoadIconImages()
         std::wstring userPath = desktopPath + L"\\" + ci.wFileName;
         std::wstring pubPath = publicDesktopPath + L"\\" + ci.wFileName;
 
-        if (GetFileAttributesW(userPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        DWORD attrs = GetFileAttributesW(userPath.c_str());
+        if (attrs != INVALID_FILE_ATTRIBUTES)
         {
             ci.fullPath = userPath;
         }
-        else if (GetFileAttributesW(pubPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        else if ((attrs = GetFileAttributesW(pubPath.c_str())) != INVALID_FILE_ATTRIBUTES)
         {
             ci.fullPath = pubPath;
         }
@@ -462,6 +451,7 @@ void CorralWindow::LoadIconImages()
                 staleFiles.push_back(fileName);
             continue;
         }
+        ci.isFolder = (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
         // Display name exactly as Explorer shows it — respects "Hide extensions
         // for known file types" and strips .lnk
@@ -1214,6 +1204,8 @@ void CorralWindow::CalculateIconLayout()
 
 void CorralWindow::RecalculateLayout()
 {
+    if (!isHoverExpanded && !isAnimating)
+        FitRolledUpHeight(); // The header height may have changed
     UpdateIconSpacingForViewMode();
     CalculateIconLayout();
     UpdateLayeredContent();

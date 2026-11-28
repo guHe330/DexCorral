@@ -84,6 +84,7 @@ Source: "..\..\DexCorral\build\DexCorral.exe"; DestDir: "{app}"; Flags: ignoreve
 Source: "..\..\DexCorral\build\DexCorralHook.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
 ; License
 Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\DexCorral\include\nlohmann\LICENSE.MIT"; DestDir: "{app}"; DestName: "LICENSE-nlohmann-json.txt"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName} - Register"; Filename: "{app}\DexCorral.exe"; Parameters: "--register {code:GetScopeArg}"

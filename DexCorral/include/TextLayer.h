@@ -51,8 +51,8 @@ public:
      * @param width       Layer width in pixels.
      * @param height      Layer height in pixels.
      * @param fillPixel   Value every pixel starts at. Transparent black (0) for
-     *                    a layer with real alpha; opaque white for a coverage
-     *                    layer that GDI text will be drawn into in black.
+     *                    a layer with real alpha; white with alpha 0 for a
+     *                    coverage layer that GDI text will be drawn into in black.
      */
     TextLayer(HDC referenceDC, int width, int height, DWORD fillPixel)
         : dc(nullptr), bmp(nullptr), oldBmp(nullptr), pixels(nullptr), w(width), h(height)
@@ -109,7 +109,12 @@ public:
 
     bool IsValid() const { return pixels != nullptr; }
     HDC DC() const { return dc; }
-    DWORD *Pixels() const { return pixels; }
+    /// Flushes GDI first: the DIB bits are only safe to read once batched drawing has landed.
+    DWORD *Pixels() const
+    {
+        GdiFlush();
+        return pixels;
+    }
     int Width() const { return w; }
     int Height() const { return h; }
 

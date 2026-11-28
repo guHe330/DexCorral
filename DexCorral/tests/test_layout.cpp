@@ -320,6 +320,15 @@ TEST(Placement, FullyOccupiedWorkAreaReturnsDesired) {
     EXPECT_EQ(p.y, 480);
 }
 
+TEST(Placement, FindsAGapOffTheGrid) {
+    // The 303 px gap right of the corral fits 300 px, but only at x 1617..1620:
+    // no 16 px grid point lies there.
+    std::vector<RECT> occupied = {{0, 0, 1617, 1040}};
+    auto p = FindNearestFreeTopLeft({500, 400}, 300, 200, kWork, occupied, 0);
+    EXPECT_EQ(p.x, 1617);
+    EXPECT_EQ(p.y, 400);
+}
+
 TEST(Placement, ExcludedRectsAreSimplyAbsent) {
     // The exclude-the-source behaviour is the caller's: passing a shorter list
     // must let the corral land on the spot that rect covered.

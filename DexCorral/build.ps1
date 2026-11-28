@@ -29,9 +29,20 @@ if (Test-Path $hookDll) {
     } catch {
         Write-Host "  DexCorralHook.dll is locked (loaded by Explorer as shell extension)" -ForegroundColor Yellow
         Write-Host "  Restarting Explorer to unlock DLL..." -ForegroundColor Yellow
-        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 3
-        Start-Process explorer.exe
+        # Only this session's Explorer: from an elevated prompt -Name alone also
+        # kills every other signed-in user's desktop.
+        $session = (Get-Process -Id $PID).SessionId
+        $explorers = Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session
+        $explorers | Stop-Process -Force -ErrorAction SilentlyContinue
+        $explorers | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+        # Winlogon usually restarts the shell by itself. Start it only if it stays
+        # down: a second explorer.exe next to a running shell opens a folder window.
+        for ($i = 0; $i -lt 20 -and -not (Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session); $i++) {
+            Start-Sleep -Milliseconds 500
+        }
+        if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session)) {
+            Start-Process explorer.exe
+        }
         Start-Sleep -Seconds 3
     }
 }
@@ -39,8 +50,10 @@ if (Test-Path $hookDll) {
 # Find Visual Studio installation
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if (Test-Path $vsWhere) {
-    $vsPath = & $vsWhere -latest -property installationPath
-    $vcvarsall = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+    # -products * includes Build Tools; -requires skips an instance without the C++ tools.
+    $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    # Null when nothing matches; the not-found check below reports it.
+    $vcvarsall = if ($vsPath) { Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat" } else { $null }
 } else {
     # Fallback to common paths
     $vcvarsall = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
@@ -52,9 +65,9 @@ if (Test-Path $vsWhere) {
     }
 }
 
-if (!(Test-Path $vcvarsall)) {
+if (!$vcvarsall -or !(Test-Path $vcvarsall)) {
     Write-Host "ERROR: vcvarsall.bat not found!" -ForegroundColor Red
-    Write-Host "Please install Visual Studio 2022 with 'Desktop development with C++' workload." -ForegroundColor Red
+    Write-Host "Please install Visual Studio 2022 (or its Build Tools) with the 'Desktop development with C++' workload." -ForegroundColor Red
     exit 1
 }
 
@@ -129,8 +142,9 @@ if ($exitCode -eq 0) {
     Write-Host "Registration:    $buildDir\DexCorral.exe" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "To install:   DexCorral.exe --register  (run as Admin)" -ForegroundColor Cyan
-    Write-Host "To uninstall: DexCorral.exe --unregister" -ForegroundColor Cyan
+    Write-Host "To install:   DexCorral.exe --register --scope=user  (no admin needed)" -ForegroundColor Cyan
+    Write-Host "To uninstall: DexCorral.exe --unregister --scope=user" -ForegroundColor Cyan
+    Write-Host "(--scope=machine, from an elevated prompt, only to test the all-users load path)" -ForegroundColor DarkGray
 
     # Run unit tests
     $testsExe = Join-Path $buildDir "DexCorralTests.exe"
@@ -224,7 +238,8 @@ if ($exitCode -eq 0) {
                     Write-Host "Installer:   $($setupExe.FullName)" -ForegroundColor Green
                 }
             } else {
-                Write-Host "Installer build failed (exit code $LASTEXITCODE)" -ForegroundColor Yellow
+                $exitCode = $LASTEXITCODE
+                Write-Host "Installer build failed (exit code $exitCode)" -ForegroundColor Red
             }
         }
     } else {

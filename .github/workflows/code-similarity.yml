@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install scancode-toolkit
-        run: pip install scancode-toolkit
+        run: pip install scancode-toolkit==32.5.0
 
       - name: Run scan
         run: |
@@ -29,27 +29,10 @@ jobs:
             --json-pp scancode-report.json \
             .
 
+      # Report only, no pass/fail gate: deciding which licenses are compatible
+      # with this GPL-3.0 project is a review call, so read the report by hand.
       - name: Upload results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: scancode-report
           path: scancode-report.json
-
-      - name: Fail on license policy violations
-        run: |
-          python - <<'EOF'
-          import json, sys
-          with open("scancode-report.json") as f:
-              report = json.load(f)
-          violations = [
-              file["path"]
-              for file in report.get("files", [])
-              for lic in file.get("licenses", [])
-              if lic.get("category") in ("Copyleft", "Proprietary Free")
-          ]
-          if violations:
-              print("License violations found in:")
-              print("\n".join(violations))
-              sys.exit(1)
-          print("No violations found.")
-          EOF

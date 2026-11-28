@@ -123,7 +123,7 @@ struct CorralIcon
     bool isSpecialIcon = false; /// True if this is a virtual shell item
     std::wstring clsid;         /// CLSID string for special icons
 
-    bool isFolder = false;      /// True if this entry is a directory (virtual corral navigation)
+    bool isFolder = false;      /// True if this entry is a directory (virtual corral navigation, blank Size)
 
     /// Details view information
     std::wstring fileType;                    /// File type description (e.g., "Text Document")
@@ -201,6 +201,12 @@ public:
     /// True for a UNC path or a path on a mapped network drive. Does not touch the network.
     static bool IsNetworkFolder(const std::wstring &path);
 
+    /// Folder picker for a virtual Corral; empty if cancelled. An empty startFolder leaves the dialog's own choice.
+    static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title, const std::wstring &startFolder);
+
+    /// False, with the message to show, when path is not an existing folder
+    static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg);
+
     /// Helper to extract CLSID from special icon entry
     static std::wstring GetSpecialIconClsid(const std::string &fileName);
 
@@ -218,7 +224,8 @@ public:
     /// Returns top Y coordinate of icon area (title bar + optional details header)
     int GetIconAreaTop() const { return Dpi(config.TitleBarHeight + 4) + GetDetailsHeaderHeight(); }
 
-    /// Recalculates icon layout based on window size and view mode
+    /// Recalculates icon layout based on window size and view mode; a rolled-up
+    /// Corral first takes the current header height
     void RecalculateLayout();
 
     /// Sets current window opacity (0-255, clamped to minimum 5)

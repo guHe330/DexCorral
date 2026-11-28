@@ -314,8 +314,9 @@ void CorralWindow::UpdateLayeredContent()
      * The font is created with ANTIALIASED_QUALITY rather than ClearType:
      * subpixel antialiasing encodes coverage per colour channel, which a single
      * alpha channel cannot carry, and it was never meaningful on a layered
-     * window composited over an unknown wallpaper anyway. This matches how the
-     * icon labels have always been drawn.
+     * window composited over an unknown wallpaper anyway. The icon label font
+     * asks for ClearType, but DrawThemeTextEx with DTT_COMPOSITED draws it in
+     * greyscale all the same.
      */
     // Reserved before the titles are laid out: the padlock sits over the last tab,
     // so that tab has to give up the width or a long title runs under it.
@@ -379,11 +380,14 @@ void CorralWindow::UpdateLayeredContent()
                 }
                 else if (tab.IsCatchAll)
                 {
-                    wtitle = L"\u2B07 " + wtitle; // Down arrow (escaped: this source is not compiled as UTF-8)
+                    wtitle = L"\u2B07 " + wtitle; // Down arrow (escaped by choice; the source is compiled as UTF-8)
                 }
 
                 RECT tabRect = GetTabRect(i);
                 tabRect.left += Dpi(6);
+                // With more than one tab the reorder grip shows at the left edge on hover
+                if (config.Tabs.size() > 1)
+                    tabRect.left = (std::max)(tabRect.left, GetTabGripRect(i).right);
                 tabRect.right -= Dpi(6);
                 if (i == (int)config.Tabs.size() - 1)
                     tabRect.right -= lockReserve;
@@ -475,13 +479,16 @@ void CorralWindow::UpdateLayeredContent()
     // ---- Lock Position badge ----
     // Composited over the title bar in the last tab's header colour and opacity, so
     // it reads as part of the header rather than an overlay pasted on top of it.
+    // Floored at LOCK_GLYPH_ALPHA_MIN: it is the only sign that moving and
+    // resizing are off, so hidden titles must not hide it too.
     if (lockRect.right > lockRect.left && !config.Tabs.empty())
     {
         const int lw = lockRect.right - lockRect.left;
         const int lh = lockRect.bottom - lockRect.top;
         const int ti = (int)config.Tabs.size() - 1;
-        const int lockAlpha = ChromeAlpha::HoverBlendTextOpacity(config.Tabs[ti].HeaderFontOpacity,
-                                                                 currentTextHover);
+        const int lockAlpha = (std::max)(LOCK_GLYPH_ALPHA_MIN,
+                                         ChromeAlpha::HoverBlendTextOpacity(config.Tabs[ti].HeaderFontOpacity,
+                                                                            currentTextHover));
         if (lockAlpha > 0)
         {
             LockGlyph glyph(lw, lh);
@@ -529,17 +536,20 @@ void CorralWindow::UpdateLayeredContent()
             DrawThemeTextEx(hHdrTheme, memDC, 0, 0, text, len, flags, &r, &o);
         };
 
-        // Glyphs (declared via codepoints; the source is not compiled as UTF-8)
+        // Glyphs (declared via codepoints by choice; the source is compiled as UTF-8)
         static const wchar_t kUpArrow[] = {0x2191, 0};   // up arrow (nav up)
         static const wchar_t kSortAsc[] = {0x25B2, 0};   // black up triangle
         static const wchar_t kSortDesc[] = {0x25BC, 0};  // black down triangle
 
-        // Nav "up" button (folder-up arrow) — only when navigated below the root
+        // Nav "up" button (folder-up arrow) — only when navigated below the root.
+        // In the header font colour like the titles, but like the reorder grip not
+        // subject to the header text opacity: it is a button, not decoration.
         if (IsNavBackVisible())
         {
             RECT nb = GetNavBackButtonRect();
+            const int at = config.ActiveTabIndex; // made valid by GetActiveTab() above
             drawHeaderText(kUpArrow, 1, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                           nb, RGB(255, 255, 255));
+                           nb, RGB(tabFontR[at], tabFontG[at], tabFontB[at]));
         }
 
         // Details column header band
@@ -552,9 +562,10 @@ void CorralWindow::UpdateLayeredContent()
             // Band background (semi-opaque dark, premultiplied)
             const BYTE hdrA = 200, hdrPm = (BYTE)((40 * 200) / 255);
             DWORD hdrBg = (hdrA << 24) | (hdrPm << 16) | (hdrPm << 8) | hdrPm;
+            const int bandInset = (borderAlpha > 0) ? 1 : 0; // keep the left and right border
             for (int y = headerTop; y < headerBottom && y < h; y++)
                 if (y >= 0)
-                    for (int x = 0; x < w; x++)
+                    for (int x = bandInset; x < w - bandInset; x++)
                         pixels[y * w + x] = hdrBg;
 
             auto cols = GetDetailsColumns();
@@ -925,6 +936,7 @@ void CorralWindow::UpdateLayeredContent()
                         // Draw to temp DIB, apply tint+opacity, composite onto main buffer
                         memset(iconTempPixels, 0, ICON_TEMP_SIZE * ICON_TEMP_SIZE * 4);
                         DrawIconEx(iconTempDC, 0, 0, hIconToDraw, currentIconSize, currentIconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         for (int py = 0; py < currentIconSize; py++)
                         {
                             int destY = iconDrawTop + py;
@@ -979,6 +991,7 @@ void CorralWindow::UpdateLayeredContent()
                     {
                         DrawIconEx(memDC, icon.iconRect.left, iconDrawTop, hIconToDraw,
                                    currentIconSize, currentIconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         // Fix alpha for old-style icons (no tint/opacity needed in this path)
                         for (int py = iconDrawTop; py < iconDrawTop + currentIconSize && py < h; py++)
                         {
@@ -1008,8 +1021,9 @@ void CorralWindow::UpdateLayeredContent()
                 int dateCol = detailCols[3].left;
                 int syncCol = detailCols[3].right;
 
-                // Draw detail columns (DrawThemeTextEx ignores clip regions, so guard visibility)
-                if (drawTop >= visibleTop && drawBottom <= visibleBottom)
+                // Draw detail columns. DrawThemeTextEx ignores clip regions: the label
+                // layer's bounds clip a part-visible row, the back buffer needs a guard.
+                if (useLabelLayer || (drawTop >= visibleTop && drawBottom <= visibleBottom))
                 {
                     // Draw name (bright white)
                     RECT nameRect = {nameCol, drawTop, typeCol - Dpi(4), drawBottom};
@@ -1025,7 +1039,11 @@ void CorralWindow::UpdateLayeredContent()
 
                     // Draw size
                     std::wstring sizeStr;
-                    if (icon.fileSize < 1024)
+                    if (icon.isFolder || icon.isSpecialIcon)
+                    {
+                        // No size, as in Explorer
+                    }
+                    else if (icon.fileSize < 1024)
                     {
                         sizeStr = std::to_wstring(icon.fileSize) + Tr(Str::Unit_Bytes);
                     }
@@ -1046,16 +1064,29 @@ void CorralWindow::UpdateLayeredContent()
                                      DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                                      sizeRect, RGB(255, 255, 255));
 
-                    // Draw date
-                    FILETIME localTime;
-                    SYSTEMTIME sysTime;
-                    FileTimeToLocalFileTime(&icon.modifiedTime, &localTime);
-                    FileTimeToSystemTime(&localTime, &sysTime);
-                    wchar_t dateStr[32];
-                    swprintf_s(dateStr, L"%02d/%02d/%04d", sysTime.wMonth, sysTime.wDay, sysTime.wYear);
+                    // Draw date in the user's short date and time format, as Explorer does;
+                    // blank when there is none (special icons, unreadable files)
+                    SYSTEMTIME utcTime, sysTime;
+                    wchar_t dateStr[64] = L"";
+                    if ((icon.modifiedTime.dwLowDateTime || icon.modifiedTime.dwHighDateTime) &&
+                        FileTimeToSystemTime(&icon.modifiedTime, &utcTime) &&
+                        SystemTimeToTzSpecificLocalTime(nullptr, &utcTime, &sysTime))
+                    {
+                        int len = GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, DATE_SHORTDATE, &sysTime, nullptr,
+                                                  dateStr, ARRAYSIZE(dateStr), nullptr);
+                        if (len > 0 && len < ARRAYSIZE(dateStr))
+                        {
+                            dateStr[len - 1] = L' ';
+                            if (!GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &sysTime, nullptr,
+                                                 dateStr + len, ARRAYSIZE(dateStr) - len))
+                                dateStr[len - 1] = 0;
+                        }
+                        else
+                            dateStr[0] = 0;
+                    }
                     RECT dateRect = {dateCol, drawTop, syncCol - Dpi(4), drawBottom};
                     drawShadowedText(dateStr, -1,
-                                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
                                      dateRect, RGB(255, 255, 255));
 
                     // Draw sync status indicator
@@ -1128,6 +1159,7 @@ void CorralWindow::UpdateLayeredContent()
                         // Draw to temp DIB, apply tint+opacity, composite onto main buffer
                         memset(iconTempPixels, 0, ICON_TEMP_SIZE * ICON_TEMP_SIZE * 4);
                         DrawIconEx(iconTempDC, 0, 0, icon.hIcon, iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         for (int py = 0; py < iconSize; py++)
                         {
                             int destY = iconDrawTop + py;
@@ -1182,6 +1214,7 @@ void CorralWindow::UpdateLayeredContent()
                     {
                         DrawIconEx(memDC, icon.iconRect.left, iconDrawTop, icon.hIcon,
                                    iconSize, iconSize, 0, nullptr, DI_NORMAL);
+                        GdiFlush(); // before reading the DIB bits
                         // Fix alpha for old-style icons (no tint/opacity needed in this path)
                         for (int py = iconDrawTop; py < iconDrawTop + iconSize && py < h; py++)
                         {
@@ -1203,21 +1236,22 @@ void CorralWindow::UpdateLayeredContent()
                     }
                 }
 
-                // Label with glow shadow (matches Windows desktop style)
+                // Label with glow shadow (matches Windows desktop style). DT_EDITCONTROL
+                // drops a part-visible last line and ends the last whole one in an ellipsis.
                 int labelTop = iconDrawTop + iconSize + Dpi(2);
                 RECT labelRect = {
                     icon.rect.left,
                     labelTop,
                     icon.rect.right,
                     drawBottom};
-                // Only draw if label area is fully within visible region.
-                // DrawThemeTextEx with DTT_COMPOSITED ignores GDI clip regions,
-                // so we skip the label entirely when it would overflow into the title bar
-                // (clamping the rect causes the label to visually "stick" at the border).
-                if (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop)
+                // DrawThemeTextEx with DTT_COMPOSITED ignores GDI clip regions. The label
+                // layer's bounds clip a label that scrolls under the header; drawn straight
+                // into the back buffer it is skipped instead, as it would overflow into the
+                // title bar (clamping the rect makes the label "stick" at the border).
+                if (useLabelLayer || (labelTop >= visibleTop && labelTop < visibleBottom && drawBottom > visibleTop))
                 {
                     drawShadowedText(icon.displayName.c_str(), (int)icon.displayName.length(),
-                                     DT_CENTER | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+                                     DT_CENTER | DT_TOP | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS | DT_NOPREFIX,
                                      labelRect, RGB(255, 255, 255));
                 }
             }
@@ -1466,12 +1500,12 @@ void CorralWindow::UpdateLayeredContent()
         }
     }
 
-    // Resize grip (bottom-right corner, skip when rolled up).
-    // Deliberately unaffected by BorderOpacity: the grip is the corral's resize
-    // affordance, not part of the frame. A frameless corral (border at 0) still
+    // Resize grip (bottom-right corner, skip when rolled up or locked: neither
+    // can be resized). Deliberately unaffected by BorderOpacity: the grip is the
+    // corral's resize affordance, not part of the frame. A frameless corral (border at 0) still
     // needs somewhere visible to grab, so the grip stays at full strength while
     // the frame around it fades away. Confirmed as wanted in UAT of #1.
-    if (!config.IsRolledUp)
+    if (!config.IsRolledUp && !config.IsLocked)
     {
         DWORD gripPixel = (255 << 24) | (150 << 16) | (150 << 8) | 150;
         const int gripLen = Dpi(8), gripInset = Dpi(2);

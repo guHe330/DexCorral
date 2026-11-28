@@ -179,8 +179,9 @@ void CorralWindow::EndIconRename(bool save)
                 size_t lastSlash = oldPath.find_last_of(L"\\");
                 std::wstring newPath;
                 // A name with a path separator would move the file to another
-                // folder: such a name is refused like any failed rename.
-                if (lastSlash != std::wstring::npos && IconUtils::IsValidNewFileName(newName))
+                // folder: such a name is refused with the other invalid ones.
+                const bool validName = IconUtils::IsValidNewFileName(newName);
+                if (lastSlash != std::wstring::npos && validName)
                 {
                     // The editable name is the shell display name, which may
                     // omit the extension (.lnk, or any extension when "hide
@@ -229,9 +230,30 @@ void CorralWindow::EndIconRename(bool save)
                 }
                 else
                 {
-                    // Rename failed - could show error message
-                    MessageBoxBehind(Tr(Str::Err_RenameFailedBody), Tr(Str::Err_RenameFailedTitle),
-                                     MB_OK | MB_ICONERROR);
+                    const DWORD error = GetLastError();
+                    const bool taken = !newPath.empty() && (error == ERROR_ALREADY_EXISTS || error == ERROR_FILE_EXISTS);
+                    if (!validName)
+                        MessageBoxBehind(Tr(Str::Err_RenameInvalidName), Tr(Str::Err_RenameFailedTitle),
+                                         MB_OK | MB_ICONWARNING);
+                    else if (taken)
+                        MessageBoxBehind(TrFmt(Str::Err_RenameNameTaken, newName).c_str(),
+                                         Tr(Str::Err_RenameFailedTitle), MB_OK | MB_ICONWARNING);
+                    else
+                        MessageBoxBehind(Tr(Str::Err_RenameFailedBody), Tr(Str::Err_RenameFailedTitle),
+                                         MB_OK | MB_ICONERROR);
+
+                    // A name the user can fix: keep the edit open with what was
+                    // typed, as Explorer does. Escape still cancels.
+                    if ((!validName || taken) && IsWindow(hEditControl))
+                    {
+                        isRenamingIcon = true;
+                        blockRaise++;
+                        SetForegroundWindow(hEditControl);
+                        SetFocus(hEditControl);
+                        blockRaise--;
+                        SendMessageW(hEditControl, EM_SETSEL, 0, -1);
+                        return;
+                    }
                 }
             }
         }
@@ -309,6 +331,24 @@ LRESULT CALLBACK CorralWindow::EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wPa
 // Where the footer band of the rename dialog begins (dialog units)
 static const int RENAME_FOOTER_TOP = 32;
 
+struct NamePrompt
+{
+    wchar_t *name; // 256 characters: the text to start with and, on OK, the trimmed result
+    int maxLength; // Characters the edit accepts
+};
+
+/// What the name edit holds, without blanks around it
+static std::wstring NamePromptText(HWND hDlg)
+{
+    wchar_t buffer[256] = {};
+    GetDlgItemTextW(hDlg, 101, buffer, 256);
+    const std::wstring text = buffer;
+    const size_t first = text.find_first_not_of(L" \t");
+    if (first == std::wstring::npos)
+        return L"";
+    return text.substr(first, text.find_last_not_of(L" \t") - first + 1);
+}
+
 static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -316,10 +356,12 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
     case WM_INITDIALOG:
     {
         SetWindowLongPtrW(hDlg, GWLP_USERDATA, lParam);
-        wchar_t *initialText = (wchar_t *)lParam;
-        SetDlgItemTextW(hDlg, 101, initialText);
-
+        const NamePrompt *prompt = (const NamePrompt *)lParam;
         HWND hEdit = GetDlgItem(hDlg, 101);
+        SendMessageW(hEdit, EM_LIMITTEXT, prompt->maxLength, 0);
+        SetDlgItemTextW(hDlg, 101, prompt->name);
+        EnableWindow(GetDlgItem(hDlg, IDOK), !NamePromptText(hDlg).empty()); // A blank name is not a name
+
         SendMessageW(hEdit, EM_SETSEL, 0, -1);
         SetFocus(hEdit);
         DialogSkin::Attach(hDlg, RENAME_FOOTER_TOP);
@@ -357,12 +399,15 @@ static INT_PTR CALLBACK RenameDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM
         return FALSE;
     }
     case WM_COMMAND:
+        if (LOWORD(wParam) == 101 && HIWORD(wParam) == EN_CHANGE)
+            EnableWindow(GetDlgItem(hDlg, IDOK), !NamePromptText(hDlg).empty());
         if (LOWORD(wParam) == IDOK)
         {
-            wchar_t buffer[256];
-            GetDlgItemTextW(hDlg, 101, buffer, 256);
-            wchar_t *result = (wchar_t *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
-            wcscpy_s(result, 256, buffer);
+            const std::wstring text = NamePromptText(hDlg);
+            if (text.empty())
+                return TRUE; // OK is disabled then; this covers Enter
+            NamePrompt *prompt = (NamePrompt *)GetWindowLongPtrW(hDlg, GWLP_USERDATA);
+            wcscpy_s(prompt->name, 256, text.c_str());
             EndDialog(hDlg, IDOK);
             return TRUE;
         }
@@ -388,9 +433,11 @@ void CorralWindow::PromptRename()
 }
 
 /// Asks for a name in the small edit dialog. `name` (256 characters) holds
-/// the text to start with and, on true, what the user entered.
-static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name)
+/// the text to start with and, on true, what the user entered without blanks
+/// around it, never empty. The edit takes at most `maxLength` characters.
+static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name, int maxLength = 255)
 {
+    NamePrompt prompt = {name, maxLength};
     WORD dlgTemplate[512] = {};
     WORD *p = BeginDlgTemplate(dlgTemplate,
                                DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_SETFONT,
@@ -402,7 +449,7 @@ static bool PromptForName(HWND owner, const wchar_t *title, wchar_t *name)
     p = AddDlgItem(p, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 118, RENAME_FOOTER_TOP + 7, 50, 14, IDCANCEL,
                    0xFFFF, DLG_CLASS_BUTTON, Tr(Str::Btn_Cancel));
     return DialogBoxIndirectParamW(GetModuleHandleW(nullptr), (DLGTEMPLATE *)dlgTemplate, owner, RenameDlgProc,
-                                   (LPARAM)name) == IDOK;
+                                   (LPARAM)&prompt) == IDOK;
 }
 
 void CorralWindow::ShowRenameDialog()
@@ -416,7 +463,7 @@ void CorralWindow::ShowRenameDialog()
     blockRaise--;
     PinToBandTop();
 
-    if (result == IDOK && wcslen(nameBuffer) > 0)
+    if (result == IDOK)
     {
         int sz = WideCharToMultiByte(CP_UTF8, 0, nameBuffer, -1, nullptr, 0, nullptr, nullptr);
         std::string newTitle(sz - 1, 0);
@@ -940,12 +987,13 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             cf.lStructSize = sizeof(CHOOSEFONTW);
             cf.hwndOwner = hDlg;
             cf.lpLogFont = &lf;
-            cf.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL;
+            // No style list: the header is always drawn semibold and upright
+            cf.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL | CF_NOSTYLESEL;
 
             if (ChooseFontW(&cf))
             {
                 data->fontName = lf.lfFaceName;
-                data->fontSize = cf.iPointSize / 10; // iPointSize is in 1/10 points
+                data->fontSize = (cf.iPointSize + 5) / 10; // iPointSize is in 1/10 points; only whole points are kept
                 data->fontChanged = true;
                 SetDlgItemTextW(hDlg, 112, data->fontName.c_str());
 
@@ -1025,7 +1073,10 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         if (id == IDC_APPEARANCE_RESET)
         { // Reset to Defaults: every control goes to the style a new corral would get
             if (App *app = App::GetInstance())
+            {
                 AppearanceLoadLook(hDlg, data, app->GetDefaultAppearance());
+                data->presetLoaded = true; // A new Corral's tabs share one look, so OK gives it to every tab
+            }
             return TRUE;
         }
 
@@ -1050,7 +1101,7 @@ static INT_PTR CALLBACK AppearanceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
             wchar_t name[256] = {};
             const std::string selected = AppearanceOwnPresetName(hDlg);
             wcsncpy_s(name, CorralWindow::Utf8ToWide(selected).c_str(), _TRUNCATE);
-            if (!PromptForName(hDlg, Tr(Str::Title_SavePreset), name))
+            if (!PromptForName(hDlg, Tr(Str::Title_SavePreset), name, (int)Presets::MAX_NAME))
                 return TRUE;
 
             const std::string clean = Presets::CleanName(CorralWindow::WideToUtf8(name));
@@ -1338,8 +1389,9 @@ void CorralWindow::ShowAppearanceDialog()
                                0, APPEARANCE_DLG_W, APPEARANCE_FOOTER_TOP + 28, dlgTitleStr.c_str());
     WORD itemCount = 0;
 
-    // WS_GROUP on every label: the arrow keys stay within the page strip and within each row
-    const DWORD labelStyle = WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX | WS_GROUP;
+    // WS_GROUP on every label: the arrow keys stay within the page strip and within each row.
+    // No SS_NOPREFIX: a label's access key moves to the control after it.
+    const DWORD labelStyle = WS_CHILD | WS_VISIBLE | SS_LEFT | WS_GROUP;
     const DWORD buttonStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
     const DWORD checkStyle = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP;
     const DWORD swatchStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | SS_NOTIFY;
@@ -1395,7 +1447,7 @@ void CorralWindow::ShowAppearanceDialog()
     slider(0, 153, Tr(Str::Lbl_Height), 110, 111);
     slider(1, 154, Tr(Str::Grp_Opacity), 124, 125);
     text(LABEL_X, rowY(2), LABEL_W, 155, Tr(Str::Lbl_Font), labelStyle);
-    text(FIELD_X, rowY(2), 84, 112, L"", labelStyle | SS_ENDELLIPSIS);
+    text(FIELD_X, rowY(2), 84, 112, L"", labelStyle | SS_ENDELLIPSIS | SS_NOPREFIX); // A font name, not a label
     button(FIELD_X + 88, (short)(rowY(2) - 2), 58, 113, Tr(Str::Btn_Choose), buttonStyle);
     text(LABEL_X, rowY(3), LABEL_W, 156, Tr(Str::Lbl_Color), labelStyle);
     swatch(3, 114);
@@ -1407,7 +1459,7 @@ void CorralWindow::ShowAppearanceDialog()
     slider(1, 159, Tr(Str::Lbl_IconLabel), 128, 129);
     text(LABEL_X, rowY(2), LABEL_W, 160, Tr(Str::Lbl_Tint), labelStyle);
     swatch(2, 118);
-    button(FIELD_X + 32, (short)(rowY(2) - 2), 58, 119, Tr(Str::Btn_Color), buttonStyle);
+    button(FIELD_X + 32, (short)(rowY(2) - 2), 58, 119, Tr(Str::Btn_Change), buttonStyle);
     slider(3, 161, Tr(Str::Lbl_TintStrength), 120, 121);
     slider(4, 162, Tr(Str::Lbl_Horiz), 130, 131);
     slider(5, 163, Tr(Str::Lbl_Vert), 132, 133);
@@ -1533,8 +1585,7 @@ void CorralWindow::ShowAppearanceDialog()
         currentTintStrength = originalTintStrength;
         config.IconSpacingXPercent = originalSpacingX;
         config.IconSpacingYPercent = originalSpacingY;
-        CalculateIconLayout();
-        UpdateLayeredContent();
+        RecalculateLayout(); // Not only CalculateIconLayout: the spacing preview changed the cached pixel spacing
         // A preset saved or deleted in the dialog stays so; the look is back as it was
         if (dlgData.presetsChanged && App::GetInstance())
             App::GetInstance()->SaveConfig();

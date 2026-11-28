@@ -3,6 +3,7 @@
 #include "HookBridge.h"
 #include "AppMessages.h"
 #include "CorralHook.h"
+#include "Strings.h"
 #include <strsafe.h>
 
 // Defined in dllmain.cpp (same DLL) — gated by the DebugLogging config flag
@@ -93,11 +94,11 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::QueryContextMenu(HMENU hmenu, UINT 
     if (GetCorralHookStandbyReason() != HookStandbyReason::None || HookBridge::IsUserPaused())
         return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 0);
 
-    // Add "New Corral" submenu
+    // Same names as in the tray menu, in the language the app runs in
     InsertMenuW(hmenu, indexMenu++, MF_BYPOSITION | MF_STRING,
-        idCmdFirst + IDM_NEW_CORRAL, L"New DexCorral");
+        idCmdFirst + IDM_NEW_CORRAL, Tr(Str::Menu_CreateNewCorral));
     InsertMenuW(hmenu, indexMenu++, MF_BYPOSITION | MF_STRING,
-        idCmdFirst + IDM_NEW_VIRTUAL_CORRAL, L"New Virtual DexCorral");
+        idCmdFirst + IDM_NEW_VIRTUAL_CORRAL, Tr(Str::Menu_NewVirtualCorral));
 
     return MAKE_HRESULT(SEVERITY_SUCCESS, 0, IDM_COUNT);
 }
@@ -152,10 +153,10 @@ HRESULT STDMETHODCALLTYPE DexCorralShellExt::GetCommandString(UINT_PTR idCmd, UI
 
     switch (idCmd) {
     case IDM_NEW_CORRAL:
-        StringCchCopyW((LPWSTR)pszName, cchMax, L"Create a new DexCorral on the desktop");
+        StringCchCopyW((LPWSTR)pszName, cchMax, Tr(Str::Shell_NewCorralHelp));
         return S_OK;
     case IDM_NEW_VIRTUAL_CORRAL:
-        StringCchCopyW((LPWSTR)pszName, cchMax, L"Create a new virtual DexCorral linked to a folder");
+        StringCchCopyW((LPWSTR)pszName, cchMax, Tr(Str::Shell_NewVirtualCorralHelp));
         return S_OK;
     default:
         return E_INVALIDARG;

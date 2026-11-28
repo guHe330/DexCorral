@@ -8,6 +8,8 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Dropping one Corral on another Corral's title bar asks before it merges them. The Corral you drop onto keeps its place, size, Lock and other settings and takes the tabs of the other one; the desktop icons pushed aside during the drag go back. If you answer No, the dragged Corral returns to where it came from. ([#215](https://github.com/guHe330/DexCorral/issues/215))
 - The first Corral after installing is no longer the Catch-All, so new files saved to the desktop stay on the desktop until you choose a Catch-All tab. Existing configurations keep theirs. A new Corral moves the desktop icons beneath it aside instead of covering them. ([#215](https://github.com/guHe330/DexCorral/issues/215))
 - The automatic update check, when switched on, also runs every 24 hours while DexCorral runs, not only when Explorer starts. A clock that was set ahead no longer stops it. ([#216](https://github.com/guHe330/DexCorral/issues/216))
+- The German texts use "Sie" throughout. The desktop right-click entries and the auto-sort notice follow the app language and use the names of the tray menu. The Appearance, Settings and About windows have **Alt**+letter access keys, and typing the first letter of an entry works again in DexCorral's menus. ([#221](https://github.com/guHe330/DexCorral/issues/221))
+- The release packages include the MIT license of nlohmann/json, and the release runs the unit tests before it publishes anything. ([#224](https://github.com/guHe330/DexCorral/issues/224))
 
 ### Fixed
 - Moving a Corral to a monitor with different scaling rescales its icon spacing, label font, resize grip, scroll arrows and minimum size, and snapping while you drag it across uses its new size. ([#213](https://github.com/guHe330/DexCorral/issues/213))
@@ -16,6 +18,10 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Out-of-range values in a hand-edited `config.json` (header height, icon opacity, tint, icon spacing, header font size and the defaults for new Corrals) are brought into the range the Appearance window offers, so a Corral can no longer get a header you cannot drag or invisible icons. A colour with the wrong number of digits, such as a 6-digit tab background, falls back to the default. The Settings window no longer shows a Win hotkey from `config.json` without the Win key, and renaming an icon to a name that ends in a dot or a space is refused, as in Explorer. ([#217](https://github.com/guHe330/DexCorral/issues/217))
 - Explorer no longer closes at start when your roaming AppData folder has a very long path, and the desktop stays responsive while Windows cannot provide the desktop view yet. ([#218](https://github.com/guHe330/DexCorral/issues/218))
 - Folder Corrals sort by type, size and date in every view, notice when a folder right on a drive is renamed, and fill again by themselves when a missing local folder (on a USB drive, say) comes back. A Corral on a drive root gets a title, **Change Folder** keeps a tab name you gave it and opens at the current folder, and a network share that DexCorral is already retrying no longer says to relink it. ([#219](https://github.com/guHe330/DexCorral/issues/219))
+- The Details view shows dates in your Windows short date and time format and leaves Size and Date blank for folders, This PC, the Recycle Bin and other items without a value. Long icon names end in "…" instead of a cut line, and rows scroll smoothly under the header instead of popping in. A locked Corral no longer shows its resize grip, the padlock stays visible when header labels are hidden, tab titles no longer run under the reorder grip, and the Details column header no longer covers the side border. Apps without 256 px icons look sharper in Large Icons, and a new Corral finds a free spot even where the gap is only just wide enough. ([#220](https://github.com/guHe330/DexCorral/issues/220))
+- Texts point to the right places: the crash notice names the Settings window for the configuration folder, the hotkey message states the real rule, "Corral" is written the same everywhere, and both ways to pick a folder for a Corral give the same error for an invalid one. ([#221](https://github.com/guHe330/DexCorral/issues/221))
+- **Cancel** in the Appearance window undoes the icon spacing preview, a rolled-up Corral follows a changed header height, and **Reset to Defaults** and "Make all Corrals look like this one" reach every tab including its header font. Blank tab and preset names are refused. An inline rename with a forbidden character or a name that already exists says so and keeps what you typed. ([#222](https://github.com/guHe330/DexCorral/issues/222))
+- The documentation matches the program: a way to hand-edit `config.json` that keeps the edit, the right registry values, setting names and log files on the privacy and technical pages, the missing Corral menu entries and the developer registration steps. ([#223](https://github.com/guHe330/DexCorral/issues/223))
 - Corrals come back where you arranged them for the monitors that are connected. A Corral on a monitor left of or above the main one no longer jumps to the middle of the main monitor at every start, and one from a monitor that is gone no longer opens off the screen. Hover reveal expands the right way on every monitor, sorting the desktop icons keeps them on the main monitor, and the auto-sort notice appears on the monitor of the pointer at its scaling. ([#209](https://github.com/guHe330/DexCorral/issues/209))
 - The portable package registered just for you now starts DexCorral right away and at every sign-in; before, it never started on its own. `--unregister` ends the start at sign-in too, so the Start Menu's **Unregister** really stops DexCorral. An all-users registration asks for Administrator rights instead of failing, which also makes the Start Menu entries of an all-users install work. Setup no longer stops at a question in a silent install (`/VERYSILENT /SUPPRESSMSGBOXES`), the uninstaller asks about keeping your configuration before it stops Explorer, and an uninstall that does not keep it also removes your settings in the registry. Setup refuses Windows on Arm, which the Explorer extension cannot run on. ([#210](https://github.com/guHe330/DexCorral/issues/210))
 - Icons inside Corrals can no longer be selected on the desktop by the keyboard. **Ctrl+A** followed by **Delete** used to send them to the Recycle Bin together with the visible ones. A rolled-up Corral ignores keys and the mouse wheel for the icons it does not show, and **F2** renames only a selected icon. ([#211](https://github.com/guHe330/DexCorral/issues/211))
@@ -236,6 +242,10 @@ All notable changes to DexCorral will be documented in this file. Format follows
 - Every release now ships a machine-readable bill of materials (`DexCorral_<version>_sbom.cdx.json`, CycloneDX) listing what DexCorral is built from, with a checksum for each component, so you can check what is inside a build without taking our word for it. The build verifies that the bundled JSON library still matches its recorded checksum and that the document describes the version actually being released, and a weekly job watches for new upstream releases.
 - The test framework is now fetched by content hash rather than by tag, so a build cannot silently pick up a different version than the one it was checked against.
 
+## [1.0.23] - 2026-08-31
+
+Tagged but never released: the release build refused it because the bill of materials still named 1.0.22. The same changes shipped as 1.0.24 that day.
+
 ## [1.0.22] - 2026-08-27
 
 ### Added
@@ -317,6 +327,10 @@ All notable changes to DexCorral will be documented in this file. Format follows
 
 ### Known Limitations
 - Corral membership is stored as a bare filename, so two files with the same name on the user and Public desktop cannot be told apart (the user-desktop one wins). Fixing it needs paths in the config plus a migration.
+
+## [1.0.18] - 2026-06-18
+
+Tagged, but no release was published from it. Its changes are listed under 1.0.19, which followed with a fix to the release build.
 
 ## [1.0.16] - 2026-03-07
 

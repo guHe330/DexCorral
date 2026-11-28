@@ -21,6 +21,7 @@ SHA-256:
 ```
 DexCorral_${VERSION}_Setup.exe     ${SETUP_SHA256}
 Portable_DexCorral_${VERSION}.zip  ${PORTABLE_SHA256}
+DexCorral_${VERSION}_sbom.cdx.json ${SBOM_SHA256}
 ```
 
 Check a file in PowerShell:
@@ -29,7 +30,7 @@ Check a file in PowerShell:
 Get-FileHash DexCorral_${VERSION}_Setup.exe -Algorithm SHA256
 ```
 
-Both artifacts also carry a GitHub build provenance attestation, which ties them to the exact workflow run and commit that produced them. With the [GitHub CLI](https://cli.github.com/):
+All three files also carry a GitHub build provenance attestation, which ties them to the exact workflow run and commit that produced them. With the [GitHub CLI](https://cli.github.com/):
 
 ```powershell
 gh attestation verify DexCorral_${VERSION}_Setup.exe --repo guHe330/DexCorral
@@ -60,6 +61,7 @@ The zip contains:
 - `DexCorral.exe`: registration tool
 - `DexCorralHook.dll`: Explorer shell extension
 - `LICENSE`: GPL-3.0 license
+- `LICENSE-nlohmann-json.txt`: MIT license of nlohmann/json, which is built into DexCorral
 - `readme.txt`: quick start guide
 
 ### What's New
@@ -83,7 +85,7 @@ The complete list is in the [changelog](https://github.com/guHe330/DexCorral/blo
 
 - Two files with the exact same filename on the user desktop and the Public desktop can't be told apart; DexCorral assumes the one on the user desktop.
 - A network folder is read on the thread all Corrals share. If a share stops answering in the two seconds after DexCorral has checked it, or while the folder is being read, Corrals can stall once until Windows gives up on it.
-- On recent Windows 11 builds the desktop right-click menu no longer lists **New DexCorral** and **New Virtual DexCorral**. Hold Shift while right-clicking the desktop, or use the tray menu or the right-click menu of any Corral.
+- On recent Windows 11 builds the desktop right-click menu no longer lists **Create New Corral** and **New Virtual Corral...**. Hold Shift while right-clicking the desktop, or use the tray menu or the right-click menu of any Corral.
 - If Stardock Fences is started while DexCorral is already running, DexCorral can only tell you; it steps aside at the next sign-in.
 
 See [open issues](https://github.com/guHe330/DexCorral/issues?q=is%3Aissue+is%3Aopen+label%3Abug) for known bugs.

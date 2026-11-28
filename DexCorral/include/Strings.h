@@ -45,9 +45,9 @@ enum class Str
     Tray_Tooltip,                // "DexCorral - double-click here or on the desktop to hide everything"
     Menu_About,                  // "About"
     Menu_UserManual,             // "User Manual" (opens the manual in the browser)
-    Menu_OpenConfigFolder,       // "Open Config Folder"
+    Menu_OpenConfigFolder,       // "Open Config Folder" (button in the settings window)
     Menu_CreateNewCorral,        // "Create New Corral"
-    Menu_NewVirtualCorral,       // "New Virtual Corral"
+    Menu_NewVirtualCorral,       // "New Virtual Corral..." (opens a folder picker)
     Menu_ShowDesktopIcons,       // "Show Desktop Icons"
     Menu_QuickHideEverything,    // "Quick-Hide Everything"
     Key_Ctrl,                    // "Ctrl" as the keyboard labels it (German: "Strg")
@@ -57,7 +57,8 @@ enum class Str
     Menu_Language,               // "Language" (label in the settings window)
     Menu_Settings,               // "Settings..." (tray menu)
 
-    // Settings window (App.cpp)
+    // Settings window (App.cpp). Its labels, checkboxes and buttons, also the Menu_* ones it
+    // shows, carry a unique '&' access key per language (a test checks it)
     Title_Settings,              // window title
     Settings_Hotkey,             // label of the Quick-Hide hotkey field
     Settings_HotkeyHint,         // how to use the field
@@ -143,7 +144,6 @@ enum class Str
 
     // Virtual corral folder selection (App.cpp, CorralWindowCommands.cpp)
     Dlg_SelectVirtualFolder,     // "Select Folder for Virtual Corral"
-    Err_InvalidFolderSelected,   // "Invalid folder selected."
     Info_NetworkFolder,          // notice when a network folder is chosen: what happens while the share is away
     Err_FolderNotExist,          // "The specified folder does not exist."
     Err_PathNotFolder,           // "The specified path is not a folder."
@@ -152,7 +152,7 @@ enum class Str
     // Corral context menu (CorralWindowCommands.cpp, CorralWindowInput.cpp)
     Menu_AddTab,                 // "Add Tab"
     Menu_DetachTab,              // "Detach Tab"
-    Menu_RenameTab,              // "Rename Tab"
+    Menu_RenameTab,              // "Rename Tab..."
     Menu_Appearance,             // "Appearance..."
     Menu_ChangeFolder,           // "Change Folder..."
     Menu_View,                   // "View"
@@ -174,6 +174,14 @@ enum class Str
     Menu_RemoveFromCorral,       // "Remove from Corral"
     Menu_MoveToTab,              // "Move to Tab" (submenu listing the corral's other tabs)
 
+    // Desktop right-click menu and auto-sort popup (ShellExtension); the menu entries
+    // themselves reuse Menu_CreateNewCorral and Menu_NewVirtualCorral
+    Shell_NewCorralHelp,         // help text of Create New Corral
+    Shell_NewVirtualCorralHelp,  // help text of New Virtual Corral...
+    AutoSort_Body,               // "Auto-sort moved your icon back." (one line, about 280 px)
+    AutoSort_Disable,            // button: turn auto-sort off (about 80 px)
+    AutoSort_Keep,               // button: keep sorting (about 80 px)
+
     // Confirmations (CorralWindowCommands.cpp)
     Confirm_CloseTabBody,        // {0} = tab title; icons return to the desktop
     Confirm_CloseVirtualTabBody, // {0} = tab title; the folder is not touched
@@ -188,10 +196,12 @@ enum class Str
     Dlg_RenameTab,               // "Rename Tab" (also shown right after creating a corral or tab)
     Err_RenameFailedBody,        // file rename failure text
     Err_RenameFailedTitle,       // "Rename Error"
+    Err_RenameInvalidName,       // inline file rename: forbidden characters or a trailing dot
+    Err_RenameNameTaken,         // inline file rename: {0} = the name, which another file has
 
-    // Appearance dialog (CorralWindowDialogs.cpp)
+    // Appearance dialog (CorralWindowDialogs.cpp). A '&' marks the access key: unique among the
+    // controls always shown plus each page, per language (a test checks it)
     Title_Appearance,            // "Appearance: {0}"  ({0} = tab title)
-    Grp_BackgroundColor,         // "Background Color"
     Btn_Change,                  // "Change..."
     Grp_Opacity,                 // "Opacity"
     Grp_Header,                  // "Header"
@@ -200,15 +210,13 @@ enum class Str
     Btn_Choose,                  // "Choose..."
     Lbl_Color,                   // "Color"
     Grp_Icons,                   // "Icons"
-    Lbl_Opacity,                 // "Opacity"
     Lbl_Tint,                    // "Tint"
-    Lbl_Background,              // "Background" (opacity row)
+    Lbl_Background,              // "Background" (first page of the page strip)
     Lbl_Border,                  // "Border" (opacity row)
     Lbl_HeaderLabel,             // "Header Label" (opacity row)
     Lbl_IconLabel,               // "Icon Label" (opacity row)
-    Btn_Color,                   // "Color..."
-    Lbl_Horiz,                   // "Horiz"
-    Lbl_Vert,                    // "Vert"
+    Lbl_Horiz,                   // "Spacing across"
+    Lbl_Vert,                    // "Spacing down"
     Lbl_TintStrength,            // "Tint strength"
     Chk_AccentColor,             // "Windows accent color"
     Chk_UseAsDefault,            // save this style as the default for new corrals

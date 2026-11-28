@@ -375,9 +375,7 @@ void CorralWindow::ApplyLook(const AppearanceSettings &look)
     SetCurrentBorderOpacity(config.BorderOpacity);
     SetCurrentOpacity(config.IconOpacity);
     SetCurrentTintStrength(config.IconTintStrength);
-    if (!isHoverExpanded && !isAnimating)
-        FitRolledUpHeight(); // The header height may have changed
-    RecalculateLayout();
+    RecalculateLayout(); // Also fits a rolled-up Corral to the new header height
 }
 
 void CorralWindow::Hide()

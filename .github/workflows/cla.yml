@@ -25,7 +25,8 @@ jobs:
           path-to-document: 'https://github.com/guHe330/DexCorral/blob/main/docs/CLA.md'
           path-to-signatures: 'signatures/version1/cla.json'
           branch: 'main'
-          allowlist: guHe330,dependabot[bot],github-actions[bot],bot*
+          # The action turns * into an unanchored regex, so 'bot*' exempted any login containing 'bot'. Only bot accounts have '[bot]'.
+          allowlist: guHe330,dependabot[bot],github-actions[bot],*[bot]
           custom-notsigned-prcomment: 'Thank you for your contribution to DexCorral. Before this pull request can be merged, please read the [Contributor License Agreement](https://github.com/guHe330/DexCorral/blob/main/docs/CLA.md) and sign it by posting the comment below. It is three lines: your contribution is licensed under the GPLv3, you have the right to submit it, and you keep your copyright.'
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           custom-allsigned-prcomment: 'All contributors have signed the CLA. Thank you!'

@@ -50,33 +50,34 @@ const wchar_t *const kEnglish[] = {
     /* Tray_Tooltip */             L"DexCorral - double-click here or on the desktop to hide everything",
     /* Menu_About */               L"About",
     /* Menu_UserManual */          L"User Manual",
-    /* Menu_OpenConfigFolder */    L"Open Config Folder",
+    /* Menu_OpenConfigFolder */    L"Open &Config Folder",
     /* Menu_CreateNewCorral */     L"Create New Corral",
-    /* Menu_NewVirtualCorral */    L"New Virtual Corral",
+    /* Menu_NewVirtualCorral */    L"New Virtual Corral...",
     /* Menu_ShowDesktopIcons */    L"Show Desktop Icons",
     /* Menu_QuickHideEverything */ L"Quick-Hide Everything",
     /* Key_Ctrl */                 L"Ctrl",
     /* Key_Shift */                L"Shift",
-    /* Menu_CheckUpdatesAuto */    L"Check for Updates Automatically",
+    /* Menu_CheckUpdatesAuto */    L"Check for &Updates Automatically",
     /* Menu_CheckUpdatesNow */     L"Check for Updates Now",
-    /* Menu_Language */            L"Language",
+    /* Menu_Language */            L"&Language",
     /* Menu_Settings */            L"Settings...",
 
     // Settings window
     /* Title_Settings */           L"DexCorral Settings",
-    /* Settings_Hotkey */          L"Quick-Hide hotkey",
+    /* Settings_Hotkey */          L"&Quick-Hide hotkey",
     /* Settings_HotkeyHint */      L"Click the field and press the keys, for example Ctrl+Alt+H. "
                                    L"Backspace removes the hotkey.",
     /* Settings_HotkeyWinHint */   L"config.json sets {0}, which this field cannot show. "
                                    L"Press other keys in the field to replace it.",
-    /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl, Alt or Shift plus a letter, a digit or a function key.",
-    /* Settings_DebugLogging */    L"Write debug logs",
+    /* Settings_HotkeyUnsupported */ L"A hotkey needs Ctrl or Alt (Shift can be added) plus a letter, a digit or a "
+                                   L"function key.",
+    /* Settings_DebugLogging */    L"Write &debug logs",
     /* Settings_DebugHint */       L"For bug reports. The logs are written to the config folder.",
-    /* Settings_Theme */           L"Windows and menus",
+    /* Settings_Theme */           L"&Windows and menus",
     /* Theme_Windows */            L"Like Windows",
     /* Theme_Light */              L"Light",
     /* Theme_Dark */               L"Dark",
-    /* Settings_Look */            L"Look",
+    /* Settings_Look */            L"L&ook",
     /* Settings_LookKeep */        L"Keep current look",
     /* Settings_LookHint */        L"A preset is shown on an example Corral. "
                                    L"OK applies it to all Corrals and to new ones.",
@@ -90,14 +91,14 @@ const wchar_t *const kEnglish[] = {
     /* Preset_Compact */           L"Compact",
     /* Preset_DemoTitle */         L"Example",
     /* Preset_Load */              L"Load a preset...",
-    /* Btn_SavePreset */           L"Save as...",
-    /* Btn_DeletePreset */         L"Delete",
+    /* Btn_SavePreset */           L"&Save as...",
+    /* Btn_DeletePreset */         L"&Delete",
     /* Title_SavePreset */         L"Save Look as Preset",
     /* Msg_PresetReplace */        L"A preset named \"{0}\" already exists. Replace it?",
     /* Msg_PresetDelete */         L"Delete the preset \"{0}\"?",
     /* Msg_PresetsFull */          L"There are already {0} presets of your own. Delete one first.",
-    /* Btn_ExportPresets */        L"Export presets...",
-    /* Btn_ImportPresets */        L"Import presets...",
+    /* Btn_ExportPresets */        L"&Export presets...",
+    /* Btn_ImportPresets */        L"&Import presets...",
     /* Filter_Presets */           L"DexCorral presets",
     /* Msg_NoPresetsToExport */    L"There are no presets of your own yet.\n\n"
                                    L"Save one with \"Save as...\" in the Appearance dialog of a Corral.",
@@ -121,8 +122,9 @@ const wchar_t *const kEnglish[] = {
                                    L"and their settings are saved.\n\n"
                                    L"DexCorral stays paused, also after a restart, until you right-click its "
                                    L"tray icon and choose \"Resume DexCorral\".\n\n"
-                                   L"If it happens again, please report it. \"Open Config Folder\" in the same "
-                                   L"menu shows guard.log and config.json, which are what a report needs.",
+                                   L"If it happens again, please report it. \"Settings...\" in the same menu has "
+                                   L"an \"Open Config Folder\" button that shows guard.log and config.json, which "
+                                   L"are what a report needs.",
     /* Resume_FailedTitle */       L"DexCorral could not resume",
     /* Resume_FailedBody */        L"The desktop was not ready. Sign out and back in, and DexCorral will start "
                                    L"normally.",
@@ -178,8 +180,8 @@ const wchar_t *const kEnglish[] = {
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
                                    L"Free software under the GNU General Public License, version 3 or later. "
                                    L"It comes with no warranty.",
-    /* Btn_Website */              L"Website",
-    /* Btn_License */              L"License",
+    /* Btn_Website */              L"&Website",
+    /* Btn_License */              L"&License",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral update available",
@@ -191,7 +193,6 @@ const wchar_t *const kEnglish[] = {
 
     // Virtual corral folder selection
     /* Dlg_SelectVirtualFolder */  L"Select Folder for Virtual Corral",
-    /* Err_InvalidFolderSelected */L"Invalid folder selected.",
     /* Info_NetworkFolder */       L"This folder is on the network.\n\n"
                                    L"While it cannot be reached, the Corral shows \"Folder unavailable\". Once the share "
                                    L"answers again, it fills by itself: after five minutes at the latest, or right away "
@@ -203,7 +204,7 @@ const wchar_t *const kEnglish[] = {
     // Corral context menu
     /* Menu_AddTab */              L"Add Tab",
     /* Menu_DetachTab */           L"Detach Tab",
-    /* Menu_RenameTab */           L"Rename Tab",
+    /* Menu_RenameTab */           L"Rename Tab...",
     /* Menu_Appearance */          L"Appearance...",
     /* Menu_ChangeFolder */        L"Change Folder...",
     /* Menu_View */                L"View",
@@ -225,47 +226,53 @@ const wchar_t *const kEnglish[] = {
     /* Menu_RemoveFromCorral */    L"Remove from Corral",
     /* Menu_MoveToTab */           L"Move to Tab",
 
+    // Desktop right-click menu and auto-sort popup
+    /* Shell_NewCorralHelp */      L"Create a new Corral on the desktop",
+    /* Shell_NewVirtualCorralHelp */ L"Create a new virtual Corral that shows a folder",
+    /* AutoSort_Body */            L"Auto-sort moved your icon back.",
+    /* AutoSort_Disable */         L"Disable",
+    /* AutoSort_Keep */            L"Keep sorting",
+
     // Confirmations
     /* Confirm_CloseTabBody */     L"Close the tab \"{0}\"?\n\nIts icons go back to the desktop. No files are deleted.",
     /* Confirm_CloseVirtualTabBody */ L"Close the tab \"{0}\"?\n\nThe folder it shows and the files in it are not touched.",
     /* Confirm_CloseTabTitle */    L"Close Tab",
-    /* Confirm_DeleteCorralBody */ L"Delete this corral?\n\nIts icons go back to the desktop. No files are deleted.",
-    /* Confirm_DeleteVirtualCorralBody */ L"Delete this corral?\n\nThe folder it shows and the files in it are not touched.",
+    /* Confirm_DeleteCorralBody */ L"Delete this Corral?\n\nIts icons go back to the desktop. No files are deleted.",
+    /* Confirm_DeleteVirtualCorralBody */ L"Delete this Corral?\n\nThe folder it shows and the files in it are not touched.",
     /* Confirm_DeleteCorralTitle */L"Delete Corral",
-    /* Confirm_MergeCorralsBody */ L"Merge the two corrals?\n\nThe tabs of the corral you dragged move into the other one, which keeps its place and settings. Detach Tab splits a tab off again.",
+    /* Confirm_MergeCorralsBody */ L"Merge the two Corrals?\n\nThe tabs of the Corral you dragged move into the other one, which keeps its place and settings. Detach Tab splits a tab off again.",
     /* Confirm_MergeCorralsTitle */L"Merge Corrals",
 
     // Rename dialog / file rename
     /* Dlg_RenameTab */            L"Rename Tab",
     /* Err_RenameFailedBody */     L"Failed to rename file. The file may be in use or you may not have permission.",
     /* Err_RenameFailedTitle */    L"Rename Error",
+    /* Err_RenameInvalidName */    L"A file name cannot contain any of these characters:\n\\ / : * ? \" < > |\n\nIt also cannot end with a dot or a space.",
+    /* Err_RenameNameTaken */      L"There is already a file named \"{0}\" in this folder. Please choose a different name.",
 
     // Appearance dialog
     /* Title_Appearance */         L"Appearance: {0}",
-    /* Grp_BackgroundColor */      L"Background Color",
     /* Btn_Change */               L"Change...",
-    /* Grp_Opacity */              L"Opacity",
-    /* Grp_Header */               L"Header",
-    /* Lbl_Height */               L"Height",
-    /* Lbl_Font */                 L"Font",
+    /* Grp_Opacity */              L"&Opacity",
+    /* Grp_Header */               L"&Header",
+    /* Lbl_Height */               L"H&eight",
+    /* Lbl_Font */                 L"&Font",
     /* Btn_Choose */               L"Choose...",
-    /* Lbl_Color */                L"Color",
-    /* Grp_Icons */                L"Icons",
-    /* Lbl_Opacity */              L"Opacity",
-    /* Lbl_Tint */                 L"Tint",
-    /* Lbl_Background */           L"Background",
-    /* Lbl_Border */               L"Border",
-    /* Lbl_HeaderLabel */          L"Header Label",
-    /* Lbl_IconLabel */            L"Icon Label",
-    /* Btn_Color */                L"Color...",
-    /* Lbl_Horiz */                L"Spacing across",
-    /* Lbl_Vert */                 L"Spacing down",
-    /* Lbl_TintStrength */         L"Tint strength",
-    /* Chk_AccentColor */          L"Windows accent color",
-    /* Chk_UseAsDefault */         L"Save this style as the default for new corrals",
-    /* Chk_ApplyToAll */           L"Apply only what I changed to all corrals",
-    /* Chk_CopyStyleToAll */       L"Make all corrals look like this one",
-    /* Btn_ResetToDefaults */      L"Reset to Defaults",
+    /* Lbl_Color */                L"&Color",
+    /* Grp_Icons */                L"&Icons",
+    /* Lbl_Tint */                 L"&Tint",
+    /* Lbl_Background */           L"&Background",
+    /* Lbl_Border */               L"Bord&er",
+    /* Lbl_HeaderLabel */          L"Header &Label",
+    /* Lbl_IconLabel */            L"Icon &Label",
+    /* Lbl_Horiz */                L"Spacing &across",
+    /* Lbl_Vert */                 L"Spacing do&wn",
+    /* Lbl_TintStrength */         L"Tint stre&ngth",
+    /* Chk_AccentColor */          L"&Windows accent color",
+    /* Chk_UseAsDefault */         L"Save this style as the defa&ult for new Corrals",
+    /* Chk_ApplyToAll */           L"A&pply only what I changed to all Corrals",
+    /* Chk_CopyStyleToAll */       L"&Make all Corrals look like this one",
+    /* Btn_ResetToDefaults */      L"&Reset to Defaults",
 
     // Details view column headers / sort menu
     /* Col_Name */                 L"Name",
@@ -361,34 +368,34 @@ const wchar_t *const kGerman[] = {
     /* Tray_Tooltip */             L"DexCorral - Doppelklick hier oder auf den Desktop blendet alles aus",
     /* Menu_About */               L"Info",
     /* Menu_UserManual */          L"Benutzerhandbuch",
-    /* Menu_OpenConfigFolder */    L"Konfigurationsordner öffnen",
+    /* Menu_OpenConfigFolder */    L"&Konfigurationsordner öffnen",
     /* Menu_CreateNewCorral */     L"Neues Corral erstellen",
-    /* Menu_NewVirtualCorral */    L"Neues virtuelles Corral",
+    /* Menu_NewVirtualCorral */    L"Neues virtuelles Corral...",
     /* Menu_ShowDesktopIcons */    L"Desktopsymbole anzeigen",
     /* Menu_QuickHideEverything */ L"Alles schnell ausblenden",
     /* Key_Ctrl */                 L"Strg",
     /* Key_Shift */                L"Umschalt",
-    /* Menu_CheckUpdatesAuto */    L"Automatisch nach Updates suchen",
+    /* Menu_CheckUpdatesAuto */    L"Automatisch nach &Updates suchen",
     /* Menu_CheckUpdatesNow */     L"Jetzt nach Updates suchen",
-    /* Menu_Language */            L"Sprache",
+    /* Menu_Language */            L"&Sprache",
     /* Menu_Settings */            L"Einstellungen...",
 
     // Settings window
     /* Title_Settings */           L"DexCorral-Einstellungen",
-    /* Settings_Hotkey */          L"Tastenkürzel für Schnell-Ausblenden",
+    /* Settings_Hotkey */          L"&Tastenkürzel für Schnell-Ausblenden",
     /* Settings_HotkeyHint */      L"In das Feld klicken und die Tasten drücken, zum Beispiel Strg+Alt+H. "
                                    L"Die Rücktaste entfernt das Tastenkürzel.",
     /* Settings_HotkeyWinHint */   L"In config.json ist {0} festgelegt, das dieses Feld nicht anzeigen kann. "
                                    L"Andere Tasten im Feld ersetzen es.",
-    /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg, Alt oder Umschalt und dazu einen Buchstaben, "
-                                   L"eine Ziffer oder eine Funktionstaste.",
-    /* Settings_DebugLogging */    L"Debug-Protokolle schreiben",
+    /* Settings_HotkeyUnsupported */ L"Ein Tastenkürzel braucht Strg oder Alt (Umschalt kann dazukommen) und dazu "
+                                   L"einen Buchstaben, eine Ziffer oder eine Funktionstaste.",
+    /* Settings_DebugLogging */    L"&Debug-Protokolle schreiben",
     /* Settings_DebugHint */       L"Für Fehlerberichte. Die Protokolle liegen im Konfigurationsordner.",
-    /* Settings_Theme */           L"Fenster und Menüs",
+    /* Settings_Theme */           L"&Fenster und Menüs",
     /* Theme_Windows */            L"Wie Windows",
     /* Theme_Light */              L"Hell",
     /* Theme_Dark */               L"Dunkel",
-    /* Settings_Look */            L"Aussehen",
+    /* Settings_Look */            L"&Aussehen",
     /* Settings_LookKeep */        L"Aktuelles Aussehen behalten",
     /* Settings_LookHint */        L"Eine Vorlage wird an einem Beispiel-Corral gezeigt. "
                                    L"OK wendet sie auf alle Corrals und auf neue an.",
@@ -402,14 +409,14 @@ const wchar_t *const kGerman[] = {
     /* Preset_Compact */           L"Kompakt",
     /* Preset_DemoTitle */         L"Beispiel",
     /* Preset_Load */              L"Vorlage laden...",
-    /* Btn_SavePreset */           L"Speichern...",
-    /* Btn_DeletePreset */         L"Löschen",
+    /* Btn_SavePreset */           L"&Speichern...",
+    /* Btn_DeletePreset */         L"&Löschen",
     /* Title_SavePreset */         L"Aussehen als Vorlage speichern",
     /* Msg_PresetReplace */        L"Eine Vorlage namens \"{0}\" gibt es schon. Ersetzen?",
     /* Msg_PresetDelete */         L"Die Vorlage \"{0}\" löschen?",
     /* Msg_PresetsFull */          L"Es gibt schon {0} eigene Vorlagen. Bitte zuerst eine löschen.",
-    /* Btn_ExportPresets */        L"Vorlagen exportieren...",
-    /* Btn_ImportPresets */        L"Vorlagen importieren...",
+    /* Btn_ExportPresets */        L"Vorlagen &exportieren...",
+    /* Btn_ImportPresets */        L"Vorlagen &importieren...",
     /* Filter_Presets */           L"DexCorral-Vorlagen",
     /* Msg_NoPresetsToExport */    L"Es gibt noch keine eigenen Vorlagen.\n\n"
                                    L"Eine Vorlage speichert man mit \"Speichern...\" im Darstellungs-Dialog eines Corrals.",
@@ -436,9 +443,9 @@ const wchar_t *const kGerman[] = {
                                    L"DexCorral bleibt pausiert, auch nach einem Neustart, bis Sie mit der rechten "
                                    L"Maustaste auf das Symbol im Infobereich klicken und \"DexCorral fortsetzen\" "
                                    L"wählen.\n\n"
-                                   L"Sollte es erneut passieren, melden Sie es bitte. \"Konfigurationsordner "
-                                   L"öffnen\" im selben Menü zeigt guard.log und config.json, die für eine Meldung "
-                                   L"gebraucht werden.",
+                                   L"Sollte es erneut passieren, melden Sie es bitte. \"Einstellungen...\" im "
+                                   L"selben Menü hat eine Schaltfläche \"Konfigurationsordner öffnen\", die "
+                                   L"guard.log und config.json zeigt, die für eine Meldung gebraucht werden.",
     /* Resume_FailedTitle */       L"DexCorral konnte nicht fortgesetzt werden",
     /* Resume_FailedBody */        L"Der Desktop war nicht bereit. Nach dem Ab- und Anmelden startet DexCorral "
                                    L"normal.",
@@ -498,8 +505,8 @@ const wchar_t *const kGerman[] = {
                                    L"Copyright (C) 2026 Gunter Heiss\n\n"
                                    L"Freie Software unter der GNU General Public License, Version 3 oder später. "
                                    L"Es besteht keinerlei Garantie.",
-    /* Btn_Website */              L"Website",
-    /* Btn_License */              L"Lizenz",
+    /* Btn_Website */              L"&Website",
+    /* Btn_License */              L"&Lizenz",
 
     // Update check balloons
     /* Update_AvailableTitle */    L"DexCorral-Update verfügbar",
@@ -511,7 +518,6 @@ const wchar_t *const kGerman[] = {
 
     // Virtual corral folder selection
     /* Dlg_SelectVirtualFolder */  L"Ordner für virtuelles Corral auswählen",
-    /* Err_InvalidFolderSelected */L"Ungültiger Ordner ausgewählt.",
     /* Info_NetworkFolder */       L"Dieser Ordner liegt im Netzwerk.\n\n"
                                    L"Solange er nicht erreichbar ist, zeigt das Corral \"Ordner nicht verfügbar\". "
                                    L"Sobald die Freigabe wieder antwortet, füllt es sich von selbst: spätestens nach fünf Minuten, "
@@ -523,7 +529,7 @@ const wchar_t *const kGerman[] = {
     // Corral context menu
     /* Menu_AddTab */              L"Tab hinzufügen",
     /* Menu_DetachTab */           L"Tab abtrennen",
-    /* Menu_RenameTab */           L"Tab umbenennen",
+    /* Menu_RenameTab */           L"Tab umbenennen...",
     /* Menu_Appearance */          L"Darstellung...",
     /* Menu_ChangeFolder */        L"Ordner ändern...",
     /* Menu_View */                L"Ansicht",
@@ -545,6 +551,13 @@ const wchar_t *const kGerman[] = {
     /* Menu_RemoveFromCorral */    L"Aus dem Corral entfernen",
     /* Menu_MoveToTab */           L"In Tab verschieben",
 
+    // Desktop right-click menu and auto-sort popup
+    /* Shell_NewCorralHelp */      L"Ein neues Corral auf dem Desktop erstellen",
+    /* Shell_NewVirtualCorralHelp */ L"Ein neues virtuelles Corral erstellen, das einen Ordner zeigt",
+    /* AutoSort_Body */            L"Das Symbol wurde automatisch zurücksortiert.",
+    /* AutoSort_Disable */         L"Ausschalten",
+    /* AutoSort_Keep */            L"Beibehalten",
+
     // Confirmations
     /* Confirm_CloseTabBody */     L"Den Tab „{0}“ schließen?\n\nSeine Symbole kehren auf den Desktop zurück. Es werden keine Dateien gelöscht.",
     /* Confirm_CloseVirtualTabBody */ L"Den Tab „{0}“ schließen?\n\nDer angezeigte Ordner und seine Dateien bleiben unverändert.",
@@ -559,33 +572,32 @@ const wchar_t *const kGerman[] = {
     /* Dlg_RenameTab */            L"Tab umbenennen",
     /* Err_RenameFailedBody */     L"Die Datei konnte nicht umbenannt werden. Sie wird möglicherweise verwendet, oder Ihnen fehlt die Berechtigung.",
     /* Err_RenameFailedTitle */    L"Fehler beim Umbenennen",
+    /* Err_RenameInvalidName */    L"Ein Dateiname darf keines dieser Zeichen enthalten:\n\\ / : * ? \" < > |\n\nEr darf auch nicht mit einem Punkt oder einem Leerzeichen enden.",
+    /* Err_RenameNameTaken */      L"In diesem Ordner gibt es schon eine Datei namens „{0}“. Bitte wählen Sie einen anderen Namen.",
 
     // Appearance dialog
     /* Title_Appearance */         L"Darstellung: {0}",
-    /* Grp_BackgroundColor */      L"Hintergrundfarbe",
     /* Btn_Change */               L"Ändern...",
-    /* Grp_Opacity */              L"Deckkraft",
-    /* Grp_Header */               L"Kopfzeile",
-    /* Lbl_Height */               L"Höhe",
-    /* Lbl_Font */                 L"Schrift",
+    /* Grp_Opacity */              L"De&ckkraft",
+    /* Grp_Header */               L"&Kopfzeile",
+    /* Lbl_Height */               L"Höh&e",
+    /* Lbl_Font */                 L"Schr&ift",
     /* Btn_Choose */               L"Wählen...",
-    /* Lbl_Color */                L"Farbe",
-    /* Grp_Icons */                L"Symbole",
-    /* Lbl_Opacity */              L"Deckkraft",
-    /* Lbl_Tint */                 L"Tönung",
-    /* Lbl_Background */           L"Hintergrund",
-    /* Lbl_Border */               L"Rahmen",
-    /* Lbl_HeaderLabel */          L"Kopfzeilentext",
-    /* Lbl_IconLabel */            L"Symboltext",
-    /* Btn_Color */                L"Farbe...",
-    /* Lbl_Horiz */                L"Abstand quer",
-    /* Lbl_Vert */                 L"Abstand hoch",
-    /* Lbl_TintStrength */         L"Tönungsstärke",
-    /* Chk_AccentColor */          L"Windows-Akzentfarbe",
-    /* Chk_UseAsDefault */         L"Diesen Stil als Standard für neue Corrals speichern",
-    /* Chk_ApplyToAll */           L"Nur hier Geändertes auf alle Corrals anwenden",
-    /* Chk_CopyStyleToAll */       L"Alle Corrals wie dieses aussehen lassen",
-    /* Btn_ResetToDefaults */      L"Auf Standard zurücksetzen",
+    /* Lbl_Color */                L"&Farbe",
+    /* Grp_Icons */                L"S&ymbole",
+    /* Lbl_Tint */                 L"&Tönung",
+    /* Lbl_Background */           L"&Hintergrund",
+    /* Lbl_Border */               L"&Rahmen",
+    /* Lbl_HeaderLabel */          L"Kopfzeilen&text",
+    /* Lbl_IconLabel */            L"Sym&boltext",
+    /* Lbl_Horiz */                L"Abstand &quer",
+    /* Lbl_Vert */                 L"Abstand h&och",
+    /* Lbl_TintStrength */         L"Tönungsstärk&e",
+    /* Chk_AccentColor */          L"&Windows-Akzentfarbe",
+    /* Chk_UseAsDefault */         L"&Diesen Stil als Standard für neue Corrals speichern",
+    /* Chk_ApplyToAll */           L"&Nur hier Geändertes auf alle Corrals anwenden",
+    /* Chk_CopyStyleToAll */       L"&Alle Corrals wie dieses aussehen lassen",
+    /* Btn_ResetToDefaults */      L"Auf Standard &zurücksetzen",
 
     // Details view column headers / sort menu
     /* Col_Name */                 L"Name",
@@ -649,9 +661,9 @@ const wchar_t *const kGerman[] = {
                                    L"Dieses System meldet Build {1}.\n\n"
                                    L"Windows 10 hat das Supportende erreicht; DexCorral ist darauf weder "
                                    L"getestet noch unterstützt.\n\n"
-                                   L"Wenn du trotzdem registrieren möchtest, auf eigene Gefahr:\n"
+                                   L"Wenn Sie trotzdem registrieren möchten, auf eigene Gefahr:\n"
                                    L"  DexCorral.exe --register --force\n\n"
-                                   L"Bitte melde keine Fehler von nicht unterstützten Windows-Versionen.",
+                                   L"Bitte melden Sie keine Fehler von nicht unterstützten Windows-Versionen.",
     /* Reg_NeedsElevation */       L"Eine systemweite Registrierung (alle Benutzer) schreibt nach "
                                    L"HKEY_LOCAL_MACHINE und benötigt Administratorrechte, die nicht erteilt wurden.\n\n"
                                    L"Für Ihr eigenes Konto braucht DexCorral keine Administratorrechte:\n"
@@ -661,7 +673,7 @@ const wchar_t *const kGerman[] = {
                                    L"Beide Programme übernehmen die Symbolansicht des Desktops. Läuft Fences, "
                                    L"werden die von DexCorral ausgeblendeten Symbole wieder sichtbar und doppelt "
                                    L"gezeichnet.\n\n"
-                                   L"Welches der beiden du nutzt, entscheidest du: Stardock Fences deinstallieren "
+                                   L"Welches der beiden Sie nutzen, entscheiden Sie: Stardock Fences deinstallieren "
                                    L"und dies erneut ausführen, oder Fences behalten und auf DexCorral verzichten.\n\n"
                                    L"Stardock und Fences sind Marken von Stardock. DexCorral steht in keiner "
                                    L"Verbindung zu Stardock.",

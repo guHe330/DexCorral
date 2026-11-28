@@ -39,10 +39,10 @@
 #include <algorithm>
 
 // ============================================================================
-// File-local helper functions for folder browsing
+// Folder browsing (also used by App for New Virtual Corral)
 // ============================================================================
 
-static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title, const std::wstring &startFolder)
+std::wstring CorralWindow::BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title, const std::wstring &startFolder)
 {
     std::wstring result;
 
@@ -93,7 +93,7 @@ static std::wstring BrowseForLocalFolder(HWND hwndOwner, const wchar_t *title, c
     return result;
 }
 
-static bool ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg)
+bool CorralWindow::ValidateLocalFolder(const std::wstring &path, std::wstring &errorMsg)
 {
     DWORD attrs = GetFileAttributesW(path.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES)

@@ -132,12 +132,14 @@ To also remove your settings:
   Remove-Item "HKCU:\Software\DexCorral" -Recurse -Force
 
 DexCorral writes nothing else outside its own folder. The registry entries are
-the shell extension's COM registration and the start at sign-in (both removed
-by --unregister), which go to HKCU with --scope=user and HKLM with
---scope=machine, and, under
-HKCU\Software\DexCorral, your language choice and the crash guard's memory. The
-full list is in the Technical Notes, "What DexCorral writes outside its own
-folder".
+the shell extension's COM registration, the start at sign-in and the install
+marker under Software\DexCorral (InstallDir, InstallScope, Version), all
+removed by --unregister, which go to HKCU with --scope=user and HKLM with
+--scope=machine. Under HKCU\Software\DexCorral it also keeps your language
+choice, the crash guard's memory, the Auto arrange setting and whether the
+Stardock Fences notice was shown. The full list is in the Technical Notes,
+"What DexCorral writes outside its own folder":
+https://github.com/guHe330/DexCorral/blob/main/docs/TECHNICAL_NOTES.md
 
 IF DEXCORRAL PAUSES ITSELF: when Explorer crashes twice within two minutes
 while DexCorral is starting, DexCorral stops trying. All icons are back on the
@@ -172,6 +174,7 @@ PACKAGE CONTENTS
 * DexCorral.exe       - Registration tool
 * DexCorralHook.dll   - Explorer shell extension (all app logic)
 * LICENSE             - GPL-3.0 License
+* LICENSE-nlohmann-json.txt - MIT License of nlohmann/json, built into DexCorral
 * readme.txt          - This file
 
 ================================================================================
@@ -189,7 +192,7 @@ LICENSE
 This project is licensed under the GPL-3.0 License - see the LICENSE file for
 details.
 
-Third-party: nlohmann/json v3.12.0 (MIT License)
+Third-party: nlohmann/json v3.12.0 (MIT License) - see LICENSE-nlohmann-json.txt
 https://github.com/nlohmann/json
 
 ================================================================================

@@ -37,8 +37,8 @@
 enum class ViewMode : int
 {
     SmallIcons = 0,  /// 32px icons in grid layout
-    MediumIcons = 1, /// 48px icons in grid layout
-    LargeIcons = 2,  /// 64px icons in grid layout
+    MediumIcons = 1, /// Desktop icon size (48px when that is 32 or less) in grid layout
+    LargeIcons = 2,  /// Twice the desktop icon size, at least 96px, in grid layout
     Details = 3      /// List view with columns (name, type, size, modified date, sync status)
 };
 
@@ -216,13 +216,13 @@ struct AppConfig
     bool DebugLogging = false;             // Write debug log files (dllmain.log, CorralHook.log, CorralHook_DropTarget.log, CorralDrop.log)
 
     // Update check (opt-in, off by default). Checks the GitHub Releases API at
-    // most once per 24h on startup and notifies via a tray balloon — no auto-download.
+    // start and every 24h while running, and notifies via a tray balloon — no auto-download.
     bool CheckForUpdates = false;
     long long LastUpdateCheckEpoch = 0;    // Unix time of the last check that got an answer (throttle)
 
     // UI language code ("en", "de"), set in the settings window.
-    // Empty = use the installer's choice (HKCU\Software\DexCorral\Language),
-    // falling back to English.
+    // Empty = use Software\DexCorral\Language from HKCU, then HKLM (written by
+    // the installer and the settings window), falling back to English.
     std::string Language = "";
 
     // Global hotkey that toggles quick-hide, e.g. "Ctrl+Alt+H" (see Hotkey.h for

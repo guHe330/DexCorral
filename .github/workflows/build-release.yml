@@ -117,6 +117,14 @@ jobs:
     - name: Build Release
       run: cmake --build DexCorral/build --config Release
 
+    # Same step as ci.yml. A tag can sit on a commit CI never passed, so the
+    # tests run here too before anything is packaged.
+    - name: Run tests
+      shell: pwsh
+      run: |
+        & "DexCorral/build/Release/DexCorralTests.exe"
+        if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+
     - name: Prepare portable readme
       shell: pwsh
       run: |
@@ -135,6 +143,8 @@ jobs:
         Copy-Item "DexCorral/build/Release/DexCorral.exe" -Destination "package/"
         Copy-Item "DexCorral/build/Release/DexCorralHook.dll" -Destination "package/"
         Copy-Item "LICENSE" -Destination "package/"
+        # MIT asks for its notice with every copy, binaries included.
+        Copy-Item "DexCorral/include/nlohmann/LICENSE.MIT" -Destination "package/LICENSE-nlohmann-json.txt"
         Copy-Item "portable_readme.txt" -Destination "package/readme.txt"
 
         # Create zip. The version goes in the filename so downloaded
@@ -221,6 +231,7 @@ jobs:
         $body = $body -replace '\$\{SBOM_SIZE\}', (Format-Size "DexCorral_${version}_sbom.cdx.json")
         $body = $body -replace '\$\{SETUP_SHA256\}', (Get-Sha "DexCorral_${version}_Setup.exe")
         $body = $body -replace '\$\{PORTABLE_SHA256\}', (Get-Sha "Portable_DexCorral_${version}.zip")
+        $body = $body -replace '\$\{SBOM_SHA256\}', (Get-Sha "DexCorral_${version}_sbom.cdx.json")
         Set-Content "release_notes.md" -Value $body
 
     - name: Attest build provenance
@@ -229,6 +240,7 @@ jobs:
         subject-path: |
           Portable_DexCorral_${{ steps.get_version.outputs.version }}.zip
           DexCorral_${{ steps.get_version.outputs.version }}_Setup.exe
+          DexCorral_${{ steps.get_version.outputs.version }}_sbom.cdx.json
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3

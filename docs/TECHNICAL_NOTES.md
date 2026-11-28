@@ -19,7 +19,8 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | Key | Value | Why | Removed by the uninstaller |
 |---|---|---|---|
 | `<root>\Software\Microsoft\Windows\CurrentVersion\Run` | `DexCorral` | Starts DexCorral at login. Written by the installer and by `DexCorral.exe --register`, removed by `--unregister`. | Yes |
-| `<root>\Software\DexCorral` | `Language` | The interface language, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer and by the **Language** choice in the settings window. | Yes |
+| `<root>\Software\DexCorral` | `Language` | The language chosen in Setup, so it is known before `config.json` exists and by `DexCorral.exe`'s own dialogs, which never read the config. Written by the installer. | Yes |
+| `HKCU\Software\DexCorral` | `Language` | The **Language** choice in the settings window, so that `DexCorral.exe`'s dialogs follow it too. Always per-user, and read before the `<root>` value; for a per-user install the two are the same value. | When you do not keep your configuration |
 | `<root>\Software\DexCorral` | `InstallDir`, `InstallScope`, `Version` | Records where and how DexCorral is installed, so Setup can tell you if you are about to install the two modes on top of each other. | Yes |
 | `HKCU\Software\DexCorral` | `ConflictNoticeShown` | Remembers that the Stardock Fences explanation has been shown, so later starts only remind. Removed by DexCorral itself once Fences is gone. | When you do not keep your configuration |
 | `HKCU\Software\DexCorral` | `HookStartPending`, `GuardLastFailure`, `GuardStandby`, `GuardVersion` | The crash guard's memory (see [When DexCorral pauses itself](USER_MANUAL.md#when-dexcorral-pauses-itself)). Written from inside Explorer, where the config file is not available, so always per-user. | When you do not keep your configuration |
@@ -29,6 +30,8 @@ Which hive these live in follows the install mode you chose. `<root>` below is `
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler` | `{7A3B9E42-…}` | How Explorer loads the extension at startup. All-users installs only. | Yes |
 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DexCorral` | (default) | Second startup load path. No overlay is ever drawn. All-users installs only. | Yes |
 
+For a per-user install `<root>` is `HKCU`, so its uninstaller removes all of `HKCU\Software\DexCorral`. An all-users uninstall removes the `HKCU` values only for the account that runs it, and only when you do not keep your configuration; other accounts keep theirs.
+
 The `Software\Classes` and `HKLM` entries are the ones `DexCorral.exe --register` creates and `--unregister` removes. They are the reason an all-users registration needs Administrator rights; a per-user registration writes only to `HKCU` and needs none. Nothing else on the system is touched.
 
 ## Removing a portable package
@@ -37,9 +40,7 @@ Deleting the folder of a portable package leaves its registry entries behind. Ru
 
 ## Leftovers of old versions
 
-Upgrading from 1.0.27 or earlier? Those versions registered without any notion of scope. The installer clears the old entries for you; for a portable install, run `DexCorral.exe --cleanup-legacy` once as Administrator.
-
-Versions up to 1.0.27 wrote the COM registration through `HKEY_CLASSES_ROOT` instead, with no per-user option. `DexCorral.exe --cleanup-legacy`, run once as Administrator, removes what those versions left behind; the installer does it for you.
+Upgrading from 1.0.27 or earlier? Those versions registered without any notion of scope, writing the COM registration through `HKEY_CLASSES_ROOT`. The installer clears the old entries for you; for a portable install, run `DexCorral.exe --cleanup-legacy` once as Administrator.
 
 Early versions had a **Hide shortcut arrows** option, removed since. If you switched it on back then and want the arrows back, delete the value `29` under `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons` in `HKLM` or `HKCU`, whichever holds it, and restart Explorer.
 
@@ -61,4 +62,4 @@ Fences is recognised by its entry in Windows' list of installed programs and by 
 
 ## A Quick-Hide hotkey with the Win key
 
-The hotkey field of the settings window cannot take a combination with the Win key. Set it as `QuickHideHotkey` in `config.json` instead, for example `"QuickHideHotkey": "Win+Alt+D"`, then sign out and back in. The settings window leaves such a hotkey alone unless you enter a new one.
+The hotkey field of the settings window cannot take a combination with the Win key. Set it as `QuickHideHotkey` in `config.json` instead, for example `"QuickHideHotkey": "Win+Alt+D"`. An edit made while DexCorral runs is overwritten at its next save, so follow the steps under [Configuration](USER_MANUAL.md#configuration) in the User Manual; the hotkey works once DexCorral has started again. The settings window leaves such a hotkey alone unless you enter a new one.
