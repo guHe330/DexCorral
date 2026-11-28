@@ -109,8 +109,8 @@ std::string MonitorManager::GetMonitorDeviceId(HMONITOR hMon)
 
                 if (DisplayConfigGetDeviceInfo(&targetName.header) == ERROR_SUCCESS)
                 {
-                    // Build a stable ID from the monitor device path
-                    // Format: "DISPLAY\<EDID Manufacturer>\<EDID Product Code>"
+                    // The monitor's device interface path is the stable ID, e.g.
+                    // "\\?\DISPLAY#GSM5B7F#5&1a2b3c4d&0&UID4353#{e6f07b5f-...}"
                     std::wstring wpath = targetName.monitorDevicePath;
 
                     // Convert to narrow string for storage
@@ -173,10 +173,23 @@ const MonitorInfo *MonitorManager::FindMonitorAt(int x, int y) const
 
 const MonitorInfo *MonitorManager::FindMonitorForRect(const RECT &rect) const
 {
-    // Find by center point
-    int cx = (rect.left + rect.right) / 2;
-    int cy = (rect.top + rect.bottom) / 2;
-    return FindMonitorAt(cx, cy);
+    // The monitor with the largest share of the rect, like MonitorFromRect.
+    // Not the centre point: that can fall into a gap between monitors.
+    const MonitorInfo *best = nullptr;
+    LONGLONG bestArea = 0;
+    for (const auto &mon : monitors)
+    {
+        RECT overlap;
+        if (!IntersectRect(&overlap, &mon.bounds, &rect))
+            continue;
+        LONGLONG area = (LONGLONG)(overlap.right - overlap.left) * (overlap.bottom - overlap.top);
+        if (area > bestArea)
+        {
+            bestArea = area;
+            best = &mon;
+        }
+    }
+    return best;
 }
 
 const MonitorInfo *MonitorManager::GetPrimaryMonitor() const
