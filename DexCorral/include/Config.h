@@ -37,8 +37,8 @@
 enum class ViewMode : int
 {
     SmallIcons = 0,  /// 32px icons in grid layout
-    MediumIcons = 1, /// 48px icons in grid layout
-    LargeIcons = 2,  /// 64px icons in grid layout
+    MediumIcons = 1, /// Desktop icon size (48px when that is 32 or less) in grid layout
+    LargeIcons = 2,  /// Twice the desktop icon size, at least 96px, in grid layout
     Details = 3      /// List view with columns (name, type, size, modified date, sync status)
 };
 
