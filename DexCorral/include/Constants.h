@@ -144,8 +144,8 @@ constexpr BYTE HOVER_B = 200;
 // Icon Rendering
 // ============================================================================
 
-/// Temporary icon rendering size threshold (64px)
-/// Icons larger than this are rendered at native size for performance
+/// Minimum side of the scratch DIB used to tint and fade icons (64px)
+/// Larger icons get a DIB of their own size
 constexpr int ICON_TEMP_SIZE_THRESHOLD = 64;
 
 /// Maximum icon size in pixels (256)
