@@ -684,6 +684,25 @@ var
   ExePath: String;
 begin
   if CurUninstallStep = usUninstall then begin
+    // Ask whether to keep the user's configuration files first, while the
+    // desktop is still there: the manual promises this order. A silent
+    // uninstall (/SUPPRESSMSGBOXES) keeps them.
+    // (ActiveLanguage returns the language chosen at install time)
+    if ActiveLanguage = 'german' then
+      g_KeepConfig := SuppressibleMsgBox(
+        'Möchten Sie Ihre DexCorral-Konfiguration behalten?' + #13#10 + #13#10 +
+        'Ihre Corral-Layouts und Darstellungseinstellungen sind gespeichert unter:' + #13#10 +
+        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
+        'Klicken Sie auf Ja, um sie zu behalten, oder auf Nein, um alles zu löschen.',
+        mbConfirmation, MB_YESNO, IDYES) = IDYES
+    else
+      g_KeepConfig := SuppressibleMsgBox(
+        'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
+        'Your corral layouts and appearance settings are stored in:' + #13#10 +
+        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
+        'Click Yes to keep them for future use, or No to delete everything.',
+        mbConfirmation, MB_YESNO, IDYES) = IDYES;
+
     Exec('taskkill', '/F /IM DexCorral.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(500);
 
@@ -704,23 +723,6 @@ begin
 
     // Restart Explorer to unload the DLL before the files are removed
     RestartExplorer;
-
-    // Ask whether to keep the user's configuration files
-    // (ActiveLanguage returns the language chosen at install time)
-    if ActiveLanguage = 'german' then
-      g_KeepConfig := MsgBox(
-        'Möchten Sie Ihre DexCorral-Konfiguration behalten?' + #13#10 + #13#10 +
-        'Ihre Corral-Layouts und Darstellungseinstellungen sind gespeichert unter:' + #13#10 +
-        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
-        'Klicken Sie auf Ja, um sie zu behalten, oder auf Nein, um alles zu löschen.',
-        mbConfirmation, MB_YESNO) = IDYES
-    else
-      g_KeepConfig := MsgBox(
-        'Would you like to keep your DexCorral configuration?' + #13#10 + #13#10 +
-        'Your corral layouts and appearance settings are stored in:' + #13#10 +
-        '  ' + ExpandConstant('{userappdata}') + '\DexCorral' + #13#10 + #13#10 +
-        'Click Yes to keep them for future use, or No to delete everything.',
-        mbConfirmation, MB_YESNO) = IDYES;
   end;
 
   if CurUninstallStep = usPostUninstall then begin
