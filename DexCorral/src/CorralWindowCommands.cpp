@@ -202,8 +202,15 @@ void CorralWindow::ShowContextMenu(int x, int y)
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
-    // Show Desktop Icons with checkmark
-    UINT iconFlags = MF_STRING | (DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED);
+    // Show Desktop Icons with checkmark; greyed during quick-hide, as in the tray menu
+    // (a Corral excluded from quick-hide is still there to right-click)
+    App *menuApp = App::GetInstance();
+    UINT iconFlags = MF_STRING;
+    if (menuApp)
+        iconFlags |= (menuApp->DesktopIconsShownSetting() ? MF_CHECKED : MF_UNCHECKED) |
+                     (menuApp->IsQuickHideActive() ? MF_GRAYED : 0);
+    else
+        iconFlags |= DesktopIcons::AreIconsVisible() ? MF_CHECKED : MF_UNCHECKED;
     AppendMenuW(menu, iconFlags, 5, Tr(Str::Menu_ShowDesktopIcons));
 
     // Quick-hide exclusion (corral stays visible when double-clicking the desktop)

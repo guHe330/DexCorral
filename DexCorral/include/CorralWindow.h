@@ -295,6 +295,9 @@ public:
     /// a drag out of a corral released there goes to that icon. With data, asks
     /// the icon whether it takes that data (at the release, not cached).
     static bool DesktopIconTakesDropsAt(POINT screenPt, IDataObject *data = nullptr, DWORD keyState = 0);
+    // A shell drag released on a Corral: true when its drop target hands the
+    // drop to the shell (an icon that takes these files, or a virtual tab's folder)
+    static bool CorralShellTakesDropAt(POINT screenPt, IDataObject *data, DWORD keyState);
 
 private:
     // Virtual corral support
@@ -360,6 +363,7 @@ private:
     void OnLeftButtonDown(int x, int y);
     void OnLeftButtonUp(int x, int y); // Added for drag-end detection
     void OnLeftButtonDblClick(int x, int y);
+    bool IsOnButton(int x, int y); // Nav up, scrollbar or column header
     void OnRightButtonDown(int x, int y);
     void OnDrop(IDataObject *pDataObj);                      // OLE drop handler (replaces OnDropFiles)
     /// The item's own shell drop target, or nullptr if it takes no drops (a document)
@@ -697,6 +701,9 @@ private:
     // Deferred (slow-click) rename: clicking the label of an already-selected icon
     // schedules a rename after the double-click time; a double-click cancels it and opens.
     int pendingRenameIcon = -1;
+    // The last press went to a button (nav up, scrollbar, column header): its
+    // double-click is a second click even if the button has gone since
+    bool lastDownOnButton = false;
     static const UINT_PTR RENAME_TIMER_ID = 6;
     void CancelPendingRename(); // Any other click or key cancels it
 

@@ -85,7 +85,8 @@ static bool IsProcessElevated()
 
 // Runs this exe again elevated (UAC prompt) with the given arguments and waits.
 // Returns its exit code, or -1 when it did not start (the prompt was declined).
-static int RunElevated(const wchar_t *exePath, const std::wstring &args)
+// False when the elevated copy did not start (UAC declined); otherwise its exit code
+static bool RunElevated(const wchar_t *exePath, const std::wstring &args, DWORD &code)
 {
     SHELLEXECUTEINFOW sei = { sizeof(sei) };
     sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
@@ -94,12 +95,12 @@ static int RunElevated(const wchar_t *exePath, const std::wstring &args)
     sei.lpParameters = args.c_str();
     sei.nShow = SW_SHOWNORMAL;
     if (!ShellExecuteExW(&sei) || !sei.hProcess)
-        return -1;
+        return false;
     WaitForSingleObject(sei.hProcess, INFINITE);
-    DWORD code = 1;
+    code = 1;
     GetExitCodeProcess(sei.hProcess, &code);
     CloseHandle(sei.hProcess);
-    return (int)code;
+    return true;
 }
 
 // The login start, the same value the installer writes (DexCorral.iss,
@@ -188,6 +189,7 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
 
     // Install the hook — this injects the DLL into Explorer's Progman thread.
     HHOOK hHook = SetWindowsHookExW(WH_GETMESSAGE, hookProc, hDll, tid);
+    bool running = false;
     if (hHook)
     {
         // Poll until DexCorralMessageWindow appears, confirming the App is running
@@ -197,7 +199,10 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
         for (int i = 0; i < 60; i++)
         {
             if (FindWindowW(L"DexCorralMessageWindow", nullptr))
+            {
+                running = true;
                 break;
+            }
             PostMessage(hProgman, WM_NULL, 0, 0);
             Sleep(500);
         }
@@ -206,7 +211,7 @@ static int DoStartup(const wchar_t* dllPath, bool silent)
     }
 
     FreeLibrary(hDll);
-    return hHook ? 0 : 1;
+    return running ? 0 : 1; // 0 only once the App inside Explorer is there
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
@@ -330,9 +335,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     if ((doCleanupOld || ((doRegister || doUnregister) && scope == kScopeMachine)) &&
         !IsProcessElevated())
     {
-        const int code = silent ? -1 : RunElevated(exePath, args);
-        if (code >= 0)
-            return code;
+        // A crashed child has a negative exit code as int: it still ran
+        DWORD code = 0;
+        if (!silent && RunElevated(exePath, args, code))
+            return (int)code;
         if (!silent)
             MessageBoxW(nullptr, Tr(Str::Reg_NeedsElevation), Tr(Str::App_Name), MB_ICONERROR);
         return 1;
@@ -379,9 +385,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
                 // Setup (--silent) starts it itself, after its Explorer restart.
                 if (!silent && scope == kScopeUser)
                 {
-                    DoStartup(dllPath, false);
-                    MessageBoxW(nullptr, Tr(Str::Reg_RegisterSuccessUser),
-                                Tr(Str::App_Name), MB_ICONINFORMATION);
+                    // Not "running now" unless it is (DoStartup may have said why not)
+                    const bool started = DoStartup(dllPath, false) == 0;
+                    MessageBoxW(nullptr,
+                                Tr(started ? Str::Reg_RegisterSuccessUser : Str::Reg_RegisterSuccessUserNotStarted),
+                                Tr(Str::App_Name), started ? MB_ICONINFORMATION : MB_ICONWARNING);
                 }
                 else if (!silent)
                     MessageBoxW(nullptr,

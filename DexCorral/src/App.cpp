@@ -199,8 +199,15 @@ static bool ShowConfigNoticeIfPending(TrayIcon *tray)
     return false;
 }
 
-// Other warnings that must not get lost: title and text, oldest first
-static std::vector<std::pair<Str, std::wstring>> s_Notices;
+// Every other balloon, oldest first: one on screen replaces the one before,
+// so all of them wait their turn here
+struct TrayNotice
+{
+    std::wstring title, text;
+    DWORD icon;
+    std::wstring clickUrl;
+};
+static std::vector<TrayNotice> s_Notices;
 static bool s_NoticeOnScreen = false;
 
 // Shows the next waiting notice once the tray icon is visible. One at a time:
@@ -212,7 +219,8 @@ static void ShowNextNotice(TrayIcon *tray, HWND hwnd)
         return;
     bool shown = ShowSafeModeNoticeIfPending(tray) || ShowConfigNoticeIfPending(tray);
     if (!shown && !s_Notices.empty() &&
-        tray->ShowBalloon(Tr(s_Notices.front().first), s_Notices.front().second, NIIF_WARNING))
+        tray->ShowBalloon(s_Notices.front().title, s_Notices.front().text, s_Notices.front().icon,
+                          s_Notices.front().clickUrl))
     {
         s_Notices.erase(s_Notices.begin());
         shown = true;
@@ -228,6 +236,13 @@ static void NoticeGone(TrayIcon *tray, HWND hwnd)
 {
     KillTimer(hwnd, NOTICE_TIMER);
     s_NoticeOnScreen = false;
+    ShowNextNotice(tray, hwnd);
+}
+
+static void QueueNotice(TrayIcon *tray, HWND hwnd, Str title, const std::wstring &text, DWORD icon,
+                        const std::wstring &clickUrl = std::wstring())
+{
+    s_Notices.push_back({Tr(title), text, icon, clickUrl});
     ShowNextNotice(tray, hwnd);
 }
 
@@ -426,12 +441,30 @@ void App::SetPaused(bool pause)
         // centre: move them out beside it onto free cells, the way icons make
         // room for a new Corral. Un-pause parks them again.
         CacheDesktopIconPositions(); // The free icons, which they must not land on
+        // Active-tab icons scrolled out of view sit just outside their Corral,
+        // where the pushed icons would land: obstacles, but not icons to push
+        // (a virtual tab's files are no desktop icons)
+        HWND hListView = DesktopIcons::GetDesktopListView();
+        for (auto &corral : corrals)
+        {
+            RECT r;
+            if (!hListView || corral->GetActiveTab().IsVirtual || !GetWindowRect(corral->GetHWND(), &r))
+                continue;
+            MapWindowPoints(nullptr, hListView, (POINT *)&r, 2);
+            for (const auto &icon : corral->GetIconScreenPositions())
+            {
+                POINT pt = {icon.pt.x, icon.pt.y};
+                if (!PtInRect(&r, pt))
+                    pushObstacles.push_back({icon.displayName, icon.parsingName, icon.pt});
+            }
+        }
         std::vector<IconPositionRequest> parked;
         for (auto &corral : corrals)
             AppendInactiveTabIcons(*corral, parked);
         for (auto &icon : parked)
             cachedDesktopIconPositions.push_back({icon.displayName, icon.parsingName, icon.pt});
         PushDesktopIconsFromCorrals();
+        pushObstacles.clear();
         InvalidateDesktopIconCache();
 
         for (auto &corral : corrals)
@@ -480,9 +513,8 @@ void App::ActivateDesktop()
     // notice may be on screen.
     if (!ApplyQuickHideHotkey())
     {
-        s_Notices.emplace_back(Str::Hotkey_FailedTitle,
-                               TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)));
-        ShowNextNotice(trayIcon.get(), messageWindow);
+        QueueNotice(trayIcon.get(), messageWindow, Str::Hotkey_FailedTitle,
+                    TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)), NIIF_WARNING);
     }
 
     // Restore corrals
@@ -583,8 +615,7 @@ void App::ResumeFromStandby()
     if (!ResumeCorralHook())
     {
         // The recorded failures are cleared either way, so the next start is a normal one
-        if (trayIcon)
-            trayIcon->ShowBalloon(Tr(Str::Resume_FailedTitle), Tr(Str::Resume_FailedBody), NIIF_WARNING);
+        QueueNotice(trayIcon.get(), messageWindow, Str::Resume_FailedTitle, Tr(Str::Resume_FailedBody), NIIF_WARNING);
         return;
     }
 
@@ -723,8 +754,7 @@ void App::FlushConfigWrite()
         if (!told)
         {
             told = true;
-            s_Notices.emplace_back(Str::Save_FailedTitle, Tr(Str::Save_FailedBody));
-            ShowNextNotice(trayIcon.get(), messageWindow);
+            QueueNotice(trayIcon.get(), messageWindow, Str::Save_FailedTitle, Tr(Str::Save_FailedBody), NIIF_WARNING);
         }
     }
 }
@@ -871,25 +901,28 @@ void App::BeginMoveUndo(CorralWindow *corral)
     pendingMoveUndo = {corral, place.left, place.top, place.width, place.height, cachedDesktopIconPositions, {}};
 }
 
-void App::CommitMoveUndo(CorralWindow *corral, bool moved)
+unsigned App::CommitMoveUndo(CorralWindow *corral, bool moved)
 {
     MoveUndoRecord record = std::move(pendingMoveUndo);
     pendingMoveUndo = {};
 
     // A click that never became a move leaves the earlier steps as they are
     if (!moved || !corral || record.corral != corral)
-        return;
+        return 0;
 
     // Read the positions back instead of trusting the ones the push asked
     // for: Explorer may have snapped an icon to its own grid
     CacheDesktopIconPositions();
     record.iconsAfter = cachedDesktopIconPositions;
+    const unsigned serial = record.serial = ++moveUndoSerial; // From 1: 0 means no step
     UndoMove::PushCapped(moveUndoStack, std::move(record), MOVE_UNDO_DEPTH);
+    return serial;
 }
 
-bool App::UndoLastMove(CorralWindow *only)
+bool App::UndoLastMove(CorralWindow *only, unsigned serial)
 {
-    if (moveUndoStack.empty() || (only && moveUndoStack.back().corral != only))
+    if (moveUndoStack.empty() || (only && moveUndoStack.back().corral != only) ||
+        (serial && moveUndoStack.back().serial != serial))
         return false;
     MoveUndoRecord record = std::move(moveUndoStack.back());
     moveUndoStack.pop_back();
@@ -1095,8 +1128,17 @@ void App::ApplyLookToAllCorrals(const AppearanceSettings &look)
     SetDefaultAppearance(look);
 }
 
+bool App::DesktopIconsShownSetting() const
+{
+    return quickHideActive ? desktopIconsVisibleBeforeQuickHide : DesktopIcons::AreIconsVisible();
+}
+
 void App::ToggleDesktopIcons()
 {
+    // Quick-hide hid the icons and puts back the earlier state when it ends,
+    // which would undo a toggle now (the menu entries are greyed then)
+    if (quickHideActive)
+        return;
     bool currentlyVisible = DesktopIcons::AreIconsVisible();
     DesktopIcons::SetIconsVisible(!currentlyVisible);
     SaveConfig();
@@ -1586,15 +1628,18 @@ void App::PushDesktopIconsFromCorrals()
             if (RectsOverlap(r, cr))
                 return false;
         }
-        for (const auto &other : cachedDesktopIconPositions)
+        for (const auto *list : {&cachedDesktopIconPositions, &pushObstacles})
         {
-            if (&other == skip)
-                continue;
-            if (other.pt.x < -1000 || other.pt.y < -1000)
-                continue;
-            RECT otherRect = {other.pt.x, other.pt.y, other.pt.x + ICON_W, other.pt.y + ICON_H};
-            if (RectsOverlap(r, otherRect))
-                return false;
+            for (const auto &other : *list)
+            {
+                if (&other == skip)
+                    continue;
+                if (other.pt.x < -1000 || other.pt.y < -1000)
+                    continue;
+                RECT otherRect = {other.pt.x, other.pt.y, other.pt.x + ICON_W, other.pt.y + ICON_H};
+                if (RectsOverlap(r, otherRect))
+                    return false;
+            }
         }
         return true;
     };
@@ -1793,8 +1838,7 @@ void App::ShowTrayMenu()
 
     // Icon visibility toggle. Not during quick-hide: it hid the icons and puts
     // back the state shown here when it ends, which a toggle now would undo.
-    UINT flags = (quickHideActive ? desktopIconsVisibleBeforeQuickHide : DesktopIcons::AreIconsVisible())
-                     ? MF_CHECKED : MF_UNCHECKED;
+    UINT flags = DesktopIconsShownSetting() ? MF_CHECKED : MF_UNCHECKED;
     if (quickHideActive)
         flags |= MF_GRAYED;
     AppendMenuW(menu, MF_STRING | flags, 2, Tr(Str::Menu_ShowDesktopIcons));
@@ -2448,10 +2492,9 @@ void App::ShowSettings()
     if (data.german != wasGerman)
         ApplyLanguage(data.german ? "de" : "en");
 
-    if (!hotkeyOk && trayIcon)
-        trayIcon->ShowBalloon(Tr(Str::Hotkey_FailedTitle),
-                              TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)),
-                              NIIF_WARNING);
+    if (!hotkeyOk)
+        QueueNotice(trayIcon.get(), messageWindow, Str::Hotkey_FailedTitle,
+                    TrFmt(Str::Hotkey_FailedBody, CorralWindow::Utf8ToWide(config.QuickHideHotkey)), NIIF_WARNING);
     if (updatesSwitchedOn)
         StartUpdateCheck(true); // immediate confirmation that checking works
 }
@@ -2744,8 +2787,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         if (!told)
         {
             told = true;
-            s_Notices.emplace_back(Str::Hook_InactiveTitle, Tr(Str::Hook_InactiveBody));
-            ShowNextNotice(app->trayIcon.get(), hwnd);
+            QueueNotice(app->trayIcon.get(), hwnd, Str::Hook_InactiveTitle, Tr(Str::Hook_InactiveBody), NIIF_WARNING);
         }
         return 0;
     }
@@ -2852,21 +2894,18 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         {
             if (result->Success && result->UpdateAvailable)
             {
-                app->trayIcon->ShowBalloon(
-                    Tr(Str::Update_AvailableTitle),
-                    TrFmt(Str::Update_AvailableBody, result->LatestVersion), NIIF_INFO, result->ReleaseUrl);
+                QueueNotice(app->trayIcon.get(), hwnd, Str::Update_AvailableTitle,
+                            TrFmt(Str::Update_AvailableBody, result->LatestVersion), NIIF_INFO, result->ReleaseUrl);
             }
             else if (result->UserInitiated)
             {
                 // Only surface the no-update / failure outcome for manual checks.
                 if (result->Success)
-                    app->trayIcon->ShowBalloon(
-                        Tr(Str::Update_UpToDateTitle),
-                        TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION), NIIF_INFO);
+                    QueueNotice(app->trayIcon.get(), hwnd, Str::Update_UpToDateTitle,
+                                TrFmt(Str::Update_UpToDateBody, DEXCORRAL_VERSION), NIIF_INFO);
                 else
-                    app->trayIcon->ShowBalloon(
-                        Tr(Str::Update_FailedTitle),
-                        Tr(Str::Update_FailedBody), NIIF_WARNING);
+                    QueueNotice(app->trayIcon.get(), hwnd, Str::Update_FailedTitle, Tr(Str::Update_FailedBody),
+                                NIIF_WARNING);
             }
         }
         return 0;
@@ -3009,7 +3048,7 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         if (app && app->trayIcon && app->trayIcon->Show()) {
             KillTimer(hwnd, TRAY_RETRY_TIMER);
             DllLog(L"App: TRAY_RETRY_TIMER — tray icon added successfully");
-            NoticeGone(app->trayIcon.get(), hwnd);
+            ShowNextNotice(app->trayIcon.get(), hwnd); // Not NoticeGone: one may be on screen already
         }
         return 0;
     }
@@ -3020,12 +3059,23 @@ LRESULT CALLBACK App::MessageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         DllLog(L"App: WM_TASKBARCREATED — Explorer restarted, retrying tray icon");
         if (app->trayIcon)
         {
-            // The new taskbar knows no icon of ours, even when the old one did:
-            // forget it and add it again (NIM_MODIFY alone would fail quietly)
+            // Still known (the icon was added to this taskbar already, e.g. by the
+            // retry at sign-in): leave it, and the balloon on it, alone
+            if (app->trayIcon->Show())
+            {
+                KillTimer(hwnd, TRAY_RETRY_TIMER);
+                ShowNextNotice(app->trayIcon.get(), hwnd);
+                return 0;
+            }
+            // A new taskbar knows no icon of ours: forget it and add it again
             app->trayIcon->Hide();
-            if (!app->trayIcon->Show())
+            if (app->trayIcon->Show())
+                KillTimer(hwnd, TRAY_RETRY_TIMER);
+            else
                 SetTimer(hwnd, TRAY_RETRY_TIMER, 500, nullptr);
-            NoticeGone(app->trayIcon.get(), hwnd); // A balloon on the old taskbar is gone with it
+            // A balloon on the old taskbar is gone with it (shows nothing while
+            // the icon is not back; the retry shows the next one then)
+            NoticeGone(app->trayIcon.get(), hwnd);
         }
         return 0;
     }

@@ -310,8 +310,20 @@ bool Config::SaveTo(const std::wstring &wPath, const AppConfig &config)
 {
     // The unreadable file is the only copy of the user's last layout: retry
     // setting it aside, and write nothing over it until that works
-    if (wPath == s_UnkeptPath && !KeepUnreadableFile(wPath))
-        return false;
+    if (wPath == s_UnkeptPath)
+    {
+        if (!KeepUnreadableFile(wPath))
+            return false;
+        // It reads now: it was only held open at start (a backup tool, a scanner)
+        // and is newer than what was loaded instead. Keep holding saves so it
+        // survives; the next start loads it.
+        AppConfig probe;
+        if (ReadConfigFile(wPath, probe) == ReadResult::Good)
+        {
+            s_UnkeptPath = wPath;
+            return false;
+        }
+    }
 
     std::wstring wTmp = wPath + L".tmp";
 

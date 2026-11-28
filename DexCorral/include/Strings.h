@@ -256,6 +256,7 @@ enum class Str
     Reg_RegisterProcMissing,     // "DexCorralRegister not found in DexCorralHook.dll."
     Reg_RegisterSuccess,         // all users: registered + restart Explorer steps
     Reg_RegisterSuccessUser,     // this user: registered, running now and at every sign-in
+    Reg_RegisterSuccessUserNotStarted, // this user: registered, but not started now
     Reg_RegisterFailed,          // "Failed to register shell extension..."
     Reg_UnregisterProcMissing,   // "DexCorralUnregister not found in DexCorralHook.dll."
     Reg_UnregisterSuccess,       // unregistered + restart Explorer

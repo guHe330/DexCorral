@@ -94,9 +94,12 @@ void CorralWindow::RestoreSelectionByFile(const SelectionByFile &saved)
         if (k == saved.rename)
             rename = i;
     }
-    if (pendingRenameIcon >= 0 && rename < 0)
+    // Only a known file that is gone cancels the rename. An empty key means the
+    // index did not name a file of this list: a sort nested in a reload saves
+    // after the list was rebuilt, and the reload's own restore puts it right.
+    if (!saved.rename.empty() && rename < 0)
         CancelPendingRename(); // Its file is gone
-    else
+    else if (!saved.rename.empty())
         pendingRenameIcon = rename;
 }
 

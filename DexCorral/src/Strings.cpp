@@ -314,6 +314,8 @@ const wchar_t *const kEnglish[] = {
                                    L"  3. Right-click > Restart",
     /* Reg_RegisterSuccessUser */  L"DexCorral is registered for your account and running now.\n\n"
                                    L"It starts again at every sign-in.",
+    /* Reg_RegisterSuccessUserNotStarted */ L"DexCorral is registered for your account, but it could not be started now.\n\n"
+                                   L"It starts at your next sign-in.",
     /* Reg_RegisterFailed */       L"Failed to register shell extension.\n\nTry running as Administrator.",
     /* Reg_UnregisterProcMissing */L"DexCorralUnregister not found in DexCorralHook.dll.",
     /* Reg_UnregisterSuccess */    L"DexCorral shell extension unregistered successfully.\n\n"
@@ -644,6 +646,8 @@ const wchar_t *const kGerman[] = {
                                    L"  3. Rechtsklick > Neu starten",
     /* Reg_RegisterSuccessUser */  L"DexCorral ist für Ihr Konto registriert und läuft jetzt.\n\n"
                                    L"Es startet bei jeder Anmeldung wieder.",
+    /* Reg_RegisterSuccessUserNotStarted */ L"DexCorral ist für Ihr Konto registriert, konnte aber jetzt nicht gestartet werden.\n\n"
+                                   L"Es startet bei Ihrer nächsten Anmeldung.",
     /* Reg_RegisterFailed */       L"Die Shell-Erweiterung konnte nicht registriert werden.\n\nVersuchen Sie es als Administrator.",
     /* Reg_UnregisterProcMissing */L"DexCorralUnregister wurde in DexCorralHook.dll nicht gefunden.",
     /* Reg_UnregisterSuccess */    L"Die DexCorral-Shell-Erweiterung wurde erfolgreich deregistriert.\n\n"

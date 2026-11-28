@@ -883,10 +883,18 @@ void CorralWindow::CancelPendingRename()
     }
 }
 
+bool CorralWindow::IsOnButton(int x, int y)
+{
+    RECT nb = IsNavBackVisible() ? GetNavBackButtonRect() : RECT{};
+    POINT p = {x, y};
+    return PtInRect(&nb, p) || HitTestScrollbar(x, y) || HitTestDetailsHeader(x, y) >= 0;
+}
+
 void CorralWindow::OnLeftButtonDown(int x, int y)
 {
     // A fresh click cancels any pending (deferred) rename.
     CancelPendingRename();
+    lastDownOnButton = IsOnButton(x, y);
 
     // Check resize area first (but not when rolled up, and not when locked) — except
     // where the top edge would steal a click meant for a tab; see HitTestResizeAllowingTabs.
@@ -1133,9 +1141,8 @@ void CorralWindow::OnLeftButtonDblClick(int x, int y)
 
     // On a button (nav up, scrollbar, column header) the second of two fast clicks
     // is just another click: going up two folders must not roll the Corral up.
-    RECT nb = IsNavBackVisible() ? GetNavBackButtonRect() : RECT{};
-    POINT p = {x, y};
-    if (PtInRect(&nb, p) || HitTestScrollbar(x, y) || HitTestDetailsHeader(x, y) >= 0)
+    // The first click may have taken the button away (up to the root folder).
+    if (lastDownOnButton || IsOnButton(x, y))
     {
         OnLeftButtonDown(x, y);
         return;
@@ -1368,13 +1375,15 @@ void CorralWindow::OnLeftButtonUp(int x, int y)
             // The drag becomes an undo step that either answer takes back: on No
             // this Corral returns to where it came from, on Yes the icons it
             // pushed on the way go back before it joins the target.
-            app->CommitMoveUndo(this, true);
+            const unsigned step = app->CommitMoveUndo(this, true);
             const bool merge = MessageBoxBehind(Tr(Str::Confirm_MergeCorralsBody), Tr(Str::Confirm_MergeCorralsTitle),
                                                 MB_YESNO | MB_ICONQUESTION) == IDYES &&
                                canMergeInto(target); // The box ran a message loop: the target may be gone
             if (merge)
                 Hide(); // Not seen jumping back first
-            const bool undone = app->UndoLastMove(this);
+            // Only this drag's step: the box ran a message loop, and Undo Last
+            // Move from a menu may have taken it already
+            const bool undone = step && app->UndoLastMove(this, step);
             if (merge)
             {
                 app->InvalidateDesktopIconCache(); // When nothing was undone, Commit left it valid
@@ -1750,19 +1759,31 @@ namespace
                ia.nFileIndexHigh == ib.nFileIndexHigh && ia.nFileIndexLow == ib.nFileIndexLow;
     }
 
+    /// The last parent folder asked about in one pass over dropped items. They
+    /// mostly share one, and comparing folders opens them (maybe on a share).
+    struct ParentMemo
+    {
+        std::wstring parent;
+        bool onDesktop = false;
+    };
+
     /// True if `path` names an item directly on the user or the public desktop.
-    bool IsDesktopItem(const std::wstring &path)
+    bool IsDesktopItem(const std::wstring &path, ParentMemo &memo)
     {
         std::wstring parent = ParentOf(path);
-        return IsSameDirectory(parent, CorralWindow::GetDesktopPath()) ||
-               IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
+        if (!memo.parent.empty() && lstrcmpiW(parent.c_str(), memo.parent.c_str()) == 0)
+            return memo.onDesktop;
+        memo.onDesktop = IsSameDirectory(parent, CorralWindow::GetDesktopPath()) ||
+                         IsSameDirectory(parent, CorralWindow::GetPublicDesktopPath());
+        memo.parent = std::move(parent);
+        return memo.onDesktop;
     }
 
     /// True if a CF_HDROP path names an existing item on the user or public desktop.
     /// Its folder counts, not just its name: a file elsewhere may share a desktop file's name.
-    bool IsHdropDesktopFile(const wchar_t *filePath)
+    bool IsHdropDesktopFile(const wchar_t *filePath, ParentMemo &memo)
     {
-        return IsDesktopItem(filePath) && GetFileAttributesW(filePath) != INVALID_FILE_ATTRIBUTES;
+        return IsDesktopItem(filePath, memo) && GetFileAttributesW(filePath) != INVALID_FILE_ATTRIBUTES;
     }
 
     /// True if at least one CF_HDROP file is a file on the desktop.
@@ -1774,6 +1795,7 @@ namespace
             return false;
 
         bool found = false;
+        ParentMemo memo;
         if (HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal))
         {
             UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
@@ -1782,7 +1804,7 @@ namespace
                 wchar_t filePath[MAX_PATH];
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
-                found = IsHdropDesktopFile(filePath);
+                found = IsHdropDesktopFile(filePath, memo);
             }
             GlobalUnlock(stg.hGlobal);
         }
@@ -2130,7 +2152,9 @@ HRESULT STDMETHODCALLTYPE CorralDropTarget::Drop(IDataObject *pDataObj, DWORD gr
     // in an Explorer window: the drop is for the tab.
     if (owner->GetActiveTab().IsVirtual)
     {
-        SyncFolderTarget(grfKeyState, pt, true);
+        // Bound only now (a tab brought forward, a share not asked yet): its
+        // DragEnter needs the button still in the keys, as for an icon above
+        SyncFolderTarget(dragKeyState, pt, true);
         if (folderTarget)
         {
             LogCorralDrop(L"Drop: virtual tab -> folder drop target '%s'", folderTargetPath.c_str());
@@ -2201,13 +2225,14 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         if (hDrop)
         {
             UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+            ParentMemo memo;
             for (UINT i = 0; i < fileCount; i++)
             {
                 wchar_t filePath[MAX_PATH];
                 if (!DragQueryFileW(hDrop, i, filePath, MAX_PATH))
                     continue;
 
-                if (IsHdropDesktopFile(filePath))
+                if (IsHdropDesktopFile(filePath, memo))
                     addEntry(WideToUtf8(NameOf(filePath)));
             }
             GlobalUnlock(stgHdrop.hGlobal);
@@ -2228,6 +2253,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
         {
             LPCITEMIDLIST pidlParent = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[0]);
 
+            ParentMemo memo; // A shell ID list has one parent for all its items
             for (UINT i = 0; i < pida->cidl; i++)
             {
                 LPCITEMIDLIST pidlChild = (LPCITEMIDLIST)((BYTE *)pida + pida->aoffset[i + 1]);
@@ -2245,7 +2271,7 @@ void CorralWindow::OnDrop(IDataObject *pDataObj)
                     std::wstring fsPath = pszPath;
                     CoTaskMemFree(pszPath);
 
-                    if (IsDesktopItem(fsPath))
+                    if (IsDesktopItem(fsPath, memo))
                     {
                         addEntry(WideToUtf8(NameOf(fsPath)));
                     }
@@ -2320,6 +2346,45 @@ IDropTarget *CorralWindow::BindIconDropTarget(int iconIndex)
         target = nullptr;
     item->Release();
     return target;
+}
+
+bool CorralWindow::CorralShellTakesDropAt(POINT screenPt, IDataObject *data, DWORD keyState)
+{
+    App *app = App::GetInstance();
+    if (!app || !data)
+        return false;
+    HWND root = GetAncestor(WindowFromPoint(screenPt), GA_ROOT);
+    for (const auto &corral : app->GetCorrals())
+    {
+        if (corral->GetHWND() != root)
+            continue;
+        // As CorralDropTarget::EffectAt decides, so the result is what the cursor showed
+        POINT client = screenPt;
+        ScreenToClient(root, &client);
+        // An inactive tab: EffectAt shows what that tab would take
+        const int tab = corral->HitTestTab(client.x, client.y);
+        if (tab >= 0 && tab != corral->config.ActiveTabIndex && tab < (int)corral->config.Tabs.size())
+            return corral->config.Tabs[tab].IsVirtual;
+        const int hit = corral->HitTestDropIcon(client.x, client.y);
+        if (hit >= 0 && corral->FolderAnswers()) // Binding blocks on a share that does not answer
+        {
+            if (IDropTarget *target = corral->BindIconDropTarget(hit))
+            {
+                DWORD effect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
+                bool takes = false;
+                if (SUCCEEDED(target->DragEnter(data, keyState | MK_LBUTTON, {screenPt.x, screenPt.y}, &effect)))
+                {
+                    takes = effect != DROPEFFECT_NONE;
+                    target->DragLeave();
+                }
+                target->Release();
+                if (takes)
+                    return true;
+            }
+        }
+        return corral->GetActiveTab().IsVirtual;
+    }
+    return false;
 }
 
 bool CorralWindow::DesktopIconTakesDropsAt(POINT screenPt, IDataObject *data, DWORD keyState)
@@ -2447,8 +2512,11 @@ namespace
             POINT pt;
             GetCursorPos(&pt);
             App *app = App::GetInstance();
+            // On a Corral or the desktop the drag comes home (OnIconDragEnd puts
+            // it in place), unless the spot hands it to the shell, as the cursor showed
             if (app && app->IsPointOnCorralOrDesktop(pt) &&
-                !CorralWindow::DesktopIconTakesDropsAt(pt, data, keyState))
+                !CorralWindow::DesktopIconTakesDropsAt(pt, data, keyState) &&
+                !CorralWindow::CorralShellTakesDropAt(pt, data, keyState))
             {
                 releasedAtHome = true;
                 return DRAGDROP_S_CANCEL;
