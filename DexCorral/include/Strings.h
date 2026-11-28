@@ -208,7 +208,6 @@ enum class Str
     Lbl_Border,                  // "Border" (opacity row)
     Lbl_HeaderLabel,             // "Header Label" (opacity row)
     Lbl_IconLabel,               // "Icon Label" (opacity row)
-    Btn_Color,                   // "Color..."
     Lbl_Horiz,                   // "Horiz"
     Lbl_Vert,                    // "Vert"
     Lbl_TintStrength,            // "Tint strength"

@@ -1458,7 +1458,7 @@ void CorralWindow::ShowAppearanceDialog()
     slider(1, 159, Tr(Str::Lbl_IconLabel), 128, 129);
     text(LABEL_X, rowY(2), LABEL_W, 160, Tr(Str::Lbl_Tint), labelStyle);
     swatch(2, 118);
-    button(FIELD_X + 32, (short)(rowY(2) - 2), 58, 119, Tr(Str::Btn_Color), buttonStyle);
+    button(FIELD_X + 32, (short)(rowY(2) - 2), 58, 119, Tr(Str::Btn_Change), buttonStyle);
     slider(3, 161, Tr(Str::Lbl_TintStrength), 120, 121);
     slider(4, 162, Tr(Str::Lbl_Horiz), 130, 131);
     slider(5, 163, Tr(Str::Lbl_Vert), 132, 133);
