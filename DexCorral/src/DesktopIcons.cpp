@@ -111,6 +111,30 @@ bool DesktopIcons::IsPointOnIcon(int screenX, int screenY)
     return (int)SendMessageW(hListView, LVM_HITTEST, 0, (LPARAM)&info) != -1;
 }
 
+std::wstring DesktopIcons::GetVisibleIconParsingNameAt(int screenX, int screenY)
+{
+    HWND hListView = GetDesktopListView();
+    POINT pt = {screenX, screenY};
+    // Not under a corral or another window, and not while the icons are hidden
+    if (hListView == nullptr || WindowFromPoint(pt) != hListView)
+        return L"";
+
+    // The hook leaves corral-owned icons out of the hit test
+    LVHITTESTINFO info = {};
+    info.pt = pt;
+    ScreenToClient(hListView, &info.pt);
+    int hit = (int)SendMessageW(hListView, LVM_HITTEST, 0, (LPARAM)&info);
+    if (hit < 0)
+        return L"";
+
+    // Only the hook can name an item (returns 1 when handled)
+    static UINT parsingNameMsg = RegisterWindowMessageW(L"DexCorral_GetItemParsingName");
+    std::wstring name;
+    if (SendMessageW(hListView, parsingNameMsg, hit, (LPARAM)&name) != 1)
+        return L"";
+    return name;
+}
+
 void DesktopIcons::PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions)
 {
     if (iconPositions.empty())

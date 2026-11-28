@@ -1062,12 +1062,18 @@ LRESULT CALLBACK CorralWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
                 {
                     window->OnIconDrag(x, y);
 
-                    // Over a window that is neither a corral nor the desktop: only
-                    // a shell drag lets that window take the files.
+                    // Over a window that is neither a corral nor the desktop, or
+                    // over a desktop icon that takes drops: only a shell drag lets
+                    // that window or icon take the files. Special items alone
+                    // (Recycle Bin, This PC) carry no files and stay our own drag.
                     POINT screenPt;
                     GetCursorPos(&screenPt);
                     App *app = App::GetInstance();
-                    if (app && !app->IsPointOnCorralOrDesktop(screenPt))
+                    std::vector<int> dragged = window->GetDraggedIconIndices();
+                    const bool carriesFiles = std::any_of(dragged.begin(), dragged.end(), [&](int i)
+                                                          { return !window->icons[i].fullPath.empty(); });
+                    if (app && (!app->IsPointOnCorralOrDesktop(screenPt) ||
+                                (carriesFiles && CorralWindow::DesktopIconTakesDropsAt(screenPt))))
                         window->StartShellDrag();
                 }
             }

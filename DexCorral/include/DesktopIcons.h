@@ -76,6 +76,10 @@ public:
     /// Returns true if the specified screen point is over a desktop icon
     static bool IsPointOnIcon(int screenX, int screenY);
 
+    /// Parsing name of the free desktop icon the user sees at a screen point
+    /// (no window in front of it), or empty. Needs the Explorer hook.
+    static std::wstring GetVisibleIconParsingNameAt(int screenX, int screenY);
+
     /// Positions multiple icons according to the provided map of name->position
     static void PositionIcons(const std::map<std::wstring, POINT2D> &iconPositions);
 

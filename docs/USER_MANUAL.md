@@ -184,7 +184,7 @@ The tab title and the icon labels fade on their own sliders, so text can be dial
 - **Drop a file onto an icon** inside a Corral to invoke its target, e.g. drop a document onto an application's icon to open it with that app.
 - **Click the label of a selected icon** once more (or press F2) to rename it in place. If the name contains a character Windows does not allow, or another file already has it, DexCorral says so and leaves the name open for editing; Esc gives up.
 - **Select several icons** with Ctrl+click, Shift+click, Ctrl+A or by dragging a rectangle over them. Dragging one of the selected icons carries all of them: to another Corral, back out to the desktop, or to a new place in the same Corral.
-- **Drag an icon into another application or an Explorer window** and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it. Moving it into another folder takes the file off the desktop, and so out of the Corral.
+- **Drag an icon into another application or an Explorer window**, or onto a desktop folder, app or the Recycle Bin, and it behaves as if dragged from the desktop: a terminal gets its path, an editor opens it, the Recycle Bin takes it. Moving it into another folder takes the file off the desktop, and so out of the Corral. Dropped anywhere else on the desktop, a document's icon included, it leaves the Corral and stays on the desktop at that spot.
 - **Scroll** with the mouse wheel or trackpad when a tab holds more icons than fit; a slim scrollbar appears on hover.
 
 ### Keyboard

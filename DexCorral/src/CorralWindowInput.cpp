@@ -2322,6 +2322,48 @@ IDropTarget *CorralWindow::BindIconDropTarget(int iconIndex)
     return target;
 }
 
+bool CorralWindow::DesktopIconTakesDropsAt(POINT screenPt, IDataObject *data, DWORD keyState)
+{
+    const std::wstring name = DesktopIcons::GetVisibleIconParsingNameAt(screenPt.x, screenPt.y);
+    if (name.empty())
+        return false;
+
+    if (data)
+    {
+        // The release: the icon itself says whether it takes these files. Every
+        // shortcut has a drop target, but one to a document refuses them.
+        bool takes = false;
+        if (IDropTarget *target = BindFolderDropTarget(name))
+        {
+            DWORD effect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
+            if (SUCCEEDED(target->DragEnter(data, keyState | MK_LBUTTON, {screenPt.x, screenPt.y}, &effect)))
+            {
+                takes = effect != DROPEFFECT_NONE;
+                target->DragLeave();
+            }
+            target->Release();
+        }
+        LogCorralDrop(L"DesktopIconTakesDropsAt: '%s' -> %d", name.c_str(), takes);
+        return takes;
+    }
+
+    // Mouse moves come fast and binding is not free: reuse the answer for the
+    // same icon while asked again within a second (one drag), else ask anew.
+    static std::wstring asked;
+    static bool answer = false;
+    static DWORD askedAt = 0;
+    if (name != asked || GetTickCount() - askedAt > 1000)
+    {
+        IDropTarget *target = BindFolderDropTarget(name);
+        answer = target != nullptr;
+        if (target)
+            target->Release();
+        asked = name;
+    }
+    askedAt = GetTickCount();
+    return answer;
+}
+
 // ============================================================================
 // Icon reordering
 // ============================================================================
@@ -2367,10 +2409,13 @@ namespace
     /// Drop source for a drag out of a normal tab. A release over a corral or the
     /// desktop is cancelled as an OLE drop: OnIconDragEnd handles those (reorder,
     /// other corral, back to the desktop), and Explorer must not act on them too.
+    /// Over a desktop icon that takes drops the drop goes ahead: the desktop's
+    /// own target hands it to that icon (moves, recycles, opens with).
     class CorralDropSource : public IDropSource
     {
     public:
         bool releasedAtHome = false;
+        IDataObject *data = nullptr; // What is dragged; outlives the drag loop
 
         HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override
         {
@@ -2402,7 +2447,8 @@ namespace
             POINT pt;
             GetCursorPos(&pt);
             App *app = App::GetInstance();
-            if (app && app->IsPointOnCorralOrDesktop(pt))
+            if (app && app->IsPointOnCorralOrDesktop(pt) &&
+                !CorralWindow::DesktopIconTakesDropsAt(pt, data, keyState))
             {
                 releasedAtHome = true;
                 return DRAGDROP_S_CANCEL;
@@ -2467,6 +2513,8 @@ void CorralWindow::StartShellDrag()
         // offered; the drop target and the modifier keys pick one, as for a drag
         // out of an Explorer window.
         CorralDropSource *source = isVirtual ? nullptr : new CorralDropSource();
+        if (source)
+            source->data = dataObject;
         DWORD effect = DROPEFFECT_NONE;
         // While the drag runs, none of these may be its own drop target (HitTestDropIcon)
         for (int i : dragged)
