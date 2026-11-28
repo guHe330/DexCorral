@@ -7,7 +7,7 @@ Thanks for your interest in DexCorral. Bug reports, feature suggestions, and pul
 Open an [issue](https://github.com/guHe330/DexCorral/issues/new/choose) and pick a template. The forms ask for what is actually needed to reproduce a problem:
 
 - Your Windows version (e.g. Windows 11 Pro 24H2)
-- The DexCorral version (visible in the tray menu)
+- The DexCorral version (tray menu > **About**)
 - What you did, what you expected, and what happened instead
 - A screenshot, if the problem is visual
 - Your display setup, if more than one monitor is involved
